@@ -1,0 +1,447 @@
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import type { PageComponent } from '@/lib/pages/schema'
+
+interface ComponentRendererProps {
+  component: PageComponent
+}
+
+export function ComponentRenderer({ component }: ComponentRendererProps) {
+  const { type, content, styles, settings, children } = component
+
+  // Convert styles object to inline CSS
+  const containerStyle: React.CSSProperties = {
+    backgroundColor: styles.backgroundColor || 'transparent',
+    color: styles.textColor || 'inherit',
+    paddingTop: styles.paddingTop || styles.padding || '0px',
+    paddingBottom: styles.paddingBottom || styles.padding || '0px',
+    paddingLeft: styles.paddingLeft || styles.padding || '16px',
+    paddingRight: styles.paddingRight || styles.padding || '16px',
+    marginTop: styles.marginTop || styles.margin || '0px',
+    marginBottom: styles.marginBottom || styles.margin || '0px',
+    marginLeft: styles.marginLeft || styles.margin || 'auto',
+    marginRight: styles.marginRight || styles.margin || 'auto',
+    textAlign: styles.textAlign as any,
+    maxWidth: styles.maxWidth || '100%',
+    minHeight: styles.minHeight,
+    borderRadius: styles.borderRadius,
+    border: styles.border,
+    boxShadow: styles.boxShadow,
+  }
+
+  switch (type) {
+    case 'text':
+      return (
+        <div style={containerStyle}>
+          <div
+            className="container mx-auto"
+            dangerouslySetInnerHTML={{ __html: content }}
+          />
+        </div>
+      )
+
+    case 'image':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            {settings.imageUrl ? (
+              <img
+                src={settings.imageUrl as string}
+                alt={(settings.alt as string) || ''}
+                className="max-w-full h-auto"
+                style={{
+                  width: styles.width || '100%',
+                  height: styles.height || 'auto',
+                }}
+              />
+            ) : (
+              <div className="bg-gray-200 flex items-center justify-center p-12">
+                <p className="text-gray-500">No image selected</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+
+    case 'button':
+      const alignment = styles.textAlign || 'left'
+      const justifyClass =
+        alignment === 'center'
+          ? 'justify-center'
+          : alignment === 'right'
+          ? 'justify-end'
+          : 'justify-start'
+
+      return (
+        <div style={containerStyle}>
+          <div className={`container mx-auto flex ${justifyClass}`}>
+            <Button
+              size={
+                settings.size === 'large'
+                  ? 'lg'
+                  : settings.size === 'small'
+                  ? 'sm'
+                  : 'md'
+              }
+              variant={(settings.variant as any) || 'primary'}
+              asChild
+            >
+              <Link href={(settings.link as string) || '#'}>{content || 'Button'}</Link>
+            </Button>
+          </div>
+        </div>
+      )
+
+    case 'hero':
+      return (
+        <section style={containerStyle}>
+          <div className="container mx-auto">
+            <div
+              className={`max-w-3xl ${
+                settings.alignment === 'center' ? 'mx-auto text-center' : ''
+              }`}
+            >
+              <h1 className="text-4xl md:text-6xl font-bold mb-6">
+                {settings.title || 'Hero Title'}
+              </h1>
+              {settings.subtitle && (
+                <p className="text-lg md:text-xl text-gray-300 mb-8">
+                  {settings.subtitle}
+                </p>
+              )}
+              <div className="flex flex-col sm:flex-row gap-4">
+                {settings.buttonText && (
+                  <Button
+                    size="lg"
+                    className="bg-primary hover:bg-primary-dark text-white"
+                    asChild
+                  >
+                    <Link href={(settings.buttonLink as string) || '#'}>
+                      {settings.buttonText}
+                    </Link>
+                  </Button>
+                )}
+                {settings.secondaryButtonText && (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="bg-transparent text-white border-white hover:bg-white hover:text-secondary"
+                    asChild
+                  >
+                    <Link href={(settings.secondaryButtonLink as string) || '#'}>
+                      {settings.secondaryButtonText}
+                    </Link>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+      )
+
+    case 'two-column':
+      return (
+        <section style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {children?.slice(0, 2).map((child) => (
+                <div key={child.id}>
+                  <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )
+
+    case 'three-column':
+      return (
+        <section style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {children?.map((child) => (
+                <div
+                  key={child.id}
+                  className={styles.textAlign === 'center' ? 'text-center' : ''}
+                >
+                  {child.settings.icon && (
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
+                      {child.settings.icon}
+                    </div>
+                  )}
+                  <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )
+
+    case 'card':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className={`grid grid-cols-1 md:grid-cols-${settings.columns || 3} gap-6`}>
+              {children?.map((card) => (
+                <div key={card.id} className="bg-white rounded-lg shadow-md p-6">
+                  <div dangerouslySetInnerHTML={{ __html: card.content }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'divider':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <hr
+              style={{
+                borderTop: `${settings.thickness || '1px'} ${settings.style || 'solid'} ${
+                  settings.color || '#e5e7eb'
+                }`,
+              }}
+            />
+          </div>
+        </div>
+      )
+
+    case 'video':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            {settings.videoUrl ? (
+              <div className="aspect-video">
+                <iframe
+                  src={settings.videoUrl as string}
+                  className="w-full h-full"
+                  allowFullScreen
+                  title={(settings.title as string) || 'Video'}
+                />
+              </div>
+            ) : (
+              <div className="aspect-video bg-gray-200 flex items-center justify-center">
+                <p className="text-gray-500">No video URL provided</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+
+    case 'quote':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <blockquote className="text-2xl italic font-serif border-l-4 border-primary pl-6 py-4">
+              {content}
+              {settings.author && (
+                <footer className="text-base not-italic font-sans text-gray-600 mt-2">
+                  — {settings.author}
+                </footer>
+              )}
+            </blockquote>
+          </div>
+        </div>
+      )
+
+    case 'icon-text':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="flex items-start gap-4">
+              {settings.icon && <div className="text-4xl">{settings.icon}</div>}
+              <div className="flex-1">
+                <div dangerouslySetInnerHTML={{ __html: content }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'gallery':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className={`grid grid-cols-2 md:grid-cols-${settings.columns || 3} gap-4`}>
+              {children?.map((image, index) => (
+                <div
+                  key={image.id}
+                  className="aspect-square bg-gray-200 overflow-hidden rounded-lg"
+                >
+                  {image.settings.imageUrl ? (
+                    <img
+                      src={image.settings.imageUrl as string}
+                      alt={(image.settings.alt as string) || ''}
+                      className="w-full h-full object-cover hover:scale-110 transition-transform"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      Image {index + 1}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'product-grid':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {Array.from({ length: (settings.productCount as number) || 8 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                  <div className="aspect-square bg-gray-200 flex items-center justify-center">
+                    <span className="text-gray-400 text-4xl">🏎️</span>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-lg mb-2">Product {i + 1}</h3>
+                    {settings.showPrice && <p className="text-primary font-bold mb-3">$99.99</p>}
+                    {settings.showAddToCart && (
+                      <button className="w-full bg-primary text-black font-semibold py-2 px-4 rounded hover:bg-primary/90">
+                        Add to Cart
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'product-card':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="inline-block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+              <div className="aspect-square bg-gray-200 flex items-center justify-center">
+                {settings.imageUrl ? (
+                  <img src={settings.imageUrl as string} alt={content} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-gray-400 text-6xl">🏎️</span>
+                )}
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold text-xl mb-2">{content}</h3>
+                <p className="text-primary font-bold text-lg mb-3">{settings.price || '$99.99'}</p>
+                {settings.showAddToCart && (
+                  <button className="w-full bg-primary text-black font-semibold py-2 px-4 rounded hover:bg-primary/90">
+                    Add to Cart
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'product-carousel':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="relative">
+              <h2 className="text-2xl font-bold mb-6">Featured Products</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 overflow-x-auto">
+                {Array.from({ length: (settings.productCount as number) || 6 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden min-w-[150px]">
+                    <div className="aspect-square bg-gray-200 flex items-center justify-center">
+                      <span className="text-gray-400 text-3xl">🏎️</span>
+                    </div>
+                    <div className="p-3">
+                      <h4 className="font-semibold text-sm mb-1">Product {i + 1}</h4>
+                      <p className="text-primary font-bold text-sm">$99.99</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'featured-product':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="grid md:grid-cols-2 gap-8 items-center">
+              <div className="aspect-square bg-gray-700 rounded-lg flex items-center justify-center">
+                {settings.imageUrl ? (
+                  <img src={settings.imageUrl as string} alt={content} className="w-full h-full object-cover rounded-lg" />
+                ) : (
+                  <span className="text-gray-400 text-8xl">🏎️</span>
+                )}
+              </div>
+              <div>
+                <h2 className="text-4xl font-bold mb-4">{content}</h2>
+                <p className="text-lg mb-6">{settings.description || 'Premium slot car collection'}</p>
+                <p className="text-primary text-3xl font-bold mb-6">{settings.price || '$149.99'}</p>
+                <button className="bg-primary text-black font-bold py-4 px-8 rounded-lg text-lg hover:bg-primary/90">
+                  Add to Cart
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+
+    case 'add-to-cart':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <button
+              style={{
+                backgroundColor: styles.backgroundColor || '#FFDD00',
+                color: styles.textColor || '#000000',
+                padding: styles.padding || '16px 32px',
+                borderRadius: styles.borderRadius || '8px',
+                fontSize: styles.fontSize || '18px',
+                fontWeight: styles.fontWeight || 'bold',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+              className="hover:opacity-90 transition-opacity"
+            >
+              {content || 'Add to Cart'}
+            </button>
+          </div>
+        </div>
+      )
+
+    case 'price-display':
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div>
+              <span
+                style={{
+                  fontSize: styles.fontSize || '32px',
+                  fontWeight: styles.fontWeight || 'bold',
+                  color: styles.textColor || '#FFDD00',
+                }}
+              >
+                {content || '$99.99'}
+              </span>
+              {settings.showDiscount && settings.originalPrice && (
+                <span className="ml-3 text-gray-500 line-through text-xl">
+                  {settings.originalPrice}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+
+    default:
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <p className="text-gray-500">Unknown component type: {type}</p>
+          </div>
+        </div>
+      )
+  }
+}

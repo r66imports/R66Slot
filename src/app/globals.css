@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* React Resizable Styles */
+@import 'react-resizable/css/styles.css';
+
+:root {
+  --font-assistant: 'Assistant', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: #000000;
+  background: #ffffff;
+  font-family: var(--font-assistant);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom Resize Handle Styles */
+.react-resizable-handle {
+  background-color: #FFDD00 !important;
+  border: 2px solid #000 !important;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.react-resizable:hover .react-resizable-handle {
+  opacity: 1;
+}
+
+.react-resizable-handle-se {
+  bottom: -5px !important;
+  right: -5px !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+}
+
+.react-resizable-handle-sw {
+  bottom: -5px !important;
+  left: -5px !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+}
+
+.react-resizable-handle-ne {
+  top: -5px !important;
+  right: -5px !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+}
+
+.react-resizable-handle-nw {
+  top: -5px !important;
+  left: -5px !important;
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+}
+
+.react-resizable-handle-e,
+.react-resizable-handle-w {
+  width: 8px !important;
+  background: linear-gradient(to bottom, transparent 40%, #FFDD00 40%, #FFDD00 60%, transparent 60%) !important;
+  border: none !important;
+}
+
+.react-resizable-handle-n,
+.react-resizable-handle-s {
+  height: 8px !important;
+  background: linear-gradient(to right, transparent 40%, #FFDD00 40%, #FFDD00 60%, transparent 60%) !important;
+  border: none !important;
+}

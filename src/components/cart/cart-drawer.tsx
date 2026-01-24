@@ -1,0 +1,241 @@
+'use client'
+
+import { useCart } from '@/context/cart-context'
+import { formatPrice, getShopifyImageUrl } from '@/lib/shopify/client'
+import Image from 'next/image'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { useEffect } from 'react'
+
+interface CartDrawerProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
+  const { cart, isLoading, updateCartLine, removeFromCart } = useCart()
+
+  // Prevent body scroll when drawer is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
+
+  const cartLines = cart?.lines.edges || []
+  const subtotal = cart?.cost.subtotalAmount
+
+  return (
+    <>
+      {/* Backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Drawer */}
+      <div
+        className={`fixed top-0 right-0 h-full w-full sm:w-96 bg-white shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        <div className="flex flex-col h-full">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-lg font-semibold">
+              Shopping Cart {cart && `(${cart.totalQuantity})`}
+            </h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+              aria-label="Close cart"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Cart Items */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {isLoading ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">Loading...</p>
+              </div>
+            ) : cartLines.length === 0 ? (
+              <div className="text-center py-8">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-16 w-16 mx-auto text-gray-400 mb-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
+                  />
+                </svg>
+                <p className="text-gray-600 mb-4">Your cart is empty</p>
+                <Button onClick={onClose} asChild>
+                  <Link href="/products">Start Shopping</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {cartLines.map(({ node: line }) => (
+                  <div key={line.id} className="flex gap-4">
+                    {/* Product Image */}
+                    <Link
+                      href={`/products/${line.merchandise.product.handle}`}
+                      className="relative w-20 h-20 bg-gray-100 rounded-md flex-shrink-0 overflow-hidden"
+                      onClick={onClose}
+                    >
+                      {line.merchandise.product.featuredImage ? (
+                        <Image
+                          src={getShopifyImageUrl(
+                            line.merchandise.product.featuredImage.url,
+                            160
+                          )}
+                          alt={
+                            line.merchandise.product.featuredImage.altText ||
+                            line.merchandise.product.title
+                          }
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
+                          No image
+                        </div>
+                      )}
+                    </Link>
+
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/products/${line.merchandise.product.handle}`}
+                        className="font-medium text-sm hover:text-primary line-clamp-2"
+                        onClick={onClose}
+                      >
+                        {line.merchandise.product.title}
+                      </Link>
+                      {line.merchandise.title !== 'Default Title' && (
+                        <p className="text-xs text-gray-600 mt-1">
+                          {line.merchandise.title}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() =>
+                              updateCartLine(line.id, line.quantity - 1)
+                            }
+                            disabled={line.quantity <= 1}
+                            className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            -
+                          </button>
+                          <span className="text-sm w-8 text-center">
+                            {line.quantity}
+                          </span>
+                          <button
+                            onClick={() =>
+                              updateCartLine(line.id, line.quantity + 1)
+                            }
+                            className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-sm font-semibold">
+                          {formatPrice(
+                            line.cost.totalAmount.amount,
+                            line.cost.totalAmount.currencyCode
+                          )}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Remove Button */}
+                    <button
+                      onClick={() => removeFromCart(line.id)}
+                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      aria-label="Remove item"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          {cart && cartLines.length > 0 && (
+            <div className="border-t p-4 space-y-4">
+              <div className="flex items-center justify-between text-lg font-semibold">
+                <span>Subtotal:</span>
+                <span>
+                  {subtotal &&
+                    formatPrice(subtotal.amount, subtotal.currencyCode)}
+                </span>
+              </div>
+              <p className="text-xs text-gray-600">
+                Shipping and taxes calculated at checkout
+              </p>
+              <div className="space-y-2">
+                <Button size="lg" className="w-full" asChild>
+                  <a href={cart.checkoutUrl}>Proceed to Checkout</a>
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full"
+                  onClick={onClose}
+                  asChild
+                >
+                  <Link href="/cart">View Cart</Link>
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}

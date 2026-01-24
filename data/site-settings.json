@@ -1,0 +1,42 @@
+{
+  "siteName": "R66SLOT",
+  "siteDescription": "Premium Slot Car Racing - Quality Slot Cars, Parts & Accessories",
+  "siteUrl": "http://localhost:3000",
+  "email": "info@r66slot.com",
+  "phone": "(555) 123-4567",
+  "address": "123 Route 66, Racing City, RC 12345",
+  "facebook": "https://facebook.com/r66slot",
+  "instagram": "https://instagram.com/r66slot",
+  "twitter": "https://twitter.com/r66slot",
+  "youtube": "https://youtube.com/@r66slot",
+  "hero": {
+    "title": "Premium Slot Car Racing",
+    "subtitle": "Discover the finest slot cars, parts, and accessories for collectors and enthusiasts",
+    "ctaText": "Shop Now",
+    "ctaLink": "/products",
+    "backgroundImage": ""
+  },
+  "featuredBrands": [
+    "Carrera",
+    "Scalextric",
+    "Ninco",
+    "SCX",
+    "Fly",
+    "Slot.it",
+    "NSR",
+    "Revell"
+  ],
+  "announcement": {
+    "enabled": true,
+    "message": "Free shipping on orders over $99!",
+    "type": "info"
+  },
+  "seo": {
+    "metaTitle": "R66SLOT - Premium Slot Car Racing",
+    "metaDescription": "Discover the finest slot cars, parts, and accessories for collectors and enthusiasts",
+    "metaKeywords": "slot cars, racing, collectibles, Carrera, Scalextric"
+  },
+  "freeShippingThreshold": 99,
+  "standardShippingCost": 9.99,
+  "expressShippingCost": 19.99
+}

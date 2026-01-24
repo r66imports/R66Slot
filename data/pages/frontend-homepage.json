@@ -1,0 +1,146 @@
+{
+  "id": "frontend-homepage",
+  "title": "Homepage",
+  "slug": "",
+  "published": true,
+  "components": [
+    {
+      "id": "hero-1",
+      "type": "hero",
+      "content": "",
+      "styles": {
+        "backgroundColor": "#1F2937",
+        "textColor": "#FFFFFF",
+        "paddingTop": "96px",
+        "paddingBottom": "128px",
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "settings": {
+        "title": "Premium Slot Car Racing",
+        "subtitle": "Discover the finest selection of slot cars, tracks, and accessories from the world's leading manufacturers.",
+        "buttonText": "Shop Now",
+        "buttonLink": "/products",
+        "secondaryButtonText": "New Arrivals",
+        "secondaryButtonLink": "/collections/new-arrivals",
+        "alignment": "left"
+      }
+    },
+    {
+      "id": "text-brands-title",
+      "type": "text",
+      "content": "<div style='text-align: center;'><h2 style='font-size: 2.25rem; font-weight: bold; margin-bottom: 1rem;'>Shop by Brand</h2><p style='color: #4B5563; max-width: 48rem; margin: 0 auto;'>Explore our curated collection from the world's leading slot car manufacturers.</p></div>",
+      "styles": {
+        "backgroundColor": "#F9FAFB",
+        "paddingTop": "64px",
+        "paddingBottom": "48px",
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "textColor": "#0084ff"
+      },
+      "settings": {}
+    },
+    {
+      "id": "text-new-arrivals-title",
+      "type": "text",
+      "content": "<div><h2 style='font-size: 2.25rem; font-weight: bold; margin-bottom: 0.5rem;'>New Arrivals</h2><p style='color: #4B5563;'>Just added to our collection</p></div>",
+      "styles": {
+        "paddingTop": "64px",
+        "paddingBottom": "48px",
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "settings": {}
+    },
+    {
+      "id": "features-1",
+      "type": "three-column",
+      "content": "",
+      "styles": {
+        "backgroundColor": "#F9FAFB",
+        "paddingTop": "64px",
+        "paddingBottom": "96px",
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "textAlign": "center"
+      },
+      "settings": {
+        "columns": 3
+      },
+      "children": [
+        {
+          "id": "feature-1-1",
+          "type": "icon-text",
+          "content": "<h3 style='font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;'>Fast Shipping</h3><p style='color: #4B5563;'>Free shipping on orders over $100. Express delivery available.</p>",
+          "styles": {
+            "textAlign": "center"
+          },
+          "settings": {
+            "icon": "📦"
+          }
+        },
+        {
+          "id": "feature-1-2",
+          "type": "icon-text",
+          "content": "<h3 style='font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;'>Secure Payment</h3><p style='color: #4B5563;'>Shop with confidence. All transactions are 100% secure.</p>",
+          "styles": {
+            "textAlign": "center"
+          },
+          "settings": {
+            "icon": "🔒"
+          }
+        },
+        {
+          "id": "feature-1-3",
+          "type": "icon-text",
+          "content": "<h3 style='font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;'>Easy Returns</h3><p style='color: #4B5563;'>Not satisfied? Return within 30 days for a full refund.</p>",
+          "styles": {
+            "textAlign": "center"
+          },
+          "settings": {
+            "icon": "🔄"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cta-preorders",
+      "type": "text",
+      "content": "<div style='text-align: center;'><h2 style='font-size: 2.25rem; font-weight: bold; margin-bottom: 1rem; color: #FFFFFF;'>Never Miss a <span style='color: #DC2626;'>Limited Edition</span></h2><p style='color: #D1D5DB; max-width: 48rem; margin: 0 auto 2rem;'>Pre-order the latest releases and get exclusive access to limited edition slot cars before they sell out.</p></div>",
+      "styles": {
+        "backgroundColor": "#1F2937",
+        "textColor": "#FFFFFF",
+        "paddingTop": "64px",
+        "paddingBottom": "32px",
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "settings": {}
+    },
+    {
+      "id": "button-preorders",
+      "type": "button",
+      "content": "View Pre-Orders",
+      "styles": {
+        "backgroundColor": "#1F2937",
+        "paddingTop": "0px",
+        "paddingBottom": "64px",
+        "paddingLeft": "16px",
+        "paddingRight": "16px",
+        "textAlign": "center"
+      },
+      "settings": {
+        "link": "/pre-orders",
+        "variant": "primary",
+        "size": "large"
+      }
+    }
+  ],
+  "seo": {
+    "metaTitle": "R66SLOT - Premium Slot Car Racing",
+    "metaDescription": "Discover the finest selection of slot cars, tracks, and accessories from the world's leading manufacturers.",
+    "metaKeywords": "slot cars, racing, models, tracks, accessories"
+  },
+  "createdAt": "2026-01-23T00:00:00.000Z",
+  "updatedAt": "2026-01-23T21:25:39.110Z"
+}
