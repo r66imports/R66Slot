@@ -18,6 +18,12 @@ export interface PageComponent {
     | 'quote'
     | 'icon-text'
     | 'gallery'
+    | 'product-grid'
+    | 'product-card'
+    | 'product-carousel'
+    | 'featured-product'
+    | 'add-to-cart'
+    | 'price-display'
   content: string
   styles: {
     backgroundColor?: string
@@ -61,6 +67,15 @@ export interface PageComponent {
     videoUrl?: string
     icon?: string
     columns?: number
+    productCount?: number
+    showPrice?: boolean
+    showAddToCart?: boolean
+    price?: string
+    description?: string
+    productId?: string
+    showDiscount?: boolean
+    originalPrice?: string
+    autoplay?: boolean
     [key: string]: string | boolean | number | undefined
   }
   children?: PageComponent[]
