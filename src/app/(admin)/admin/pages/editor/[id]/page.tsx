@@ -1,14 +1,14 @@
 'use client'
 
 import { use } from 'react'
-import { WixStyleEditor } from '@/components/page-editor/wix-style-editor'
+import { TrueWixEditor } from '@/components/page-editor/true-wix-editor'
 
-export default function WixEditorPage({
+export default function EditorPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
   const resolvedParams = use(params)
 
-  return <WixStyleEditor pageId={resolvedParams.id} />
+  return <TrueWixEditor pageId={resolvedParams.id} />
 }
