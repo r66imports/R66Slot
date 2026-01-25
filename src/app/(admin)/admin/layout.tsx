@@ -26,6 +26,7 @@ export default function AdminLayout({
     ],
     business: [
       { name: 'Products', href: '/admin/products', icon: '🛍️' },
+      { name: 'Costing', href: '/admin/costing', icon: '💰' },
     ],
     settings: [
       { name: 'Site Settings', href: '/admin/settings', icon: '⚙️' },
