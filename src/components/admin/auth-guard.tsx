@@ -18,6 +18,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
         return
       }
 
+      // Development bypass - skip auth in development mode
+      if (process.env.NODE_ENV === 'development') {
+        setIsAuthenticated(true)
+        setIsLoading(false)
+        return
+      }
+
       try {
         const response = await fetch('/api/admin/auth/check')
         const data = await response.json()
