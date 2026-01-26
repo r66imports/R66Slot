@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { shopifyFetch } from '@/lib/shopify/client'
+import { shopifyFetch, isShopifyEnabled } from '@/lib/shopify/client'
 import {
   CREATE_CART,
   ADD_TO_CART,
@@ -31,6 +31,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Load cart on mount
   useEffect(() => {
     const loadCart = async () => {
+      // Skip if Shopify is not configured
+      if (!isShopifyEnabled) {
+        setIsLoading(false)
+        return
+      }
+
       const cartId = localStorage.getItem(CART_ID_KEY)
       if (cartId) {
         try {
@@ -56,6 +62,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const createCart = async (variantId: string, quantity: number) => {
+    if (!isShopifyEnabled) {
+      return
+    }
+
     try {
       const response = await shopifyFetch<{
         cartCreate: {
@@ -91,6 +101,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   const addToCart = async (variantId: string, quantity: number) => {
+    if (!isShopifyEnabled) {
+      console.warn('Shopify is not configured. Cart functionality is disabled.')
+      return
+    }
+
     setIsLoading(true)
     try {
       if (!cart) {
@@ -130,7 +145,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updateCartLine = async (lineId: string, quantity: number) => {
-    if (!cart) return
+    if (!isShopifyEnabled || !cart) return
 
     setIsLoading(true)
     try {
@@ -167,7 +182,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   const removeFromCart = async (lineId: string) => {
-    if (!cart) return
+    if (!isShopifyEnabled || !cart) return
 
     setIsLoading(true)
     try {

@@ -26,6 +26,7 @@ export default function AdminLayout({
     ],
     business: [
       { name: 'Products', href: '/admin/products', icon: '🛍️' },
+      { name: 'Order Sheet', href: '/admin/order-sheet', icon: '📋' },
       { name: 'Costing', href: '/admin/costing', icon: '💰' },
     ],
     settings: [
@@ -72,13 +73,6 @@ export default function AdminLayout({
                 className="text-sm text-gray-300 hover:text-primary"
               >
                 View Site →
-              </Link>
-              <Link
-                href="https://admin.shopify.com"
-                target="_blank"
-                className="text-sm bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark font-semibold"
-              >
-                Shopify Admin
               </Link>
               <button
                 onClick={handleLogout}
@@ -207,15 +201,6 @@ export default function AdminLayout({
           {/* Bottom Section */}
           <div className="p-3 border-t border-gray-200">
             <div className="space-y-1">
-              <a
-                href="https://admin.shopify.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                <span className="text-base">🛒</span>
-                Shopify Admin
-              </a>
               <Link
                 href="/"
                 target="_blank"

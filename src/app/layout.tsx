@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Assistant } from 'next/font/google'
 import { CartProvider } from '@/context/cart-context'
+import { WhatsAppButton } from '@/components/layout/whatsapp-button'
 import './globals.css'
 
 const assistant = Assistant({
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className={assistant.className}>
         <CartProvider>
           {children}
+          <WhatsAppButton />
         </CartProvider>
       </body>
     </html>

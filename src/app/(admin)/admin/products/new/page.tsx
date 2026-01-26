@@ -24,10 +24,82 @@ export default function NewProductPage() {
   const [productType, setProductType] = useState('')
   const [partType, setPartType] = useState('')
   const [scale, setScale] = useState('')
-  const [vendor, setVendor] = useState('')
+  const [supplier, setSupplier] = useState('')
   const [collections, setCollections] = useState<string[]>([])
   const [tags, setTags] = useState('')
   const [status, setStatus] = useState('draft')
+
+  // Lists for custom options
+  const [brands, setBrands] = useState(['NSR', 'Revo', 'Pioneer', 'Sideways'])
+  const [suppliers, setSuppliers] = useState(['NSR'])
+  const [scales, setScales] = useState(['1/32', '1/24'])
+  const [productTypes, setProductTypes] = useState(['Slot Cars', 'Parts'])
+  const [partTypes, setPartTypes] = useState([
+    'Guides', 'Braid', 'Lead Wire', 'Magnets', 'Weights', 'Screws',
+    'Suspension Parts', 'Tires', 'Wheels', 'Wheels with Tires',
+    'Wheel Inserts', 'Inline Gears', 'Sidewinder Gears',
+    'Anglewinder Gears', 'Motors'
+  ])
+
+  // Modal states
+  const [showAddBrand, setShowAddBrand] = useState(false)
+  const [showAddSupplier, setShowAddSupplier] = useState(false)
+  const [showAddScale, setShowAddScale] = useState(false)
+  const [showAddProductType, setShowAddProductType] = useState(false)
+  const [showAddPartType, setShowAddPartType] = useState(false)
+
+  // New item inputs
+  const [newBrand, setNewBrand] = useState('')
+  const [newSupplier, setNewSupplier] = useState('')
+  const [newScale, setNewScale] = useState('')
+  const [newProductType, setNewProductType] = useState('')
+  const [newPartType, setNewPartType] = useState('')
+
+  // Add new item functions
+  const handleAddBrand = () => {
+    if (newBrand.trim() && !brands.includes(newBrand.trim())) {
+      setBrands([...brands, newBrand.trim()])
+      setBrand(newBrand.trim())
+      setNewBrand('')
+      setShowAddBrand(false)
+    }
+  }
+
+  const handleAddSupplier = () => {
+    if (newSupplier.trim() && !suppliers.includes(newSupplier.trim())) {
+      setSuppliers([...suppliers, newSupplier.trim()])
+      setSupplier(newSupplier.trim())
+      setNewSupplier('')
+      setShowAddSupplier(false)
+    }
+  }
+
+  const handleAddScale = () => {
+    if (newScale.trim() && !scales.includes(newScale.trim())) {
+      setScales([...scales, newScale.trim()])
+      setScale(newScale.trim())
+      setNewScale('')
+      setShowAddScale(false)
+    }
+  }
+
+  const handleAddProductType = () => {
+    if (newProductType.trim() && !productTypes.includes(newProductType.trim())) {
+      setProductTypes([...productTypes, newProductType.trim()])
+      setProductType(newProductType.trim().toLowerCase().replace(/ /g, '-'))
+      setNewProductType('')
+      setShowAddProductType(false)
+    }
+  }
+
+  const handleAddPartType = () => {
+    if (newPartType.trim() && !partTypes.includes(newPartType.trim())) {
+      setPartTypes([...partTypes, newPartType.trim()])
+      setPartType(newPartType.trim())
+      setNewPartType('')
+      setShowAddPartType(false)
+    }
+  }
 
   const handleSave = async (publishStatus: string) => {
     setSaving(true)
@@ -48,7 +120,7 @@ export default function NewProductPage() {
       productType,
       partType,
       scale,
-      vendor,
+      supplier,
       collections,
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       status: publishStatus
@@ -61,6 +133,32 @@ export default function NewProductPage() {
       setSaving(false)
       router.push('/admin/products')
     }, 1000)
+  }
+
+  const handleExportToWhatsApp = () => {
+    // Format the product details for WhatsApp
+    let message = `*New Product Order*\n\n`
+    message += `*Product:* ${title || 'Not specified'}\n`
+    message += `*Price:* R${price || '0.00'}\n`
+    if (compareAtPrice) message += `*Compare at:* R${compareAtPrice}\n`
+    if (brand) message += `*Brand:* ${brand}\n`
+    if (productType) message += `*Type:* ${productType}\n`
+    if (partType) message += `*Part Type:* ${partType}\n`
+    if (scale) message += `*Scale:* ${scale}\n`
+    if (supplier) message += `*Supplier:* ${supplier}\n`
+    if (sku) message += `*SKU:* ${sku}\n`
+    if (quantity) message += `*Quantity:* ${quantity}\n`
+    if (description) message += `\n*Description:*\n${description}\n`
+
+    // WhatsApp number
+    const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_DEFAULT_NUMBER || '27615898921'
+
+    // Send via WhatsApp Web (opens in same window/tab to send directly)
+    const encodedMessage = encodeURIComponent(message)
+    const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`
+
+    // Open WhatsApp - it will use WhatsApp Web or the app depending on what's available
+    window.location.href = whatsappUrl
   }
 
   return (
@@ -79,6 +177,16 @@ export default function NewProductPage() {
               <h1 className="text-xl font-semibold text-gray-900">Add product</h1>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleExportToWhatsApp}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                type="button"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                </svg>
+                Export to WhatsApp
+              </button>
               <button
                 onClick={() => router.push('/admin/products')}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
@@ -160,14 +268,14 @@ export default function NewProductPage() {
 
             {/* Pricing */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Pricing</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-4">Pricing (Rand)</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Price
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
+                    <span className="absolute left-3 top-2 text-gray-500">R</span>
                     <input
                       type="number"
                       step="0.01"
@@ -183,7 +291,7 @@ export default function NewProductPage() {
                     Compare at price
                   </label>
                   <div className="relative">
-                    <span className="absolute left-3 top-2 text-gray-500">$</span>
+                    <span className="absolute left-3 top-2 text-gray-500">R</span>
                     <input
                       type="number"
                       step="0.01"
@@ -200,7 +308,7 @@ export default function NewProductPage() {
                   Cost per item
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-2 text-gray-500">$</span>
+                  <span className="absolute left-3 top-2 text-gray-500">R</span>
                   <input
                     type="number"
                     step="0.01"
@@ -327,6 +435,7 @@ export default function NewProductPage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Product organization</h3>
               <div className="space-y-4">
+                {/* Brand */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Brand
@@ -337,12 +446,20 @@ export default function NewProductPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   >
                     <option value="">Select brand...</option>
-                    <option value="nsr">NSR</option>
-                    <option value="revo">Revo</option>
-                    <option value="pioneer">Pioneer</option>
-                    <option value="sideways">Sideways</option>
+                    {brands.map((b) => (
+                      <option key={b} value={b.toLowerCase()}>{b}</option>
+                    ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddBrand(true)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    + Add Brand
+                  </button>
                 </div>
+
+                {/* Product Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Product type
@@ -353,10 +470,20 @@ export default function NewProductPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   >
                     <option value="">Select type...</option>
-                    <option value="cars">Slot Cars</option>
-                    <option value="parts">Parts</option>
+                    {productTypes.map((pt) => (
+                      <option key={pt} value={pt.toLowerCase().replace(/ /g, '-')}>{pt}</option>
+                    ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProductType(true)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    + Add Product Type
+                  </button>
                 </div>
+
+                {/* Part Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Part Type
@@ -367,23 +494,20 @@ export default function NewProductPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   >
                     <option value="">Select part type...</option>
-                    <option value="guides">Guides</option>
-                    <option value="braid">Braid</option>
-                    <option value="lead-wire">Lead Wire</option>
-                    <option value="magnets">Magnets</option>
-                    <option value="weights">Weights</option>
-                    <option value="screws">Screws</option>
-                    <option value="suspension">Suspension Parts</option>
-                    <option value="tires">Tires</option>
-                    <option value="wheels">Wheels</option>
-                    <option value="wheels-with-tires">Wheels with Tires</option>
-                    <option value="wheel-inserts">Wheel Inserts</option>
-                    <option value="inline-gears">Inline Gears</option>
-                    <option value="sidewinder-gears">Sidewinder Gears</option>
-                    <option value="anglewinder-gears">Anglewinder Gears</option>
-                    <option value="motors">Motors</option>
+                    {partTypes.map((pt) => (
+                      <option key={pt} value={pt.toLowerCase().replace(/ /g, '-')}>{pt}</option>
+                    ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPartType(true)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    + Add Part Type
+                  </button>
                 </div>
+
+                {/* Scale */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Scale
@@ -394,21 +518,44 @@ export default function NewProductPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   >
                     <option value="">Select scale...</option>
-                    <option value="1/32">1/32</option>
-                    <option value="1/24">1/24</option>
+                    {scales.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddScale(true)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    + Add Scale
+                  </button>
                 </div>
+
+                {/* Supplier (formerly Vendor) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Vendor
+                    Supplier
                   </label>
-                  <input
-                    type="text"
-                    value={vendor}
-                    onChange={(e) => setVendor(e.target.value)}
+                  <select
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
+                  >
+                    <option value="">Select supplier...</option>
+                    {suppliers.map((s) => (
+                      <option key={s} value={s.toLowerCase()}>{s}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSupplier(true)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    + Add Supplier
+                  </button>
                 </div>
+
+                {/* Tags */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Tags
@@ -426,6 +573,181 @@ export default function NewProductPage() {
           </div>
         </div>
       </div>
+
+      {/* Add Brand Modal */}
+      {showAddBrand && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Add New Brand</h3>
+            <input
+              type="text"
+              value={newBrand}
+              onChange={(e) => setNewBrand(e.target.value)}
+              placeholder="Enter brand name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowAddBrand(false)
+                  setNewBrand('')
+                }}
+                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddBrand}
+                className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Add Brand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Supplier Modal */}
+      {showAddSupplier && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Add New Supplier</h3>
+            <input
+              type="text"
+              value={newSupplier}
+              onChange={(e) => setNewSupplier(e.target.value)}
+              placeholder="Enter supplier name"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddSupplier()}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowAddSupplier(false)
+                  setNewSupplier('')
+                }}
+                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddSupplier}
+                className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Add Supplier
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Scale Modal */}
+      {showAddScale && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Add New Scale</h3>
+            <input
+              type="text"
+              value={newScale}
+              onChange={(e) => setNewScale(e.target.value)}
+              placeholder="Enter scale (e.g., 1/43)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddScale()}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowAddScale(false)
+                  setNewScale('')
+                }}
+                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddScale}
+                className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Add Scale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Product Type Modal */}
+      {showAddProductType && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Add New Product Type</h3>
+            <input
+              type="text"
+              value={newProductType}
+              onChange={(e) => setNewProductType(e.target.value)}
+              placeholder="Enter product type"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddProductType()}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowAddProductType(false)
+                  setNewProductType('')
+                }}
+                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddProductType}
+                className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Add Product Type
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Part Type Modal */}
+      {showAddPartType && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
+            <h3 className="text-lg font-semibold mb-4">Add New Part Type</h3>
+            <input
+              type="text"
+              value={newPartType}
+              onChange={(e) => setNewPartType(e.target.value)}
+              placeholder="Enter part type"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddPartType()}
+              autoFocus
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setShowAddPartType(false)
+                  setNewPartType('')
+                }}
+                className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddPartType}
+                className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Add Part Type
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

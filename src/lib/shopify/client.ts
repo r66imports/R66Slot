@@ -3,7 +3,7 @@ function getShopifyConfig() {
   const storefrontAccessToken = process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN
 
   if (!domain || !storefrontAccessToken) {
-    throw new Error('Missing Shopify environment variables')
+    return null
   }
 
   return {
@@ -13,6 +13,8 @@ function getShopifyConfig() {
 }
 
 const config = getShopifyConfig()
+
+export const isShopifyEnabled = !!config
 
 export type ShopifyResponse<T> = {
   data: T
@@ -30,6 +32,10 @@ export async function shopifyFetch<T>({
   cache?: RequestCache
   tags?: string[]
 }): Promise<ShopifyResponse<T>> {
+  if (!config) {
+    throw new Error('Shopify is not configured. Please set up your environment variables.')
+  }
+
   try {
     const result = await fetch(config.endpoint, {
       method: 'POST',

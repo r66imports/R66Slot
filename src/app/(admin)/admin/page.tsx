@@ -25,9 +25,9 @@ export default function AdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">-</p>
+            <p className="text-3xl font-bold">0</p>
             <p className="text-xs text-gray-500 mt-1">
-              Connect Shopify to see data
+              Add products to get started
             </p>
           </CardContent>
         </Card>
@@ -39,9 +39,9 @@ export default function AdminDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">-</p>
+            <p className="text-3xl font-bold">0</p>
             <p className="text-xs text-gray-500 mt-1">
-              Connect Shopify to see data
+              Orders via WhatsApp
             </p>
           </CardContent>
         </Card>
@@ -102,15 +102,11 @@ export default function AdminDashboard() {
                 📝 Create Blog Post
               </Button>
             </Link>
-            <a
-              href="https://admin.shopify.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <Link href="/admin/products">
               <Button variant="outline" className="w-full justify-start">
-                📦 Manage Products (Shopify)
+                📦 Manage Products
               </Button>
-            </a>
+            </Link>
           </CardContent>
         </Card>
 
@@ -149,16 +145,6 @@ export default function AdminDashboard() {
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
-                id="shopify"
-                className="w-5 h-5 rounded border-gray-300"
-              />
-              <label htmlFor="shopify" className="text-sm">
-                Connect Shopify store credentials
-              </label>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
                 id="settings"
                 className="w-5 h-5 rounded border-gray-300"
               />
@@ -183,7 +169,17 @@ export default function AdminDashboard() {
                 className="w-5 h-5 rounded border-gray-300"
               />
               <label htmlFor="products" className="text-sm">
-                Add products to Shopify
+                Add products to inventory
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="order-sheet"
+                className="w-5 h-5 rounded border-gray-300"
+              />
+              <label htmlFor="order-sheet" className="text-sm">
+                Upload order sheet (JPEG)
               </label>
             </div>
             <div className="flex items-center gap-3">
@@ -193,7 +189,7 @@ export default function AdminDashboard() {
                 className="w-5 h-5 rounded border-gray-300"
               />
               <label htmlFor="test" className="text-sm">
-                Test checkout flow
+                Test WhatsApp order flow
               </label>
             </div>
           </div>
