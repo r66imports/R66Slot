@@ -264,24 +264,40 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         <div style={containerStyle}>
           <div className="container mx-auto">
             <div className={`grid grid-cols-2 md:grid-cols-${settings.columns || 3} gap-4`}>
-              {children?.map((image, index) => (
-                <div
-                  key={image.id}
-                  className="aspect-square bg-gray-200 overflow-hidden rounded-lg"
-                >
-                  {image.settings.imageUrl ? (
-                    <img
-                      src={image.settings.imageUrl as string}
-                      alt={(image.settings.alt as string) || ''}
-                      className="w-full h-full object-cover hover:scale-110 transition-transform"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      Image {index + 1}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {children?.map((image, index) => {
+                const imageContent = (
+                  <>
+                    {image.settings.imageUrl ? (
+                      <img
+                        src={image.settings.imageUrl as string}
+                        alt={(image.settings.alt as string) || ''}
+                        className="w-full h-full object-cover hover:scale-110 transition-transform"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        Image {index + 1}
+                      </div>
+                    )}
+                  </>
+                )
+
+                return image.settings.link ? (
+                  <Link
+                    key={image.id}
+                    href={image.settings.link as string}
+                    className="aspect-square bg-gray-200 overflow-hidden rounded-lg block cursor-pointer hover:shadow-xl transition-shadow"
+                  >
+                    {imageContent}
+                  </Link>
+                ) : (
+                  <div
+                    key={image.id}
+                    className="aspect-square bg-gray-200 overflow-hidden rounded-lg"
+                  >
+                    {imageContent}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

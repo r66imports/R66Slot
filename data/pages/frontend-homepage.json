@@ -33,12 +33,73 @@
       "styles": {
         "backgroundColor": "#F9FAFB",
         "paddingTop": "64px",
-        "paddingBottom": "48px",
+        "paddingBottom": "24px",
         "paddingLeft": "16px",
         "paddingRight": "16px",
         "textColor": "#0084ff"
       },
       "settings": {}
+    },
+    {
+      "id": "brand-grid",
+      "type": "gallery",
+      "content": "",
+      "styles": {
+        "backgroundColor": "#F9FAFB",
+        "paddingTop": "0px",
+        "paddingBottom": "64px",
+        "paddingLeft": "16px",
+        "paddingRight": "16px"
+      },
+      "settings": {
+        "columns": 4
+      },
+      "children": [
+        {
+          "id": "brand-nsr",
+          "type": "image",
+          "content": "",
+          "styles": {},
+          "settings": {
+            "imageUrl": "/brands/nsr.svg",
+            "alt": "NSR Slot Cars",
+            "link": "/brands/nsr"
+          }
+        },
+        {
+          "id": "brand-revo",
+          "type": "image",
+          "content": "",
+          "styles": {},
+          "settings": {
+            "imageUrl": "/brands/revo.svg",
+            "alt": "Revo Slot Cars",
+            "link": "/brands/revo"
+          }
+        },
+        {
+          "id": "brand-pioneer",
+          "type": "image",
+          "content": "",
+          "styles": {},
+          "settings": {
+            "imageUrl": "/brands/pioneer.svg",
+            "alt": "Pioneer Slot Cars",
+            "link": "/brands/pioneer"
+          }
+        },
+        {
+          "id": "brand-sideways",
+          "type": "image",
+          "content": "",
+          "styles": {},
+          "settings": {
+            "imageUrl": "/brands/sideways.svg",
+            "alt": "Sideways Slot Cars",
+            "link": "/brands/sideways"
+          }
+        }
+      ]
     },
     {
       "id": "text-new-arrivals-title",

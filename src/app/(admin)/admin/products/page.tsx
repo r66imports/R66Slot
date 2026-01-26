@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 
 export const metadata = {
   title: 'Products | R66SLOT Admin',
@@ -8,11 +9,18 @@ export const metadata = {
 export default function ProductsPage() {
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Products</h1>
-        <p className="text-gray-600 mt-1">
-          Manage your products through Shopify
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Products</h1>
+          <p className="text-gray-600 mt-1">
+            Manage your products through Shopify
+          </p>
+        </div>
+        <Button size="lg" asChild>
+          <Link href="/admin/products/new">
+            Add product
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
