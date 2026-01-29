@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 export default function NewProductPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [saving, setSaving] = useState(false)
 
   // Product state
@@ -19,15 +20,40 @@ export default function NewProductPage() {
   const [trackQuantity, setTrackQuantity] = useState(true)
   const [quantity, setQuantity] = useState('0')
   const [weight, setWeight] = useState('')
-  const [weightUnit, setWeightUnit] = useState('lb')
+  const [weightUnit, setWeightUnit] = useState('kg')
   const [brand, setBrand] = useState('')
   const [productType, setProductType] = useState('')
+  const [carType, setCarType] = useState('')
   const [partType, setPartType] = useState('')
   const [scale, setScale] = useState('')
   const [supplier, setSupplier] = useState('')
   const [collections, setCollections] = useState<string[]>([])
   const [tags, setTags] = useState('')
   const [status, setStatus] = useState('draft')
+  const [boxSize, setBoxSize] = useState('')
+  const [dimLength, setDimLength] = useState('')
+  const [dimWidth, setDimWidth] = useState('')
+  const [dimHeight, setDimHeight] = useState('')
+  const [mediaFiles, setMediaFiles] = useState<{ name: string; url: string; type: string }[]>([])
+
+  // Load data from poster page if passed via URL params
+  useEffect(() => {
+    const paramTitle = searchParams.get('title')
+    const paramDescription = searchParams.get('description')
+    const paramPrice = searchParams.get('price')
+    const paramSku = searchParams.get('sku')
+    const paramBrand = searchParams.get('brand')
+    const paramQuantity = searchParams.get('quantity')
+    const paramImageUrl = searchParams.get('imageUrl')
+
+    if (paramTitle) setTitle(paramTitle)
+    if (paramDescription) setDescription(paramDescription)
+    if (paramPrice) setPrice(paramPrice)
+    if (paramSku) setSku(paramSku)
+    if (paramBrand) setBrand(paramBrand.toLowerCase())
+    if (paramQuantity) setQuantity(paramQuantity)
+    if (paramImageUrl) setMediaFiles([{ name: 'poster-image.jpg', url: paramImageUrl, type: 'image/jpeg' }])
+  }, [searchParams])
 
   // Lists for custom options
   const [brands, setBrands] = useState(['NSR', 'Revo', 'Pioneer', 'Sideways'])
@@ -118,12 +144,20 @@ export default function NewProductPage() {
       weightUnit,
       brand,
       productType,
+      carType,
       partType,
       scale,
       supplier,
       collections,
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      status: publishStatus
+      status: publishStatus,
+      boxSize,
+      dimensions: {
+        length: dimLength ? parseFloat(dimLength) : null,
+        width: dimWidth ? parseFloat(dimWidth) : null,
+        height: dimHeight ? parseFloat(dimHeight) : null,
+      },
+      mediaFiles: mediaFiles.map(f => f.url),
     }
 
     console.log('Saving product:', productData)
@@ -157,8 +191,8 @@ export default function NewProductPage() {
     const encodedMessage = encodeURIComponent(message)
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`
 
-    // Open WhatsApp - it will use WhatsApp Web or the app depending on what's available
-    window.location.href = whatsappUrl
+    // Open WhatsApp in a new window
+    window.open(whatsappUrl, '_blank')
   }
 
   return (
@@ -251,19 +285,68 @@ export default function NewProductPage() {
             {/* Media */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Media</h3>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+              {mediaFiles.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {mediaFiles.map((file, index) => (
+                    <div key={index} className="relative group">
+                      {file.type.startsWith('image/') || file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                        <img src={file.url} alt={file.name} className="w-full h-32 object-contain rounded-lg border border-gray-200 bg-gray-50" />
+                      ) : (
+                        <div className="w-full h-32 flex items-center justify-center rounded-lg border border-gray-200 bg-gray-50">
+                          <div className="text-center">
+                            <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <p className="text-xs text-gray-500 mt-1 truncate px-2">{file.name}</p>
+                          </div>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setMediaFiles(mediaFiles.filter((_, i) => i !== index))}
+                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer block hover:border-gray-400 transition-colors">
                 <div className="space-y-2">
                   <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   <div className="text-sm text-gray-600">
-                    <button className="text-blue-600 hover:text-blue-700 font-medium">
+                    <span className="text-blue-600 hover:text-blue-700 font-medium">
                       Add file
-                    </button>
+                    </span>
                     {' '}or drop files to upload
                   </div>
+                  <p className="text-xs text-gray-400">Images, PDFs, documents</p>
                 </div>
-              </div>
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*,.pdf,.doc,.docx"
+                  onChange={(e) => {
+                    const files = e.target.files
+                    if (!files) return
+                    Array.from(files).forEach(file => {
+                      const reader = new FileReader()
+                      reader.onloadend = () => {
+                        setMediaFiles(prev => [...prev, {
+                          name: file.name,
+                          url: reader.result as string,
+                          type: file.type,
+                        }])
+                      }
+                      reader.readAsDataURL(file)
+                    })
+                    e.target.value = ''
+                  }}
+                  className="hidden"
+                />
+              </label>
             </div>
 
             {/* Pricing */}
@@ -319,7 +402,7 @@ export default function NewProductPage() {
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
-                  Customers won't see this
+                  Customers won&apos;t see this
                 </p>
               </div>
             </div>
@@ -383,6 +466,69 @@ export default function NewProductPage() {
             {/* Shipping */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Shipping</h3>
+
+              {/* Box Size */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Box Size
+                </label>
+                <select
+                  value={boxSize}
+                  onChange={(e) => setBoxSize(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                >
+                  <option value="">Select box size...</option>
+                  <option value="extra-small">Extra Small</option>
+                  <option value="small">Small</option>
+                  <option value="medium">Medium</option>
+                  <option value="large">Large</option>
+                  <option value="extra-large">Extra Large</option>
+                </select>
+              </div>
+
+              {/* Dimensions */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Dimensions (cm)
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={dimLength}
+                      onChange={(e) => setDimLength(e.target.value)}
+                      placeholder="Length"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-400 mt-1 text-center">Length</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={dimWidth}
+                      onChange={(e) => setDimWidth(e.target.value)}
+                      placeholder="Width"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-400 mt-1 text-center">Width</p>
+                  </div>
+                  <div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={dimHeight}
+                      onChange={(e) => setDimHeight(e.target.value)}
+                      placeholder="Height"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                    <p className="text-xs text-gray-400 mt-1 text-center">Height</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Weight */}
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -406,10 +552,8 @@ export default function NewProductPage() {
                     onChange={(e) => setWeightUnit(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   >
-                    <option value="lb">lb</option>
-                    <option value="oz">oz</option>
                     <option value="kg">kg</option>
-                    <option value="g">g</option>
+                    <option value="lb">lbs</option>
                   </select>
                 </div>
               </div>
@@ -481,6 +625,24 @@ export default function NewProductPage() {
                   >
                     + Add Product Type
                   </button>
+                </div>
+
+                {/* Car Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Car Type
+                  </label>
+                  <select
+                    value={carType}
+                    onChange={(e) => setCarType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  >
+                    <option value="">Select car type...</option>
+                    <option value="livery">Livery</option>
+                    <option value="white-kit">White Kit</option>
+                    <option value="white-body-kit">White Body Kit</option>
+                    <option value="white-body">White Body</option>
+                  </select>
                 </div>
 
                 {/* Part Type */}

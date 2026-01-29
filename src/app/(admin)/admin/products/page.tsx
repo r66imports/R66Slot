@@ -31,11 +31,6 @@ export default function ProductsPage() {
               ➕ Add New Product
             </Button>
           </Link>
-          <Link href="/admin/order-sheet">
-            <Button variant="outline" className="w-full justify-start">
-              📋 Upload Order Sheet
-            </Button>
-          </Link>
           <Link href="/admin/costing">
             <Button variant="outline" className="w-full justify-start">
               💰 Product Costing Calculator
@@ -70,7 +65,7 @@ export default function ProductsPage() {
                 </h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <p>
-                    Click "Add product" above to start building your slot car inventory.
+                    Click &quot;Add product&quot; above to start building your slot car inventory.
                     Products can be exported to WhatsApp for easy ordering with customers.
                   </p>
                 </div>
@@ -78,7 +73,7 @@ export default function ProductsPage() {
             </div>
           </div>
           <p className="text-sm text-gray-600">
-            Product list view coming soon. For now, add products and they'll be ready for your order sheet and WhatsApp orders.
+            Product list view coming soon. For now, add products and they&apos;ll be ready for your order sheet and WhatsApp orders.
           </p>
         </CardContent>
       </Card>

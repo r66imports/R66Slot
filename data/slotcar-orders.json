@@ -1,0 +1,47 @@
+[
+  {
+    "id": "poster_1769546547180",
+    "shortCode": "GHVWEA",
+    "orderType": "pre-order",
+    "sku": "123",
+    "itemDescription": "123",
+    "estimatedDeliveryDate": "",
+    "brand": "Revo",
+    "description": "123",
+    "preOrderPrice": "123",
+    "availableQty": 10,
+    "imageUrl": "/uploads/1769546547175-6c1gc.jpg",
+    "createdAt": "2026-01-27T20:42:27.447Z",
+    "published": true
+  },
+  {
+    "id": "poster_1769546562172",
+    "shortCode": "GHVWEA",
+    "orderType": "pre-order",
+    "sku": "123",
+    "itemDescription": "123",
+    "estimatedDeliveryDate": "",
+    "brand": "Revo",
+    "description": "123",
+    "preOrderPrice": "123",
+    "availableQty": 10,
+    "imageUrl": "/uploads/1769546562169-kzszxe.jpg",
+    "createdAt": "2026-01-27T20:42:42.187Z",
+    "published": true
+  },
+  {
+    "id": "poster_1769549761861",
+    "shortCode": "UNCS5B",
+    "orderType": "pre-order",
+    "sku": "RS0305",
+    "itemDescription": "Ford Escort MK1 Stewart No.17",
+    "estimatedDeliveryDate": "2026-03-18",
+    "brand": "Revo",
+    "description": "Ford Escort MK1 Stewart No.17\nNew Release for 18 March\n1/32 Scale Group 2 F",
+    "preOrderPrice": "1450",
+    "availableQty": 10,
+    "imageUrl": "/uploads/1769549761854-yvw74o.jpeg",
+    "createdAt": "2026-01-27T21:36:02.069Z",
+    "published": true
+  }
+]

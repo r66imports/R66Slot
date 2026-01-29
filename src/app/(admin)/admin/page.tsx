@@ -107,6 +107,16 @@ export default function AdminDashboard() {
                 📦 Manage Products
               </Button>
             </Link>
+            <Link href="/admin/slotify-preorders">
+              <Button variant="outline" className="w-full justify-start">
+                📋 Manage Slotify Pre-orders
+              </Button>
+            </Link>
+            <Link href="/slotify-preorders" target="_blank">
+              <Button variant="outline" className="w-full justify-start">
+                👁️ View Client Pre-orders Page
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
@@ -170,16 +180,6 @@ export default function AdminDashboard() {
               />
               <label htmlFor="products" className="text-sm">
                 Add products to inventory
-              </label>
-            </div>
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="order-sheet"
-                className="w-5 h-5 rounded border-gray-300"
-              />
-              <label htmlFor="order-sheet" className="text-sm">
-                Upload order sheet (JPEG)
               </label>
             </div>
             <div className="flex items-center gap-3">

@@ -38,10 +38,10 @@ export function Header() {
               New Arrivals
             </Link>
             <Link
-              href="/pre-orders"
+              href="/slotify-preorders"
               className="text-white hover:text-primary transition-colors"
             >
-              Pre-Orders
+              Slotify Pre-Orders
             </Link>
             <Link
               href="/about"
@@ -160,10 +160,10 @@ export function Header() {
                 New Arrivals
               </Link>
               <Link
-                href="/pre-orders"
+                href="/slotify-preorders"
                 className="text-white hover:text-primary transition-colors py-2"
               >
-                Pre-Orders
+                Slotify Pre-Orders
               </Link>
               <Link
                 href="/about"

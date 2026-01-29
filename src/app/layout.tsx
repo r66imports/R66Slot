@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Assistant } from 'next/font/google'
+import { Assistant, Play } from 'next/font/google'
 import { CartProvider } from '@/context/cart-context'
 import { WhatsAppButton } from '@/components/layout/whatsapp-button'
 import './globals.css'
@@ -7,6 +7,13 @@ import './globals.css'
 const assistant = Assistant({
   subsets: ['latin'],
   variable: '--font-assistant',
+  display: 'swap',
+})
+
+const play = Play({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-play',
   display: 'swap',
 })
 
@@ -22,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={assistant.variable}>
+    <html lang="en" className={`${assistant.variable} ${play.variable}`}>
       <body className={assistant.className}>
         <CartProvider>
           {children}

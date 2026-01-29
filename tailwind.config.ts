@@ -30,6 +30,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-assistant)', 'system-ui', 'sans-serif'],
+        play: ['var(--font-play)', 'system-ui', 'sans-serif'],
       },
       spacing: {
         '1': '4px',

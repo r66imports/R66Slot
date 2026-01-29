@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
 import { AuthGuard } from '@/components/admin/auth-guard'
 import { useState } from 'react'
+import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
 
 export default function AdminLayout({
   children,
@@ -14,6 +15,8 @@ export default function AdminLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [showCostingModal, setShowCostingModal] = useState(false)
+  const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
 
   const navigation = {
     site: [
@@ -23,11 +26,15 @@ export default function AdminLayout({
     content: [
       { name: 'Homepage', href: '/admin/homepage', icon: '🏠' },
       { name: 'Blog', href: '/admin/blog', icon: '📝' },
+      { name: 'Catalogue', href: '/admin/catalogue', icon: '📚' },
     ],
     business: [
       { name: 'Products', href: '/admin/products', icon: '🛍️' },
-      { name: 'Order Sheet', href: '/admin/order-sheet', icon: '📋' },
-      { name: 'Costing', href: '/admin/costing', icon: '💰' },
+      { name: 'Slot Car Pre Orders', href: '/admin/slotcar-orders', icon: '🎯' },
+      { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
+      { name: 'Slotify Pre-orders', href: '/admin/slotify-preorders', icon: '📦' },
+      { name: 'Slotify Orders', href: '/admin/slotify-orders', icon: '🎰' },
+      { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],
     settings: [
       { name: 'Site Settings', href: '/admin/settings', icon: '⚙️' },
@@ -47,6 +54,15 @@ export default function AdminLayout({
     }
   }
 
+  const handleMinimizeCosting = () => {
+    setShowCostingModal(false)
+  }
+
+  const handleCloseCosting = () => {
+    setShowCostingModal(false)
+    setCostingState(INITIAL_COSTING_STATE)
+  }
+
   // Don't show navigation for login page
   if (pathname === '/admin/login') {
     return <AuthGuard>{children}</AuthGuard>
@@ -60,7 +76,7 @@ export default function AdminLayout({
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center">
-              <Link href="/admin" className="text-2xl font-bold">
+              <Link href="/admin" className="text-2xl font-bold font-play">
                 <span className="text-white">R66</span>
                 <span className="text-primary">SLOT</span>
                 <span className="text-sm ml-2 text-gray-400">Admin</span>
@@ -70,14 +86,14 @@ export default function AdminLayout({
               <Link
                 href="/"
                 target="_blank"
-                className="text-sm text-gray-300 hover:text-primary"
+                className="text-sm text-gray-300 hover:text-primary font-play"
               >
                 View Site →
               </Link>
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="text-sm text-gray-300 hover:text-primary disabled:opacity-50"
+                className="text-sm text-gray-300 hover:text-primary disabled:opacity-50 font-play"
               >
                 {isLoggingOut ? 'Logging out...' : 'Logout'}
               </button>
@@ -99,7 +115,7 @@ export default function AdminLayout({
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mb-1',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all mb-1 font-play',
                       item.highlight
                         ? isActive
                           ? 'bg-primary text-white shadow-md'
@@ -118,18 +134,18 @@ export default function AdminLayout({
 
             {/* Content Section */}
             <div>
-              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
                 Content
               </p>
               <div className="space-y-1">
                 {navigation.content.map((item) => {
-                  const isActive = pathname === item.href
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
                         isActive
                           ? 'bg-gray-100 text-gray-900'
                           : 'text-gray-700 hover:bg-gray-50'
@@ -145,18 +161,33 @@ export default function AdminLayout({
 
             {/* Business Section */}
             <div>
-              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                Business & Store
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
+                Business &amp; Store
               </p>
               <div className="space-y-1">
                 {navigation.business.map((item) => {
-                  const isActive = pathname === item.href
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  if ((item as any).isModal) {
+                    return (
+                      <button
+                        key={item.name}
+                        onClick={() => setShowCostingModal(true)}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full text-left font-play',
+                          'text-gray-700 hover:bg-gray-50'
+                        )}
+                      >
+                        <span className="text-base">{item.icon}</span>
+                        {item.name}
+                      </button>
+                    )
+                  }
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
                         isActive
                           ? 'bg-gray-100 text-gray-900'
                           : 'text-gray-700 hover:bg-gray-50'
@@ -172,7 +203,7 @@ export default function AdminLayout({
 
             {/* Settings Section */}
             <div>
-              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
                 Settings
               </p>
               <div className="space-y-1">
@@ -183,7 +214,7 @@ export default function AdminLayout({
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
                         isActive
                           ? 'bg-gray-100 text-gray-900'
                           : 'text-gray-700 hover:bg-gray-50'
@@ -204,7 +235,7 @@ export default function AdminLayout({
               <Link
                 href="/"
                 target="_blank"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors font-play"
               >
                 <span className="text-base">👁️</span>
                 View Live Site
@@ -214,9 +245,19 @@ export default function AdminLayout({
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-8 overflow-auto">{children}</main>
+        <main className="flex-1 p-8 overflow-auto font-play">{children}</main>
       </div>
     </div>
+
+    {/* Costing Modal */}
+    {showCostingModal && (
+      <CostingModal
+        costingState={costingState}
+        setCostingState={setCostingState}
+        onMinimize={handleMinimizeCosting}
+        onClose={handleCloseCosting}
+      />
+    )}
     </AuthGuard>
   )
 }
