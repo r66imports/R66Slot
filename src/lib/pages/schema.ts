@@ -90,12 +90,22 @@ export interface PageComponent {
   }
 }
 
+export interface PageSettings {
+  backgroundImage?: string
+  backgroundColor?: string
+  backgroundSize?: 'cover' | 'contain' | 'auto'
+  backgroundPosition?: string
+  backgroundOpacity?: number
+  fullWidth?: boolean
+}
+
 export interface Page {
   id: string
   title: string
   slug: string
   published: boolean
   components: PageComponent[]
+  pageSettings?: PageSettings
   seo: {
     metaTitle: string
     metaDescription: string

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import type { Page, PageComponent } from '@/lib/pages/schema'
+import type { Page, PageComponent, PageSettings } from '@/lib/pages/schema'
 
 interface PageEditorContextType {
   // State
@@ -20,6 +20,7 @@ interface PageEditorContextType {
   duplicateComponent: (id: string) => void
   moveComponent: (id: string, direction: 'up' | 'down') => void
   reorderComponents: (fromIndex: number, toIndex: number) => void
+  updatePageSettings: (settings: Partial<PageSettings>) => void
   undo: () => void
   redo: () => void
   savePage: (publish?: boolean) => Promise<boolean>
@@ -196,6 +197,19 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     saveToHistory(newPage)
   }, [page, saveToHistory])
 
+  // Update page-level settings
+  const updatePageSettings = useCallback((settings: Partial<PageSettings>) => {
+    if (!page) return
+
+    const newPage = {
+      ...page,
+      pageSettings: { ...(page.pageSettings || {}), ...settings },
+    }
+
+    setPage(newPage)
+    saveToHistory(newPage)
+  }, [page, saveToHistory])
+
   // Undo
   const undo = useCallback(() => {
     if (historyIndex > 0) {
@@ -282,6 +296,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     duplicateComponent,
     moveComponent,
     reorderComponents,
+    updatePageSettings,
     undo,
     redo,
     savePage,

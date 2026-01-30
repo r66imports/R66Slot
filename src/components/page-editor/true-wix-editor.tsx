@@ -1,13 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import type { PageComponent } from '@/lib/pages/schema'
 import { usePageEditor } from '@/contexts/PageEditorContext'
 import { RenderedComponent } from './rendered-component'
 import { EditorPropertiesPanel } from './editor-properties-panel'
+import { PageSettingsPanel } from './page-settings-panel'
 import { TemplateChooser } from './template-chooser'
+import Draggable, { type DraggableData, type DraggableEvent } from 'react-draggable'
 import {
   DndContext,
   DragOverlay,
@@ -58,6 +60,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
     duplicateComponent,
     moveComponent,
     reorderComponents,
+    updatePageSettings,
     undo,
     redo,
     canUndo,
@@ -71,6 +74,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
   const [showTemplateChooser, setShowTemplateChooser] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const [showPageSettings, setShowPageSettings] = useState(false)
 
   // Load page on mount
   useEffect(() => {
@@ -92,7 +96,6 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
         e.preventDefault()
         handleSave(false)
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedComponentId) {
-        // Only delete if not focused on an input/textarea
         const active = document.activeElement
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
           return
@@ -150,6 +153,15 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
 
   const canvasWidth = viewMode === 'desktop' ? '100%' : viewMode === 'tablet' ? '768px' : '375px'
   const draggedComponent = activeDragId ? page.components.find(c => c.id === activeDragId) : null
+  const flowComponents = page.components.filter(c => c.positionMode !== 'absolute')
+  const absoluteComponents = page.components.filter(c => c.positionMode === 'absolute')
+  const ps = page.pageSettings || {}
+
+  // Page background style
+  const pageBackgroundStyle: React.CSSProperties = {
+    backgroundColor: ps.backgroundColor || '#ffffff',
+    position: 'relative' as const,
+  }
 
   return (
     <div className="fixed inset-0 bg-gray-100 flex flex-col font-play">
@@ -215,6 +227,16 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
 
           <div className="h-6 w-px bg-gray-200" />
 
+          {/* Page Settings */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { setShowPageSettings(true); setSelectedComponentId(null) }}
+            className={showPageSettings ? 'bg-indigo-50 text-indigo-600 border-indigo-300' : 'text-gray-600'}
+          >
+            Page BG
+          </Button>
+
           {/* Templates */}
           <Button
             variant="outline"
@@ -272,44 +294,100 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
           </div>
         </div>
 
-        {/* ─── CANVAS: Live Preview with DnD ─── */}
+        {/* ─── CANVAS: Live Preview ─── */}
         <div
           className="flex-1 overflow-y-auto bg-gray-100 p-6"
-          onClick={() => setSelectedComponentId(null)}
+          onClick={() => { setSelectedComponentId(null); setShowPageSettings(false) }}
         >
           <div
-            className="mx-auto bg-white shadow-lg transition-all duration-300 min-h-screen"
-            style={{ maxWidth: canvasWidth }}
+            className="mx-auto shadow-lg transition-all duration-300 min-h-screen"
+            style={{ maxWidth: canvasWidth, ...pageBackgroundStyle }}
           >
-            {page.components.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-32 text-gray-400">
-                <div className="text-5xl mb-4">🖼️</div>
-                <p className="text-lg font-medium font-play">Start building your page</p>
-                <p className="text-sm font-play mt-1">Click a component from the left panel to add it</p>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowTemplateChooser(true) }}
-                  className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-play font-medium transition-colors"
-                >
-                  Start from Template
-                </button>
-              </div>
-            ) : (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={page.components.map(c => c.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {page.components.map((component) => (
-                    <SortableLiveComponent
+            {/* Page background image layer */}
+            {ps.backgroundImage && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: `url(${ps.backgroundImage})`,
+                  backgroundSize: ps.fullWidth ? 'cover' : (ps.backgroundSize || 'cover'),
+                  backgroundPosition: ps.backgroundPosition || 'center',
+                  backgroundRepeat: 'no-repeat',
+                  opacity: typeof ps.backgroundOpacity === 'number' ? ps.backgroundOpacity : 1,
+                  zIndex: 0,
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+
+            {/* Content layer */}
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              {page.components.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-32 text-gray-400">
+                  <div className="text-5xl mb-4">🖼️</div>
+                  <p className="text-lg font-medium font-play">Start building your page</p>
+                  <p className="text-sm font-play mt-1">Click a component from the left panel to add it</p>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setShowTemplateChooser(true) }}
+                    className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-play font-medium transition-colors"
+                  >
+                    Start from Template
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Flow components (sortable) */}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={flowComponents.map(c => c.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      {flowComponents.map((component) => (
+                        <SortableLiveComponent
+                          key={component.id}
+                          component={component}
+                          isSelected={selectedComponentId === component.id}
+                          onSelect={() => { setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                          onUpdateSettings={(key, value) => {
+                            updateComponent(component.id, {
+                              settings: { ...component.settings, [key]: value }
+                            })
+                          }}
+                        />
+                      ))}
+                    </SortableContext>
+                    <DragOverlay>
+                      {draggedComponent ? (
+                        <div className="opacity-80 shadow-2xl rounded-lg overflow-hidden">
+                          <RenderedComponent component={draggedComponent} />
+                        </div>
+                      ) : null}
+                    </DragOverlay>
+                  </DndContext>
+
+                  {/* Absolute/freeform components (draggable) */}
+                  {absoluteComponents.map((component) => (
+                    <FreeformComponent
                       key={component.id}
                       component={component}
                       isSelected={selectedComponentId === component.id}
-                      onSelect={() => setSelectedComponentId(component.id)}
+                      onSelect={() => { setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                      onUpdatePosition={(x, y) => {
+                        updateComponent(component.id, {
+                          position: {
+                            x,
+                            y,
+                            width: component.position?.width || 300,
+                            height: component.position?.height || 200,
+                            zIndex: component.position?.zIndex || 10,
+                          }
+                        })
+                      }}
                       onUpdateSettings={(key, value) => {
                         updateComponent(component.id, {
                           settings: { ...component.settings, [key]: value }
@@ -317,21 +395,20 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                       }}
                     />
                   ))}
-                </SortableContext>
-                <DragOverlay>
-                  {draggedComponent ? (
-                    <div className="opacity-80 shadow-2xl rounded-lg overflow-hidden">
-                      <RenderedComponent component={draggedComponent} />
-                    </div>
-                  ) : null}
-                </DragOverlay>
-              </DndContext>
-            )}
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* ─── RIGHT PANEL: Properties ─── */}
-        {selectedComponent ? (
+        {/* ─── RIGHT PANEL: Properties / Page Settings ─── */}
+        {showPageSettings ? (
+          <PageSettingsPanel
+            pageSettings={page.pageSettings || {}}
+            onUpdate={updatePageSettings}
+            onClose={() => setShowPageSettings(false)}
+          />
+        ) : selectedComponent ? (
           <EditorPropertiesPanel
             component={selectedComponent}
             onUpdate={(updates) => updateComponent(selectedComponent.id, updates)}
@@ -345,6 +422,12 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
           <div className="w-72 bg-white border-l border-gray-200 flex flex-col items-center justify-center text-gray-400 p-6">
             <div className="text-4xl mb-3">👆</div>
             <p className="text-sm font-medium font-play text-center">Click a component on the page to edit its properties</p>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowPageSettings(true) }}
+              className="mt-4 px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs rounded-lg font-play font-medium hover:bg-indigo-100 transition-colors"
+            >
+              Edit Page Background
+            </button>
           </div>
         )}
       </div>
@@ -376,7 +459,7 @@ function TemplateChooserWrapper({ open, onClose }: { open: boolean; onClose: () 
   )
 }
 
-// ─── Sortable Live Component ───
+// ─── Sortable Live Component (flow mode) ───
 function SortableLiveComponent({
   component,
   isSelected,
@@ -435,5 +518,66 @@ function SortableLiveComponent({
         <RenderedComponent component={component} isEditing={true} onUpdateSettings={onUpdateSettings} />
       </div>
     </div>
+  )
+}
+
+// ─── Freeform (absolute) Component ───
+function FreeformComponent({
+  component,
+  isSelected,
+  onSelect,
+  onUpdatePosition,
+  onUpdateSettings,
+}: {
+  component: PageComponent
+  isSelected: boolean
+  onSelect: () => void
+  onUpdatePosition: (x: number, y: number) => void
+  onUpdateSettings?: (key: string, value: any) => void
+}) {
+  const nodeRef = useRef<HTMLDivElement>(null)
+  const pos = component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 }
+
+  const handleStop = useCallback((_e: DraggableEvent, data: DraggableData) => {
+    onUpdatePosition(data.x, data.y)
+  }, [onUpdatePosition])
+
+  return (
+    <Draggable
+      nodeRef={nodeRef as React.RefObject<HTMLElement>}
+      position={{ x: pos.x, y: pos.y }}
+      onStop={handleStop}
+    >
+      <div
+        ref={nodeRef}
+        style={{
+          position: 'absolute',
+          zIndex: pos.zIndex || 10,
+          cursor: 'grab',
+          top: 0,
+          left: 0,
+        }}
+        className="group"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => { e.stopPropagation(); onSelect() }}
+      >
+        {/* Label */}
+        <div className={`absolute -top-7 left-0 z-30 flex items-center gap-1 transition-opacity ${
+          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
+          <span className="bg-purple-600 text-white text-xs px-2 py-0.5 rounded font-play font-medium capitalize">
+            {component.type.replace(/-/g, ' ')} (freeform)
+          </span>
+        </div>
+
+        <div className={`transition-all ${
+          isSelected
+            ? 'ring-2 ring-purple-500 ring-offset-1'
+            : 'hover:ring-2 hover:ring-purple-300 hover:ring-offset-1'
+        }`}>
+          <RenderedComponent component={component} isEditing={true} onUpdateSettings={onUpdateSettings} />
+        </div>
+      </div>
+    </Draggable>
   )
 }

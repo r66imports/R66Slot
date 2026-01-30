@@ -1008,6 +1008,75 @@ function SettingsTab({
 }) {
   return (
     <>
+      {/* ─── Layout Mode (all components) ─── */}
+      <div>
+        <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Layout Mode</label>
+        <div className="flex gap-1">
+          <button
+            onClick={() => onUpdate({ positionMode: 'flow' })}
+            className={`flex-1 py-2 text-xs rounded-lg font-play font-medium transition-colors ${
+              (component.positionMode || 'flow') === 'flow'
+                ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
+                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            Flow
+          </button>
+          <button
+            onClick={() => onUpdate({
+              positionMode: 'absolute',
+              position: component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 },
+            })}
+            className={`flex-1 py-2 text-xs rounded-lg font-play font-medium transition-colors ${
+              component.positionMode === 'absolute'
+                ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            Freeform
+          </button>
+        </div>
+        {component.positionMode === 'absolute' && (
+          <p className="text-[10px] text-purple-500 mt-1 font-play">Drag this component freely on the canvas</p>
+        )}
+      </div>
+
+      {/* Freeform position controls */}
+      {component.positionMode === 'absolute' && component.position && (
+        <div className="space-y-2 pt-2 border-t border-gray-100">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-play">Position</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-gray-400 font-play">X</label>
+              <input
+                type="number"
+                value={Math.round(component.position.x)}
+                onChange={(e) => onUpdate({ position: { ...component.position!, x: parseInt(e.target.value) || 0 } })}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-play">Y</label>
+              <input
+                type="number"
+                value={Math.round(component.position.y)}
+                onChange={(e) => onUpdate({ position: { ...component.position!, y: parseInt(e.target.value) || 0 } })}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-play">Z-Index</label>
+              <input
+                type="number"
+                value={component.position.zIndex || 10}
+                onChange={(e) => onUpdate({ position: { ...component.position!, zIndex: parseInt(e.target.value) || 10 } })}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero alignment */}
       {component.type === 'hero' && (
         <div>

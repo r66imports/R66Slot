@@ -1,5 +1,6 @@
 import { ComponentRenderer } from '@/components/page-renderer/component-renderer'
 import { getPageById } from '@/lib/pages/storage'
+import type { PageSettings } from '@/lib/pages/schema'
 
 // Force dynamic rendering so edits from the admin editor appear immediately
 export const dynamic = 'force-dynamic'
@@ -13,14 +14,60 @@ export default async function HomePage() {
 
   // If we have stored homepage data, render it dynamically
   if (homepageData && homepageData.components) {
+    const ps: PageSettings = homepageData.pageSettings || {}
+    const flowComponents = homepageData.components.filter((c: any) => c.positionMode !== 'absolute')
+    const absoluteComponents = homepageData.components.filter((c: any) => c.positionMode === 'absolute')
+
     return (
-      <div className="bg-white">
-        {homepageData.components.map((component: any) => (
-          <ComponentRenderer
-            key={component.id}
-            component={component}
+      <div
+        style={{
+          backgroundColor: ps.backgroundColor || '#ffffff',
+          position: 'relative',
+          minHeight: '100vh',
+        }}
+      >
+        {/* Page background image */}
+        {ps.backgroundImage && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundImage: `url(${ps.backgroundImage})`,
+              backgroundSize: ps.fullWidth ? 'cover' : (ps.backgroundSize || 'cover'),
+              backgroundPosition: ps.backgroundPosition || 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: typeof ps.backgroundOpacity === 'number' ? ps.backgroundOpacity : 1,
+              zIndex: 0,
+              pointerEvents: 'none',
+            }}
           />
-        ))}
+        )}
+
+        {/* Content */}
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          {/* Flow components */}
+          {flowComponents.map((component: any) => (
+            <ComponentRenderer key={component.id} component={component} />
+          ))}
+
+          {/* Absolute/freeform components */}
+          {absoluteComponents.map((component: any) => {
+            const pos = component.position || { x: 0, y: 0, zIndex: 10 }
+            return (
+              <div
+                key={component.id}
+                style={{
+                  position: 'absolute',
+                  left: pos.x,
+                  top: pos.y,
+                  zIndex: pos.zIndex || 10,
+                }}
+              >
+                <ComponentRenderer component={component} />
+              </div>
+            )
+          })}
+        </div>
       </div>
     )
   }
