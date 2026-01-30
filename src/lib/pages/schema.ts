@@ -24,7 +24,6 @@ export interface PageComponent {
     | 'featured-product'
     | 'add-to-cart'
     | 'price-display'
-    | 'section'
     | 'content-block'
     | 'ui-component'
     | 'slot'

@@ -25,6 +25,15 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
     backgroundSize: styles.backgroundSize || 'cover',
     backgroundPosition: styles.backgroundPosition || 'center',
     minHeight: styles.minHeight,
+    // Layout mode styles
+    display: styles.display as any,
+    flexDirection: styles.flexDirection as any,
+    justifyContent: styles.justifyContent as any,
+    alignItems: styles.alignItems as any,
+    gap: styles.gap,
+    width: styles.width,
+    maxWidth: styles.maxWidth,
+    height: styles.height,
   }
 
   switch (type) {

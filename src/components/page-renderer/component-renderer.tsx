@@ -27,6 +27,14 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     borderRadius: styles.borderRadius,
     border: styles.border,
     boxShadow: styles.boxShadow,
+    // Layout mode styles
+    display: styles.display as any,
+    flexDirection: styles.flexDirection as any,
+    justifyContent: styles.justifyContent as any,
+    alignItems: styles.alignItems as any,
+    gap: styles.gap,
+    width: styles.width,
+    height: styles.height,
   }
 
   switch (type) {
