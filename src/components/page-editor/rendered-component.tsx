@@ -202,28 +202,92 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       )
     }
 
-    case 'gallery':
+    case 'gallery': {
+      const galleryMode = (settings.galleryMode as string) || 'square'
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">
             <div className={`grid grid-cols-2 md:grid-cols-${settings.columns || 3} gap-4`}>
               {children && children.length > 0 ? (
-                children.map((image, idx) => (
-                  <div key={image.id} className="aspect-square bg-gray-100 overflow-hidden rounded-lg">
-                    {image.settings.imageUrl ? (
-                      <img
-                        src={image.settings.imageUrl as string}
-                        alt={(image.settings.alt as string) || ''}
-                        className="w-full h-full object-cover hover:scale-110 transition-transform"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
-                        <span className="text-3xl mb-1">🏞️</span>
-                        <span className="text-xs">Image {idx + 1}</span>
+                children.map((image, idx) => {
+                  const imgWidth = (image.styles?.width as string) || ''
+                  const imgHeight = (image.styles?.height as string) || ''
+
+                  if (galleryMode === 'fixed') {
+                    // Fixed 300px wide, maintain aspect ratio
+                    return (
+                      <div key={image.id} className="bg-gray-100 overflow-hidden rounded-lg flex justify-center">
+                        {image.settings.imageUrl ? (
+                          <img
+                            src={image.settings.imageUrl as string}
+                            alt={(image.settings.alt as string) || ''}
+                            className="hero-image hover:scale-105 transition-transform"
+                            style={{
+                              width: imgWidth || '300px',
+                              height: imgHeight || 'auto',
+                              objectFit: 'contain',
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-48 flex flex-col items-center justify-center text-gray-300">
+                            <span className="text-3xl mb-1">🏞️</span>
+                            <span className="text-xs">Image {idx + 1}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))
+                    )
+                  }
+
+                  if (galleryMode === 'responsive') {
+                    // Responsive: fill container width, never exceed original height
+                    return (
+                      <div key={image.id} className="bg-gray-100 overflow-hidden rounded-lg">
+                        {image.settings.imageUrl ? (
+                          <img
+                            src={image.settings.imageUrl as string}
+                            alt={(image.settings.alt as string) || ''}
+                            className="hero-image hover:scale-105 transition-transform"
+                            style={{
+                              width: imgWidth || '100%',
+                              height: imgHeight || 'auto',
+                              maxHeight: '100%',
+                              objectFit: 'contain',
+                              display: 'block',
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-48 flex flex-col items-center justify-center text-gray-300">
+                            <span className="text-3xl mb-1">🏞️</span>
+                            <span className="text-xs">Image {idx + 1}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  // Default: square with object-fit cover (200x200 container)
+                  return (
+                    <div
+                      key={image.id}
+                      className="bg-gray-100 overflow-hidden rounded-lg"
+                      style={{ width: '200px', height: '200px' }}
+                    >
+                      {image.settings.imageUrl ? (
+                        <img
+                          src={image.settings.imageUrl as string}
+                          alt={(image.settings.alt as string) || ''}
+                          className="hero-image w-full h-full hover:scale-110 transition-transform"
+                          style={{ objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                          <span className="text-3xl mb-1">🏞️</span>
+                          <span className="text-xs">Image {idx + 1}</span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
               ) : (
                 <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-400">
                   <span className="text-3xl mb-2">🖼️</span>
@@ -234,6 +298,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
           </div>
         </div>
       )
+    }
 
     case 'three-column':
       return (

@@ -1178,6 +1178,13 @@ function VisualGalleryEditor({
     onUpdate({ children: updated })
   }
 
+  const updateImageSize = (index: number, key: string, value: string) => {
+    const updated = children.map((child, i) =>
+      i === index ? { ...child, styles: { ...child.styles, [key]: value } } : child
+    )
+    onUpdate({ children: updated })
+  }
+
   const moveImage = (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= children.length) return
     const updated = [...children]
@@ -1204,9 +1211,13 @@ function VisualGalleryEditor({
           <GalleryImageCard
             key={child.id}
             imageUrl={(child.settings.imageUrl as string) || ''}
+            imageWidth={(child.styles?.width as string) || ''}
+            imageHeight={(child.styles?.height as string) || ''}
             index={idx}
             total={children.length}
             onChangeUrl={(url) => updateImageUrl(idx, url)}
+            onChangeWidth={(w) => updateImageSize(idx, 'width', w)}
+            onChangeHeight={(h) => updateImageSize(idx, 'height', h)}
             onRemove={() => removeImage(idx)}
             onMoveUp={() => moveImage(idx, idx - 1)}
             onMoveDown={() => moveImage(idx, idx + 1)}
@@ -1232,23 +1243,32 @@ function VisualGalleryEditor({
 // ─── Gallery Image Card (visual thumbnail) ───
 function GalleryImageCard({
   imageUrl,
+  imageWidth,
+  imageHeight,
   index,
   total,
   onChangeUrl,
+  onChangeWidth,
+  onChangeHeight,
   onRemove,
   onMoveUp,
   onMoveDown,
 }: {
   imageUrl: string
+  imageWidth: string
+  imageHeight: string
   index: number
   total: number
   onChangeUrl: (url: string) => void
+  onChangeWidth: (w: string) => void
+  onChangeHeight: (h: string) => void
   onRemove: () => void
   onMoveUp: () => void
   onMoveDown: () => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [showSize, setShowSize] = useState(false)
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1272,53 +1292,84 @@ function GalleryImageCard({
   }
 
   return (
-    <div className="relative group/card aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-      {imageUrl ? (
-        <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-      ) : (
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="w-full h-full flex flex-col items-center justify-center text-gray-300 hover:text-blue-400 transition-colors"
-        >
-          {uploading ? (
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-          ) : (
-            <>
-              <span className="text-2xl">+</span>
-              <span className="text-[10px] font-play">Upload</span>
-            </>
-          )}
-        </button>
-      )}
-
-      {/* Hover overlay with actions */}
-      {imageUrl && (
-        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+    <div className="space-y-1">
+      <div className="relative group/card aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+        {imageUrl ? (
+          <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+        ) : (
           <button
             onClick={() => fileRef.current?.click()}
-            className="px-2 py-1 bg-white text-gray-800 text-[10px] rounded font-play"
+            className="w-full h-full flex flex-col items-center justify-center text-gray-300 hover:text-blue-400 transition-colors"
           >
-            Change
+            {uploading ? (
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+            ) : (
+              <>
+                <span className="text-2xl">+</span>
+                <span className="text-[10px] font-play">Upload</span>
+              </>
+            )}
           </button>
-          <div className="flex gap-1">
-            {index > 0 && (
-              <button onClick={onMoveUp} className="px-1.5 py-0.5 bg-white/80 text-gray-800 text-[10px] rounded">
-                &#8592;
-              </button>
-            )}
-            {index < total - 1 && (
-              <button onClick={onMoveDown} className="px-1.5 py-0.5 bg-white/80 text-gray-800 text-[10px] rounded">
-                &#8594;
-              </button>
-            )}
-            <button onClick={onRemove} className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded">
-              &#10005;
+        )}
+
+        {/* Hover overlay with actions */}
+        {imageUrl && (
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/card:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="px-2 py-1 bg-white text-gray-800 text-[10px] rounded font-play"
+            >
+              Change
             </button>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setShowSize(!showSize)}
+                className="px-1.5 py-0.5 bg-blue-500 text-white text-[10px] rounded"
+                title="Resize"
+              >
+                ⤡
+              </button>
+              {index > 0 && (
+                <button onClick={onMoveUp} className="px-1.5 py-0.5 bg-white/80 text-gray-800 text-[10px] rounded">
+                  &#8592;
+                </button>
+              )}
+              {index < total - 1 && (
+                <button onClick={onMoveDown} className="px-1.5 py-0.5 bg-white/80 text-gray-800 text-[10px] rounded">
+                  &#8594;
+                </button>
+              )}
+              <button onClick={onRemove} className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] rounded">
+                &#10005;
+              </button>
+            </div>
           </div>
+        )}
+
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
+      </div>
+
+      {/* Per-image size controls */}
+      {showSize && imageUrl && (
+        <div className="flex gap-1">
+          <input
+            type="text"
+            value={imageWidth}
+            onChange={(e) => onChangeWidth(e.target.value)}
+            placeholder="W"
+            className="flex-1 px-1 py-0.5 border border-gray-200 rounded text-[10px] font-play text-center"
+            title="Width (e.g. 300px, 100%)"
+          />
+          <input
+            type="text"
+            value={imageHeight}
+            onChange={(e) => onChangeHeight(e.target.value)}
+            placeholder="H"
+            className="flex-1 px-1 py-0.5 border border-gray-200 rounded text-[10px] font-play text-center"
+            title="Height (e.g. auto, 200px)"
+          />
         </div>
       )}
-
-      <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
     </div>
   )
 }
@@ -1630,20 +1681,41 @@ function SettingsTab({
         </>
       )}
 
-      {/* Gallery columns */}
+      {/* Gallery settings */}
       {component.type === 'gallery' && (
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Columns</label>
-          <select
-            value={(component.settings.columns as number) || 3}
-            onChange={(e) => updateSetting('columns', parseInt(e.target.value))}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-          >
-            <option value={2}>2 Columns</option>
-            <option value={3}>3 Columns</option>
-            <option value={4}>4 Columns</option>
-          </select>
-        </div>
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Display Mode</label>
+            <select
+              value={(component.settings.galleryMode as string) || 'square'}
+              onChange={(e) => updateSetting('galleryMode', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="square">Square (200x200, object-fit cover)</option>
+              <option value="fixed">Fixed Width (300px, keep aspect ratio)</option>
+              <option value="responsive">Responsive (fill container)</option>
+            </select>
+            <p className="text-[10px] text-gray-400 mt-1 font-play">
+              {(component.settings.galleryMode || 'square') === 'square'
+                ? 'Images cover a 200x200 container without distortion'
+                : (component.settings.galleryMode) === 'fixed'
+                ? 'Images display at 300px wide, maintaining aspect ratio'
+                : 'Images fill container width, never exceed original height'}
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Columns</label>
+            <select
+              value={(component.settings.columns as number) || 3}
+              onChange={(e) => updateSetting('columns', parseInt(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value={2}>2 Columns</option>
+              <option value={3}>3 Columns</option>
+              <option value={4}>4 Columns</option>
+            </select>
+          </div>
+        </>
       )}
 
       {/* Widget settings */}

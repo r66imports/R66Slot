@@ -337,22 +337,44 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       )
 
-    case 'gallery':
+    case 'gallery': {
+      const galleryMode = (settings.galleryMode as string) || 'square'
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">
             <div className={`grid grid-cols-2 md:grid-cols-${settings.columns || 3} gap-4`}>
               {children?.map((image, index) => {
+                const imgWidth = (image.styles?.width as string) || ''
+                const imgHeight = (image.styles?.height as string) || ''
+
+                const imgStyle: React.CSSProperties =
+                  galleryMode === 'fixed'
+                    ? { width: imgWidth || '300px', height: imgHeight || 'auto', objectFit: 'contain' as const }
+                    : galleryMode === 'responsive'
+                    ? { width: imgWidth || '100%', height: imgHeight || 'auto', maxHeight: '100%', objectFit: 'contain' as const, display: 'block' }
+                    : { objectFit: 'cover' as const, width: '100%', height: '100%' }
+
+                const containerClass =
+                  galleryMode === 'square'
+                    ? 'bg-gray-200 overflow-hidden rounded-lg'
+                    : galleryMode === 'fixed'
+                    ? 'bg-gray-200 overflow-hidden rounded-lg flex justify-center'
+                    : 'bg-gray-200 overflow-hidden rounded-lg'
+
+                const containerSizeStyle: React.CSSProperties =
+                  galleryMode === 'square' ? { width: '200px', height: '200px' } : {}
+
                 const imageContent = (
                   <>
                     {image.settings.imageUrl ? (
                       <img
                         src={image.settings.imageUrl as string}
                         alt={(image.settings.alt as string) || ''}
-                        className="w-full h-full object-cover hover:scale-110 transition-transform"
+                        className="hero-image hover:scale-110 transition-transform"
+                        style={imgStyle}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="w-full h-full flex items-center justify-center text-gray-400" style={{ minHeight: '120px' }}>
                         Image {index + 1}
                       </div>
                     )}
@@ -363,14 +385,16 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                   <Link
                     key={image.id}
                     href={image.settings.link as string}
-                    className="aspect-square bg-gray-200 overflow-hidden rounded-lg block cursor-pointer hover:shadow-xl transition-shadow"
+                    className={`${containerClass} block cursor-pointer hover:shadow-xl transition-shadow`}
+                    style={containerSizeStyle}
                   >
                     {imageContent}
                   </Link>
                 ) : (
                   <div
                     key={image.id}
-                    className="aspect-square bg-gray-200 overflow-hidden rounded-lg"
+                    className={containerClass}
+                    style={containerSizeStyle}
                   >
                     {imageContent}
                   </div>
@@ -380,6 +404,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
           </div>
         </div>
       )
+    }
 
     case 'product-grid':
       return (
