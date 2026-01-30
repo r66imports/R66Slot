@@ -1,6 +1,9 @@
 import { ComponentRenderer } from '@/components/page-renderer/component-renderer'
 import { getPageById } from '@/lib/pages/storage'
 
+// Force dynamic rendering so edits from the admin editor appear immediately
+export const dynamic = 'force-dynamic'
+
 async function getHomepageData() {
   return await getPageById('frontend-homepage')
 }

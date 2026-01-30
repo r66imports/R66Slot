@@ -13,7 +13,7 @@ export async function blobRead<T = unknown>(key: string, fallback: T): Promise<T
     const match = blobs.find(b => b.pathname === key)
     if (!match) return fallback
 
-    const response = await fetch(match.url)
+    const response = await fetch(match.url, { cache: 'no-store' })
     if (!response.ok) return fallback
 
     const text = await response.text()

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { getPageById, updatePage, deletePage } from '@/lib/pages/storage'
 
 // GET /api/admin/pages/[id] - Get single page
@@ -36,6 +37,17 @@ export async function PUT(
 
     if (!page) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 })
+    }
+
+    // Revalidate the frontend page so edits appear immediately
+    try {
+      revalidatePath('/')
+      if (id.startsWith('frontend-')) {
+        const slug = id.replace('frontend-', '')
+        revalidatePath(`/${slug}`)
+      }
+    } catch {
+      // Revalidation errors shouldn't block the save
     }
 
     return NextResponse.json(page)
