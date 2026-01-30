@@ -9,6 +9,205 @@ export interface PageTemplate {
   components: PageComponent[]
 }
 
+export interface FullPageTemplate {
+  id: string
+  name: string
+  description: string
+  icon: string
+  sections: string[]
+  components: PageComponent[]
+}
+
+export const FULL_PAGE_TEMPLATES: FullPageTemplate[] = [
+  {
+    id: 'slot-car-landing',
+    name: 'Slot Car Landing',
+    description: 'Complete landing page for slot car enthusiasts',
+    icon: '🏎️',
+    sections: ['Hero', 'Gallery', 'Features', 'CTA'],
+    components: [
+      {
+        id: 'fp-hero',
+        type: 'hero',
+        content: '',
+        styles: {
+          backgroundColor: '#1F2937',
+          textColor: '#FFFFFF',
+          paddingTop: '80px',
+          paddingBottom: '80px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+        },
+        settings: {
+          title: 'Premium Slot Cars & Accessories',
+          subtitle: 'South Africa\'s leading slot car retailer. Race-ready models from top brands.',
+          buttonText: 'Shop Now',
+          buttonLink: '/products',
+          alignment: 'center',
+        },
+      },
+      {
+        id: 'fp-gallery',
+        type: 'gallery',
+        content: '',
+        styles: { paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+        settings: { columns: 3 },
+        children: [
+          { id: 'fp-gal-1', type: 'image', content: '', styles: {}, settings: { imageUrl: '', alt: 'Brand 1' } },
+          { id: 'fp-gal-2', type: 'image', content: '', styles: {}, settings: { imageUrl: '', alt: 'Brand 2' } },
+          { id: 'fp-gal-3', type: 'image', content: '', styles: {}, settings: { imageUrl: '', alt: 'Brand 3' } },
+        ],
+      },
+      {
+        id: 'fp-features',
+        type: 'three-column',
+        content: '',
+        styles: { backgroundColor: '#F9FAFB', paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px', textAlign: 'center' },
+        settings: { columns: 3 },
+        children: [
+          { id: 'fp-feat-1', type: 'icon-text', content: '<h3>Fast Shipping</h3><p>Nationwide delivery in 2-5 days</p>', styles: { textAlign: 'center' }, settings: { icon: '🚚' } },
+          { id: 'fp-feat-2', type: 'icon-text', content: '<h3>Authentic Brands</h3><p>NSR, Slot.it, Scalextric & more</p>', styles: { textAlign: 'center' }, settings: { icon: '✅' } },
+          { id: 'fp-feat-3', type: 'icon-text', content: '<h3>Expert Support</h3><p>Advice from racing enthusiasts</p>', styles: { textAlign: 'center' }, settings: { icon: '🏆' } },
+        ],
+      },
+      {
+        id: 'fp-cta',
+        type: 'hero',
+        content: '',
+        styles: {
+          backgroundColor: '#DC2626',
+          textColor: '#FFFFFF',
+          paddingTop: '48px',
+          paddingBottom: '48px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+        },
+        settings: {
+          title: 'Ready to Race?',
+          subtitle: 'Browse our full collection of slot cars, tracks, and accessories.',
+          buttonText: 'View All Products',
+          buttonLink: '/products',
+          alignment: 'center',
+        },
+      },
+    ],
+  },
+  {
+    id: 'product-showcase',
+    name: 'Product Showcase',
+    description: 'Showcase products with hero and grid',
+    icon: '🛍️',
+    sections: ['Hero Image', 'Product Grid', 'Testimonial'],
+    components: [
+      {
+        id: 'ps-hero',
+        type: 'hero',
+        content: '',
+        styles: {
+          backgroundColor: '#111827',
+          textColor: '#FFFFFF',
+          paddingTop: '100px',
+          paddingBottom: '100px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+        },
+        settings: {
+          title: 'New Arrivals',
+          subtitle: 'Discover the latest additions to our collection.',
+          buttonText: 'Shop New',
+          buttonLink: '/products',
+          alignment: 'center',
+          imageUrl: '',
+        },
+      },
+      {
+        id: 'ps-grid',
+        type: 'product-grid',
+        content: '',
+        styles: { paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+        settings: { productCount: 8, showPrice: true, showAddToCart: true },
+      },
+      {
+        id: 'ps-quote',
+        type: 'quote',
+        content: 'Best slot car shop in South Africa! Amazing quality and fast delivery.',
+        styles: { paddingTop: '32px', paddingBottom: '32px', paddingLeft: '16px', paddingRight: '16px' },
+        settings: { author: 'Happy Customer' },
+      },
+    ],
+  },
+  {
+    id: 'about-page',
+    name: 'About Page',
+    description: 'Tell your story with text, images, and gallery',
+    icon: '📖',
+    sections: ['Hero', 'Text + Image', 'Gallery', 'CTA'],
+    components: [
+      {
+        id: 'ab-hero',
+        type: 'hero',
+        content: '',
+        styles: {
+          backgroundColor: '#1F2937',
+          textColor: '#FFFFFF',
+          paddingTop: '60px',
+          paddingBottom: '60px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+        },
+        settings: {
+          title: 'About Route 66',
+          subtitle: 'Passionate about slot cars since day one.',
+          alignment: 'center',
+        },
+      },
+      {
+        id: 'ab-twocol',
+        type: 'two-column',
+        content: '',
+        styles: { paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+        settings: {},
+        children: [
+          { id: 'ab-col-1', type: 'text', content: '<h3>Our Story</h3><p>We started with a love for slot car racing and a dream to bring the best brands to South Africa. Today, we serve racers across the country with premium products and expert advice.</p>', styles: {}, settings: {} },
+          { id: 'ab-col-2', type: 'text', content: '<h3>Our Mission</h3><p>To be the premier destination for slot car enthusiasts. We curate only the finest products from world-renowned manufacturers and provide unmatched customer service.</p>', styles: {}, settings: {} },
+        ],
+      },
+      {
+        id: 'ab-gallery',
+        type: 'gallery',
+        content: '',
+        styles: { paddingTop: '32px', paddingBottom: '32px', paddingLeft: '16px', paddingRight: '16px' },
+        settings: { columns: 3 },
+        children: [
+          { id: 'ab-gal-1', type: 'image', content: '', styles: {}, settings: { imageUrl: '', alt: 'Our shop' } },
+          { id: 'ab-gal-2', type: 'image', content: '', styles: {}, settings: { imageUrl: '', alt: 'Our team' } },
+          { id: 'ab-gal-3', type: 'image', content: '', styles: {}, settings: { imageUrl: '', alt: 'Our products' } },
+        ],
+      },
+      {
+        id: 'ab-cta',
+        type: 'hero',
+        content: '',
+        styles: {
+          backgroundColor: '#DC2626',
+          textColor: '#FFFFFF',
+          paddingTop: '48px',
+          paddingBottom: '48px',
+          paddingLeft: '16px',
+          paddingRight: '16px',
+        },
+        settings: {
+          title: 'Visit Us Today',
+          subtitle: 'Come see our collection in person or shop online.',
+          buttonText: 'Contact Us',
+          buttonLink: '/contact',
+          alignment: 'center',
+        },
+      },
+    ],
+  },
+]
+
 export const PAGE_TEMPLATES: PageTemplate[] = [
   {
     id: 'hero-simple',

@@ -1,16 +1,8 @@
 import { ComponentRenderer } from '@/components/page-renderer/component-renderer'
-import fs from 'fs'
-import path from 'path'
+import { getPageById } from '@/lib/pages/storage'
 
 async function getHomepageData() {
-  try {
-    const filePath = path.join(process.cwd(), 'data', 'pages', 'frontend-homepage.json')
-    const fileContents = fs.readFileSync(filePath, 'utf8')
-    return JSON.parse(fileContents)
-  } catch (error) {
-    // Return default homepage if file doesn't exist
-    return null
-  }
+  return await getPageById('frontend-homepage')
 }
 
 export default async function HomePage() {

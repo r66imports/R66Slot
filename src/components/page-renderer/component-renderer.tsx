@@ -93,9 +93,21 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       )
 
     case 'hero':
+      const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
       return (
-        <section style={containerStyle}>
-          <div className="container mx-auto">
+        <section
+          style={{
+            ...containerStyle,
+            backgroundImage: heroHasImage ? `url(${settings.imageUrl})` : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            position: 'relative',
+          }}
+        >
+          {heroHasImage && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+          )}
+          <div className="container mx-auto relative z-10">
             <div
               className={`max-w-3xl ${
                 settings.alignment === 'center' ? 'mx-auto text-center' : ''
@@ -105,11 +117,11 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                 {settings.title || 'Hero Title'}
               </h1>
               {settings.subtitle && (
-                <p className="text-lg md:text-xl text-gray-300 mb-8">
+                <p className="text-lg md:text-xl opacity-80 mb-8">
                   {settings.subtitle}
                 </p>
               )}
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className={`flex flex-col sm:flex-row gap-4 ${settings.alignment === 'center' ? 'justify-center' : ''}`}>
                 {settings.buttonText && (
                   <Button
                     size="lg"

@@ -260,7 +260,7 @@ export default function PreOrderPosterPage() {
 
       // Fallback: open WhatsApp with message (image URL will show as link preview)
       const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_DEFAULT_NUMBER || '27615898921'
-      const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`
+      const whatsappUrl = `https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`
       window.open(whatsappUrl, '_blank')
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)

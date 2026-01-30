@@ -28,6 +28,7 @@ export async function blobWrite(key: string, data: unknown): Promise<void> {
   await put(key, JSON.stringify(data, null, 2), {
     access: 'public',
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType: 'application/json',
   })
 }
@@ -74,6 +75,7 @@ export async function blobUploadFile(
   const blob = await put(key, data, {
     access: 'public',
     addRandomSuffix: false,
+    allowOverwrite: true,
     contentType,
   })
   return blob.url

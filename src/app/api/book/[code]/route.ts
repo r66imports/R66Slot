@@ -1,19 +1,8 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { blobRead } from '@/lib/blob-storage'
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'slotcar-orders.json')
-
-function getPosters() {
-  try {
-    if (!fs.existsSync(DATA_FILE)) {
-      return []
-    }
-    const data = fs.readFileSync(DATA_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getPosters() {
+  return await blobRead<any[]>('data/slotcar-orders.json', [])
 }
 
 export async function GET(
@@ -22,7 +11,7 @@ export async function GET(
 ) {
   try {
     const { code } = await params
-    const posters = getPosters()
+    const posters = await getPosters()
     const poster = posters.find((p: any) => p.shortCode === code)
 
     if (!poster) {

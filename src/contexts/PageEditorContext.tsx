@@ -119,7 +119,8 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     }
 
     setPage(newPage)
-  }, [page])
+    saveToHistory(newPage)
+  }, [page, saveToHistory])
 
   // Delete component
   const deleteComponent = useCallback((id: string) => {
