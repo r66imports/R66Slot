@@ -6,18 +6,17 @@ import { useRouter, usePathname } from 'next/navigation'
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
+  const isLoginPage = pathname === '/admin/login'
+  const [isAuthenticated, setIsAuthenticated] = useState(isLoginPage)
+  const [isLoading, setIsLoading] = useState(!isLoginPage)
 
   useEffect(() => {
-    const checkAuth = async () => {
-      // Don't check auth for login page
-      if (pathname === '/admin/login') {
-        setIsAuthenticated(true)
-        setIsLoading(false)
-        return
-      }
+    // Don't check auth for login page
+    if (isLoginPage) {
+      return
+    }
 
+    const checkAuth = async () => {
       // Development bypass - skip auth in development mode
       if (process.env.NODE_ENV === 'development') {
         setIsAuthenticated(true)
@@ -43,7 +42,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
 
     checkAuth()
-  }, [pathname, router])
+  }, [pathname, router, isLoginPage])
 
   if (isLoading) {
     return (
@@ -53,7 +52,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!isAuthenticated && pathname !== '/admin/login') {
+  if (!isAuthenticated && !isLoginPage) {
     return null
   }
 
