@@ -23,7 +23,8 @@
         "buttonLink": "/products",
         "secondaryButtonText": "New Arrivals",
         "secondaryButtonLink": "/collections/new-arrivals",
-        "alignment": "left"
+        "alignment": "left",
+        "imageUrl": "/uploads/1769782038143-a719le.avif"
       }
     },
     {
@@ -203,5 +204,5 @@
     "metaKeywords": "slot cars, racing, models, tracks, accessories"
   },
   "createdAt": "2026-01-23T00:00:00.000Z",
-  "updatedAt": "2026-01-23T21:25:39.110Z"
+  "updatedAt": "2026-01-30T14:10:53.529Z"
 }
