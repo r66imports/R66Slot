@@ -310,6 +310,11 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                       component={component}
                       isSelected={selectedComponentId === component.id}
                       onSelect={() => setSelectedComponentId(component.id)}
+                      onUpdateSettings={(key, value) => {
+                        updateComponent(component.id, {
+                          settings: { ...component.settings, [key]: value }
+                        })
+                      }}
                     />
                   ))}
                 </SortableContext>
@@ -376,10 +381,12 @@ function SortableLiveComponent({
   component,
   isSelected,
   onSelect,
+  onUpdateSettings,
 }: {
   component: PageComponent
   isSelected: boolean
   onSelect: () => void
+  onUpdateSettings?: (key: string, value: any) => void
 }) {
   const {
     attributes,
@@ -425,7 +432,7 @@ function SortableLiveComponent({
         </div>
 
         {/* Actual rendered component */}
-        <RenderedComponent component={component} />
+        <RenderedComponent component={component} isEditing={true} onUpdateSettings={onUpdateSettings} />
       </div>
     </div>
   )

@@ -1,7 +1,16 @@
-import React from 'react'
+'use client'
+
+import React, { useRef, useCallback } from 'react'
+import Draggable, { type DraggableData, type DraggableEvent } from 'react-draggable'
 import type { PageComponent } from '@/lib/pages/schema'
 
-export function RenderedComponent({ component }: { component: PageComponent }) {
+interface RenderedComponentProps {
+  component: PageComponent
+  isEditing?: boolean
+  onUpdateSettings?: (key: string, value: any) => void
+}
+
+export function RenderedComponent({ component, isEditing, onUpdateSettings }: RenderedComponentProps) {
   const { type, content, styles, settings, children } = component
 
   const containerStyle: React.CSSProperties = {
@@ -19,8 +28,11 @@ export function RenderedComponent({ component }: { component: PageComponent }) {
   }
 
   switch (type) {
-    case 'hero':
+    case 'hero': {
       const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
+      const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
+      const isFreeform = settings.heroLayout === 'freeform'
+
       return (
         <section
           style={{
@@ -29,37 +41,115 @@ export function RenderedComponent({ component }: { component: PageComponent }) {
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',
+            minHeight: isFreeform ? '500px' : undefined,
+            overflow: isFreeform ? 'hidden' : undefined,
           }}
         >
           {heroHasImage && (
-            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${overlayOpacity})` }} />
           )}
-          <div className="container mx-auto relative z-10">
-            <div className={`max-w-3xl ${settings.alignment === 'center' ? 'mx-auto text-center' : ''}`}>
-              <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                {(settings.title as string) || 'Hero Title'}
-              </h1>
+
+          {isFreeform ? (
+            <div className="relative z-10" style={{ position: 'relative', minHeight: '460px' }}>
+              {/* Title - freely movable */}
+              <HeroDraggableElement
+                isEditing={isEditing}
+                posX={(settings.titleX as number) || 0}
+                posY={(settings.titleY as number) || 0}
+                onDragStop={(x, y) => {
+                  onUpdateSettings?.('titleX', x)
+                  onUpdateSettings?.('titleY', y)
+                }}
+                label="Title"
+              >
+                <h1 className="text-4xl md:text-6xl font-bold mb-0 select-none">
+                  {(settings.title as string) || 'Hero Title'}
+                </h1>
+              </HeroDraggableElement>
+
+              {/* Subtitle - freely movable */}
               {settings.subtitle && (
-                <p className="text-lg md:text-xl opacity-80 mb-8">
-                  {settings.subtitle as string}
-                </p>
+                <HeroDraggableElement
+                  isEditing={isEditing}
+                  posX={(settings.subtitleX as number) || 0}
+                  posY={(settings.subtitleY as number) || 60}
+                  onDragStop={(x, y) => {
+                    onUpdateSettings?.('subtitleX', x)
+                    onUpdateSettings?.('subtitleY', y)
+                  }}
+                  label="Subtitle"
+                >
+                  <p className="text-lg md:text-xl opacity-80 mb-0 select-none">
+                    {settings.subtitle as string}
+                  </p>
+                </HeroDraggableElement>
               )}
-              <div className={`flex flex-col sm:flex-row gap-4 ${settings.alignment === 'center' ? 'justify-center' : ''}`}>
-                {settings.buttonText && (
-                  <span className="inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-lg cursor-pointer">
+
+              {/* Primary Button - freely movable */}
+              {settings.buttonText && (
+                <HeroDraggableElement
+                  isEditing={isEditing}
+                  posX={(settings.btnPrimaryX as number) || 0}
+                  posY={(settings.btnPrimaryY as number) || 120}
+                  onDragStop={(x, y) => {
+                    onUpdateSettings?.('btnPrimaryX', x)
+                    onUpdateSettings?.('btnPrimaryY', y)
+                  }}
+                  label="Primary Button"
+                >
+                  <span className="inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-lg cursor-pointer select-none">
                     {settings.buttonText as string}
                   </span>
-                )}
-                {settings.secondaryButtonText && (
-                  <span className="inline-block bg-transparent text-white border-2 border-white font-bold py-3 px-8 rounded-lg text-lg cursor-pointer hover:bg-white hover:text-gray-900">
+                </HeroDraggableElement>
+              )}
+
+              {/* Secondary Button - freely movable */}
+              {settings.secondaryButtonText && (
+                <HeroDraggableElement
+                  isEditing={isEditing}
+                  posX={(settings.btnSecondaryX as number) || 200}
+                  posY={(settings.btnSecondaryY as number) || 120}
+                  onDragStop={(x, y) => {
+                    onUpdateSettings?.('btnSecondaryX', x)
+                    onUpdateSettings?.('btnSecondaryY', y)
+                  }}
+                  label="Secondary Button"
+                >
+                  <span className="inline-block bg-transparent text-white border-2 border-white font-bold py-3 px-8 rounded-lg text-lg cursor-pointer select-none hover:bg-white hover:text-gray-900">
                     {settings.secondaryButtonText as string}
                   </span>
+                </HeroDraggableElement>
+              )}
+            </div>
+          ) : (
+            <div className="container mx-auto relative z-10">
+              <div className={`max-w-3xl ${settings.alignment === 'center' ? 'mx-auto text-center' : ''}`}>
+                <h1 className="text-4xl md:text-6xl font-bold mb-6">
+                  {(settings.title as string) || 'Hero Title'}
+                </h1>
+                {settings.subtitle && (
+                  <p className="text-lg md:text-xl opacity-80 mb-8">
+                    {settings.subtitle as string}
+                  </p>
                 )}
+                <div className={`flex flex-col sm:flex-row gap-4 ${settings.alignment === 'center' ? 'justify-center' : ''}`}>
+                  {settings.buttonText && (
+                    <span className="inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-lg cursor-pointer">
+                      {settings.buttonText as string}
+                    </span>
+                  )}
+                  {settings.secondaryButtonText && (
+                    <span className="inline-block bg-transparent text-white border-2 border-white font-bold py-3 px-8 rounded-lg text-lg cursor-pointer hover:bg-white hover:text-gray-900">
+                      {settings.secondaryButtonText as string}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </section>
       )
+    }
 
     case 'text':
       return (
@@ -295,4 +385,62 @@ export function RenderedComponent({ component }: { component: PageComponent }) {
         </div>
       )
   }
+}
+
+// ─── Draggable Hero Element ───
+function HeroDraggableElement({
+  children,
+  isEditing,
+  posX,
+  posY,
+  onDragStop,
+  label,
+}: {
+  children: React.ReactNode
+  isEditing?: boolean
+  posX: number
+  posY: number
+  onDragStop: (x: number, y: number) => void
+  label: string
+}) {
+  const nodeRef = useRef<HTMLDivElement>(null)
+
+  const handleStop = useCallback((_e: DraggableEvent, data: DraggableData) => {
+    onDragStop(data.x, data.y)
+  }, [onDragStop])
+
+  if (!isEditing) {
+    // Static positioned element (for drag overlay / non-edit mode)
+    return (
+      <div style={{ position: 'absolute', left: posX, top: posY }}>
+        {children}
+      </div>
+    )
+  }
+
+  return (
+    <Draggable
+      nodeRef={nodeRef as React.RefObject<HTMLElement>}
+      position={{ x: posX, y: posY }}
+      onStop={handleStop}
+      bounds="parent"
+    >
+      <div
+        ref={nodeRef}
+        style={{ position: 'absolute', cursor: 'grab' }}
+        className="group/drag"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        {/* Drag indicator label */}
+        <div className="absolute -top-6 left-0 opacity-0 group-hover/drag:opacity-100 transition-opacity pointer-events-none">
+          <span className="bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded font-play whitespace-nowrap">
+            {label} (drag to move)
+          </span>
+        </div>
+        <div className="ring-0 hover:ring-2 hover:ring-purple-400 hover:ring-offset-1 rounded transition-all">
+          {children}
+        </div>
+      </div>
+    </Draggable>
+  )
 }

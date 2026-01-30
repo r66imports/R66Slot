@@ -92,8 +92,11 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       )
 
-    case 'hero':
+    case 'hero': {
       const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
+      const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
+      const isFreeform = settings.heroLayout === 'freeform'
+
       return (
         <section
           style={{
@@ -102,27 +105,35 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',
+            minHeight: isFreeform ? '500px' : undefined,
+            overflow: isFreeform ? 'hidden' : undefined,
           }}
         >
           {heroHasImage && (
-            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)' }} />
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${overlayOpacity})` }} />
           )}
-          <div className="container mx-auto relative z-10">
-            <div
-              className={`max-w-3xl ${
-                settings.alignment === 'center' ? 'mx-auto text-center' : ''
-              }`}
-            >
-              <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                {settings.title || 'Hero Title'}
-              </h1>
+
+          {isFreeform ? (
+            <div className="relative z-10" style={{ position: 'relative', minHeight: '460px' }}>
+              {/* Title */}
+              <div style={{ position: 'absolute', left: (settings.titleX as number) || 0, top: (settings.titleY as number) || 0 }}>
+                <h1 className="text-4xl md:text-6xl font-bold">
+                  {settings.title || 'Hero Title'}
+                </h1>
+              </div>
+
+              {/* Subtitle */}
               {settings.subtitle && (
-                <p className="text-lg md:text-xl opacity-80 mb-8">
-                  {settings.subtitle}
-                </p>
+                <div style={{ position: 'absolute', left: (settings.subtitleX as number) || 0, top: (settings.subtitleY as number) || 60 }}>
+                  <p className="text-lg md:text-xl opacity-80">
+                    {settings.subtitle}
+                  </p>
+                </div>
               )}
-              <div className={`flex flex-col sm:flex-row gap-4 ${settings.alignment === 'center' ? 'justify-center' : ''}`}>
-                {settings.buttonText && (
+
+              {/* Primary Button */}
+              {settings.buttonText && (
+                <div style={{ position: 'absolute', left: (settings.btnPrimaryX as number) || 0, top: (settings.btnPrimaryY as number) || 120 }}>
                   <Button
                     size="lg"
                     className="bg-primary hover:bg-primary-dark text-white"
@@ -132,8 +143,12 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       {settings.buttonText}
                     </Link>
                   </Button>
-                )}
-                {settings.secondaryButtonText && (
+                </div>
+              )}
+
+              {/* Secondary Button */}
+              {settings.secondaryButtonText && (
+                <div style={{ position: 'absolute', left: (settings.btnSecondaryX as number) || 200, top: (settings.btnSecondaryY as number) || 120 }}>
                   <Button
                     size="lg"
                     variant="outline"
@@ -144,12 +159,55 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       {settings.secondaryButtonText}
                     </Link>
                   </Button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="container mx-auto relative z-10">
+              <div
+                className={`max-w-3xl ${
+                  settings.alignment === 'center' ? 'mx-auto text-center' : ''
+                }`}
+              >
+                <h1 className="text-4xl md:text-6xl font-bold mb-6">
+                  {settings.title || 'Hero Title'}
+                </h1>
+                {settings.subtitle && (
+                  <p className="text-lg md:text-xl opacity-80 mb-8">
+                    {settings.subtitle}
+                  </p>
                 )}
+                <div className={`flex flex-col sm:flex-row gap-4 ${settings.alignment === 'center' ? 'justify-center' : ''}`}>
+                  {settings.buttonText && (
+                    <Button
+                      size="lg"
+                      className="bg-primary hover:bg-primary-dark text-white"
+                      asChild
+                    >
+                      <Link href={(settings.buttonLink as string) || '#'}>
+                        {settings.buttonText}
+                      </Link>
+                    </Button>
+                  )}
+                  {settings.secondaryButtonText && (
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="bg-transparent text-white border-white hover:bg-white hover:text-secondary"
+                      asChild
+                    >
+                      <Link href={(settings.secondaryButtonLink as string) || '#'}>
+                        {settings.secondaryButtonText}
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </section>
       )
+    }
 
     case 'two-column':
       return (

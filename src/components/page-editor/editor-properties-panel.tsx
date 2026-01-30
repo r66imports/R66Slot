@@ -370,6 +370,36 @@ function ContentTab({
       {/* Hero Content */}
       {component.type === 'hero' && (
         <>
+          {/* Layout Mode Toggle */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Layout Mode</label>
+            <div className="flex gap-1">
+              <button
+                onClick={() => updateSetting('heroLayout', 'flow')}
+                className={`flex-1 py-2 text-xs rounded-lg font-play font-medium transition-colors ${
+                  (component.settings.heroLayout || 'flow') === 'flow'
+                    ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-300'
+                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                Flow
+              </button>
+              <button
+                onClick={() => updateSetting('heroLayout', 'freeform')}
+                className={`flex-1 py-2 text-xs rounded-lg font-play font-medium transition-colors ${
+                  component.settings.heroLayout === 'freeform'
+                    ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                    : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                Freeform
+              </button>
+            </div>
+            {component.settings.heroLayout === 'freeform' && (
+              <p className="text-[10px] text-purple-500 mt-1 font-play">Drag elements freely on the canvas</p>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Title</label>
             <input
@@ -388,11 +418,39 @@ function ContentTab({
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
             />
           </div>
-          <ImageField
-            label="Background Image"
-            value={(component.settings.imageUrl as string) || ''}
-            onChange={(url) => updateSetting('imageUrl', url)}
-          />
+
+          {/* Background Image */}
+          <div className="pt-2 border-t border-gray-100">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 font-play">Background Image</h4>
+            <ImageField
+              label="Image"
+              value={(component.settings.imageUrl as string) || ''}
+              onChange={(url) => updateSetting('imageUrl', url)}
+            />
+          </div>
+
+          {/* Overlay Opacity */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-500 font-play">Image Overlay Opacity</label>
+              <span className="text-xs text-gray-400 font-play">
+                {Math.round((typeof component.settings.overlayOpacity === 'number' ? component.settings.overlayOpacity : 0.5) * 100)}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round((typeof component.settings.overlayOpacity === 'number' ? component.settings.overlayOpacity : 0.5) * 100)}
+              onChange={(e) => updateSetting('overlayOpacity', parseInt(e.target.value) / 100)}
+              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+            <div className="flex justify-between text-[10px] text-gray-400 font-play mt-0.5">
+              <span>Lighter</span>
+              <span>Darker</span>
+            </div>
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Primary Button</label>
             <input
@@ -427,6 +485,36 @@ function ContentTab({
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
             />
           </div>
+
+          {/* Freeform Position Controls */}
+          {component.settings.heroLayout === 'freeform' && (
+            <div className="pt-2 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-play">Element Positions</h4>
+                <button
+                  onClick={() => {
+                    updateSetting('titleX', 0)
+                    updateSetting('titleY', 0)
+                    updateSetting('subtitleX', 0)
+                    updateSetting('subtitleY', 60)
+                    updateSetting('btnPrimaryX', 0)
+                    updateSetting('btnPrimaryY', 120)
+                    updateSetting('btnSecondaryX', 200)
+                    updateSetting('btnSecondaryY', 120)
+                  }}
+                  className="text-[10px] text-blue-500 hover:text-blue-700 font-play font-medium"
+                >
+                  Reset All
+                </button>
+              </div>
+              <div className="space-y-2">
+                <PositionInput label="Title" x={(component.settings.titleX as number) || 0} y={(component.settings.titleY as number) || 0} onChangeX={(v) => updateSetting('titleX', v)} onChangeY={(v) => updateSetting('titleY', v)} />
+                <PositionInput label="Subtitle" x={(component.settings.subtitleX as number) || 0} y={(component.settings.subtitleY as number) || 60} onChangeX={(v) => updateSetting('subtitleX', v)} onChangeY={(v) => updateSetting('subtitleY', v)} />
+                <PositionInput label="Primary Btn" x={(component.settings.btnPrimaryX as number) || 0} y={(component.settings.btnPrimaryY as number) || 120} onChangeX={(v) => updateSetting('btnPrimaryX', v)} onChangeY={(v) => updateSetting('btnPrimaryY', v)} />
+                <PositionInput label="Secondary Btn" x={(component.settings.btnSecondaryX as number) || 200} y={(component.settings.btnSecondaryY as number) || 120} onChangeX={(v) => updateSetting('btnSecondaryX', v)} onChangeY={(v) => updateSetting('btnSecondaryY', v)} />
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -770,6 +858,43 @@ function VisualColumnEditor({
           />
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── Position Input (X/Y pair) ───
+function PositionInput({
+  label,
+  x,
+  y,
+  onChangeX,
+  onChangeY,
+}: {
+  label: string
+  x: number
+  y: number
+  onChangeX: (v: number) => void
+  onChangeY: (v: number) => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[10px] text-gray-500 font-play w-20 truncate">{label}</span>
+      <div className="flex items-center gap-1 flex-1">
+        <span className="text-[10px] text-gray-400">X</span>
+        <input
+          type="number"
+          value={Math.round(x)}
+          onChange={(e) => onChangeX(parseInt(e.target.value) || 0)}
+          className="w-14 px-1 py-0.5 border border-gray-200 rounded text-[11px] font-play text-center"
+        />
+        <span className="text-[10px] text-gray-400">Y</span>
+        <input
+          type="number"
+          value={Math.round(y)}
+          onChange={(e) => onChangeY(parseInt(e.target.value) || 0)}
+          className="w-14 px-1 py-0.5 border border-gray-200 rounded text-[11px] font-play text-center"
+        />
+      </div>
     </div>
   )
 }
