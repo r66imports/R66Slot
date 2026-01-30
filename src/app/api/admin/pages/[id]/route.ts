@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { getPageById, updatePage, deletePage } from '@/lib/pages/storage'
+import { blobWrite } from '@/lib/blob-storage'
+import type { Page } from '@/lib/pages/schema'
+
+// Default page templates for frontend pages that don't exist yet
+const FRONTEND_PAGE_TEMPLATES: Record<string, { title: string; slug: string }> = {
+  'frontend-homepage': { title: 'Homepage', slug: '' },
+  'frontend-products': { title: 'Products Page', slug: 'products' },
+  'frontend-about': { title: 'About Page', slug: 'about' },
+  'frontend-contact': { title: 'Contact Page', slug: 'contact' },
+}
 
 // GET /api/admin/pages/[id] - Get single page
 export async function GET(
@@ -9,7 +19,35 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const page = await getPageById(id)
+    let page = await getPageById(id)
+
+    // Auto-create frontend pages that don't exist yet
+    if (!page && id.startsWith('frontend-')) {
+      const template = FRONTEND_PAGE_TEMPLATES[id]
+      if (template) {
+        const now = new Date().toISOString()
+        const newPage: Page = {
+          id,
+          title: template.title,
+          slug: template.slug,
+          published: false,
+          components: [],
+          pageSettings: {
+            backgroundColor: '#ffffff',
+          },
+          seo: {
+            metaTitle: template.title,
+            metaDescription: '',
+            metaKeywords: '',
+          },
+          createdAt: now,
+          updatedAt: now,
+        }
+
+        await blobWrite(`data/pages/${id}.json`, newPage)
+        page = newPage
+      }
+    }
 
     if (!page) {
       return NextResponse.json({ error: 'Page not found' }, { status: 404 })

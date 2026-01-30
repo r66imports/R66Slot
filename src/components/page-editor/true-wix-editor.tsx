@@ -75,6 +75,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
     savePage,
     loadPage,
     isSaving,
+    loadError,
     selectedComponent,
   } = usePageEditor()
 
@@ -151,8 +152,34 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
     return (
       <div className="fixed inset-0 bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-500 font-play">Loading editor...</p>
+          {loadError ? (
+            <>
+              <div className="text-5xl mb-4">⚠️</div>
+              <p className="text-red-600 font-play font-semibold mb-2">Failed to load page</p>
+              <p className="text-gray-500 font-play text-sm mb-4 max-w-md">{loadError}</p>
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadPage(pageId)}
+                >
+                  Retry
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/admin/pages')}
+                >
+                  Back to Pages
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto mb-4"></div>
+              <p className="text-gray-500 font-play">Loading editor...</p>
+            </>
+          )}
         </div>
       </div>
     )

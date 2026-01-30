@@ -10,6 +10,7 @@ interface PageEditorContextType {
   history: Page[]
   historyIndex: number
   isSaving: boolean
+  loadError: string | null
 
   // Actions
   setPage: (page: Page | null) => void
@@ -56,6 +57,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
   const [history, setHistory] = useState<Page[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [isSaving, setIsSaving] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Save to history
   const saveToHistory = useCallback((newPage: Page) => {
@@ -261,6 +263,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
 
   // Load page
   const loadPage = useCallback(async (pageId: string) => {
+    setLoadError(null)
     try {
       const response = await fetch(`/api/admin/pages/${pageId}`)
       if (response.ok) {
@@ -268,9 +271,13 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
         setPage(data)
         setHistory([])
         setHistoryIndex(-1)
+      } else {
+        const err = await response.json().catch(() => ({ error: 'Unknown error' }))
+        setLoadError(err.error || `Failed to load page (${response.status})`)
       }
     } catch (error) {
       console.error('Error loading page:', error)
+      setLoadError('Network error — could not reach the server')
     }
   }, [])
 
@@ -286,6 +293,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     history,
     historyIndex,
     isSaving,
+    loadError,
 
     // Actions
     setPage,
