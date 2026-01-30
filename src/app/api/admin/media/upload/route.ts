@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { blobUploadFile } from '@/lib/blob-storage'
 
 export async function POST(request: Request) {
   try {
@@ -11,27 +10,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Create uploads directory if it doesn't exist
-    const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
-    try {
-      await mkdir(uploadsDir, { recursive: true })
-    } catch (error) {
-      // Directory might already exist
-    }
-
     // Generate unique filename
     const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
     const fileExtension = file.name.split('.').pop()
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`
-    const filePath = path.join(uploadsDir, fileName)
 
-    // Write file
-    await writeFile(filePath, buffer)
-
-    // Return public URL
-    const publicUrl = `/uploads/${fileName}`
+    // Upload to Vercel Blob
+    const publicUrl = await blobUploadFile(
+      `uploads/${fileName}`,
+      bytes,
+      file.type || 'application/octet-stream'
+    )
 
     return NextResponse.json({
       success: true,

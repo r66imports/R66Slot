@@ -1,27 +1,16 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { blobRead } from '@/lib/blob-storage'
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'preorder-list.json')
+const ORDERS_KEY = 'data/preorder-list.json'
 
-function getOrders() {
-  try {
-    if (!fs.existsSync(DATA_FILE)) {
-      fs.writeFileSync(DATA_FILE, '[]', 'utf-8')
-      return []
-    }
-    const data = fs.readFileSync(DATA_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getOrders() {
+  return await blobRead<any[]>(ORDERS_KEY, [])
 }
 
 // GET all orders
 export async function GET() {
   try {
-    const orders = getOrders()
-    // Sort by date, newest first
+    const orders = await getOrders()
     orders.sort((a: any, b: any) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )

@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import fs from 'fs'
-import path from 'path'
+import { blobRead } from '@/lib/blob-storage'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-const CUSTOMERS_FILE = path.join(process.cwd(), 'data', 'customers.json')
+const CUSTOMERS_KEY = 'data/customers.json'
 
-function getCustomers() {
-  try {
-    const data = fs.readFileSync(CUSTOMERS_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getCustomers() {
+  return await blobRead<any[]>(CUSTOMERS_KEY, [])
 }
 
 export async function GET(request: NextRequest) {
@@ -26,7 +20,7 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any
-    const customers = getCustomers()
+    const customers = await getCustomers()
     const customer = customers.find((c: any) => c.id === decoded.id)
 
     if (!customer) {

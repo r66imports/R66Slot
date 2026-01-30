@@ -1,49 +1,32 @@
-import fs from 'fs/promises'
-import path from 'path'
+import { blobRead, blobWrite, blobDelete, blobList } from '@/lib/blob-storage'
 import type { Page } from './schema'
 
-const PAGES_DIR = path.join(process.cwd(), 'data', 'pages')
-
-// Ensure pages directory exists
-async function ensureDir() {
-  try {
-    await fs.access(PAGES_DIR)
-  } catch {
-    await fs.mkdir(PAGES_DIR, { recursive: true })
-  }
-}
+const PAGES_PREFIX = 'data/pages/'
 
 export async function getAllPages(): Promise<Page[]> {
-  await ensureDir()
-
   try {
-    const files = await fs.readdir(PAGES_DIR)
+    const files = await blobList(PAGES_PREFIX)
     const jsonFiles = files.filter((f) => f.endsWith('.json'))
 
     const pages = await Promise.all(
       jsonFiles.map(async (file) => {
-        const content = await fs.readFile(path.join(PAGES_DIR, file), 'utf-8')
-        return JSON.parse(content) as Page
+        return await blobRead<Page>(file, null as unknown as Page)
       })
     )
 
-    return pages.sort((a, b) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
+    return pages
+      .filter(Boolean)
+      .sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
   } catch {
     return []
   }
 }
 
 export async function getPageById(id: string): Promise<Page | null> {
-  await ensureDir()
-
   try {
-    const content = await fs.readFile(
-      path.join(PAGES_DIR, `${id}.json`),
-      'utf-8'
-    )
-    return JSON.parse(content)
+    return await blobRead<Page | null>(`${PAGES_PREFIX}${id}.json`, null)
   } catch {
     return null
   }
@@ -55,8 +38,6 @@ export async function getPageBySlug(slug: string): Promise<Page | null> {
 }
 
 export async function createPage(data: Partial<Page>): Promise<Page> {
-  await ensureDir()
-
   const id = Date.now().toString()
   const now = new Date().toISOString()
 
@@ -75,11 +56,7 @@ export async function createPage(data: Partial<Page>): Promise<Page> {
     updatedAt: now,
   }
 
-  await fs.writeFile(
-    path.join(PAGES_DIR, `${id}.json`),
-    JSON.stringify(page, null, 2)
-  )
-
+  await blobWrite(`${PAGES_PREFIX}${id}.json`, page)
   return page
 }
 
@@ -98,19 +75,10 @@ export async function updatePage(
     updatedAt: new Date().toISOString(),
   }
 
-  await fs.writeFile(
-    path.join(PAGES_DIR, `${id}.json`),
-    JSON.stringify(updated, null, 2)
-  )
-
+  await blobWrite(`${PAGES_PREFIX}${id}.json`, updated)
   return updated
 }
 
 export async function deletePage(id: string): Promise<boolean> {
-  try {
-    await fs.unlink(path.join(PAGES_DIR, `${id}.json`))
-    return true
-  } catch {
-    return false
-  }
+  return await blobDelete(`${PAGES_PREFIX}${id}.json`)
 }

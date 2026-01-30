@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
-import fs from 'fs'
-import path from 'path'
+import { blobRead } from '@/lib/blob-storage'
 
-const CUSTOMERS_FILE = path.join(process.cwd(), 'data', 'customers.json')
+const CUSTOMERS_KEY = 'data/customers.json'
 
-function getCustomers() {
-  try {
-    const data = fs.readFileSync(CUSTOMERS_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getCustomers() {
+  return await blobRead<any[]>(CUSTOMERS_KEY, [])
 }
 
 export async function POST(request: Request) {
@@ -26,7 +20,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const customers = getCustomers()
+    const customers = await getCustomers()
 
     // Find admin user by username "Admin"
     const admin = customers.find((c: any) => c.username === 'Admin')

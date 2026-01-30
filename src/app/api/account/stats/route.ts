@@ -1,29 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import fs from 'fs'
-import path from 'path'
+import { blobRead } from '@/lib/blob-storage'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-const ORDERS_FILE = path.join(process.cwd(), 'data', 'orders.json')
-const ADDRESSES_FILE = path.join(process.cwd(), 'data', 'addresses.json')
+const ORDERS_KEY = 'data/orders.json'
+const ADDRESSES_KEY = 'data/addresses.json'
 
-function getOrders() {
-  try {
-    const data = fs.readFileSync(ORDERS_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getOrders() {
+  return await blobRead<any[]>(ORDERS_KEY, [])
 }
 
-function getAddresses() {
-  try {
-    const data = fs.readFileSync(ADDRESSES_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getAddresses() {
+  return await blobRead<any[]>(ADDRESSES_KEY, [])
 }
 
 export async function GET(request: NextRequest) {
@@ -36,8 +25,8 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any
-    const orders = getOrders().filter((o: any) => o.customerId === decoded.id)
-    const addresses = getAddresses().filter((a: any) => a.customerId === decoded.id)
+    const orders = (await getOrders()).filter((o: any) => o.customerId === decoded.id)
+    const addresses = (await getAddresses()).filter((a: any) => a.customerId === decoded.id)
 
     const stats = {
       totalOrders: orders.length,

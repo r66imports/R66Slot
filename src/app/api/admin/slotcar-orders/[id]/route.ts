@@ -1,23 +1,14 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { blobRead, blobWrite } from '@/lib/blob-storage'
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'slotcar-orders.json')
+const POSTERS_KEY = 'data/slotcar-orders.json'
 
-function getPosters() {
-  try {
-    if (!fs.existsSync(DATA_FILE)) {
-      return []
-    }
-    const data = fs.readFileSync(DATA_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getPosters() {
+  return await blobRead<any[]>(POSTERS_KEY, [])
 }
 
-function savePosters(posters: any[]) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(posters, null, 2), 'utf-8')
+async function savePosters(posters: any[]) {
+  await blobWrite(POSTERS_KEY, posters)
 }
 
 // GET single poster
@@ -27,7 +18,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const posters = getPosters()
+    const posters = await getPosters()
     const poster = posters.find((p: any) => p.id === id)
 
     if (!poster) {
@@ -48,14 +39,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const posters = getPosters()
+    const posters = await getPosters()
     const filteredPosters = posters.filter((p: any) => p.id !== id)
 
     if (filteredPosters.length === posters.length) {
       return NextResponse.json({ error: 'Poster not found' }, { status: 404 })
     }
 
-    savePosters(filteredPosters)
+    await savePosters(filteredPosters)
 
     return NextResponse.json({ success: true })
   } catch (error) {

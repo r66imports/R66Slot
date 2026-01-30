@@ -2,26 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import fs from 'fs'
-import path from 'path'
+import { blobRead } from '@/lib/blob-storage'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-const CUSTOMERS_FILE = path.join(process.cwd(), 'data', 'customers.json')
+const CUSTOMERS_KEY = 'data/customers.json'
 
-// Ensure data directory exists
-const dataDir = path.join(process.cwd(), 'data')
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true })
-}
-
-// Initialize customers file if it doesn't exist
-if (!fs.existsSync(CUSTOMERS_FILE)) {
-  fs.writeFileSync(CUSTOMERS_FILE, JSON.stringify([]))
-}
-
-function getCustomers() {
-  const data = fs.readFileSync(CUSTOMERS_FILE, 'utf-8')
-  return JSON.parse(data)
+async function getCustomers() {
+  return await blobRead<any[]>(CUSTOMERS_KEY, [])
 }
 
 export async function POST(request: NextRequest) {
@@ -35,7 +22,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const customers = getCustomers()
+    const customers = await getCustomers()
 
     // Find customer by email OR username
     const customer = customers.find((c: any) =>

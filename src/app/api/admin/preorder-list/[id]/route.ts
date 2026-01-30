@@ -1,23 +1,14 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { blobRead, blobWrite } from '@/lib/blob-storage'
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'preorder-list.json')
+const ORDERS_KEY = 'data/preorder-list.json'
 
-function getOrders() {
-  try {
-    if (!fs.existsSync(DATA_FILE)) {
-      return []
-    }
-    const data = fs.readFileSync(DATA_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getOrders() {
+  return await blobRead<any[]>(ORDERS_KEY, [])
 }
 
-function saveOrders(orders: any[]) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(orders, null, 2), 'utf-8')
+async function saveOrders(orders: any[]) {
+  await blobWrite(ORDERS_KEY, orders)
 }
 
 // GET single order
@@ -27,7 +18,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const orders = getOrders()
+    const orders = await getOrders()
     const order = orders.find((o: any) => o.id === id)
 
     if (!order) {
@@ -50,14 +41,13 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
-    const orders = getOrders()
+    const orders = await getOrders()
     const orderIndex = orders.findIndex((o: any) => o.id === id)
 
     if (orderIndex === -1) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    // Allow updating any of these fields
     const allowedFields = [
       'status', 'quoteSent', 'salesOrderSent', 'invoiceSent',
       'shipped', 'archivedAt'
@@ -75,7 +65,7 @@ export async function PATCH(
       ...updates,
     }
 
-    saveOrders(orders)
+    await saveOrders(orders)
 
     return NextResponse.json(orders[orderIndex])
   } catch (error) {
@@ -91,14 +81,14 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const orders = getOrders()
+    const orders = await getOrders()
     const filteredOrders = orders.filter((o: any) => o.id !== id)
 
     if (filteredOrders.length === orders.length) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
 
-    saveOrders(filteredOrders)
+    await saveOrders(filteredOrders)
 
     return NextResponse.json({ success: true })
   } catch (error) {

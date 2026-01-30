@@ -1,30 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
-import fs from 'fs'
-import path from 'path'
+import { blobRead, blobWrite } from '@/lib/blob-storage'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-const ADDRESSES_FILE = path.join(process.cwd(), 'data', 'addresses.json')
+const ADDRESSES_KEY = 'data/addresses.json'
 
-// Ensure data directory exists
-const dataDir = path.join(process.cwd(), 'data')
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true })
+async function getAddresses() {
+  return await blobRead<any[]>(ADDRESSES_KEY, [])
 }
 
-// Initialize addresses file if it doesn't exist
-if (!fs.existsSync(ADDRESSES_FILE)) {
-  fs.writeFileSync(ADDRESSES_FILE, JSON.stringify([]))
-}
-
-function getAddresses() {
-  const data = fs.readFileSync(ADDRESSES_FILE, 'utf-8')
-  return JSON.parse(data)
-}
-
-function saveAddresses(addresses: any[]) {
-  fs.writeFileSync(ADDRESSES_FILE, JSON.stringify(addresses, null, 2))
+async function saveAddresses(addresses: any[]) {
+  await blobWrite(ADDRESSES_KEY, addresses)
 }
 
 export async function GET(request: NextRequest) {
@@ -37,7 +24,7 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any
-    const addresses = getAddresses().filter((a: any) => a.customerId === decoded.id)
+    const addresses = (await getAddresses()).filter((a: any) => a.customerId === decoded.id)
 
     return NextResponse.json(addresses)
   } catch (error) {
@@ -57,7 +44,7 @@ export async function POST(request: NextRequest) {
     const decoded = jwt.verify(token, JWT_SECRET) as any
     const addressData = await request.json()
 
-    const addresses = getAddresses()
+    const addresses = await getAddresses()
 
     // If this is set as default, unset other default addresses
     if (addressData.isDefault) {
@@ -77,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     addresses.push(newAddress)
-    saveAddresses(addresses)
+    await saveAddresses(addresses)
 
     return NextResponse.json(newAddress, { status: 201 })
   } catch (error) {

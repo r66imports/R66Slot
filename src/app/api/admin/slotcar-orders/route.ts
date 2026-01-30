@@ -1,34 +1,20 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { blobRead, blobWrite } from '@/lib/blob-storage'
 
-const DATA_FILE = path.join(process.cwd(), 'data', 'slotcar-orders.json')
+const POSTERS_KEY = 'data/slotcar-orders.json'
 
-function getPosters() {
-  try {
-    if (!fs.existsSync(DATA_FILE)) {
-      fs.writeFileSync(DATA_FILE, '[]', 'utf-8')
-      return []
-    }
-    const data = fs.readFileSync(DATA_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getPosters() {
+  return await blobRead<any[]>(POSTERS_KEY, [])
 }
 
-function savePosters(posters: any[]) {
-  const dir = path.dirname(DATA_FILE)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
-  }
-  fs.writeFileSync(DATA_FILE, JSON.stringify(posters, null, 2), 'utf-8')
+async function savePosters(posters: any[]) {
+  await blobWrite(POSTERS_KEY, posters)
 }
 
 // GET all posters
 export async function GET() {
   try {
-    const posters = getPosters()
+    const posters = await getPosters()
     return NextResponse.json(posters)
   } catch (error) {
     console.error('Error fetching posters:', error)
@@ -41,15 +27,14 @@ export async function POST(request: Request) {
   try {
     const posterData = await request.json()
 
-    const posters = getPosters()
+    const posters = await getPosters()
 
-    // Add the new poster
     posters.push({
       ...posterData,
       createdAt: new Date().toISOString(),
     })
 
-    savePosters(posters)
+    await savePosters(posters)
 
     return NextResponse.json(posterData)
   } catch (error) {
@@ -63,7 +48,7 @@ export async function PUT(request: Request) {
   try {
     const posterData = await request.json()
 
-    const posters = getPosters()
+    const posters = await getPosters()
     const index = posters.findIndex((p: any) => p.id === posterData.id)
 
     if (index === -1) {
@@ -76,7 +61,7 @@ export async function PUT(request: Request) {
       updatedAt: new Date().toISOString(),
     }
 
-    savePosters(posters)
+    await savePosters(posters)
 
     return NextResponse.json(posters[index])
   } catch (error) {

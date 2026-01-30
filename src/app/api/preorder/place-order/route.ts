@@ -1,45 +1,23 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
+import { blobRead, blobWrite } from '@/lib/blob-storage'
 
-const ORDERS_FILE = path.join(process.cwd(), 'data', 'preorder-list.json')
-const POSTERS_FILE = path.join(process.cwd(), 'data', 'slotcar-orders.json')
+const ORDERS_KEY = 'data/preorder-list.json'
+const POSTERS_KEY = 'data/slotcar-orders.json'
 
-function getOrders() {
-  try {
-    if (!fs.existsSync(ORDERS_FILE)) {
-      fs.writeFileSync(ORDERS_FILE, '[]', 'utf-8')
-      return []
-    }
-    const data = fs.readFileSync(ORDERS_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getOrders() {
+  return await blobRead<any[]>(ORDERS_KEY, [])
 }
 
-function saveOrders(orders: any[]) {
-  const dir = path.dirname(ORDERS_FILE)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
-  }
-  fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8')
+async function saveOrders(orders: any[]) {
+  await blobWrite(ORDERS_KEY, orders)
 }
 
-function getPosters() {
-  try {
-    if (!fs.existsSync(POSTERS_FILE)) {
-      return []
-    }
-    const data = fs.readFileSync(POSTERS_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch {
-    return []
-  }
+async function getPosters() {
+  return await blobRead<any[]>(POSTERS_KEY, [])
 }
 
-function savePosters(posters: any[]) {
-  fs.writeFileSync(POSTERS_FILE, JSON.stringify(posters, null, 2), 'utf-8')
+async function savePosters(posters: any[]) {
+  await blobWrite(POSTERS_KEY, posters)
 }
 
 // POST place order
@@ -56,7 +34,7 @@ export async function POST(request: Request) {
     }
 
     // Check if poster exists and has availability
-    const posters = getPosters()
+    const posters = await getPosters()
     const posterIndex = posters.findIndex((p: any) => p.id === orderData.posterId)
 
     if (posterIndex === -1) {
@@ -76,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     // Create order
-    const orders = getOrders()
+    const orders = await getOrders()
     const newOrder = {
       id: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       ...orderData,
@@ -85,11 +63,11 @@ export async function POST(request: Request) {
     }
 
     orders.push(newOrder)
-    saveOrders(orders)
+    await saveOrders(orders)
 
     // Update poster available quantity
     posters[posterIndex].availableQty -= orderData.quantity
-    savePosters(posters)
+    await savePosters(posters)
 
     return NextResponse.json({
       success: true,
