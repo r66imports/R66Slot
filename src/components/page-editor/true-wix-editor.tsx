@@ -46,6 +46,12 @@ const COMPONENT_LIBRARY = [
   { type: 'product-grid' as const, label: 'Product Grid', icon: '🛍️', desc: 'Product listing' },
   { type: 'featured-product' as const, label: 'Featured Product', icon: '⭐', desc: 'Showcase product' },
   { type: 'quote' as const, label: 'Quote', icon: '❝', desc: 'Blockquote text' },
+  { type: 'section' as const, label: 'Section', icon: '📐', desc: 'Page section container' },
+  { type: 'content-block' as const, label: 'Content Block', icon: '📄', desc: 'Text & image block' },
+  { type: 'ui-component' as const, label: 'UI Component', icon: '🧩', desc: 'Reusable UI element' },
+  { type: 'slot' as const, label: 'Slot', icon: '🔲', desc: 'Placeholder insertion point' },
+  { type: 'widget' as const, label: 'Widget', icon: '⚙️', desc: 'Interactive module' },
+  { type: 'media' as const, label: 'Media', icon: '🎨', desc: 'Image/video media block' },
 ]
 
 export function TrueWixEditor({ pageId }: TrueWixEditorProps) {

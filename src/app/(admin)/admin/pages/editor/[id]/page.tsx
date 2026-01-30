@@ -115,6 +115,56 @@ const COMPONENT_DEFAULTS: Array<{
       settings: { author: 'Author Name' },
     },
   },
+  {
+    type: 'section',
+    defaultProps: {
+      content: '',
+      styles: { backgroundColor: '#F9FAFB', paddingTop: '64px', paddingBottom: '64px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { sectionTitle: 'Section Title', sectionSubtitle: '', sectionLayout: 'stacked' },
+      children: [],
+    },
+  },
+  {
+    type: 'content-block',
+    defaultProps: {
+      content: '<h3>Content Block</h3><p>Add your content here. Content blocks are versatile pieces that combine text, images, and actions.</p>',
+      styles: { backgroundColor: '#FFFFFF', paddingTop: '32px', paddingBottom: '32px', paddingLeft: '24px', paddingRight: '24px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+      settings: { imageUrl: '', imagePosition: 'top', buttonText: '', buttonLink: '' },
+    },
+  },
+  {
+    type: 'ui-component',
+    defaultProps: {
+      content: '',
+      styles: { paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { componentType: 'card', title: 'Card Title', description: 'Card description text', icon: '🧩', actionText: '', actionLink: '' },
+    },
+  },
+  {
+    type: 'slot',
+    defaultProps: {
+      content: '',
+      styles: { paddingTop: '24px', paddingBottom: '24px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { slotLabel: 'Drop Zone', slotMinHeight: '120' },
+      children: [],
+    },
+  },
+  {
+    type: 'widget',
+    defaultProps: {
+      content: '',
+      styles: { paddingTop: '24px', paddingBottom: '24px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { widgetType: 'search', placeholder: 'Search...', title: 'Widget' },
+    },
+  },
+  {
+    type: 'media',
+    defaultProps: {
+      content: '',
+      styles: { paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { mediaType: 'image', imageUrl: '', videoUrl: '', alt: '', caption: '', aspectRatio: '16/9' },
+    },
+  },
 ]
 
 export default function EditorPage({

@@ -622,6 +622,280 @@ function ContentTab({
       {(component.type === 'two-column' || component.type === 'three-column') && (
         <VisualColumnEditor component={component} onUpdate={onUpdate} />
       )}
+
+      {/* Section Content */}
+      {component.type === 'section' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Section Title</label>
+            <input
+              type="text"
+              value={(component.settings.sectionTitle as string) || ''}
+              onChange={(e) => updateSetting('sectionTitle', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play font-bold"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Section Subtitle</label>
+            <textarea
+              value={(component.settings.sectionSubtitle as string) || ''}
+              onChange={(e) => updateSetting('sectionSubtitle', e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Content Block */}
+      {component.type === 'content-block' && (
+        <>
+          <RichTextEditor
+            label="Block Content"
+            value={component.content}
+            onChange={(html) => onUpdate({ content: html })}
+            rows={4}
+          />
+          <ImageField
+            label="Block Image"
+            value={(component.settings.imageUrl as string) || ''}
+            onChange={(url) => updateSetting('imageUrl', url)}
+          />
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Position</label>
+            <select
+              value={(component.settings.imagePosition as string) || 'top'}
+              onChange={(e) => updateSetting('imagePosition', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="top">Top</option>
+              <option value="bottom">Bottom</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Button Text</label>
+            <input
+              type="text"
+              value={(component.settings.buttonText as string) || ''}
+              onChange={(e) => updateSetting('buttonText', e.target.value)}
+              placeholder="Optional button"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play mb-1"
+            />
+            <input
+              type="text"
+              value={(component.settings.buttonLink as string) || ''}
+              onChange={(e) => updateSetting('buttonLink', e.target.value)}
+              placeholder="Button URL"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+        </>
+      )}
+
+      {/* UI Component */}
+      {component.type === 'ui-component' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Component Type</label>
+            <select
+              value={(component.settings.componentType as string) || 'card'}
+              onChange={(e) => updateSetting('componentType', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="card">Card</option>
+              <option value="stat">Stat / Counter</option>
+              <option value="badge">Badge / Tag</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{(component.settings.icon as string) || '🧩'}</span>
+            <input
+              type="text"
+              value={(component.settings.icon as string) || ''}
+              onChange={(e) => updateSetting('icon', e.target.value)}
+              placeholder="Emoji icon"
+              className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm font-play"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Title</label>
+            <input
+              type="text"
+              value={(component.settings.title as string) || ''}
+              onChange={(e) => updateSetting('title', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Description</label>
+            <textarea
+              value={(component.settings.description as string) || ''}
+              onChange={(e) => updateSetting('description', e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Action Text</label>
+            <input
+              type="text"
+              value={(component.settings.actionText as string) || ''}
+              onChange={(e) => updateSetting('actionText', e.target.value)}
+              placeholder="e.g. Learn More"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play mb-1"
+            />
+            <input
+              type="text"
+              value={(component.settings.actionLink as string) || ''}
+              onChange={(e) => updateSetting('actionLink', e.target.value)}
+              placeholder="Link URL"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Slot */}
+      {component.type === 'slot' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Slot Label</label>
+            <input
+              type="text"
+              value={(component.settings.slotLabel as string) || ''}
+              onChange={(e) => updateSetting('slotLabel', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Min Height (px)</label>
+            <input
+              type="number"
+              value={(component.settings.slotMinHeight as string) || '120'}
+              onChange={(e) => updateSetting('slotMinHeight', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+        </>
+      )}
+
+      {/* Widget */}
+      {component.type === 'widget' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Widget Type</label>
+            <select
+              value={(component.settings.widgetType as string) || 'search'}
+              onChange={(e) => updateSetting('widgetType', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="search">Search Bar</option>
+              <option value="newsletter">Newsletter Signup</option>
+              <option value="contact-form">Contact Form</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Title</label>
+            <input
+              type="text"
+              value={(component.settings.title as string) || ''}
+              onChange={(e) => updateSetting('title', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+          {(component.settings.widgetType === 'search') && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Placeholder</label>
+              <input
+                type="text"
+                value={(component.settings.placeholder as string) || ''}
+                onChange={(e) => updateSetting('placeholder', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              />
+            </div>
+          )}
+          {(component.settings.widgetType === 'newsletter' || component.settings.widgetType === 'contact-form') && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Description</label>
+              <textarea
+                value={(component.settings.description as string) || ''}
+                onChange={(e) => updateSetting('description', e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Media */}
+      {component.type === 'media' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Media Type</label>
+            <select
+              value={(component.settings.mediaType as string) || 'image'}
+              onChange={(e) => updateSetting('mediaType', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+            </select>
+          </div>
+          {(component.settings.mediaType || 'image') === 'image' ? (
+            <ImageField
+              label="Image"
+              value={(component.settings.imageUrl as string) || ''}
+              onChange={(url) => updateSetting('imageUrl', url)}
+            />
+          ) : (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Video URL</label>
+              <input
+                type="text"
+                value={(component.settings.videoUrl as string) || ''}
+                onChange={(e) => updateSetting('videoUrl', e.target.value)}
+                placeholder="YouTube or Vimeo embed URL"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Alt Text</label>
+            <input
+              type="text"
+              value={(component.settings.alt as string) || ''}
+              onChange={(e) => updateSetting('alt', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Caption</label>
+            <input
+              type="text"
+              value={(component.settings.caption as string) || ''}
+              onChange={(e) => updateSetting('caption', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Aspect Ratio</label>
+            <select
+              value={(component.settings.aspectRatio as string) || '16/9'}
+              onChange={(e) => updateSetting('aspectRatio', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="16/9">16:9 (Widescreen)</option>
+              <option value="4/3">4:3 (Standard)</option>
+              <option value="1/1">1:1 (Square)</option>
+              <option value="21/9">21:9 (Ultra-wide)</option>
+              <option value="auto">Auto</option>
+            </select>
+          </div>
+        </>
+      )}
     </>
   )
 }
@@ -1187,8 +1461,57 @@ function SettingsTab({
         </div>
       )}
 
+      {/* Widget settings */}
+      {component.type === 'widget' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Widget Type</label>
+          <select
+            value={(component.settings.widgetType as string) || 'search'}
+            onChange={(e) => updateSetting('widgetType', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+          >
+            <option value="search">Search Bar</option>
+            <option value="newsletter">Newsletter Signup</option>
+            <option value="contact-form">Contact Form</option>
+          </select>
+        </div>
+      )}
+
+      {/* UI Component type */}
+      {component.type === 'ui-component' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Display Type</label>
+          <select
+            value={(component.settings.componentType as string) || 'card'}
+            onChange={(e) => updateSetting('componentType', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+          >
+            <option value="card">Card</option>
+            <option value="stat">Stat / Counter</option>
+            <option value="badge">Badge / Tag</option>
+          </select>
+        </div>
+      )}
+
+      {/* Media aspect ratio */}
+      {component.type === 'media' && (
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Aspect Ratio</label>
+          <select
+            value={(component.settings.aspectRatio as string) || '16/9'}
+            onChange={(e) => updateSetting('aspectRatio', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+          >
+            <option value="16/9">16:9</option>
+            <option value="4/3">4:3</option>
+            <option value="1/1">1:1</option>
+            <option value="auto">Auto</option>
+          </select>
+        </div>
+      )}
+
       {/* Generic info for types with no special settings */}
-      {!['hero', 'divider', 'product-grid', 'gallery'].includes(component.type) && (
+      {!['hero', 'divider', 'product-grid', 'gallery', 'section', 'content-block', 'ui-component', 'slot', 'widget', 'media'].includes(component.type) && (
         <div className="text-xs text-gray-400 text-center py-4 font-play">
           No additional settings for this component type.
         </div>

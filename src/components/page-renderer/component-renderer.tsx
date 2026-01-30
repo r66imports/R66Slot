@@ -521,6 +521,241 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       )
 
+    case 'section': {
+      const sectionTitle = (settings.sectionTitle as string) || ''
+      const sectionSubtitle = (settings.sectionSubtitle as string) || ''
+      return (
+        <section style={containerStyle}>
+          <div className="container mx-auto">
+            {sectionTitle && (
+              <h2 className="text-3xl font-bold mb-2 text-center">{sectionTitle}</h2>
+            )}
+            {sectionSubtitle && (
+              <p className="text-lg opacity-70 mb-8 text-center max-w-2xl mx-auto">{sectionSubtitle}</p>
+            )}
+            {children && children.length > 0 ? (
+              <div className="space-y-4">
+                {children.map((child) => (
+                  <ComponentRenderer key={child.id} component={child} />
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </section>
+      )
+    }
+
+    case 'content-block': {
+      const imgPos = (settings.imagePosition as string) || 'top'
+      const hasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
+      const blockContent = (
+        <div className="flex-1">
+          <div dangerouslySetInnerHTML={{ __html: content }} />
+          {settings.buttonText && (
+            <div className="mt-4">
+              <Button asChild>
+                <Link href={(settings.buttonLink as string) || '#'}>
+                  {settings.buttonText as string}
+                </Link>
+              </Button>
+            </div>
+          )}
+        </div>
+      )
+      const blockImage = hasImage ? (
+        <div className={imgPos === 'top' || imgPos === 'bottom' ? 'w-full' : 'w-1/2 flex-shrink-0'}>
+          <img
+            src={settings.imageUrl as string}
+            alt={(settings.alt as string) || ''}
+            className="w-full h-auto rounded-lg object-cover"
+            style={{ maxHeight: imgPos === 'top' || imgPos === 'bottom' ? '300px' : undefined }}
+          />
+        </div>
+      ) : null
+
+      if (imgPos === 'left' && blockImage) {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto flex flex-col md:flex-row gap-6 items-start">
+              {blockImage}
+              {blockContent}
+            </div>
+          </div>
+        )
+      }
+      if (imgPos === 'right' && blockImage) {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto flex flex-col md:flex-row gap-6 items-start">
+              {blockContent}
+              {blockImage}
+            </div>
+          </div>
+        )
+      }
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            {imgPos === 'top' && blockImage}
+            {blockContent}
+            {imgPos === 'bottom' && blockImage}
+          </div>
+        </div>
+      )
+    }
+
+    case 'ui-component': {
+      const compType = (settings.componentType as string) || 'card'
+      const uiTitle = (settings.title as string) || 'Component'
+      const uiDescription = (settings.description as string) || ''
+      const uiIcon = (settings.icon as string) || '🧩'
+
+      if (compType === 'stat') {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto text-center">
+              <div className="text-4xl mb-2">{uiIcon}</div>
+              <div className="text-3xl font-bold mb-1">{uiTitle}</div>
+              {uiDescription && <p className="text-sm opacity-70">{uiDescription}</p>}
+            </div>
+          </div>
+        )
+      }
+      if (compType === 'badge') {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto flex justify-center">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold">
+                <span>{uiIcon}</span> {uiTitle}
+              </span>
+            </div>
+          </div>
+        )
+      }
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+              <div className="text-3xl mb-3">{uiIcon}</div>
+              <h3 className="text-lg font-bold mb-2">{uiTitle}</h3>
+              {uiDescription && <p className="text-sm text-gray-600">{uiDescription}</p>}
+              {settings.actionText && settings.actionLink && (
+                <Link href={settings.actionLink as string} className="inline-block mt-4 text-primary font-semibold text-sm hover:underline">
+                  {settings.actionText as string} &rarr;
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    case 'slot':
+      // Slots render their children on the frontend, or nothing if empty
+      return children && children.length > 0 ? (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            {children.map((child) => (
+              <ComponentRenderer key={child.id} component={child} />
+            ))}
+          </div>
+        </div>
+      ) : null
+
+    case 'widget': {
+      const widgetType = (settings.widgetType as string) || 'search'
+      if (widgetType === 'search') {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto max-w-xl">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder={(settings.placeholder as string) || 'Search...'}
+                  className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        )
+      }
+      if (widgetType === 'newsletter') {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto max-w-lg text-center">
+              <h3 className="text-xl font-bold mb-2">{(settings.title as string) || 'Subscribe'}</h3>
+              <p className="text-sm opacity-70 mb-4">{(settings.description as string) || 'Get the latest updates'}</p>
+              <form className="flex gap-2">
+                <input type="email" placeholder="Enter your email" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                <Button type="submit">Subscribe</Button>
+              </form>
+            </div>
+          </div>
+        )
+      }
+      if (widgetType === 'contact-form') {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto max-w-lg">
+              <h3 className="text-xl font-bold mb-4">{(settings.title as string) || 'Contact Us'}</h3>
+              <form className="space-y-3">
+                <input type="text" placeholder="Your Name" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                <input type="email" placeholder="Email Address" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm" />
+                <textarea placeholder="Your Message" rows={4} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm resize-none" />
+                <Button type="submit">Send Message</Button>
+              </form>
+            </div>
+          </div>
+        )
+      }
+      return null
+    }
+
+    case 'media': {
+      const mediaType = (settings.mediaType as string) || 'image'
+      const caption = (settings.caption as string) || ''
+      const aspectRatio = (settings.aspectRatio as string) || '16/9'
+
+      if (mediaType === 'video' && settings.videoUrl) {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto">
+              <div style={{ aspectRatio }} className="rounded-lg overflow-hidden">
+                <iframe
+                  src={settings.videoUrl as string}
+                  className="w-full h-full"
+                  allowFullScreen
+                  title="Video"
+                />
+              </div>
+              {caption && <p className="text-sm text-gray-500 mt-2 text-center italic">{caption}</p>}
+            </div>
+          </div>
+        )
+      }
+      if (settings.imageUrl) {
+        return (
+          <div style={containerStyle}>
+            <div className="container mx-auto">
+              <figure>
+                <img
+                  src={settings.imageUrl as string}
+                  alt={(settings.alt as string) || ''}
+                  className="w-full rounded-lg object-cover"
+                  style={{ aspectRatio }}
+                />
+                {caption && <figcaption className="text-sm text-gray-500 mt-2 text-center italic">{caption}</figcaption>}
+              </figure>
+            </div>
+          </div>
+        )
+      }
+      return null
+    }
+
     default:
       return (
         <div style={containerStyle}>
