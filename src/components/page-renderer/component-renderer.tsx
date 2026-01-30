@@ -101,7 +101,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         <section
           style={{
             ...containerStyle,
-            backgroundImage: heroHasImage ? `url(${settings.imageUrl})` : undefined,
+            backgroundImage: heroHasImage ? `url("${settings.imageUrl}")` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',

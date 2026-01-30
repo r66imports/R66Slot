@@ -1315,10 +1315,10 @@ function SettingsTab({
         )}
       </div>
 
-      {/* Freeform position controls */}
+      {/* Freeform position & size controls */}
       {component.positionMode === 'absolute' && component.position && (
         <div className="space-y-2 pt-2 border-t border-gray-100">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-play">Position</h4>
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-play">Position & Size</h4>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-gray-400 font-play">X</label>
@@ -1335,6 +1335,24 @@ function SettingsTab({
                 type="number"
                 value={Math.round(component.position.y)}
                 onChange={(e) => onUpdate({ position: { ...component.position!, y: parseInt(e.target.value) || 0 } })}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-play">Width</label>
+              <input
+                type="number"
+                value={Math.round(component.position.width)}
+                onChange={(e) => onUpdate({ position: { ...component.position!, width: Math.max(40, parseInt(e.target.value) || 100) } })}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-400 font-play">Height</label>
+              <input
+                type="number"
+                value={Math.round(component.position.height)}
+                onChange={(e) => onUpdate({ position: { ...component.position!, height: Math.max(24, parseInt(e.target.value) || 100) } })}
                 className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
               />
             </div>

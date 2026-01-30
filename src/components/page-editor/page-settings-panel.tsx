@@ -12,12 +12,16 @@ interface PageSettingsPanelProps {
 export function PageSettingsPanel({ pageSettings, onUpdate, onClose }: PageSettingsPanelProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [imgError, setImgError] = useState(false)
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     setUploading(true)
+    setUploadError(null)
+    setImgError(false)
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -25,9 +29,13 @@ export function PageSettingsPanel({ pageSettings, onUpdate, onClose }: PageSetti
       if (res.ok) {
         const data = await res.json()
         onUpdate({ backgroundImage: data.url })
+      } else {
+        const errData = await res.json().catch(() => ({ error: 'Upload failed' }))
+        setUploadError(errData.error || `Upload failed (${res.status})`)
       }
     } catch (err) {
       console.error('Upload failed:', err)
+      setUploadError('Network error — check your connection')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -67,14 +75,28 @@ export function PageSettingsPanel({ pageSettings, onUpdate, onClose }: PageSetti
         <div className="pt-2 border-t border-gray-100">
           <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Background Image</label>
 
+          {uploadError && (
+            <div className="mb-2 px-2 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-600 font-play">
+              {uploadError}
+            </div>
+          )}
+
           {pageSettings.backgroundImage ? (
             <div className="relative group/img rounded-lg overflow-hidden border border-gray-200 mb-2">
-              <img
-                src={pageSettings.backgroundImage}
-                alt=""
-                className="w-full h-36 object-cover"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-              />
+              {imgError ? (
+                <div className="w-full h-36 bg-gray-100 flex flex-col items-center justify-center text-gray-400">
+                  <span className="text-2xl mb-1">⚠️</span>
+                  <p className="text-xs font-play">Image failed to load</p>
+                  <p className="text-[10px] font-play mt-1 max-w-[200px] truncate">{pageSettings.backgroundImage}</p>
+                </div>
+              ) : (
+                <img
+                  src={pageSettings.backgroundImage}
+                  alt=""
+                  className="w-full h-36 object-cover"
+                  onError={() => setImgError(true)}
+                />
+              )}
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button
                   onClick={() => fileRef.current?.click()}
@@ -113,7 +135,7 @@ export function PageSettingsPanel({ pageSettings, onUpdate, onClose }: PageSetti
           <input
             type="text"
             value={pageSettings.backgroundImage || ''}
-            onChange={(e) => onUpdate({ backgroundImage: e.target.value })}
+            onChange={(e) => { setImgError(false); onUpdate({ backgroundImage: e.target.value }) }}
             placeholder="Or paste image URL..."
             className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play text-gray-500 focus:text-gray-900 focus:ring-1 focus:ring-indigo-400"
           />

@@ -37,7 +37,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
         <section
           style={{
             ...containerStyle,
-            backgroundImage: heroHasImage ? `url(${settings.imageUrl})` : undefined,
+            backgroundImage: heroHasImage ? `url("${settings.imageUrl}")` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',

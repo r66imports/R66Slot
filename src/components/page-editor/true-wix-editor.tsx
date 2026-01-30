@@ -9,6 +9,7 @@ import { RenderedComponent } from './rendered-component'
 import { EditorPropertiesPanel } from './editor-properties-panel'
 import { PageSettingsPanel } from './page-settings-panel'
 import { TemplateChooser } from './template-chooser'
+import { ResizableBox } from '@/components/editor/ResizableBox'
 import Draggable, { type DraggableData, type DraggableEvent } from 'react-draggable'
 import {
   DndContext,
@@ -306,7 +307,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
           onClick={() => { setSelectedComponentId(null); setShowPageSettings(false) }}
         >
           <div
-            className="mx-auto shadow-lg transition-all duration-300 min-h-screen"
+            className="mx-auto shadow-lg transition-all duration-300 min-h-screen overflow-hidden"
             style={{ maxWidth: canvasWidth, ...pageBackgroundStyle }}
           >
             {/* Page background image layer */}
@@ -315,7 +316,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  backgroundImage: `url(${ps.backgroundImage})`,
+                  backgroundImage: `url("${ps.backgroundImage}")`,
                   backgroundSize: ps.fullWidth ? 'cover' : (ps.backgroundSize || 'cover'),
                   backgroundPosition: ps.backgroundPosition || 'center',
                   backgroundRepeat: 'no-repeat',
@@ -376,7 +377,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                     </DragOverlay>
                   </DndContext>
 
-                  {/* Absolute/freeform components (draggable) */}
+                  {/* Absolute/freeform components (draggable + resizable) */}
                   {absoluteComponents.map((component) => (
                     <FreeformComponent
                       key={component.id}
@@ -390,6 +391,17 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                             y,
                             width: component.position?.width || 300,
                             height: component.position?.height || 200,
+                            zIndex: component.position?.zIndex || 10,
+                          }
+                        })
+                      }}
+                      onUpdateSize={(w, h) => {
+                        updateComponent(component.id, {
+                          position: {
+                            x: component.position?.x || 50,
+                            y: component.position?.y || 50,
+                            width: w,
+                            height: h,
                             zIndex: component.position?.zIndex || 10,
                           }
                         })
@@ -527,25 +539,40 @@ function SortableLiveComponent({
   )
 }
 
-// ─── Freeform (absolute) Component ───
+// ─── Freeform (absolute) Component with Resize ───
 function FreeformComponent({
   component,
   isSelected,
   onSelect,
   onUpdatePosition,
+  onUpdateSize,
   onUpdateSettings,
 }: {
   component: PageComponent
   isSelected: boolean
   onSelect: () => void
   onUpdatePosition: (x: number, y: number) => void
+  onUpdateSize: (w: number, h: number) => void
   onUpdateSettings?: (key: string, value: any) => void
 }) {
   const nodeRef = useRef<HTMLDivElement>(null)
   const pos = component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 }
+  const [liveWidth, setLiveWidth] = useState(pos.width)
+  const [liveHeight, setLiveHeight] = useState(pos.height)
+  const isResizingRef = useRef(false)
+
+  // Sync live dimensions when component position changes externally
+  useEffect(() => {
+    if (!isResizingRef.current) {
+      setLiveWidth(pos.width)
+      setLiveHeight(pos.height)
+    }
+  }, [pos.width, pos.height])
 
   const handleStop = useCallback((_e: DraggableEvent, data: DraggableData) => {
-    onUpdatePosition(data.x, data.y)
+    if (!isResizingRef.current) {
+      onUpdatePosition(data.x, data.y)
+    }
   }, [onUpdatePosition])
 
   return (
@@ -553,13 +580,14 @@ function FreeformComponent({
       nodeRef={nodeRef as React.RefObject<HTMLElement>}
       position={{ x: pos.x, y: pos.y }}
       onStop={handleStop}
+      disabled={isResizingRef.current}
     >
       <div
         ref={nodeRef}
         style={{
           position: 'absolute',
           zIndex: pos.zIndex || 10,
-          cursor: 'grab',
+          cursor: isResizingRef.current ? 'default' : 'grab',
           top: 0,
           left: 0,
         }}
@@ -576,13 +604,36 @@ function FreeformComponent({
           </span>
         </div>
 
-        <div className={`transition-all ${
-          isSelected
-            ? 'ring-2 ring-purple-500 ring-offset-1'
-            : 'hover:ring-2 hover:ring-purple-300 hover:ring-offset-1'
-        }`}>
-          <RenderedComponent component={component} isEditing={true} onUpdateSettings={onUpdateSettings} />
-        </div>
+        <ResizableBox
+          width={liveWidth}
+          height={liveHeight}
+          isSelected={isSelected}
+          minWidth={60}
+          minHeight={30}
+          snapGrid={4}
+          onResizeStart={() => {
+            isResizingRef.current = true
+          }}
+          onResize={(w, h) => {
+            setLiveWidth(w)
+            setLiveHeight(h)
+          }}
+          onResizeEnd={(w, h) => {
+            isResizingRef.current = false
+            onUpdateSize(w, h)
+          }}
+        >
+          <div
+            className={`w-full h-full transition-all ${
+              isSelected
+                ? 'ring-2 ring-purple-500 ring-offset-1'
+                : 'hover:ring-2 hover:ring-purple-300 hover:ring-offset-1'
+            }`}
+            style={{ overflow: 'hidden' }}
+          >
+            <RenderedComponent component={component} isEditing={true} onUpdateSettings={onUpdateSettings} />
+          </div>
+        </ResizableBox>
       </div>
     </Draggable>
   )

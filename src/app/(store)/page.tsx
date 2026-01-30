@@ -32,7 +32,7 @@ export default async function HomePage() {
             style={{
               position: 'fixed',
               inset: 0,
-              backgroundImage: `url(${ps.backgroundImage})`,
+              backgroundImage: `url("${ps.backgroundImage}")`,
               backgroundSize: ps.fullWidth ? 'cover' : (ps.backgroundSize || 'cover'),
               backgroundPosition: ps.backgroundPosition || 'center',
               backgroundRepeat: 'no-repeat',
