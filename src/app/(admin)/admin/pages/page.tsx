@@ -225,11 +225,29 @@ export default function PagesManagementPage() {
     })),
   ]
 
+  // Strip domain from search query to match slugs from full URLs
+  const normalizeSearch = (query: string): string => {
+    let q = query.trim().toLowerCase()
+    // Strip common domain patterns: https://r66slot.co.za/about -> about
+    try {
+      const url = new URL(q)
+      q = url.pathname.replace(/^\//, '').replace(/\/$/, '')
+    } catch {
+      // Not a full URL, strip leading slash
+      q = q.replace(/^\/+/, '').replace(/\/$/, '')
+    }
+    return q
+  }
+
+  const normalizedQuery = normalizeSearch(searchQuery)
+
   const searchResults = searchQuery.trim()
     ? allSearchablePages.filter(
         (p) =>
-          p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.title.toLowerCase().includes(searchQuery.toLowerCase())
+          p.slug.toLowerCase().includes(normalizedQuery) ||
+          p.title.toLowerCase().includes(normalizedQuery) ||
+          // Also match raw query against title
+          p.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
       )
     : []
 
@@ -275,47 +293,74 @@ export default function PagesManagementPage() {
 
         {/* Search Results */}
         {searchQuery.trim() && (
-          <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm">
+          <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-lg">
+            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+              <p className="text-xs text-gray-500 font-play">
+                {searchResults.length} page{searchResults.length !== 1 ? 's' : ''} found
+                {normalizedQuery !== searchQuery.trim().toLowerCase() && (
+                  <span className="ml-1 text-blue-500">
+                    (searching: /{normalizedQuery || 'home'})
+                  </span>
+                )}
+              </p>
+            </div>
             {searchResults.length === 0 ? (
-              <div className="p-4 text-sm text-gray-500 text-center">
-                No pages found matching &ldquo;{searchQuery}&rdquo;
+              <div className="p-6 text-center">
+                <div className="text-3xl mb-2">🔍</div>
+                <p className="text-sm text-gray-500">
+                  No pages found matching &ldquo;{searchQuery}&rdquo;
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Try searching by page name or URL path
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
                 {searchResults.map((page) => (
                   <div
                     key={`${page.type}-${page.id}`}
-                    className="flex items-center justify-between p-3 hover:bg-gray-50"
+                    className="flex items-center justify-between p-4 hover:bg-blue-50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-xl">{page.icon}</span>
+                      <span className="text-2xl">{page.icon}</span>
                       <div>
-                        <p className="text-sm font-medium">{page.title}</p>
+                        <p className="text-sm font-semibold">{page.title}</p>
                         <p className="text-xs text-gray-500">
-                          /{page.slug || 'home'}
+                          https://r66slot.co.za/{page.slug || ''}
                         </p>
                       </div>
                       <span
-                        className={`px-2 py-0.5 text-xs rounded ${
+                        className={`px-2 py-0.5 text-xs rounded font-medium ${
                           page.type === 'frontend'
                             ? 'bg-blue-100 text-blue-700'
-                            : 'bg-gray-100 text-gray-600'
+                            : 'bg-purple-100 text-purple-700'
                         }`}
                       >
-                        {page.type === 'frontend' ? 'Main Page' : 'Custom'}
+                        {page.type === 'frontend' ? 'Main Page' : 'Custom Page'}
                       </span>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link
-                        href={
-                          page.type === 'frontend'
-                            ? `/admin/pages/editor/frontend-${page.id}`
-                            : `/admin/pages/editor/${page.id}`
-                        }
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={page.slug ? `/${page.slug}` : '/'} target="_blank">
+                          View Live
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                        asChild
                       >
-                        Edit
-                      </Link>
-                    </Button>
+                        <Link
+                          href={
+                            page.type === 'frontend'
+                              ? `/admin/pages/editor/frontend-${page.id}`
+                              : `/admin/pages/editor/${page.id}`
+                          }
+                        >
+                          Edit Page
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

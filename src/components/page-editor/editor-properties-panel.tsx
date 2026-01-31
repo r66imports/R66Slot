@@ -1502,6 +1502,31 @@ function PositionInput({
   )
 }
 
+// ─── Opacity Slider ───
+function OpacitySlider({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const numValue = parseInt(value) || 100
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-xs text-gray-500 font-play">Opacity</label>
+        <span className="text-xs text-gray-400 font-play">{numValue}%</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={numValue}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+      />
+      <div className="flex justify-between text-[10px] text-gray-400 font-play mt-0.5">
+        <span>Transparent</span>
+        <span>Opaque</span>
+      </div>
+    </div>
+  )
+}
+
 // ─── Style Tab ───
 function StyleTab({
   component,
@@ -1512,6 +1537,21 @@ function StyleTab({
 }) {
   return (
     <>
+      {/* Opacity Control */}
+      <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider mb-2 font-play flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          Opacity
+        </h4>
+        <OpacitySlider
+          value={component.styles.opacity || '100'}
+          onChange={(v) => updateStyle('opacity', v)}
+        />
+      </div>
+
       <div>
         <label className="block text-xs text-gray-500 mb-1 font-play">Background Color</label>
         <div className="flex items-center gap-2">
@@ -1527,6 +1567,21 @@ function StyleTab({
             onChange={(e) => updateStyle('backgroundColor', e.target.value)}
             placeholder="#ffffff"
             className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs font-play"
+          />
+        </div>
+        {/* Background Opacity */}
+        <div className="mt-2">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] text-gray-500 font-play">Background Opacity</label>
+            <span className="text-[10px] text-gray-400 font-play">{parseInt(component.styles.backgroundOpacity || '100')}%</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={parseInt(component.styles.backgroundOpacity || '100')}
+            onChange={(e) => updateStyle('backgroundOpacity', e.target.value)}
+            className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
         </div>
       </div>
@@ -1548,6 +1603,21 @@ function StyleTab({
             className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs font-play"
           />
         </div>
+        {/* Text Opacity */}
+        <div className="mt-2">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] text-gray-500 font-play">Text Opacity</label>
+            <span className="text-[10px] text-gray-400 font-play">{parseInt(component.styles.textOpacity || '100')}%</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={parseInt(component.styles.textOpacity || '100')}
+            onChange={(e) => updateStyle('textOpacity', e.target.value)}
+            className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+          />
+        </div>
       </div>
 
       <div>
@@ -1566,6 +1636,71 @@ function StyleTab({
               {align.charAt(0).toUpperCase() + align.slice(1)}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Border & Shadow */}
+      <div className="pt-2 border-t border-gray-100">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 font-play">Border & Shadow</h4>
+        <div className="space-y-2">
+          <div>
+            <label className="text-[10px] text-gray-500 font-play mb-1 block">Border Radius</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min={0}
+                max={50}
+                value={parseInt(component.styles.borderRadius || '0')}
+                onChange={(e) => updateStyle('borderRadius', `${e.target.value}px`)}
+                className="flex-1 h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              />
+              <span className="text-[10px] text-gray-400 font-play w-10 text-right">{parseInt(component.styles.borderRadius || '0')}px</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-gray-500 font-play mb-1 block">Border Width</label>
+              <input
+                type="text"
+                value={component.styles.borderWidth || ''}
+                onChange={(e) => updateStyle('borderWidth', e.target.value)}
+                placeholder="0px"
+                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 font-play mb-1 block">Border Color</label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="color"
+                  value={component.styles.borderColor || '#e5e7eb'}
+                  onChange={(e) => updateStyle('borderColor', e.target.value)}
+                  className="w-6 h-6 rounded cursor-pointer border border-gray-200"
+                />
+                <input
+                  type="text"
+                  value={component.styles.borderColor || ''}
+                  onChange={(e) => updateStyle('borderColor', e.target.value)}
+                  placeholder="#e5e7eb"
+                  className="flex-1 px-1 py-1 border border-gray-200 rounded text-[11px] font-play"
+                />
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-500 font-play mb-1 block">Box Shadow</label>
+            <select
+              value={component.styles.boxShadow || ''}
+              onChange={(e) => updateStyle('boxShadow', e.target.value)}
+              className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+            >
+              <option value="">None</option>
+              <option value="0 1px 3px rgba(0,0,0,0.12)">Small</option>
+              <option value="0 4px 6px rgba(0,0,0,0.1)">Medium</option>
+              <option value="0 10px 25px rgba(0,0,0,0.15)">Large</option>
+              <option value="0 20px 50px rgba(0,0,0,0.2)">XL</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1592,6 +1727,23 @@ function StyleTab({
             label="Right"
             value={component.styles.paddingRight || '16px'}
             onChange={(v) => updateStyle('paddingRight', v)}
+          />
+        </div>
+      </div>
+
+      {/* Margin Controls */}
+      <div className="pt-2 border-t border-gray-100">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 font-play">Margin</h4>
+        <div className="space-y-2">
+          <PaddingSlider
+            label="Top"
+            value={component.styles.marginTop || '0px'}
+            onChange={(v) => updateStyle('marginTop', v)}
+          />
+          <PaddingSlider
+            label="Bottom"
+            value={component.styles.marginBottom || '0px'}
+            onChange={(v) => updateStyle('marginBottom', v)}
           />
         </div>
       </div>

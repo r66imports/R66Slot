@@ -19,10 +19,26 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       ? { transform: `rotate(${component.position.rotation}deg)` }
       : undefined
 
+  // Compute opacity values
+  const componentOpacity = styles.opacity ? parseInt(styles.opacity) / 100 : 1
+  const bgOpacity = styles.backgroundOpacity ? parseInt(styles.backgroundOpacity) / 100 : 1
+  const textOpacity = styles.textOpacity ? parseInt(styles.textOpacity) / 100 : 1
+
+  // Helper to apply opacity to hex color
+  const applyOpacity = (color: string | undefined, opacity: number): string | undefined => {
+    if (!color || opacity >= 1) return color
+    if (color.startsWith('#') && color.length === 7) {
+      const alphaHex = Math.round(opacity * 255).toString(16).padStart(2, '0')
+      return color + alphaHex
+    }
+    return color
+  }
+
   // Convert styles object to inline CSS
   const containerStyle: React.CSSProperties = {
-    backgroundColor: styles.backgroundColor || 'transparent',
-    color: styles.textColor || 'inherit',
+    opacity: componentOpacity < 1 ? componentOpacity : undefined,
+    backgroundColor: applyOpacity(styles.backgroundColor, bgOpacity) || 'transparent',
+    color: applyOpacity(styles.textColor, textOpacity) || 'inherit',
     paddingTop: styles.paddingTop || styles.padding || '0px',
     paddingBottom: styles.paddingBottom || styles.padding || '0px',
     paddingLeft: styles.paddingLeft || styles.padding || '16px',
