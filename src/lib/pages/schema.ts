@@ -29,6 +29,7 @@ export interface PageComponent {
     | 'slot'
     | 'widget'
     | 'media'
+    | 'box'
   content: string
   styles: {
     backgroundColor?: string

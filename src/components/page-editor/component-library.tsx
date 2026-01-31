@@ -73,6 +73,23 @@ export const COMPONENT_LIBRARY: {
     },
   },
   {
+    type: 'box',
+    label: 'Box',
+    icon: '📦',
+    defaultProps: {
+      content: '',
+      styles: {
+        backgroundColor: '#ffffff',
+        width: '100%',
+        height: '300px',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb',
+      },
+      settings: {},
+      children: [],
+    },
+  },
+  {
     type: 'section',
     label: 'Section',
     icon: '▢',
@@ -283,6 +300,8 @@ export const COMPONENT_LIBRARY: {
         gap: '16px',
         padding: '20px',
       },
+      // default to flow layout; can be switched to absolute in the editor
+      positionMode: 'flow',
       settings: {
         columns: 3,
       },

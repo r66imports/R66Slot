@@ -460,6 +460,54 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
         </div>
       )
 
+    case 'box': {
+      const isFreeformBox = component.positionMode === 'absolute'
+      return (
+        <div
+          style={{
+            ...containerStyle,
+            position: 'relative',
+            overflow: 'hidden',
+            width: isFreeformBox ? '100%' : (styles.width || '100%'),
+            height: isFreeformBox ? '100%' : (styles.height || '300px'),
+          }}
+        >
+          {children && children.length > 0 ? (
+            children.map((child) => {
+              if (child.type === 'image') {
+                return (
+                  <div key={child.id} style={{ position: 'absolute', inset: 0 }}>
+                    {child.settings.imageUrl ? (
+                      <img
+                        src={child.settings.imageUrl as string}
+                        alt={(child.settings.alt as string) || ''}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: (child.settings.objectFit as string as any) || 'cover',
+                          objectPosition: (child.settings.objectPosition as string) || 'center center',
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                        <span className="text-gray-400 text-sm font-play">No image</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+              return <RenderedComponent key={child.id} component={child} />
+            })
+          ) : (
+            <div className="w-full h-full border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center text-gray-400">
+              <span className="text-3xl mb-2">📦</span>
+              <p className="text-sm font-play">Empty box — drop an image here</p>
+            </div>
+          )}
+        </div>
+      )
+    }
+
     case 'section': {
       const sectionTitle = (settings.sectionTitle as string) || ''
       const sectionSubtitle = (settings.sectionSubtitle as string) || ''

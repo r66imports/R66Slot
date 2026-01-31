@@ -627,6 +627,45 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       )
 
+    case 'box': {
+      const isFreeformBox = component.positionMode === 'absolute'
+      return (
+        <div
+          style={{
+            ...containerStyle,
+            position: 'relative',
+            overflow: 'hidden',
+            width: isFreeformBox ? '100%' : (styles.width || '100%'),
+            height: isFreeformBox ? '100%' : (styles.height || '300px'),
+          }}
+        >
+          {children && children.length > 0 ? (
+            children.map((child) => {
+              if (child.type === 'image') {
+                return (
+                  <div key={child.id} style={{ position: 'absolute', inset: 0 }}>
+                    {child.settings.imageUrl ? (
+                      <img
+                        src={child.settings.imageUrl as string}
+                        alt={(child.settings.alt as string) || ''}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: (child.settings.objectFit as string as any) || 'cover',
+                          objectPosition: (child.settings.objectPosition as string) || 'center center',
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                )
+              }
+              return <ComponentRenderer key={child.id} component={child} />
+            })
+          ) : null}
+        </div>
+      )
+    }
+
     case 'section': {
       const sectionTitle = (settings.sectionTitle as string) || ''
       const sectionSubtitle = (settings.sectionSubtitle as string) || ''
