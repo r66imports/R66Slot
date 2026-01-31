@@ -30,6 +30,8 @@ export interface PageComponent {
     | 'widget'
     | 'media'
     | 'box'
+    | 'strip'
+    | 'banner'
   content: string
   styles: {
     backgroundColor?: string

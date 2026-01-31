@@ -7,33 +7,63 @@ export const COMPONENT_LIBRARY: {
   defaultProps: Partial<PageComponent>
 }[] = [
   {
-    type: 'heading',
-    label: 'Heading',
-    icon: 'H',
+    type: 'add-to-cart',
+    label: 'Add to Cart Button',
+    icon: '🛒',
     defaultProps: {
-      content: 'Heading Text',
+      content: 'Add to Cart',
       styles: {
-        fontSize: '32px',
+        backgroundColor: '#FFDD00',
+        textColor: '#000000',
+        padding: '16px 32px',
+        borderRadius: '8px',
+        fontSize: '18px',
         fontWeight: 'bold',
-        textAlign: 'left',
-        padding: '20px',
-        margin: '0',
+        textAlign: 'center',
+        border: 'none',
+        cursor: 'pointer',
       },
-      settings: {},
+      settings: {
+        productId: '',
+      },
     },
   },
   {
-    type: 'text',
-    label: 'Text',
-    icon: 'T',
+    type: 'banner',
+    label: 'Banner',
+    icon: '🏷️',
     defaultProps: {
-      content: 'Your text here...',
+      content: 'Special Offer — Shop Now!',
       styles: {
-        fontSize: '16px',
-        padding: '10px',
-        textAlign: 'left',
+        backgroundColor: '#1a1a2e',
+        textColor: '#FFFFFF',
+        padding: '24px 20px',
+        fontSize: '20px',
+        fontWeight: '600',
+        textAlign: 'center',
+        width: '100%',
+      },
+      settings: {
+        buttonText: 'Shop Now',
+        buttonLink: '#',
+      },
+    },
+  },
+  {
+    type: 'box',
+    label: 'Box',
+    icon: '📦',
+    defaultProps: {
+      content: '',
+      styles: {
+        backgroundColor: '#ffffff',
+        width: '100%',
+        height: '300px',
+        borderRadius: '8px',
+        border: '1px solid #e5e7eb',
       },
       settings: {},
+      children: [],
     },
   },
   {
@@ -57,6 +87,152 @@ export const COMPONENT_LIBRARY: {
     },
   },
   {
+    type: 'card',
+    label: 'Card',
+    icon: '🗃️',
+    defaultProps: {
+      content: 'Card content goes here',
+      styles: {
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        border: '1px solid #e5e7eb',
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'divider',
+    label: 'Divider',
+    icon: '—',
+    defaultProps: {
+      content: '',
+      styles: {
+        height: '1px',
+        backgroundColor: '#e5e7eb',
+        margin: '20px 0',
+        border: 'none',
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'featured-product',
+    label: 'Featured Product',
+    icon: '⭐',
+    defaultProps: {
+      content: 'Premium Slot Car Collection',
+      styles: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '40px',
+        padding: '60px 40px',
+        backgroundColor: '#000000',
+        textColor: '#FFFFFF',
+      },
+      settings: {
+        imageUrl: 'https://via.placeholder.com/600x600',
+        price: '$149.99',
+        description: 'Our finest collection of premium slot cars',
+      },
+    },
+  },
+  {
+    type: 'gallery',
+    label: 'Gallery Grid',
+    icon: '📷',
+    defaultProps: {
+      content: '',
+      styles: {
+        display: 'grid',
+        gap: '16px',
+        padding: '20px',
+      },
+      positionMode: 'flow',
+      settings: {
+        columns: 3,
+      },
+      children: [
+        {
+          id: 'img-1',
+          type: 'image',
+          content: '',
+          styles: { width: '100%', height: 'auto', borderRadius: '8px' },
+          settings: { imageUrl: 'https://via.placeholder.com/400x300' },
+        },
+        {
+          id: 'img-2',
+          type: 'image',
+          content: '',
+          styles: { width: '100%', height: 'auto', borderRadius: '8px' },
+          settings: { imageUrl: 'https://via.placeholder.com/400x300' },
+        },
+        {
+          id: 'img-3',
+          type: 'image',
+          content: '',
+          styles: { width: '100%', height: 'auto', borderRadius: '8px' },
+          settings: { imageUrl: 'https://via.placeholder.com/400x300' },
+        },
+      ],
+    },
+  },
+  {
+    type: 'heading',
+    label: 'Heading',
+    icon: 'H',
+    defaultProps: {
+      content: 'Heading Text',
+      styles: {
+        fontSize: '32px',
+        fontWeight: 'bold',
+        textAlign: 'left',
+        padding: '20px',
+        margin: '0',
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'hero',
+    label: 'Hero Banner',
+    icon: '🎯',
+    defaultProps: {
+      content: 'Hero Title',
+      styles: {
+        backgroundColor: '#000000',
+        textColor: '#FFFFFF',
+        padding: '80px 20px',
+        fontSize: '48px',
+        fontWeight: 'bold',
+        textAlign: 'center',
+        minHeight: '400px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      },
+      settings: {},
+    },
+  },
+  {
+    type: 'icon-text',
+    label: 'Icon + Text',
+    icon: '✨',
+    defaultProps: {
+      content: 'Feature description text',
+      styles: {
+        display: 'flex',
+        gap: '16px',
+        alignItems: 'center',
+        padding: '16px',
+      },
+      settings: {
+        icon: '⭐',
+      },
+    },
+  },
+  {
     type: 'image',
     label: 'Image',
     icon: '🖼️',
@@ -73,20 +249,95 @@ export const COMPONENT_LIBRARY: {
     },
   },
   {
-    type: 'box',
-    label: 'Box',
-    icon: '📦',
+    type: 'price-display',
+    label: 'Price Display',
+    icon: '💰',
+    defaultProps: {
+      content: '$99.99',
+      styles: {
+        fontSize: '32px',
+        fontWeight: 'bold',
+        textColor: '#FFDD00',
+        padding: '10px',
+      },
+      settings: {
+        showDiscount: false,
+        originalPrice: '',
+      },
+    },
+  },
+  {
+    type: 'product-card',
+    label: 'Product Card',
+    icon: '🏷️',
+    defaultProps: {
+      content: 'Product Name',
+      styles: {
+        backgroundColor: '#ffffff',
+        padding: '20px',
+        borderRadius: '12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        border: '1px solid #e5e7eb',
+        maxWidth: '300px',
+      },
+      settings: {
+        imageUrl: 'https://via.placeholder.com/300x300',
+        price: '$29.99',
+        showAddToCart: true,
+      },
+    },
+  },
+  {
+    type: 'product-carousel',
+    label: 'Product Carousel',
+    icon: '🎠',
     defaultProps: {
       content: '',
       styles: {
-        backgroundColor: '#ffffff',
-        width: '100%',
-        height: '300px',
-        borderRadius: '8px',
-        border: '1px solid #e5e7eb',
+        padding: '40px 20px',
+        backgroundColor: '#f9fafb',
+      },
+      settings: {
+        productCount: 6,
+        autoplay: true,
+      },
+    },
+  },
+  {
+    type: 'product-grid',
+    label: 'Product Grid',
+    icon: '🛍️',
+    defaultProps: {
+      content: '',
+      styles: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+        gap: '24px',
+        padding: '40px 20px',
+      },
+      settings: {
+        productCount: 8,
+        showPrice: true,
+        showAddToCart: true,
+      },
+    },
+  },
+  {
+    type: 'quote',
+    label: 'Quote',
+    icon: '💬',
+    defaultProps: {
+      content: 'This is an inspiring quote or testimonial.',
+      styles: {
+        fontSize: '20px',
+        fontWeight: '500',
+        fontStyle: 'italic',
+        padding: '24px',
+        borderLeft: '4px solid #FFDD00',
+        backgroundColor: '#f9fafb',
+        margin: '20px 0',
       },
       settings: {},
-      children: [],
     },
   },
   {
@@ -116,56 +367,33 @@ export const COMPONENT_LIBRARY: {
     },
   },
   {
-    type: 'hero',
-    label: 'Hero Banner',
-    icon: '🎯',
-    defaultProps: {
-      content: 'Hero Title',
-      styles: {
-        backgroundColor: '#000000',
-        textColor: '#FFFFFF',
-        padding: '80px 20px',
-        fontSize: '48px',
-        fontWeight: 'bold',
-        textAlign: 'center',
-        minHeight: '400px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      },
-      settings: {},
-    },
-  },
-  {
-    type: 'two-column',
-    label: 'Two Columns',
-    icon: '▦',
+    type: 'strip',
+    label: 'Strip',
+    icon: '▬',
     defaultProps: {
       content: '',
       styles: {
-        display: 'grid',
-        gap: '20px',
-        padding: '20px',
+        backgroundColor: '#f3f4f6',
+        padding: '60px 20px',
+        width: '100%',
+        minHeight: '200px',
       },
-      settings: {
-        columns: 2,
+      settings: {},
+      children: [],
+    },
+  },
+  {
+    type: 'text',
+    label: 'Text',
+    icon: 'T',
+    defaultProps: {
+      content: 'Your text here...',
+      styles: {
+        fontSize: '16px',
+        padding: '10px',
+        textAlign: 'left',
       },
-      children: [
-        {
-          id: 'col-1',
-          type: 'text',
-          content: 'Left column content',
-          styles: { padding: '10px' },
-          settings: {},
-        },
-        {
-          id: 'col-2',
-          type: 'text',
-          content: 'Right column content',
-          styles: { padding: '10px' },
-          settings: {},
-        },
-      ],
+      settings: {},
     },
   },
   {
@@ -208,22 +436,6 @@ export const COMPONENT_LIBRARY: {
     },
   },
   {
-    type: 'card',
-    label: 'Card',
-    icon: '🗃️',
-    defaultProps: {
-      content: 'Card content goes here',
-      styles: {
-        backgroundColor: '#ffffff',
-        padding: '24px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        border: '1px solid #e5e7eb',
-      },
-      settings: {},
-    },
-  },
-  {
     type: 'video',
     label: 'Video',
     icon: '🎥',
@@ -236,214 +448,6 @@ export const COMPONENT_LIBRARY: {
       },
       settings: {
         videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-      },
-    },
-  },
-  {
-    type: 'divider',
-    label: 'Divider',
-    icon: '—',
-    defaultProps: {
-      content: '',
-      styles: {
-        height: '1px',
-        backgroundColor: '#e5e7eb',
-        margin: '20px 0',
-        border: 'none',
-      },
-      settings: {},
-    },
-  },
-  {
-    type: 'quote',
-    label: 'Quote',
-    icon: '💬',
-    defaultProps: {
-      content: 'This is an inspiring quote or testimonial.',
-      styles: {
-        fontSize: '20px',
-        fontWeight: '500',
-        fontStyle: 'italic',
-        padding: '24px',
-        borderLeft: '4px solid #FFDD00',
-        backgroundColor: '#f9fafb',
-        margin: '20px 0',
-      },
-      settings: {},
-    },
-  },
-  {
-    type: 'icon-text',
-    label: 'Icon + Text',
-    icon: '✨',
-    defaultProps: {
-      content: 'Feature description text',
-      styles: {
-        display: 'flex',
-        gap: '16px',
-        alignItems: 'center',
-        padding: '16px',
-      },
-      settings: {
-        icon: '⭐',
-      },
-    },
-  },
-  {
-    type: 'gallery',
-    label: 'Gallery Grid',
-    icon: '📷',
-    defaultProps: {
-      content: '',
-      styles: {
-        display: 'grid',
-        gap: '16px',
-        padding: '20px',
-      },
-      // default to flow layout; can be switched to absolute in the editor
-      positionMode: 'flow',
-      settings: {
-        columns: 3,
-      },
-      children: [
-        {
-          id: 'img-1',
-          type: 'image',
-          content: '',
-          styles: { width: '100%', height: 'auto', borderRadius: '8px' },
-          settings: { imageUrl: 'https://via.placeholder.com/400x300' },
-        },
-        {
-          id: 'img-2',
-          type: 'image',
-          content: '',
-          styles: { width: '100%', height: 'auto', borderRadius: '8px' },
-          settings: { imageUrl: 'https://via.placeholder.com/400x300' },
-        },
-        {
-          id: 'img-3',
-          type: 'image',
-          content: '',
-          styles: { width: '100%', height: 'auto', borderRadius: '8px' },
-          settings: { imageUrl: 'https://via.placeholder.com/400x300' },
-        },
-      ],
-    },
-  },
-  {
-    type: 'product-grid',
-    label: 'Product Grid',
-    icon: '🛍️',
-    defaultProps: {
-      content: '',
-      styles: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-        gap: '24px',
-        padding: '40px 20px',
-      },
-      settings: {
-        productCount: 8,
-        showPrice: true,
-        showAddToCart: true,
-      },
-    },
-  },
-  {
-    type: 'product-card',
-    label: 'Product Card',
-    icon: '🏷️',
-    defaultProps: {
-      content: 'Product Name',
-      styles: {
-        backgroundColor: '#ffffff',
-        padding: '20px',
-        borderRadius: '12px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        border: '1px solid #e5e7eb',
-        maxWidth: '300px',
-      },
-      settings: {
-        imageUrl: 'https://via.placeholder.com/300x300',
-        price: '$29.99',
-        showAddToCart: true,
-      },
-    },
-  },
-  {
-    type: 'product-carousel',
-    label: 'Product Carousel',
-    icon: '🎠',
-    defaultProps: {
-      content: '',
-      styles: {
-        padding: '40px 20px',
-        backgroundColor: '#f9fafb',
-      },
-      settings: {
-        productCount: 6,
-        autoplay: true,
-      },
-    },
-  },
-  {
-    type: 'featured-product',
-    label: 'Featured Product',
-    icon: '⭐',
-    defaultProps: {
-      content: 'Premium Slot Car Collection',
-      styles: {
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '40px',
-        padding: '60px 40px',
-        backgroundColor: '#000000',
-        textColor: '#FFFFFF',
-      },
-      settings: {
-        imageUrl: 'https://via.placeholder.com/600x600',
-        price: '$149.99',
-        description: 'Our finest collection of premium slot cars',
-      },
-    },
-  },
-  {
-    type: 'add-to-cart',
-    label: 'Add to Cart Button',
-    icon: '🛒',
-    defaultProps: {
-      content: 'Add to Cart',
-      styles: {
-        backgroundColor: '#FFDD00',
-        textColor: '#000000',
-        padding: '16px 32px',
-        borderRadius: '8px',
-        fontSize: '18px',
-        fontWeight: 'bold',
-        textAlign: 'center',
-        border: 'none',
-        cursor: 'pointer',
-      },
-      settings: {
-        productId: '',
-      },
-    },
-  },
-  {
-    type: 'price-display',
-    label: 'Price Display',
-    icon: '💰',
-    defaultProps: {
-      content: '$99.99',
-      styles: {
-        fontSize: '32px',
-        fontWeight: 'bold',
-        textColor: '#FFDD00',
-        padding: '10px',
-      },
-      settings: {
-        showDiscount: false,
-        originalPrice: '',
       },
     },
   },

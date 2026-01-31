@@ -803,6 +803,87 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       )
     }
 
+    case 'strip': {
+      return (
+        <div
+          style={{
+            ...containerStyle,
+            width: '100%',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {settings.imageUrl && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `url("${settings.imageUrl}")`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                zIndex: 0,
+              }}
+            />
+          )}
+          <div className="container mx-auto relative z-10">
+            {children && children.length > 0 ? (
+              <div className="space-y-4">
+                {children.map((child) => (
+                  <RenderedComponent key={child.id} component={child} />
+                ))}
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center text-gray-400">
+                <span className="text-3xl mb-2 block">▬</span>
+                <p className="text-sm font-play">Empty strip — add child components</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    case 'banner': {
+      const bannerText = content || 'Banner Text'
+      const btnText = (settings.buttonText as string) || ''
+      return (
+        <div
+          style={{
+            ...containerStyle,
+            width: '100%',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          {settings.imageUrl && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `url("${settings.imageUrl}")`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                zIndex: 0,
+              }}
+            />
+          )}
+          {settings.imageUrl && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 1 }} />
+          )}
+          <div className="container mx-auto relative z-10 flex items-center justify-center gap-6 flex-wrap">
+            <span style={{ fontSize: styles.fontSize || '20px', fontWeight: styles.fontWeight || '600' }}>
+              {bannerText}
+            </span>
+            {btnText && (
+              <span className="inline-block bg-primary text-black font-semibold py-2 px-6 rounded-lg text-sm cursor-pointer hover:bg-primary/90">
+                {btnText}
+              </span>
+            )}
+          </div>
+        </div>
+      )
+    }
+
     default:
       return (
         <div style={containerStyle}>
