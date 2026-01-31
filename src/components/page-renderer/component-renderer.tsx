@@ -325,6 +325,34 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </section>
       )
 
+    case 'columns': {
+      const colCount = (settings.columns as number) || 2
+      return (
+        <section style={containerStyle}>
+          <div className="container mx-auto">
+            <div
+              className="grid gap-8"
+              style={{ gridTemplateColumns: `repeat(${colCount}, 1fr)` }}
+            >
+              {children?.slice(0, colCount).map((child) => (
+                <div
+                  key={child.id}
+                  className={styles.textAlign === 'center' ? 'text-center' : ''}
+                >
+                  {child.settings.icon && (
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
+                      {child.settings.icon}
+                    </div>
+                  )}
+                  <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )
+    }
+
     case 'card':
       return (
         <div style={containerStyle}>

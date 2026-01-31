@@ -397,9 +397,9 @@ export const COMPONENT_LIBRARY: {
     },
   },
   {
-    type: 'three-column',
-    label: 'Three Columns',
-    icon: '▦▦',
+    type: 'columns',
+    label: 'Columns',
+    icon: '▦',
     defaultProps: {
       content: '',
       styles: {
@@ -408,7 +408,7 @@ export const COMPONENT_LIBRARY: {
         padding: '20px',
       },
       settings: {
-        columns: 3,
+        columns: 2,
       },
       children: [
         {
@@ -422,13 +422,6 @@ export const COMPONENT_LIBRARY: {
           id: 'col-2',
           type: 'text',
           content: 'Column 2',
-          styles: { padding: '10px' },
-          settings: {},
-        },
-        {
-          id: 'col-3',
-          type: 'text',
-          content: 'Column 3',
           styles: { padding: '10px' },
           settings: {},
         },

@@ -41,8 +41,7 @@ const COMPONENT_LIBRARY = [
   { type: 'image' as const, label: 'Image', icon: '🏞️', desc: 'Single image' },
   { type: 'button' as const, label: 'Button', icon: '🔘', desc: 'Call to action' },
   { type: 'gallery' as const, label: 'Image Gallery', icon: '🖼️', desc: 'Grid of images' },
-  { type: 'three-column' as const, label: '3 Columns', icon: '▥', desc: 'Three column layout' },
-  { type: 'two-column' as const, label: '2 Columns', icon: '▤', desc: 'Two column layout' },
+  { type: 'columns' as const, label: 'Columns', icon: '▦', desc: '1-4 column layout' },
   { type: 'video' as const, label: 'Video', icon: '🎬', desc: 'Embedded video' },
   { type: 'divider' as const, label: 'Divider', icon: '─', desc: 'Horizontal line' },
   { type: 'product-grid' as const, label: 'Product Grid', icon: '🛍️', desc: 'Product listing' },
@@ -538,6 +537,12 @@ ${canvasHTML}
                       isSelected={selectedComponentId === component.id}
                       snapEnabled={snapEnabled}
                       onSelect={() => { setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        setSelectedComponentId(component.id)
+                        setShowPageSettings(false)
+                        setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
+                      }}
                       onUpdatePosition={(x, y) => {
                         updateComponent(component.id, {
                           position: {
@@ -616,36 +621,70 @@ ${canvasHTML}
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Edit Settings */}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
               onClick={() => { setSelectedComponentId(comp.id); setShowPageSettings(false); setContextMenu(null) }}
             >
-              <span>&#9881;</span> Edit Settings
+              <span>⚙️</span> Edit Settings
             </button>
+            <div className="border-t border-gray-100 my-1" />
+            {/* Duplicate */}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
               onClick={() => { duplicateComponent(comp.id); setContextMenu(null) }}
             >
-              <span>&#10063;</span> Duplicate
+              <span>📋</span> Duplicate
             </button>
+            {/* Copy Type */}
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => {
+                navigator.clipboard.writeText(JSON.stringify(comp))
+                setContextMenu(null)
+              }}
+            >
+              <span>📄</span> Copy Element
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            {/* Move */}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
               onClick={() => { moveComponent(comp.id, 'up'); setContextMenu(null) }}
             >
-              <span>&#8593;</span> Move Up
+              <span>⬆️</span> Move Up
             </button>
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
               onClick={() => { moveComponent(comp.id, 'down'); setContextMenu(null) }}
             >
-              <span>&#8595;</span> Move Down
+              <span>⬇️</span> Move Down
             </button>
             <div className="border-t border-gray-100 my-1" />
+            {/* Position mode toggle */}
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => {
+                const newMode = comp.positionMode === 'absolute' ? 'flow' : 'absolute'
+                updateComponent(comp.id, {
+                  positionMode: newMode,
+                  ...(newMode === 'absolute' ? {
+                    position: comp.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10, rotation: 0 },
+                  } : {}),
+                })
+                setContextMenu(null)
+              }}
+            >
+              <span>{comp.positionMode === 'absolute' ? '📌' : '🔓'}</span>
+              {comp.positionMode === 'absolute' ? 'Switch to Flow' : 'Switch to Freeform'}
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            {/* Delete */}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
               onClick={() => { deleteComponent(comp.id); setContextMenu(null) }}
             >
-              <span>&#10005;</span> Delete
+              <span>🗑️</span> Delete
             </button>
           </div>
         )
@@ -749,6 +788,7 @@ function FreeformComponent({
   isSelected,
   snapEnabled,
   onSelect,
+  onContextMenu,
   onUpdatePosition,
   onUpdateSize,
   onUpdateSettings,
@@ -757,6 +797,7 @@ function FreeformComponent({
   isSelected: boolean
   snapEnabled: boolean
   onSelect: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   onUpdatePosition: (x: number, y: number) => void
   onUpdateSize: (w: number, h: number) => void
   onUpdateSettings?: (key: string, value: any) => void
@@ -804,6 +845,7 @@ function FreeformComponent({
         className="group"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => { e.stopPropagation(); onSelect() }}
+        onContextMenu={onContextMenu}
       >
         {/* Label */}
         <div className={`absolute -top-7 left-0 z-30 flex items-center gap-1 transition-opacity ${

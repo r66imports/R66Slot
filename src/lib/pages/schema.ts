@@ -32,6 +32,7 @@ export interface PageComponent {
     | 'box'
     | 'strip'
     | 'banner'
+    | 'columns'
   content: string
   styles: {
     backgroundColor?: string

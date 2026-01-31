@@ -13,7 +13,7 @@ export function DraggableLibrary() {
   )
 
   const layoutElements = COMPONENT_LIBRARY.filter(c =>
-    ['section', 'strip', 'box', 'three-column', 'card', 'hero', 'banner'].includes(c.type)
+    ['section', 'strip', 'box', 'columns', 'card', 'hero', 'banner'].includes(c.type)
   )
 
   const contentElements = COMPONENT_LIBRARY.filter(c =>
@@ -220,7 +220,7 @@ function getComponentDescription(type: PageComponent['type']): string {
     strip: 'Full-width strip',
     box: 'Image container',
     banner: 'Promotional banner',
-    'three-column': '3-column grid layout',
+    columns: '1-4 column layout',
     card: 'Card with content',
     hero: 'Hero banner section',
     quote: 'Blockquote or testimonial',
