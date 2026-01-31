@@ -81,7 +81,8 @@ export interface PageComponent {
     showDiscount?: boolean
     originalPrice?: string
     autoplay?: boolean
-    [key: string]: string | boolean | number | undefined
+    cta?: { label: string; url: string }
+    [key: string]: string | boolean | number | { label: string; url: string } | undefined
   }
   children?: PageComponent[]
   // Free positioning support

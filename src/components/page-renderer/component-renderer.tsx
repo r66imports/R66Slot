@@ -141,7 +141,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               {/* Title */}
               <div style={{ position: 'absolute', left: (settings.titleX as number) || 0, top: (settings.titleY as number) || 0 }}>
                 <h1 className="text-4xl md:text-6xl font-bold">
-                  {settings.title || 'Hero Title'}
+                  {String(settings.title || 'Hero Title')}
                 </h1>
               </div>
 
@@ -149,7 +149,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               {settings.subtitle && (
                 <div style={{ position: 'absolute', left: (settings.subtitleX as number) || 0, top: (settings.subtitleY as number) || 60 }}>
                   <p className="text-lg md:text-xl opacity-80">
-                    {settings.subtitle}
+                    {String(settings.subtitle)}
                   </p>
                 </div>
               )}
@@ -163,7 +163,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                     asChild
                   >
                     <Link href={(settings.buttonLink as string) || '#'}>
-                      {settings.buttonText}
+                      {String(settings.buttonText)}
                     </Link>
                   </Button>
                 </div>
@@ -179,7 +179,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                     asChild
                   >
                     <Link href={(settings.secondaryButtonLink as string) || '#'}>
-                      {settings.secondaryButtonText}
+                      {String(settings.secondaryButtonText)}
                     </Link>
                   </Button>
                 </div>
@@ -193,11 +193,11 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                 }`}
               >
                 <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                  {settings.title || 'Hero Title'}
+                  {String(settings.title || 'Hero Title')}
                 </h1>
                 {settings.subtitle && (
                   <p className="text-lg md:text-xl opacity-80 mb-8">
-                    {settings.subtitle}
+                    {String(settings.subtitle)}
                   </p>
                 )}
                 <div className={`flex flex-col sm:flex-row gap-4 ${settings.alignment === 'center' ? 'justify-center' : ''}`}>
@@ -208,7 +208,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       asChild
                     >
                       <Link href={(settings.buttonLink as string) || '#'}>
-                        {settings.buttonText}
+                        {String(settings.buttonText)}
                       </Link>
                     </Button>
                   )}
@@ -220,7 +220,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       asChild
                     >
                       <Link href={(settings.secondaryButtonLink as string) || '#'}>
-                        {settings.secondaryButtonText}
+                        {String(settings.secondaryButtonText)}
                       </Link>
                     </Button>
                   )}
@@ -330,7 +330,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               {content}
               {settings.author && (
                 <footer className="text-base not-italic font-sans text-gray-600 mt-2">
-                  — {settings.author}
+                  — {String(settings.author)}
                 </footer>
               )}
             </blockquote>
@@ -488,7 +488,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               </div>
               <div className="p-4">
                 <h3 className="font-semibold text-xl mb-2">{content}</h3>
-                <p className="text-primary font-bold text-lg mb-3">{settings.price || '$99.99'}</p>
+                <p className="text-primary font-bold text-lg mb-3">{String(settings.price || '$99.99')}</p>
                 {settings.showAddToCart && (
                   <button className="w-full bg-primary text-black font-semibold py-2 px-4 rounded hover:bg-primary/90">
                     Add to Cart
@@ -538,8 +538,8 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               </div>
               <div>
                 <h2 className="text-4xl font-bold mb-4">{content}</h2>
-                <p className="text-lg mb-6">{settings.description || 'Premium slot car collection'}</p>
-                <p className="text-primary text-3xl font-bold mb-6">{settings.price || '$149.99'}</p>
+                <p className="text-lg mb-6">{String(settings.description || 'Premium slot car collection')}</p>
+                <p className="text-primary text-3xl font-bold mb-6">{String(settings.price || '$149.99')}</p>
                 <button className="bg-primary text-black font-bold py-4 px-8 rounded-lg text-lg hover:bg-primary/90">
                   Add to Cart
                 </button>
@@ -588,7 +588,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               </span>
               {settings.showDiscount && settings.originalPrice && (
                 <span className="ml-3 text-gray-500 line-through text-xl">
-                  {settings.originalPrice}
+                  {String(settings.originalPrice)}
                 </span>
               )}
             </div>

@@ -370,6 +370,70 @@ export function PropertiesPanel() {
           </PropertySection>
         )}
 
+        {/* Gallery Background & Overlay */}
+        {selectedComponent.type === 'gallery' && (
+          <PropertySection title="Background">
+            <label className="block text-sm font-medium mb-2">Background Image URL</label>
+            <Input
+              value={selectedComponent.styles.backgroundImage?.replace('url(', '').replace(')', '') || ''}
+              onChange={(e) =>
+                updateComponent(selectedComponent.id, {
+                  styles: {
+                    ...selectedComponent.styles,
+                    backgroundImage: e.target.value ? `url(${e.target.value})` : '',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  },
+                })
+              }
+              placeholder="https://..."
+            />
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Image Overlay Opacity</label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round((Number(selectedComponent.styles.backgroundOverlayOpacity) || 0) * 100)}
+                onChange={(e) =>
+                  updateComponent(selectedComponent.id, {
+                    styles: {
+                      ...selectedComponent.styles,
+                      backgroundOverlayOpacity: String(Number(e.target.value) / 100),
+                    },
+                  })
+                }
+                className="w-full"
+              />
+              <div className="text-xs text-gray-500 mt-1">{Math.round((Number(selectedComponent.styles.backgroundOverlayOpacity) || 0) * 100)}%</div>
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Overlay Color</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={selectedComponent.styles.backgroundOverlayColor || '#000000'}
+                  onChange={(e) =>
+                    updateComponent(selectedComponent.id, {
+                      styles: { ...selectedComponent.styles, backgroundOverlayColor: e.target.value },
+                    })
+                  }
+                  className="w-10 h-10 p-0 border rounded"
+                />
+                <Input
+                  value={selectedComponent.styles.backgroundOverlayColor || '#000000'}
+                  onChange={(e) =>
+                    updateComponent(selectedComponent.id, {
+                      styles: { ...selectedComponent.styles, backgroundOverlayColor: e.target.value },
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </PropertySection>
+        )}
+
         {/* Hero Background */}
         {selectedComponent.type === 'hero' && (
           <PropertySection title="Background Image">

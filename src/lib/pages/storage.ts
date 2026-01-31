@@ -1,4 +1,4 @@
-import { blobRead, blobWrite, blobDelete, blobList, blobListWithUrls } from '@/lib/blob-storage'
+import { blobRead, blobWrite, blobDelete, blobListWithUrls } from '@/lib/blob-storage'
 import type { Page } from './schema'
 
 const PAGES_PREFIX = 'data/pages/'
