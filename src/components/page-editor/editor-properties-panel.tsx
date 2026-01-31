@@ -791,6 +791,67 @@ function ContentTab({
             value={(component.settings.imageUrl as string) || ''}
             onChange={(url) => updateSetting('imageUrl', url)}
           />
+
+          {/* Freeform Image Fit - adjust image within its box */}
+          {component.positionMode === 'absolute' && (
+            <div className="bg-purple-50 rounded-lg p-3 space-y-2 border border-purple-200">
+              <h4 className="text-xs font-semibold text-purple-700 uppercase tracking-wider font-play">Image Fit (Freeform Box)</h4>
+              <div>
+                <label className="text-[10px] text-gray-500 font-play mb-1 block">Object Fit</label>
+                <div className="grid grid-cols-3 gap-1">
+                  {(['cover', 'contain', 'fill', 'none', 'scale-down'] as const).map((fit) => (
+                    <button
+                      key={fit}
+                      onClick={() => updateSetting('objectFit', fit)}
+                      className={`py-1.5 text-[10px] rounded font-play font-medium transition-colors ${
+                        (component.settings.objectFit || 'cover') === fit
+                          ? 'bg-purple-200 text-purple-800 ring-1 ring-purple-400'
+                          : 'bg-white text-gray-500 hover:bg-purple-100 border border-gray-200'
+                      }`}
+                    >
+                      {fit}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-purple-500 mt-1.5 font-play">
+                  {(component.settings.objectFit || 'cover') === 'cover' && 'Fills the box, may crop edges'}
+                  {component.settings.objectFit === 'contain' && 'Fits entirely inside the box'}
+                  {component.settings.objectFit === 'fill' && 'Stretches to fill the box exactly'}
+                  {component.settings.objectFit === 'none' && 'Original size, no resizing'}
+                  {component.settings.objectFit === 'scale-down' && 'Shrinks to fit if needed, never enlarges'}
+                </p>
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500 font-play mb-1 block">Object Position</label>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { label: '↖', value: 'top left' },
+                    { label: '↑', value: 'top center' },
+                    { label: '↗', value: 'top right' },
+                    { label: '←', value: 'center left' },
+                    { label: '●', value: 'center center' },
+                    { label: '→', value: 'center right' },
+                    { label: '↙', value: 'bottom left' },
+                    { label: '↓', value: 'bottom center' },
+                    { label: '↘', value: 'bottom right' },
+                  ].map((pos) => (
+                    <button
+                      key={pos.value}
+                      onClick={() => updateSetting('objectPosition', pos.value)}
+                      className={`py-1.5 text-[11px] rounded font-play transition-colors ${
+                        (component.settings.objectPosition || 'center center') === pos.value
+                          ? 'bg-purple-200 text-purple-800 ring-1 ring-purple-400'
+                          : 'bg-white text-gray-500 hover:bg-purple-100 border border-gray-200'
+                      }`}
+                    >
+                      {pos.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Alt Text</label>
             <input

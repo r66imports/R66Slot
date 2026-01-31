@@ -167,16 +167,23 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
         </div>
       )
 
-    case 'image':
+    case 'image': {
+      const isFreeformImage = component.positionMode === 'absolute'
+      const imgObjectFit = (settings.objectFit as string) || 'cover'
+      const imgObjectPosition = (settings.objectPosition as string) || 'center center'
+
       return (
         <div style={containerStyle}>
-          <div className="container mx-auto">
+          <div className={isFreeformImage ? 'w-full h-full' : 'container mx-auto'}>
             {settings.imageUrl ? (
               <img
                 src={settings.imageUrl as string}
                 alt={(settings.alt as string) || ''}
-                className="max-w-full h-auto rounded-lg"
-                style={{ width: styles.width || '100%', height: styles.height || 'auto' }}
+                className={isFreeformImage ? 'w-full h-full' : 'max-w-full h-auto rounded-lg'}
+                style={isFreeformImage
+                  ? { objectFit: imgObjectFit as any, objectPosition: imgObjectPosition, width: '100%', height: '100%' }
+                  : { width: styles.width || '100%', height: styles.height || 'auto' }
+                }
               />
             ) : (
               <div className="bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center p-16 rounded-lg">
@@ -187,6 +194,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
           </div>
         </div>
       )
+    }
 
     case 'button': {
       const alignment = styles.textAlign || 'center'
