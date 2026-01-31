@@ -58,28 +58,37 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       )
 
-    case 'image':
+    case 'image': {
+      const imageElement = settings.imageUrl ? (
+        <img
+          src={settings.imageUrl as string}
+          alt={(settings.alt as string) || ''}
+          className="max-w-full h-auto"
+          style={{
+            width: styles.width || '100%',
+            height: styles.height || 'auto',
+          }}
+        />
+      ) : (
+        <div className="bg-gray-200 flex items-center justify-center p-12">
+          <p className="text-gray-500">No image selected</p>
+        </div>
+      )
+
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">
-            {settings.imageUrl ? (
-              <img
-                src={settings.imageUrl as string}
-                alt={(settings.alt as string) || ''}
-                className="max-w-full h-auto"
-                style={{
-                  width: styles.width || '100%',
-                  height: styles.height || 'auto',
-                }}
-              />
+            {settings.link ? (
+              <a href={settings.link as string} target="_blank" rel="noopener noreferrer">
+                {imageElement}
+              </a>
             ) : (
-              <div className="bg-gray-200 flex items-center justify-center p-12">
-                <p className="text-gray-500">No image selected</p>
-              </div>
+              imageElement
             )}
           </div>
         </div>
       )
+    }
 
     case 'button':
       const alignment = styles.textAlign || 'left'

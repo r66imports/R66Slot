@@ -111,6 +111,7 @@ export interface Page {
   title: string
   slug: string
   published: boolean
+  isWebsitePage?: boolean
   components: PageComponent[]
   pageSettings?: PageSettings
   seo: {

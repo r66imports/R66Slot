@@ -106,6 +106,7 @@ function InlineEditableTitle({
 export default function PagesManagementPage() {
   const [customPages, setCustomPages] = useState<Page[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     fetchCustomPages()
@@ -180,6 +181,58 @@ export default function PagesManagementPage() {
     }
   }
 
+  const handleToggleWebsitePage = async (id: string) => {
+    const page = customPages.find((p) => p.id === id)
+    if (!page) return
+
+    const newValue = !page.isWebsitePage
+    try {
+      const res = await fetch(`/api/admin/pages/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isWebsitePage: newValue }),
+      })
+      if (res.ok) {
+        setCustomPages((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, isWebsitePage: newValue } : p))
+        )
+      }
+    } catch (error) {
+      console.error('Error toggling website page:', error)
+    }
+  }
+
+  // Website pages = custom pages marked as website pages
+  const websitePages = customPages.filter((p) => p.isWebsitePage)
+
+  // Search across all pages (frontend + custom) by URL/slug
+  const allSearchablePages = [
+    ...FRONTEND_PAGES.map((p) => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      type: 'frontend' as const,
+      icon: p.icon,
+      description: p.description,
+    })),
+    ...customPages.map((p) => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      type: 'custom' as const,
+      icon: '📄',
+      description: `/${p.slug}`,
+    })),
+  ]
+
+  const searchResults = searchQuery.trim()
+    ? allSearchablePages.filter(
+        (p) =>
+          p.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : []
+
   if (isLoading) {
     return <div>Loading pages...</div>
   }
@@ -193,6 +246,82 @@ export default function PagesManagementPage() {
         <p className="text-gray-600 mt-2">
           Edit the pages that your customers see on the website
         </p>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mb-8">
+        <div className="relative">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search pages by URL or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+
+        {/* Search Results */}
+        {searchQuery.trim() && (
+          <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-sm">
+            {searchResults.length === 0 ? (
+              <div className="p-4 text-sm text-gray-500 text-center">
+                No pages found matching &ldquo;{searchQuery}&rdquo;
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {searchResults.map((page) => (
+                  <div
+                    key={`${page.type}-${page.id}`}
+                    className="flex items-center justify-between p-3 hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{page.icon}</span>
+                      <div>
+                        <p className="text-sm font-medium">{page.title}</p>
+                        <p className="text-xs text-gray-500">
+                          /{page.slug || 'home'}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 text-xs rounded ${
+                          page.type === 'frontend'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {page.type === 'frontend' ? 'Main Page' : 'Custom'}
+                      </span>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        href={
+                          page.type === 'frontend'
+                            ? `/admin/pages/editor/frontend-${page.id}`
+                            : `/admin/pages/editor/${page.id}`
+                        }
+                      >
+                        Edit
+                      </Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Frontend Pages - Main Site Pages */}
@@ -246,6 +375,72 @@ export default function PagesManagementPage() {
         </div>
       </div>
 
+      {/* Website Pages Section */}
+      {websitePages.length > 0 && (
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">Website Pages</h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Linked pages from the Main Website Pages
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {websitePages.map((page) => (
+              <Card
+                key={page.id}
+                className="hover:shadow-lg transition-shadow border-green-200 bg-green-50"
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="text-4xl">🌐</div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                        <span>/{page.slug}</span>
+                        <span>•</span>
+                        {page.published ? (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                            Published
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded">
+                            Draft
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        {page.components.length} components
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        size="sm"
+                        className="bg-primary hover:bg-primary-dark text-white"
+                        asChild
+                      >
+                        <Link href={`/admin/pages/editor/${page.id}`}>
+                          Edit Page
+                        </Link>
+                      </Button>
+                      {page.published && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/${page.slug}`} target="_blank">
+                            View Live
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Custom Pages - User Created */}
       <div>
         <div className="flex items-center justify-between mb-6">
@@ -281,7 +476,14 @@ export default function PagesManagementPage() {
         ) : (
           <div className="space-y-4">
             {customPages.map((page) => (
-              <Card key={page.id}>
+              <Card
+                key={page.id}
+                className={
+                  page.isWebsitePage
+                    ? 'border-green-300 bg-green-50'
+                    : ''
+                }
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -301,6 +503,11 @@ export default function PagesManagementPage() {
                             Published
                           </span>
                         )}
+                        {page.isWebsitePage && (
+                          <span className="px-2 py-1 bg-green-200 text-green-800 text-xs rounded font-medium">
+                            Website Page
+                          </span>
+                        )}
                       </div>
                       <p className="text-gray-600 text-sm mb-3">/{page.slug}</p>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
@@ -312,6 +519,18 @@ export default function PagesManagementPage() {
                       </div>
                     </div>
                     <div className="flex gap-2 ml-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleWebsitePage(page.id)}
+                        className={
+                          page.isWebsitePage
+                            ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                            : ''
+                        }
+                      >
+                        Website Page
+                      </Button>
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>
                       </Button>
@@ -351,6 +570,8 @@ export default function PagesManagementPage() {
                 <li>• Use drag & drop to rearrange sections and components</li>
                 <li>• Double-click any custom page name to rename it</li>
                 <li>• Create custom pages for landing pages, promotions, or special content</li>
+                <li>• Click &ldquo;Website Page&rdquo; to link a custom page to the Website Pages section</li>
+                <li>• Use the search bar to quickly find pages by URL or name</li>
               </ul>
             </div>
           </div>

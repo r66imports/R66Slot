@@ -800,6 +800,19 @@ function ContentTab({
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
             />
           </div>
+          <div className="pt-2 border-t border-gray-100">
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Link URL (opens in new tab)</label>
+            <input
+              type="text"
+              value={(component.settings.link as string) || ''}
+              onChange={(e) => updateSetting('link', e.target.value)}
+              placeholder="https://example.com or /page-slug"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+            {component.settings.link && (
+              <p className="text-[10px] text-green-600 mt-1 font-play">Image will link to: {String(component.settings.link)}</p>
+            )}
+          </div>
         </>
       )}
 
