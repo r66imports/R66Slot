@@ -34,6 +34,9 @@ export default function AdminLayout({
       { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
       { name: 'Pre Orders', href: '/admin/slotify-preorders', icon: '📦' },
       { name: 'Slotify Orders', href: '/admin/slotify-orders', icon: '🎰' },
+      { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
+      { name: 'Shipping', href: '/admin/shipping', icon: '🚚' },
+      { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],
     settings: [

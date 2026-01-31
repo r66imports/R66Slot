@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,6 +42,67 @@ const FRONTEND_PAGES = [
   },
 ]
 
+function InlineEditableTitle({
+  value,
+  onSave,
+  className,
+}: {
+  value: string
+  onSave: (newTitle: string) => void
+  className?: string
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+  }, [editing])
+
+  const commit = () => {
+    const trimmed = draft.trim()
+    if (trimmed && trimmed !== value) {
+      onSave(trimmed)
+    } else {
+      setDraft(value)
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') {
+            setDraft(value)
+            setEditing(false)
+          }
+        }}
+        className={`${className} border border-blue-400 rounded px-2 py-0.5 outline-none focus:ring-2 focus:ring-blue-500 bg-white`}
+      />
+    )
+  }
+
+  return (
+    <span
+      onDoubleClick={() => setEditing(true)}
+      className={`${className} cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1`}
+      title="Double-click to rename"
+    >
+      {value}
+    </span>
+  )
+}
+
 export default function PagesManagementPage() {
   const [customPages, setCustomPages] = useState<Page[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -59,6 +120,23 @@ export default function PagesManagementPage() {
       console.error('Error fetching pages:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleRename = async (id: string, newTitle: string) => {
+    try {
+      const res = await fetch(`/api/admin/pages/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle }),
+      })
+      if (res.ok) {
+        setCustomPages((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, title: newTitle } : p))
+        )
+      }
+    } catch (error) {
+      console.error('Error renaming page:', error)
     }
   }
 
@@ -174,7 +252,8 @@ export default function PagesManagementPage() {
           <div>
             <h2 className="text-2xl font-bold">Custom Pages</h2>
             <p className="text-gray-600 text-sm mt-1">
-              Additional pages created with the visual editor
+              Additional pages created with the visual editor.{' '}
+              <span className="text-blue-600">Double-click a page name to rename it.</span>
             </p>
           </div>
           <Button
@@ -207,7 +286,11 @@ export default function PagesManagementPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-xl font-semibold">{page.title}</h3>
+                        <InlineEditableTitle
+                          value={page.title}
+                          onSave={(newTitle) => handleRename(page.id, newTitle)}
+                          className="text-xl font-semibold"
+                        />
                         {!page.published && (
                           <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded">
                             Draft
@@ -266,7 +349,7 @@ export default function PagesManagementPage() {
               <ul className="space-y-1 text-sm text-gray-700">
                 <li>• Click &ldquo;Edit Page&rdquo; on any main website page to customize its content</li>
                 <li>• Use drag & drop to rearrange sections and components</li>
-                <li>• Changes are saved automatically and can be published when ready</li>
+                <li>• Double-click any custom page name to rename it</li>
                 <li>• Create custom pages for landing pages, promotions, or special content</li>
               </ul>
             </div>
