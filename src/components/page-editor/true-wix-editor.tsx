@@ -389,7 +389,7 @@ ${canvasHTML}
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* ─── LEFT SIDEBAR: Component Library / Layers ─── */}
+        {/* ─── LEFT SIDEBAR: Elements Library / Layers ─── */}
         <div className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
           <div className="flex border-b border-gray-100">
             <button
@@ -400,7 +400,7 @@ ${canvasHTML}
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              Components
+              Elements
             </button>
             <button
               onClick={() => setLeftTab('layers')}

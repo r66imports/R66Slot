@@ -25,16 +25,20 @@ export function DraggableLibrary({ onAddComponent }: DraggableLibraryProps) {
     onAddComponent(componentType)
   }
 
-  const basicComponents = COMPONENT_LIBRARY.filter(c =>
+  const basicElements = COMPONENT_LIBRARY.filter(c =>
     ['heading', 'text', 'button', 'image', 'spacer', 'divider'].includes(c.type)
   )
 
-  const layoutComponents = COMPONENT_LIBRARY.filter(c =>
-    ['section', 'two-column', 'three-column', 'card', 'hero'].includes(c.type)
+  const layoutElements = COMPONENT_LIBRARY.filter(c =>
+    ['section', 'strip', 'box', 'three-column', 'card', 'hero', 'banner'].includes(c.type)
   )
 
-  const contentComponents = COMPONENT_LIBRARY.filter(c =>
+  const contentElements = COMPONENT_LIBRARY.filter(c =>
     ['quote', 'icon-text', 'video', 'gallery'].includes(c.type)
+  )
+
+  const storeElements = COMPONENT_LIBRARY.filter(c =>
+    ['product-grid', 'product-card', 'product-carousel', 'featured-product', 'add-to-cart', 'price-display'].includes(c.type)
   )
 
   return (
@@ -42,40 +46,51 @@ export function DraggableLibrary({ onAddComponent }: DraggableLibraryProps) {
       <div className="mb-6">
         <h3 className="font-semibold mb-2 text-lg flex items-center gap-2">
           <span>🎨</span>
-          Add Components
+          Add Elements
         </h3>
         <p className="text-xs text-gray-500">
           Drag & drop or click to add
         </p>
       </div>
 
-      {/* Basic Components */}
+      {/* Basic Elements */}
       <ComponentSection
         title="Basic"
         icon="📝"
-        components={basicComponents}
+        components={basicElements}
         draggedType={draggedType}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={handleClick}
       />
 
-      {/* Layout Components */}
+      {/* Layout Elements */}
       <ComponentSection
         title="Layout"
         icon="📐"
-        components={layoutComponents}
+        components={layoutElements}
         draggedType={draggedType}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={handleClick}
       />
 
-      {/* Content Components */}
+      {/* Content Elements */}
       <ComponentSection
         title="Content"
         icon="🎬"
-        components={contentComponents}
+        components={contentElements}
+        draggedType={draggedType}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onClick={handleClick}
+      />
+
+      {/* Store Elements */}
+      <ComponentSection
+        title="Store"
+        icon="🛍️"
+        components={storeElements}
         draggedType={draggedType}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -86,7 +101,7 @@ export function DraggableLibrary({ onAddComponent }: DraggableLibraryProps) {
       <div className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <h4 className="font-semibold text-sm mb-2">💡 Quick Tips</h4>
         <ul className="text-xs text-gray-600 space-y-1">
-          <li>• Drag components to canvas</li>
+          <li>• Drag elements to canvas</li>
           <li>• Double-click to edit text</li>
           <li>• Click to select & style</li>
           <li>• Drag to reorder elements</li>
@@ -173,7 +188,9 @@ function getComponentDescription(type: PageComponent['type']): string {
     spacer: 'Vertical space',
     divider: 'Horizontal line',
     section: 'Container block',
-    'two-column': '2-column layout',
+    strip: 'Full-width strip',
+    box: 'Image container',
+    banner: 'Promotional banner',
     'three-column': '3-column layout',
     card: 'Content card',
     hero: 'Hero banner',
@@ -181,6 +198,12 @@ function getComponentDescription(type: PageComponent['type']): string {
     'icon-text': 'Icon with text',
     video: 'Video embed',
     gallery: 'Image grid',
+    'product-grid': 'Product listing',
+    'product-card': 'Product card',
+    'product-carousel': 'Product slider',
+    'featured-product': 'Featured product',
+    'add-to-cart': 'Cart button',
+    'price-display': 'Price tag',
   }
-  return descriptions[type] || 'Component'
+  return descriptions[type] || 'Element'
 }

@@ -201,11 +201,39 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
     case 'button': {
       const alignment = styles.textAlign || 'center'
       const justifyClass = alignment === 'center' ? 'justify-center' : alignment === 'right' ? 'justify-end' : 'justify-start'
+      const btnVariant = (settings.variant as string) || 'primary'
+      const btnSize = (settings.size as string) || 'medium'
+      const btnShape = (settings.shape as string) || 'rounded'
+      const btnIcon = (settings.icon as string) || ''
+      const btnIconPos = (settings.iconPosition as string) || 'right'
+      const btnFullWidth = !!settings.fullWidth
+
+      const variantClasses: Record<string, string> = {
+        primary: 'bg-primary text-black hover:brightness-110',
+        secondary: 'bg-gray-800 text-white hover:bg-gray-700',
+        outline: 'border-2 border-gray-800 text-gray-800 bg-transparent hover:bg-gray-800 hover:text-white',
+        ghost: 'text-gray-800 bg-gray-100 hover:bg-gray-200',
+        danger: 'bg-red-600 text-white hover:bg-red-700',
+        success: 'bg-green-600 text-white hover:bg-green-700',
+      }
+      const sizeClasses: Record<string, string> = {
+        small: 'py-1.5 px-4 text-sm',
+        medium: 'py-3 px-8 text-base',
+        large: 'py-4 px-10 text-lg',
+      }
+      const shapeClasses: Record<string, string> = {
+        rounded: 'rounded-lg',
+        pill: 'rounded-full',
+        square: 'rounded-none',
+      }
+
       return (
         <div style={containerStyle}>
           <div className={`container mx-auto flex ${justifyClass}`}>
-            <span className="inline-block bg-red-600 text-white font-bold py-3 px-8 rounded-lg text-lg cursor-pointer hover:bg-red-700">
+            <span className={`inline-flex items-center gap-2 font-bold cursor-pointer transition-all ${variantClasses[btnVariant] || variantClasses.primary} ${sizeClasses[btnSize] || sizeClasses.medium} ${shapeClasses[btnShape] || shapeClasses.rounded} ${btnFullWidth ? 'w-full justify-center' : ''}`}>
+              {btnIcon && btnIconPos === 'left' && <span>{btnIcon}</span>}
               {content || 'Button'}
+              {btnIcon && btnIconPos === 'right' && <span>{btnIcon}</span>}
             </span>
           </div>
         </div>

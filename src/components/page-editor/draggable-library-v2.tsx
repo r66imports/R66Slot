@@ -8,16 +8,20 @@ import { usePageEditor } from '@/contexts/PageEditorContext'
 export function DraggableLibrary() {
   const { addComponent } = usePageEditor()
 
-  const basicComponents = COMPONENT_LIBRARY.filter(c =>
+  const basicElements = COMPONENT_LIBRARY.filter(c =>
     ['heading', 'text', 'button', 'image', 'spacer', 'divider'].includes(c.type)
   )
 
-  const layoutComponents = COMPONENT_LIBRARY.filter(c =>
-    ['section', 'two-column', 'three-column', 'card', 'hero'].includes(c.type)
+  const layoutElements = COMPONENT_LIBRARY.filter(c =>
+    ['section', 'strip', 'box', 'three-column', 'card', 'hero', 'banner'].includes(c.type)
   )
 
-  const contentComponents = COMPONENT_LIBRARY.filter(c =>
+  const contentElements = COMPONENT_LIBRARY.filter(c =>
     ['quote', 'icon-text', 'video', 'gallery'].includes(c.type)
+  )
+
+  const storeElements = COMPONENT_LIBRARY.filter(c =>
+    ['product-grid', 'product-card', 'product-carousel', 'featured-product', 'add-to-cart', 'price-display'].includes(c.type)
   )
 
   return (
@@ -25,7 +29,7 @@ export function DraggableLibrary() {
       <div className="p-4 border-b border-gray-200 bg-gradient-to-br from-primary/5 to-primary/10">
         <h3 className="font-bold mb-1 text-lg flex items-center gap-2">
           <span className="text-2xl">🎨</span>
-          <span>Components</span>
+          <span>Elements</span>
         </h3>
         <p className="text-xs text-gray-600">
           Click to add or drag to position
@@ -33,30 +37,39 @@ export function DraggableLibrary() {
       </div>
 
       <div className="p-4">
-        {/* Basic Components */}
+        {/* Basic Elements */}
         <ComponentSection
           title="Basic"
           icon="📝"
           description="Essential building blocks"
-          components={basicComponents}
+          components={basicElements}
           onAdd={addComponent}
         />
 
-        {/* Layout Components */}
+        {/* Layout Elements */}
         <ComponentSection
           title="Layout"
           icon="📐"
           description="Structure your page"
-          components={layoutComponents}
+          components={layoutElements}
           onAdd={addComponent}
         />
 
-        {/* Content Components */}
+        {/* Content Elements */}
         <ComponentSection
           title="Content"
           icon="🎬"
           description="Rich media elements"
-          components={contentComponents}
+          components={contentElements}
+          onAdd={addComponent}
+        />
+
+        {/* Store Elements */}
+        <ComponentSection
+          title="Store"
+          icon="🛍️"
+          description="E-commerce components"
+          components={storeElements}
           onAdd={addComponent}
         />
       </div>
@@ -204,7 +217,9 @@ function getComponentDescription(type: PageComponent['type']): string {
     spacer: 'Vertical spacing',
     divider: 'Horizontal separator',
     section: 'Container section',
-    'two-column': '2-column grid layout',
+    strip: 'Full-width strip',
+    box: 'Image container',
+    banner: 'Promotional banner',
     'three-column': '3-column grid layout',
     card: 'Card with content',
     hero: 'Hero banner section',
@@ -212,6 +227,12 @@ function getComponentDescription(type: PageComponent['type']): string {
     'icon-text': 'Icon with description',
     video: 'Embedded video',
     gallery: 'Image gallery grid',
+    'product-grid': 'Product listing grid',
+    'product-card': 'Single product card',
+    'product-carousel': 'Scrolling products',
+    'featured-product': 'Highlighted product',
+    'add-to-cart': 'Cart button',
+    'price-display': 'Price tag',
   }
-  return descriptions[type] || 'Custom component'
+  return descriptions[type] || 'Custom element'
 }

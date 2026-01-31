@@ -939,17 +939,167 @@ function ContentTab({
         </>
       )}
 
-      {/* Button Link */}
+      {/* Button Options */}
       {component.type === 'button' && (
-        <div>
-          <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Link URL</label>
-          <input
-            type="text"
-            value={(component.settings.link as string) || ''}
-            onChange={(e) => updateSetting('link', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-          />
-        </div>
+        <>
+          {/* Link URL */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Link URL</label>
+            <input
+              type="text"
+              value={(component.settings.link as string) || ''}
+              onChange={(e) => updateSetting('link', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              placeholder="https://..."
+            />
+          </div>
+
+          {/* Open in new tab */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="btn-new-tab"
+              checked={!!component.settings.openInNewTab}
+              onChange={(e) => updateSetting('openInNewTab', e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <label htmlFor="btn-new-tab" className="text-xs font-medium text-gray-500 font-play">Open in new tab</label>
+          </div>
+
+          {/* Button Variant */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Button Style</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { value: 'primary', label: 'Primary', preview: 'bg-primary text-black' },
+                { value: 'secondary', label: 'Secondary', preview: 'bg-gray-800 text-white' },
+                { value: 'outline', label: 'Outline', preview: 'border-2 border-gray-800 text-gray-800 bg-white' },
+                { value: 'ghost', label: 'Ghost', preview: 'text-gray-800 bg-gray-100' },
+                { value: 'danger', label: 'Danger', preview: 'bg-red-600 text-white' },
+                { value: 'success', label: 'Success', preview: 'bg-green-600 text-white' },
+              ].map((v) => (
+                <button
+                  key={v.value}
+                  onClick={() => updateSetting('variant', v.value)}
+                  className={`px-2 py-1.5 rounded text-xs font-semibold font-play transition-all ${v.preview} ${
+                    (component.settings.variant || 'primary') === v.value
+                      ? 'ring-2 ring-blue-500 ring-offset-1'
+                      : 'opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Button Size */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Size</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { value: 'small', label: 'Small' },
+                { value: 'medium', label: 'Medium' },
+                { value: 'large', label: 'Large' },
+              ].map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => updateSetting('size', s.value)}
+                  className={`px-2 py-1.5 rounded border text-xs font-medium font-play transition-all ${
+                    (component.settings.size || 'medium') === s.value
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Button Shape */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Shape</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { value: 'rounded', label: 'Rounded' },
+                { value: 'pill', label: 'Pill' },
+                { value: 'square', label: 'Square' },
+              ].map((s) => (
+                <button
+                  key={s.value}
+                  onClick={() => updateSetting('shape', s.value)}
+                  className={`px-2 py-1.5 border text-xs font-medium font-play transition-all ${
+                    s.value === 'pill' ? 'rounded-full' : s.value === 'square' ? 'rounded-none' : 'rounded-lg'
+                  } ${
+                    (component.settings.shape || 'rounded') === s.value
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Full Width */}
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="btn-full-width"
+              checked={!!component.settings.fullWidth}
+              onChange={(e) => updateSetting('fullWidth', e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <label htmlFor="btn-full-width" className="text-xs font-medium text-gray-500 font-play">Full width</label>
+          </div>
+
+          {/* Button Icon */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Icon (optional)</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {['', '→', '←', '↗', '🛒', '❤️', '⬇️', '✉️', '🔍', '⚡'].map((ic) => (
+                <button
+                  key={ic}
+                  onClick={() => updateSetting('icon', ic)}
+                  className={`w-8 h-8 rounded border text-sm flex items-center justify-center transition-all ${
+                    (component.settings.icon || '') === ic
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {ic || '✕'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Icon Position */}
+          {component.settings.icon && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Icon Position</label>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { value: 'left', label: 'Left' },
+                  { value: 'right', label: 'Right' },
+                ].map((p) => (
+                  <button
+                    key={p.value}
+                    onClick={() => updateSetting('iconPosition', p.value)}
+                    className={`px-2 py-1.5 rounded border text-xs font-medium font-play transition-all ${
+                      (component.settings.iconPosition || 'right') === p.value
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Gallery - Visual Image Grid */}
