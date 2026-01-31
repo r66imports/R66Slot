@@ -151,12 +151,12 @@ export default function PagesManagementPage() {
                       className="bg-primary hover:bg-primary-dark text-white"
                       asChild
                     >
-                      <Link href={`/admin/pages/frontend/${page.id}`}>
+                      <Link href={`/admin/pages/editor/frontend-${page.id}`}>
                         Edit Page
                       </Link>
                     </Button>
                     <Button variant="outline" size="sm" asChild>
-                      <Link href={`/${page.slug}`} target="_blank">
+                      <Link href={page.slug ? `/${page.slug}` : '/'} target="_blank">
                         View Live
                       </Link>
                     </Button>
