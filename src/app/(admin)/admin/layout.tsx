@@ -30,9 +30,9 @@ export default function AdminLayout({
     ],
     business: [
       { name: 'Products', href: '/admin/products', icon: '🛍️' },
-      { name: 'Slot Car Pre Orders', href: '/admin/slotcar-orders', icon: '🎯' },
+      { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
       { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
-      { name: 'Slotify Pre-orders', href: '/admin/slotify-preorders', icon: '📦' },
+      { name: 'Pre Orders', href: '/admin/slotify-preorders', icon: '📦' },
       { name: 'Slotify Orders', href: '/admin/slotify-orders', icon: '🎰' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],

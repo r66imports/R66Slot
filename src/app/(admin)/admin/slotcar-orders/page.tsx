@@ -100,7 +100,7 @@ export default function SlotCarOrdersPage() {
     <div className="font-play">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Slot Car Pre Orders</h1>
+          <h1 className="text-3xl font-bold">Create Poster</h1>
           <p className="text-gray-600 mt-1">
             Create and manage pre-order posters for WhatsApp
           </p>

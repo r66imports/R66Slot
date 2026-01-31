@@ -160,13 +160,23 @@ export default function NewProductPage() {
       mediaFiles: mediaFiles.map(f => f.url),
     }
 
-    console.log('Saving product:', productData)
-
-    // TODO: Implement actual save to Shopify or database
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(productData),
+      })
+      if (res.ok) {
+        router.push('/admin/products')
+      } else {
+        alert('Failed to save product')
+        setSaving(false)
+      }
+    } catch (error) {
+      console.error('Error saving product:', error)
+      alert('Failed to save product')
       setSaving(false)
-      router.push('/admin/products')
-    }, 1000)
+    }
   }
 
   const handleExportToWhatsApp = () => {

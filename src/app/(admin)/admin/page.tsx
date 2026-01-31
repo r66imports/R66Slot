@@ -109,12 +109,17 @@ export default function AdminDashboard() {
             </Link>
             <Link href="/admin/slotify-preorders">
               <Button variant="outline" className="w-full justify-start">
-                📋 Manage Slotify Pre-orders
+                📋 Manage Pre Orders
               </Button>
             </Link>
-            <Link href="/slotify-preorders" target="_blank">
+            <Link href="/admin/slotcar-orders">
               <Button variant="outline" className="w-full justify-start">
-                👁️ View Client Pre-orders Page
+                🎨 Create Poster
+              </Button>
+            </Link>
+            <Link href="/admin/catalogue">
+              <Button variant="outline" className="w-full justify-start">
+                📚 View Catalogue
               </Button>
             </Link>
           </CardContent>

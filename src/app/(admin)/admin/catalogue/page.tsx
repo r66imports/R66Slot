@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button'
 
 interface CatalogueItem {
   id: string
-  name: string
+  title: string
   brand: string
   sku: string
-  price: string
-  category: string
-  inStock: boolean
+  price: number
+  productType: string
+  quantity: number
   imageUrl: string
   createdAt: string
 }
@@ -41,7 +41,7 @@ export default function CataloguePage() {
 
   const filteredItems = items.filter(
     (item) =>
-      item.name?.toLowerCase().includes(filter.toLowerCase()) ||
+      item.title?.toLowerCase().includes(filter.toLowerCase()) ||
       item.brand?.toLowerCase().includes(filter.toLowerCase()) ||
       item.sku?.toLowerCase().includes(filter.toLowerCase())
   )
@@ -92,7 +92,7 @@ export default function CataloguePage() {
                 {item.imageUrl ? (
                   <img
                     src={item.imageUrl}
-                    alt={item.name}
+                    alt={item.title}
                     className="w-full h-full object-contain"
                   />
                 ) : (
@@ -104,20 +104,20 @@ export default function CataloguePage() {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="font-semibold text-gray-900 font-play">{item.name}</h3>
+                    <h3 className="font-semibold text-gray-900 font-play">{item.title}</h3>
                     <p className="text-sm text-gray-500 font-play">{item.brand}</p>
                   </div>
                   <span className={`px-2 py-1 text-xs rounded font-play ${
-                    item.inStock
+                    item.quantity > 0
                       ? 'bg-green-100 text-green-700'
                       : 'bg-red-100 text-red-700'
                   }`}>
-                    {item.inStock ? 'In Stock' : 'Out of Stock'}
+                    {item.quantity > 0 ? 'In Stock' : 'Out of Stock'}
                   </span>
                 </div>
                 <p className="text-sm text-gray-400 mt-1 font-play">SKU: {item.sku}</p>
                 <p className="text-xl font-bold text-primary mt-2 font-play">
-                  R{item.price}
+                  R{typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
                 </p>
               </CardContent>
             </Card>

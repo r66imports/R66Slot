@@ -55,7 +55,7 @@ export default function SlotifyPreordersPage() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Slotify Pre-orders</h1>
+          <h1 className="text-3xl font-bold">Pre Orders</h1>
           <p className="text-gray-600 mt-1">
             Manage pre-order items for customer bookings
           </p>

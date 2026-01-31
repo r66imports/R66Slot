@@ -9,11 +9,10 @@ import { put, list, del, head } from '@vercel/blob'
 // Read a JSON file from blob storage
 export async function blobRead<T = unknown>(key: string, fallback: T): Promise<T> {
   try {
-    const { blobs } = await list({ prefix: key, limit: 1 })
-    const match = blobs.find(b => b.pathname === key)
-    if (!match) return fallback
+    const blob = await head(key)
+    if (!blob) return fallback
 
-    const response = await fetch(match.url, { cache: 'no-store' })
+    const response = await fetch(blob.url, { next: { revalidate: 5 } })
     if (!response.ok) return fallback
 
     const text = await response.text()
@@ -36,17 +35,16 @@ export async function blobWrite(key: string, data: unknown): Promise<void> {
 // Delete a file from blob storage
 export async function blobDelete(key: string): Promise<boolean> {
   try {
-    const { blobs } = await list({ prefix: key, limit: 1 })
-    const match = blobs.find(b => b.pathname === key)
-    if (!match) return false
-    await del(match.url)
+    const blob = await head(key)
+    if (!blob) return false
+    await del(blob.url)
     return true
   } catch {
     return false
   }
 }
 
-// List all files with a given prefix
+// List all files with a given prefix (pathnames only)
 export async function blobList(prefix: string): Promise<string[]> {
   try {
     const { blobs } = await list({ prefix, limit: 1000 })
@@ -56,11 +54,21 @@ export async function blobList(prefix: string): Promise<string[]> {
   }
 }
 
+// List all files with a given prefix (pathnames + URLs for direct fetch)
+export async function blobListWithUrls(prefix: string): Promise<{ pathname: string; url: string }[]> {
+  try {
+    const { blobs } = await list({ prefix, limit: 1000 })
+    return blobs.map(b => ({ pathname: b.pathname, url: b.url }))
+  } catch {
+    return []
+  }
+}
+
 // Check if a blob exists
 export async function blobExists(key: string): Promise<boolean> {
   try {
-    const { blobs } = await list({ prefix: key, limit: 1 })
-    return blobs.some(b => b.pathname === key)
+    await head(key)
+    return true
   } catch {
     return false
   }

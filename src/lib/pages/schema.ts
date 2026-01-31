@@ -92,6 +92,7 @@ export interface PageComponent {
     width: number
     height: number
     zIndex?: number
+    rotation?: number
   }
 }
 

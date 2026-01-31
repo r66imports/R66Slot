@@ -543,6 +543,26 @@ function LayoutModePanel({
               />
             </div>
           </div>
+          {/* Rotation */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[10px] text-gray-500 font-play">Rotation</label>
+              <span className="text-[10px] text-gray-400 font-play">{component.position.rotation || 0}°</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              value={component.position.rotation || 0}
+              onChange={(e) => onUpdate({ position: { ...component.position!, rotation: parseInt(e.target.value) || 0 } })}
+              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            />
+            <div className="flex justify-between text-[10px] text-gray-400 font-play mt-0.5">
+              <span>0°</span>
+              <span>180°</span>
+              <span>360°</span>
+            </div>
+          </div>
           <p className="text-[10px] text-purple-500 font-play">Drag to position, resize from handles</p>
         </div>
       )}
@@ -1585,6 +1605,60 @@ function SettingsTab({
           {component.positionMode === 'absolute' ? 'Freeform mode' : 'Flow mode'}
         </span>
         <span className="text-[10px] text-gray-400 font-play ml-auto">Change in Content tab</span>
+      </div>
+
+      {/* Animation */}
+      <div className="bg-indigo-50 rounded-lg p-3 space-y-2 border border-indigo-200">
+        <h4 className="text-xs font-semibold text-indigo-700 uppercase tracking-wider font-play">Animation</h4>
+        <div>
+          <label className="text-[10px] text-gray-500 font-play mb-1 block">Type</label>
+          <select
+            value={(component.settings.animation as string) || 'none'}
+            onChange={(e) => updateSetting('animation', e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+          >
+            <option value="none">None</option>
+            <option value="fade-in">Fade In</option>
+            <option value="slide-up">Slide Up</option>
+            <option value="slide-left">Slide Left</option>
+            <option value="slide-right">Slide Right</option>
+            <option value="zoom-in">Zoom In</option>
+            <option value="bounce">Bounce</option>
+          </select>
+        </div>
+        {(component.settings.animation as string) && (component.settings.animation as string) !== 'none' && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-gray-500 font-play mb-1 block">Duration</label>
+              <select
+                value={String(component.settings.animationDuration || '0.6')}
+                onChange={(e) => updateSetting('animationDuration', e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+              >
+                <option value="0.3">0.3s</option>
+                <option value="0.6">0.6s</option>
+                <option value="1">1s</option>
+                <option value="1.5">1.5s</option>
+                <option value="2">2s</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 font-play mb-1 block">Delay</label>
+              <select
+                value={String(component.settings.animationDelay || '0')}
+                onChange={(e) => updateSetting('animationDelay', e.target.value)}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+              >
+                <option value="0">0s</option>
+                <option value="0.2">0.2s</option>
+                <option value="0.4">0.4s</option>
+                <option value="0.6">0.6s</option>
+                <option value="1">1s</option>
+              </select>
+            </div>
+          </div>
+        )}
+        <p className="text-[10px] text-indigo-500 font-play">Animations play on scroll in published page</p>
       </div>
 
       {/* Hero alignment */}

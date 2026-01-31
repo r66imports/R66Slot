@@ -10,6 +10,7 @@ import { EditorPropertiesPanel } from './editor-properties-panel'
 import { PageSettingsPanel } from './page-settings-panel'
 import { TemplateChooser } from './template-chooser'
 import { ResizableBox } from '@/components/editor/ResizableBox'
+import { LayersPanel } from './layers-panel'
 import Draggable, { type DraggableData, type DraggableEvent } from 'react-draggable'
 import {
   DndContext,
@@ -55,6 +56,8 @@ const COMPONENT_LIBRARY = [
   { type: 'media' as const, label: 'Media', icon: '🎨', desc: 'Image/video media block' },
 ]
 
+const SNAP_SIZE = 20
+
 export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
   const router = useRouter()
   const {
@@ -83,6 +86,18 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
   const [showTemplateChooser, setShowTemplateChooser] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [showPageSettings, setShowPageSettings] = useState(false)
+  const [snapEnabled, setSnapEnabled] = useState(true)
+  const [showGrid, setShowGrid] = useState(false)
+  const [leftTab, setLeftTab] = useState<'components' | 'layers'>('components')
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; componentId: string } | null>(null)
+
+  // Close context menu on click anywhere
+  useEffect(() => {
+    const close = () => setContextMenu(null)
+    window.addEventListener('click', close)
+    return () => window.removeEventListener('click', close)
+  }, [])
 
   // Load page on mount
   useEffect(() => {
@@ -147,6 +162,44 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
       alert('Failed to save')
     }
   }
+
+  const handleExportHTML = useCallback(() => {
+    if (!canvasRef.current || !page) return
+    const canvasHTML = canvasRef.current.innerHTML
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${page.title}</title>
+<script src="https://cdn.tailwindcss.com"><\/script>
+<style>
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideLeft { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideRight { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes zoomIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+.animate-fadeIn { animation: fadeIn var(--anim-duration, 0.6s) var(--anim-delay, 0s) both; }
+.animate-slideUp { animation: slideUp var(--anim-duration, 0.6s) var(--anim-delay, 0s) both; }
+.animate-slideLeft { animation: slideLeft var(--anim-duration, 0.6s) var(--anim-delay, 0s) both; }
+.animate-slideRight { animation: slideRight var(--anim-duration, 0.6s) var(--anim-delay, 0s) both; }
+.animate-zoomIn { animation: zoomIn var(--anim-duration, 0.6s) var(--anim-delay, 0s) both; }
+.animate-bounce { animation: bounce var(--anim-duration, 0.6s) var(--anim-delay, 0s) both; }
+</style>
+</head>
+<body>
+${canvasHTML}
+</body>
+</html>`
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${page.slug || 'page'}.html`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [page])
 
   if (!page) {
     return (
@@ -280,6 +333,38 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
           >
             Templates
           </Button>
+
+          <div className="h-6 w-px bg-gray-200" />
+
+          {/* Snap Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSnapEnabled(!snapEnabled)}
+            className={snapEnabled ? 'bg-blue-50 text-blue-600 border-blue-300' : 'text-gray-600'}
+          >
+            Snap {snapEnabled ? 'ON' : 'OFF'}
+          </Button>
+
+          {/* Grid Toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowGrid(!showGrid)}
+            className={showGrid ? 'bg-blue-50 text-blue-600 border-blue-300' : 'text-gray-600'}
+          >
+            Grid
+          </Button>
+
+          {/* Export HTML */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportHTML}
+            className="text-gray-600"
+          >
+            Export HTML
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -304,28 +389,55 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* ─── LEFT SIDEBAR: Component Library ─── */}
+        {/* ─── LEFT SIDEBAR: Component Library / Layers ─── */}
         <div className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-          <div className="p-3 border-b border-gray-100">
-            <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-play">Components</h2>
+          <div className="flex border-b border-gray-100">
+            <button
+              onClick={() => setLeftTab('components')}
+              className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
+                leftTab === 'components'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Components
+            </button>
+            <button
+              onClick={() => setLeftTab('layers')}
+              className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
+                leftTab === 'layers'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Layers
+            </button>
           </div>
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {COMPONENT_LIBRARY.map((item) => (
-              <button
-                key={item.type}
-                onClick={() => addComponent(item.type)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
-              >
-                <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
-                  {item.icon}
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
-                  <p className="text-xs text-gray-400 font-play">{item.desc}</p>
-                </div>
-              </button>
-            ))}
-          </div>
+          {leftTab === 'components' ? (
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {COMPONENT_LIBRARY.map((item) => (
+                <button
+                  key={item.type}
+                  onClick={() => addComponent(item.type)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
+                >
+                  <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
+                    {item.icon}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
+                    <p className="text-xs text-gray-400 font-play">{item.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <LayersPanel
+              components={page.components}
+              selectedComponentId={selectedComponentId}
+              onSelect={(id) => { setSelectedComponentId(id); setShowPageSettings(false) }}
+            />
+          )}
         </div>
 
         {/* ─── CANVAS: Live Preview ─── */}
@@ -334,8 +446,16 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
           onClick={() => { setSelectedComponentId(null); setShowPageSettings(false) }}
         >
           <div
+            ref={canvasRef}
             className="mx-auto shadow-lg transition-all duration-300 min-h-screen overflow-hidden"
-            style={{ maxWidth: canvasWidth, ...pageBackgroundStyle }}
+            style={{
+              maxWidth: canvasWidth,
+              ...pageBackgroundStyle,
+              ...(showGrid ? {
+                backgroundImage: `radial-gradient(circle, #cbd5e1 1px, transparent 1px)`,
+                backgroundSize: `${SNAP_SIZE}px ${SNAP_SIZE}px`,
+              } : {}),
+            }}
           >
             {/* Page background image layer */}
             {ps.backgroundImage && (
@@ -387,6 +507,12 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                           component={component}
                           isSelected={selectedComponentId === component.id}
                           onSelect={() => { setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            setSelectedComponentId(component.id)
+                            setShowPageSettings(false)
+                            setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
+                          }}
                           onUpdateSettings={(key, value) => {
                             updateComponent(component.id, {
                               settings: { ...component.settings, [key]: value }
@@ -410,6 +536,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                       key={component.id}
                       component={component}
                       isSelected={selectedComponentId === component.id}
+                      snapEnabled={snapEnabled}
                       onSelect={() => { setSelectedComponentId(component.id); setShowPageSettings(false) }}
                       onUpdatePosition={(x, y) => {
                         updateComponent(component.id, {
@@ -419,6 +546,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                             width: component.position?.width || 300,
                             height: component.position?.height || 200,
                             zIndex: component.position?.zIndex || 10,
+                            rotation: component.position?.rotation || 0,
                           }
                         })
                       }}
@@ -430,6 +558,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
                             width: w,
                             height: h,
                             zIndex: component.position?.zIndex || 10,
+                            rotation: component.position?.rotation || 0,
                           }
                         })
                       }}
@@ -477,6 +606,51 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
         )}
       </div>
 
+      {/* Context Menu */}
+      {contextMenu && (() => {
+        const comp = page.components.find(c => c.id === contextMenu.componentId)
+        if (!comp) return null
+        return (
+          <div
+            className="fixed z-[100] bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[180px] font-play"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => { setSelectedComponentId(comp.id); setShowPageSettings(false); setContextMenu(null) }}
+            >
+              <span>&#9881;</span> Edit Settings
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => { duplicateComponent(comp.id); setContextMenu(null) }}
+            >
+              <span>&#10063;</span> Duplicate
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => { moveComponent(comp.id, 'up'); setContextMenu(null) }}
+            >
+              <span>&#8593;</span> Move Up
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => { moveComponent(comp.id, 'down'); setContextMenu(null) }}
+            >
+              <span>&#8595;</span> Move Down
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-red-50 text-red-600 flex items-center gap-2"
+              onClick={() => { deleteComponent(comp.id); setContextMenu(null) }}
+            >
+              <span>&#10005;</span> Delete
+            </button>
+          </div>
+        )
+      })()}
+
       {/* Template Chooser Modal */}
       <TemplateChooserWrapper
         open={showTemplateChooser}
@@ -509,11 +683,13 @@ function SortableLiveComponent({
   component,
   isSelected,
   onSelect,
+  onContextMenu,
   onUpdateSettings,
 }: {
   component: PageComponent
   isSelected: boolean
   onSelect: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   onUpdateSettings?: (key: string, value: any) => void
 }) {
   const {
@@ -542,6 +718,7 @@ function SortableLiveComponent({
             : 'hover:ring-2 hover:ring-blue-200 hover:ring-offset-0'
         }`}
         onClick={(e) => { e.stopPropagation(); onSelect() }}
+        onContextMenu={onContextMenu}
       >
         {/* Component label on hover / select */}
         <div className={`absolute -top-7 left-0 z-30 flex items-center gap-1 transition-opacity ${
@@ -570,6 +747,7 @@ function SortableLiveComponent({
 function FreeformComponent({
   component,
   isSelected,
+  snapEnabled,
   onSelect,
   onUpdatePosition,
   onUpdateSize,
@@ -577,6 +755,7 @@ function FreeformComponent({
 }: {
   component: PageComponent
   isSelected: boolean
+  snapEnabled: boolean
   onSelect: () => void
   onUpdatePosition: (x: number, y: number) => void
   onUpdateSize: (w: number, h: number) => void
@@ -602,10 +781,13 @@ function FreeformComponent({
     }
   }, [onUpdatePosition])
 
+  const rotation = pos.rotation || 0
+
   return (
     <Draggable
       nodeRef={nodeRef as React.RefObject<HTMLElement>}
       position={{ x: pos.x, y: pos.y }}
+      grid={snapEnabled ? [SNAP_SIZE, SNAP_SIZE] : undefined}
       onStop={handleStop}
       disabled={isResizingRef.current}
     >
@@ -617,6 +799,7 @@ function FreeformComponent({
           cursor: isResizingRef.current ? 'default' : 'grab',
           top: 0,
           left: 0,
+          transform: rotation ? `rotate(${rotation}deg)` : undefined,
         }}
         className="group"
         onMouseDown={(e) => e.stopPropagation()}
@@ -637,7 +820,7 @@ function FreeformComponent({
           isSelected={isSelected}
           minWidth={60}
           minHeight={30}
-          snapGrid={4}
+          snapGrid={snapEnabled ? SNAP_SIZE : 4}
           onResizeStart={() => {
             isResizingRef.current = true
           }}

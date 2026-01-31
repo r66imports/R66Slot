@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import type { PageComponent } from '@/lib/pages/schema'
+import { AnimatedWrapper, type AnimationType } from './animated-wrapper'
 
 interface ComponentRendererProps {
   component: PageComponent
@@ -8,6 +9,15 @@ interface ComponentRendererProps {
 
 export function ComponentRenderer({ component }: ComponentRendererProps) {
   const { type, content, styles, settings, children } = component
+  const animation = (settings.animation as AnimationType) || 'none'
+  const animDuration = parseFloat(String(settings.animationDuration || '0.6'))
+  const animDelay = parseFloat(String(settings.animationDelay || '0'))
+
+  // Apply rotation for absolute-positioned components
+  const wrapperStyle: React.CSSProperties | undefined =
+    component.positionMode === 'absolute' && component.position?.rotation
+      ? { transform: `rotate(${component.position.rotation}deg)` }
+      : undefined
 
   // Convert styles object to inline CSS
   const containerStyle: React.CSSProperties = {
@@ -37,7 +47,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     height: styles.height,
   }
 
-  switch (type) {
+  const rendered = (() => { switch (type) {
     case 'text':
       return (
         <div style={containerStyle}>
@@ -103,6 +113,11 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     case 'hero': {
       const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
       const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
+      function ensureColor(value: any) {
+        // return a valid CSS color string fallback
+        if (!value) return '#000000'
+        return String(value)
+      }
       const isFreeform = settings.heroLayout === 'freeform'
 
       return (
@@ -339,10 +354,37 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
 
     case 'gallery': {
       const galleryMode = (settings.galleryMode as string) || 'square'
+      // gallery-level background and overlay
+      const rawBg = (styles && styles.backgroundImage) || ''
+      const bgUrl = rawBg ? (String(rawBg).replace(/^url\(("|')?/, '').replace(/("|')?\)$/, '')) : ''
+      const overlayOpacity = Number(styles?.backgroundOverlayOpacity ?? 0)
+
       return (
         <div style={containerStyle}>
-          <div className="container mx-auto">
-            <div className={`grid grid-cols-2 md:grid-cols-${settings.columns || 3} gap-4`}>
+          <div className="container mx-auto" style={{ position: 'relative' }}>
+            {bgUrl && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: `url("${bgUrl}")`,
+                  backgroundSize: styles?.backgroundSize || 'cover',
+                  backgroundPosition: styles?.backgroundPosition || 'center',
+                  zIndex: 0,
+                }}
+              />
+            )}
+            {overlayOpacity > 0 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundColor: 'rgba(0,0,0,' + overlayOpacity + ')',
+                  zIndex: 1,
+                }}
+              />
+            )}
+            <div className={`grid grid-cols-2 md:grid-cols-${settings.columns || 3} gap-4`} style={{ position: 'relative', zIndex: 2 }}>
               {children?.map((image, index) => {
                 const imgWidth = (image.styles?.width as string) || ''
                 const imgHeight = (image.styles?.height as string) || ''
@@ -797,5 +839,19 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
           </div>
         </div>
       )
+  } })()
+
+  if (!rendered) return null
+
+  const withRotation = wrapperStyle ? <div style={wrapperStyle}>{rendered}</div> : rendered
+
+  if (animation !== 'none') {
+    return (
+      <AnimatedWrapper animation={animation} duration={animDuration} delay={animDelay}>
+        {withRotation}
+      </AnimatedWrapper>
+    )
   }
+
+  return withRotation
 }
