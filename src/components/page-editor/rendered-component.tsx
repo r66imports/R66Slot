@@ -173,17 +173,19 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       const imgObjectPosition = (settings.objectPosition as string) || 'center center'
 
       return (
-        <div style={containerStyle}>
-          <div className={isFreeformImage ? 'w-full h-full' : 'container mx-auto'}>
+        <div style={{ ...containerStyle, ...(isFreeformImage ? { width: '100%', height: '100%' } : {}) }}>
+          <div className={isFreeformImage ? 'w-full h-full' : 'container mx-auto'} style={isFreeformImage ? { width: '100%', height: '100%' } : undefined}>
             {settings.imageUrl ? (
               <img
                 src={settings.imageUrl as string}
                 alt={(settings.alt as string) || ''}
                 className={isFreeformImage ? 'w-full h-full' : 'max-w-full h-auto rounded-lg'}
-                style={isFreeformImage
-                  ? { objectFit: imgObjectFit as any, objectPosition: imgObjectPosition, width: '100%', height: '100%' }
-                  : { width: styles.width || '100%', height: styles.height || 'auto' }
-                }
+                style={{
+                  objectFit: imgObjectFit as any,
+                  objectPosition: imgObjectPosition,
+                  width: '100%',
+                  height: isFreeformImage ? '100%' : (styles.height || 'auto'),
+                }}
               />
             ) : (
               <div className="bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center p-16 rounded-lg">
@@ -461,9 +463,11 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
     case 'section': {
       const sectionTitle = (settings.sectionTitle as string) || ''
       const sectionSubtitle = (settings.sectionSubtitle as string) || ''
+      // Check if section has only image children (container mode)
+      const hasOnlyImages = children && children.length > 0 && children.every(c => c.type === 'image')
       return (
-        <section style={{ ...containerStyle, minHeight: '200px' }}>
-          <div className="container mx-auto">
+        <section style={{ ...containerStyle, minHeight: '200px', position: 'relative', overflow: 'hidden' }}>
+          <div className="container mx-auto" style={hasOnlyImages ? { height: '100%' } : undefined}>
             {sectionTitle && (
               <h2 className="text-3xl font-bold mb-2 text-center">{sectionTitle}</h2>
             )}
@@ -471,10 +475,26 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
               <p className="text-lg opacity-70 mb-8 text-center max-w-2xl mx-auto">{sectionSubtitle}</p>
             )}
             {children && children.length > 0 ? (
-              <div className="space-y-4">
-                {children.map((child) => (
-                  <RenderedComponent key={child.id} component={child} />
-                ))}
+              <div className={hasOnlyImages ? 'w-full h-full' : 'space-y-4'} style={hasOnlyImages ? { minHeight: 'inherit' } : undefined}>
+                {children.map((child) => {
+                  // If child is an image inside this container, force it to fill
+                  if (child.type === 'image') {
+                    const filledChild = {
+                      ...child,
+                      settings: {
+                        ...child.settings,
+                        objectFit: child.settings.objectFit || 'cover',
+                        objectPosition: child.settings.objectPosition || 'center center',
+                      },
+                    }
+                    return (
+                      <div key={child.id} className="w-full" style={{ minHeight: 'inherit' }}>
+                        <RenderedComponent component={filledChild} />
+                      </div>
+                    )
+                  }
+                  return <RenderedComponent key={child.id} component={child} />
+                })}
               </div>
             ) : (
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center text-gray-400">

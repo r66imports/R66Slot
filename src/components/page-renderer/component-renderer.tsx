@@ -84,10 +84,12 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
           src={settings.imageUrl as string}
           alt={(settings.alt as string) || ''}
           className={isFreeformImg ? 'w-full h-full' : 'max-w-full h-auto'}
-          style={isFreeformImg
-            ? { objectFit: imgFit as any, objectPosition: imgPos, width: '100%', height: '100%' }
-            : { width: styles.width || '100%', height: styles.height || 'auto' }
-          }
+          style={{
+            objectFit: imgFit as any,
+            objectPosition: imgPos,
+            width: '100%',
+            height: isFreeformImg ? '100%' : (styles.height || 'auto'),
+          }}
         />
       ) : (
         <div className="bg-gray-200 flex items-center justify-center p-12">
@@ -628,8 +630,9 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     case 'section': {
       const sectionTitle = (settings.sectionTitle as string) || ''
       const sectionSubtitle = (settings.sectionSubtitle as string) || ''
+      const sectionHasOnlyImages = children && children.length > 0 && children.every(c => c.type === 'image')
       return (
-        <section style={containerStyle}>
+        <section style={{ ...containerStyle, position: 'relative', overflow: 'hidden' }}>
           <div className="container mx-auto">
             {sectionTitle && (
               <h2 className="text-3xl font-bold mb-2 text-center">{sectionTitle}</h2>
@@ -638,10 +641,21 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               <p className="text-lg opacity-70 mb-8 text-center max-w-2xl mx-auto">{sectionSubtitle}</p>
             )}
             {children && children.length > 0 ? (
-              <div className="space-y-4">
-                {children.map((child) => (
-                  <ComponentRenderer key={child.id} component={child} />
-                ))}
+              <div className={sectionHasOnlyImages ? 'w-full' : 'space-y-4'}>
+                {children.map((child) => {
+                  if (child.type === 'image') {
+                    const filledChild = {
+                      ...child,
+                      settings: {
+                        ...child.settings,
+                        objectFit: child.settings.objectFit || 'cover',
+                        objectPosition: child.settings.objectPosition || 'center center',
+                      },
+                    }
+                    return <ComponentRenderer key={child.id} component={filledChild} />
+                  }
+                  return <ComponentRenderer key={child.id} component={child} />
+                })}
               </div>
             ) : null}
           </div>
