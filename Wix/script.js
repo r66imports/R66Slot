@@ -10,6 +10,7 @@ let containers = []; // Track all container elements
 let pendingContainer = null; // Container waiting for an image upload
 
 const canvas = document.getElementById('canvas-area');
+const rootContainer = document.getElementById('r66-root-container');
 const snapSize = 20;
 
 // ---- SPAWN GENERIC ELEMENTS ----
@@ -315,9 +316,9 @@ function syncInspector() {
         // Convert rgb() to hex for the color input
         const temp = document.createElement('div');
         temp.style.color = bg;
-        document.body.appendChild(temp);
+        rootContainer.appendChild(temp);
         const computed = getComputedStyle(temp).color;
-        document.body.removeChild(temp);
+        rootContainer.removeChild(temp);
         const match = computed.match(/\d+/g);
         if (match && match.length >= 3) {
             const hex = '#' + match.slice(0, 3).map(function (v) {
@@ -478,7 +479,7 @@ function exportHTML() {
 }
 
 function togglePreview() {
-    document.body.classList.toggle('preview-mode');
+    rootContainer.classList.toggle('preview-mode');
 }
 
 function toggleAddMenu() {
@@ -732,5 +733,5 @@ function loadTemplate(name) {
 
 // Theme toggle
 document.getElementById('theme-toggle').onclick = function () {
-    document.body.classList.toggle('light-mode');
+    rootContainer.classList.toggle('light-mode');
 };

@@ -7,176 +7,182 @@
 </head>
 <body>
 
-<!-- ========== HEADER — direct child of <body>, z-index:9999 ========== -->
-<header class="dashboard-header">
-    <div class="header-left">
-        <span class="site-logo">R66 Studio</span>
-    </div>
+<!-- ========== ROOT CONTAINER — all styles scoped to this ID ========== -->
+<div id="r66-root-container">
 
-    <nav class="header-nav">
-        <div class="dropdown">
-            <button class="dropbtn">Site <i class="arrow down"></i></button>
-            <div class="dropdown-content">
-                <a href="#">Site Settings</a>
-                <a href="#">Release History</a>
-                <a href="#">Connect Domain</a>
-            </div>
+    <!-- HEADER — z-index:9999, CSS-only dropdown hover -->
+    <header class="dashboard-header">
+        <div class="header-left">
+            <span class="site-logo">R66 Studio</span>
         </div>
-        <div class="dropdown">
-            <button class="dropbtn">Tools <i class="arrow down"></i></button>
-            <div class="dropdown-content">
-                <a href="#">Grid Overlay</a>
-                <a href="#">Asset Manager</a>
-                <a href="#">Code Console</a>
-            </div>
-        </div>
-    </nav>
 
-    <div class="header-right">
-        <button class="publish-btn">Publish</button>
-        <button id="theme-toggle" class="theme-btn">🌙</button>
-    </div>
-</header>
-
-<!-- ========== MAIN CONTENT — everything below the header ========== -->
-<div class="main-content">
-
-    <!-- Editor Toolbar (full-width row below header) -->
-    <div class="top-bar">
-        <div class="top-bar-left">
-            <button class="btn-main" onclick="togglePreview()" id="prev-btn">Preview</button>
-            <button class="btn-main btn-green" onclick="exportHTML()">Export</button>
-            <button class="btn-main btn-blue" onclick="saveToCloud()">Save</button>
-            <button class="btn-main btn-orange" onclick="loadFromCloud()">Load</button>
-        </div>
-        <div class="top-bar-center">
-            <span onclick="setBreakpoint('desktop')" class="bp-btn" title="Desktop">🖥️</span>
-            <span onclick="setBreakpoint('tablet')" class="bp-btn" title="Tablet">📱</span>
-            <span onclick="setBreakpoint('mobile')" class="bp-btn" title="Mobile">📲</span>
-        </div>
-        <div class="top-bar-right">
-            <button class="btn-main side-btn" title="Add Element" onclick="toggleAddMenu()">+</button>
-            <button class="btn-main side-btn btn-tpl" title="Templates" onclick="toggleTemplateMenu()">T</button>
-        </div>
-    </div>
-
-    <!-- Panel Row: Toolbar (Left) | Canvas (Center) | Inspector (Right) -->
-    <div class="panels">
-
-        <!-- LEFT: Sidebar Toolbar -->
-        <aside class="left-sidebar">
-            <!-- Add Element Menu -->
-            <div id="add-menu" class="sidebar-menu">
-                <div class="sidebar-header">ADD ELEMENT</div>
-                <div class="sidebar-menu-inner">
-                    <button class="btn-main btn-full" onclick="spawn('box')">Rectangle</button>
-                    <button class="btn-main btn-full" onclick="spawn('text')">Text Block</button>
-                    <button class="btn-main btn-full" onclick="spawn('img')">Image</button>
-                    <button class="btn-main btn-full btn-container" onclick="addContainer()">
-                        <span class="container-icon">▣</span> Container Box
-                    </button>
+        <nav class="header-nav">
+            <div class="dropdown">
+                <button class="dropbtn">Site <i class="arrow down"></i></button>
+                <div class="dropdown-content">
+                    <a href="#">Site Settings</a>
+                    <a href="#">Release History</a>
+                    <a href="#">Connect Domain</a>
                 </div>
             </div>
-
-            <!-- Templates Menu -->
-            <div id="template-menu" class="sidebar-menu" style="display:none;">
-                <div class="sidebar-header">TEMPLATES</div>
-                <p class="sidebar-hint">
-                    Choose a template to populate the canvas. This replaces current content.
-                </p>
-                <div class="template-grid">
-                    <button class="template-card" onclick="loadTemplate('brands')">
-                        <div class="template-preview template-preview-brands">
-                            <div class="tp-nav"></div>
-                            <div class="tp-hero"></div>
-                            <div class="tp-cards"><div class="tp-card-red"></div><div class="tp-card-dark"></div></div>
-                            <div class="tp-footer"></div>
-                        </div>
-                        <span class="template-name">Brands Page</span>
-                        <span class="template-desc">r66slot.co.za/brands/nsr clone</span>
-                    </button>
-                    <button class="template-card" onclick="loadTemplate('blank')">
-                        <div class="template-preview template-preview-blank">
-                            <div style="width:100%;height:100%;background:#f9f9f9;border-radius:4px;"></div>
-                        </div>
-                        <span class="template-name">Blank Canvas</span>
-                        <span class="template-desc">Start from scratch</span>
-                    </button>
+            <div class="dropdown">
+                <button class="dropbtn">Tools <i class="arrow down"></i></button>
+                <div class="dropdown-content">
+                    <a href="#">Grid Overlay</a>
+                    <a href="#">Asset Manager</a>
+                    <a href="#">Code Console</a>
                 </div>
             </div>
+        </nav>
 
-            <div class="sidebar-header">LAYERS</div>
-            <div id="layer-stack"></div>
-            <div class="sidebar-header">HISTORY</div>
-            <div id="history-stack"></div>
-        </aside>
+        <div class="header-right">
+            <button class="publish-btn">Publish</button>
+            <button id="theme-toggle" class="theme-btn">🌙</button>
+        </div>
+    </header>
 
-        <!-- CENTER: Canvas -->
-        <div class="canvas-container">
-            <div id="canvas-area" onclick="deselect(event)"></div>
+    <!-- MAIN CONTENT — everything below the header -->
+    <div class="main-content">
+
+        <!-- Editor Toolbar (full-width row below header) -->
+        <div class="top-bar">
+            <div class="top-bar-left">
+                <button class="btn-main" onclick="togglePreview()" id="prev-btn">Preview</button>
+                <button class="btn-main btn-green" onclick="exportHTML()">Export</button>
+                <button class="btn-main btn-blue" onclick="saveToCloud()">Save</button>
+                <button class="btn-main btn-orange" onclick="loadFromCloud()">Load</button>
+            </div>
+            <div class="top-bar-center">
+                <span onclick="setBreakpoint('desktop')" class="bp-btn" title="Desktop">🖥️</span>
+                <span onclick="setBreakpoint('tablet')" class="bp-btn" title="Tablet">📱</span>
+                <span onclick="setBreakpoint('mobile')" class="bp-btn" title="Mobile">📲</span>
+            </div>
+            <div class="top-bar-right">
+                <button class="btn-main side-btn" title="Add Element" onclick="toggleAddMenu()">+</button>
+                <button class="btn-main side-btn btn-tpl" title="Templates" onclick="toggleTemplateMenu()">T</button>
+            </div>
         </div>
 
-        <!-- RIGHT: Inspector Sidebar -->
-        <aside class="inspector">
-            <div class="sidebar-header">INSPECTOR</div>
-            <div id="no-sel" class="inspector-empty">Select an element</div>
-            <div id="inspector-ui" style="display:none;">
-                <div class="prop-group">
-                    <label class="prop-label">POSITION & SIZE</label>
-                    <div class="prop-grid-2x2">
-                        <div><label>W</label><input type="number" id="in-w" onchange="applyInspector()"></div>
-                        <div><label>H</label><input type="number" id="in-h" onchange="applyInspector()"></div>
-                        <div><label>X</label><input type="number" id="in-x" onchange="applyInspector()"></div>
-                        <div><label>Y</label><input type="number" id="in-y" onchange="applyInspector()"></div>
+        <!-- Panel Row: Sidebar (Left) | Canvas (Center) | Inspector (Right) -->
+        <div class="panels">
+
+            <!-- LEFT: Sidebar -->
+            <aside class="left-sidebar">
+                <!-- Add Element Menu -->
+                <div id="add-menu" class="sidebar-menu">
+                    <div class="sidebar-header">ADD ELEMENT</div>
+                    <div class="sidebar-menu-inner">
+                        <button class="btn-main btn-full" onclick="spawn('box')">Rectangle</button>
+                        <button class="btn-main btn-full" onclick="spawn('text')">Text Block</button>
+                        <button class="btn-main btn-full" onclick="spawn('img')">Image</button>
+                        <button class="btn-main btn-full btn-container" onclick="addContainer()">
+                            <span class="container-icon">▣</span> Container Box
+                        </button>
                     </div>
                 </div>
-                <div class="prop-group">
-                    <label class="prop-label">FILL & OPACITY</label>
-                    <div class="prop-grid-2x2">
-                        <div>
-                            <label>Fill</label>
-                            <input type="color" id="in-fill" value="#6132ef" onchange="applyFill(this.value)" class="color-input">
-                        </div>
-                        <div>
-                            <label>Opacity</label>
-                            <input type="range" id="in-opacity" min="0" max="100" value="100" oninput="applyOpacity(this.value)">
-                            <span id="opacity-val" class="range-label">100%</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="prop-group">
-                    <label class="prop-label">MOTION</label>
-                    <select id="anim-type">
-                        <option value="none">No Animation</option>
-                        <option value="fade-in">Fade In</option>
-                    </select>
-                    <button class="btn-main btn-full btn-dark" onclick="playAnim()">Preview</button>
-                </div>
-                <div class="prop-group">
-                    <label class="prop-label">ROTATION</label>
-                    <div class="rotation-row">
-                        <input type="range" id="in-rotate" min="0" max="360" value="0" oninput="updateRotation(this.value)">
-                        <span id="rotate-val" class="range-label">0°</span>
-                    </div>
-                </div>
-                <!-- Container info (shown when a container is selected) -->
-                <div class="prop-group" id="container-info" style="display:none;">
-                    <label class="prop-label">CONTAINER</label>
-                    <p class="prop-hint">
-                        Drop images inside this container. Children are clipped and bounded.
+
+                <!-- Templates Menu -->
+                <div id="template-menu" class="sidebar-menu" style="display:none;">
+                    <div class="sidebar-header">TEMPLATES</div>
+                    <p class="sidebar-hint">
+                        Choose a template to populate the canvas. This replaces current content.
                     </p>
-                    <div class="prop-hint">
-                        Children: <span id="container-child-count">0</span>
+                    <div class="template-grid">
+                        <button class="template-card" onclick="loadTemplate('brands')">
+                            <div class="template-preview template-preview-brands">
+                                <div class="tp-nav"></div>
+                                <div class="tp-hero"></div>
+                                <div class="tp-cards"><div class="tp-card-red"></div><div class="tp-card-dark"></div></div>
+                                <div class="tp-footer"></div>
+                            </div>
+                            <span class="template-name">Brands Page</span>
+                            <span class="template-desc">r66slot.co.za/brands/nsr clone</span>
+                        </button>
+                        <button class="template-card" onclick="loadTemplate('blank')">
+                            <div class="template-preview template-preview-blank">
+                                <div style="width:100%;height:100%;background:#f9f9f9;border-radius:4px;"></div>
+                            </div>
+                            <span class="template-name">Blank Canvas</span>
+                            <span class="template-desc">Start from scratch</span>
+                        </button>
                     </div>
                 </div>
-                <div class="prop-group">
-                    <button class="btn-main btn-full btn-danger" onclick="deleteElement()">Delete Element</button>
-                </div>
-            </div>
-        </aside>
 
+                <div class="sidebar-header">LAYERS</div>
+                <div id="layer-stack"></div>
+                <div class="sidebar-header">HISTORY</div>
+                <div id="history-stack"></div>
+            </aside>
+
+            <!-- CENTER: Canvas -->
+            <div class="canvas-container">
+                <div id="canvas-area" onclick="deselect(event)"></div>
+            </div>
+
+            <!-- RIGHT: Inspector Sidebar -->
+            <aside class="inspector">
+                <div class="sidebar-header">INSPECTOR</div>
+                <div id="no-sel" class="inspector-empty">Select an element</div>
+                <div id="inspector-ui" style="display:none;">
+                    <div class="prop-group">
+                        <label class="prop-label">POSITION & SIZE</label>
+                        <div class="prop-grid-2x2">
+                            <div><label>W</label><input type="number" id="in-w" onchange="applyInspector()"></div>
+                            <div><label>H</label><input type="number" id="in-h" onchange="applyInspector()"></div>
+                            <div><label>X</label><input type="number" id="in-x" onchange="applyInspector()"></div>
+                            <div><label>Y</label><input type="number" id="in-y" onchange="applyInspector()"></div>
+                        </div>
+                    </div>
+                    <div class="prop-group">
+                        <label class="prop-label">FILL & OPACITY</label>
+                        <div class="prop-grid-2x2">
+                            <div>
+                                <label>Fill</label>
+                                <input type="color" id="in-fill" value="#6132ef" onchange="applyFill(this.value)" class="color-input">
+                            </div>
+                            <div>
+                                <label>Opacity</label>
+                                <input type="range" id="in-opacity" min="0" max="100" value="100" oninput="applyOpacity(this.value)">
+                                <span id="opacity-val" class="range-label">100%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="prop-group">
+                        <label class="prop-label">MOTION</label>
+                        <select id="anim-type">
+                            <option value="none">No Animation</option>
+                            <option value="fade-in">Fade In</option>
+                        </select>
+                        <button class="btn-main btn-full btn-dark" onclick="playAnim()">Preview</button>
+                    </div>
+                    <div class="prop-group">
+                        <label class="prop-label">ROTATION</label>
+                        <div class="rotation-row">
+                            <input type="range" id="in-rotate" min="0" max="360" value="0" oninput="updateRotation(this.value)">
+                            <span id="rotate-val" class="range-label">0°</span>
+                        </div>
+                    </div>
+                    <!-- Container info (shown when a container is selected) -->
+                    <div class="prop-group" id="container-info" style="display:none;">
+                        <label class="prop-label">CONTAINER</label>
+                        <p class="prop-hint">
+                            Drop images inside this container. Children are clipped and bounded.
+                        </p>
+                        <div class="prop-hint">
+                            Children: <span id="container-child-count">0</span>
+                        </div>
+                    </div>
+                    <div class="prop-group">
+                        <button class="btn-main btn-full btn-danger" onclick="deleteElement()">Delete Element</button>
+                    </div>
+                </div>
+            </aside>
+
+        </div>
     </div>
+
 </div>
+<!-- END #r66-root-container -->
 
 <!-- Hidden file input for image uploads -->
 <input type="file" id="image-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
