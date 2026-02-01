@@ -30,24 +30,29 @@ body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     margin: 0;
     overflow: hidden;
+    height: 100vh;
 }
 
-/* --- DASHBOARD HEADER (global nav above workspace) --- */
+/* ============================================================
+   DASHBOARD HEADER — direct child of <body>, z-index: 9999
+   ============================================================ */
 .dashboard-header {
     height: 50px;
+    width: 100%;
     background: var(--bg-panel);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0 20px;
-    z-index: 1000;
     position: relative;
+    z-index: 9999;
 }
 
 .header-left, .header-right {
     display: flex;
     align-items: center;
+    gap: 8px;
 }
 
 .site-logo {
@@ -63,7 +68,7 @@ body {
     gap: 4px;
 }
 
-/* Dropdown Menu */
+/* --- Dropdown Menus (CSS-only hover) --- */
 .dropdown {
     position: relative;
     display: inline-block;
@@ -86,8 +91,8 @@ body {
     position: absolute;
     background-color: var(--bg-input);
     min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.5);
-    z-index: 2000;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+    z-index: 10000;
     border: 1px solid var(--border-color);
     border-radius: 4px;
     top: 100%;
@@ -106,7 +111,7 @@ body {
 
 .dropdown:hover .dropdown-content { display: block; }
 
-/* Arrow icon */
+/* Arrow icon for dropdowns */
 .arrow {
     border: solid var(--text-dim);
     border-width: 0 2px 2px 0;
@@ -131,14 +136,27 @@ body {
 
 .publish-btn:hover { background: #006abc; }
 
-/* --- WORKSPACE LAYOUT (flex-based) --- */
-#workspace {
+/* Theme toggle */
+.theme-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+/* ============================================================
+   MAIN CONTENT — everything below the header
+   ============================================================ */
+.main-content {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 50px);
     overflow: hidden;
 }
 
+/* --- Top Toolbar Bar --- */
 .top-bar {
     height: 50px;
     min-height: 50px;
@@ -151,25 +169,33 @@ body {
     z-index: 100;
 }
 
-/* Panel row: side-nav | left-sidebar | canvas | inspector */
-.workspace-panels {
+.top-bar-left,
+.top-bar-center,
+.top-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.bp-btn {
+    cursor: pointer;
+    font-size: 20px;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.bp-btn:hover { background: var(--bg-input); }
+
+/* ============================================================
+   PANELS ROW — Left Sidebar | Canvas | Inspector
+   ============================================================ */
+.panels {
     display: flex;
     flex: 1;
     overflow: hidden;
 }
 
-.side-nav {
-    width: 60px;
-    min-width: 60px;
-    background: var(--bg-panel);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-top: 15px;
-    gap: 15px;
-}
-
+/* --- Left Sidebar --- */
 .left-sidebar {
     width: 240px;
     min-width: 240px;
@@ -178,6 +204,7 @@ body {
     overflow-y: auto;
 }
 
+/* --- Inspector (Right Sidebar) --- */
 .inspector {
     width: 280px;
     min-width: 280px;
@@ -186,6 +213,7 @@ body {
     overflow-y: auto;
 }
 
+/* --- Canvas Container (Center) --- */
 .canvas-container {
     flex: 1;
     display: flex;
@@ -207,7 +235,172 @@ body {
     background-size: 20px 20px;
 }
 
-/* --- ELEMENTS --- */
+/* ============================================================
+   SIDEBAR UI ELEMENTS
+   ============================================================ */
+.sidebar-header {
+    padding: 15px;
+    font-size: 10px;
+    font-weight: 800;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-dim);
+    letter-spacing: 1px;
+}
+
+.sidebar-menu {
+    /* shown/hidden via JS */
+}
+
+.sidebar-menu-inner {
+    padding: 10px 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-hint {
+    padding: 8px 15px;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+.inspector-empty {
+    padding: 30px 15px;
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+}
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn-main {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: inherit;
+}
+
+.btn-main:hover { filter: brightness(1.1); }
+
+.btn-full { width: 100%; }
+.btn-green { background: #27ae60; }
+.btn-blue { background: #2980b9; }
+.btn-orange { background: #e67e22; }
+.btn-dark { background: #333; }
+.btn-danger { background: #e74c3c; }
+.btn-tpl { background: #8e44ad; }
+
+.side-btn {
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+/* Container button */
+.btn-container {
+    background: transparent !important;
+    border: 2px dashed var(--container-border) !important;
+    color: var(--container-border) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.btn-container:hover {
+    background: rgba(74, 144, 217, 0.1) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+.container-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* ============================================================
+   INSPECTOR PROPERTIES
+   ============================================================ */
+.prop-group {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.prop-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.prop-grid-2x2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.prop-grid-2x2 label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+}
+
+.prop-hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.rotation-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.range-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 40px;
+}
+
+.color-input {
+    height: 32px;
+    padding: 2px;
+    cursor: pointer;
+}
+
+input, select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: inherit;
+    padding: 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+}
+
+/* ============================================================
+   CANVAS ELEMENTS
+   ============================================================ */
 .resizable-box {
     position: absolute;
     border: 1px solid transparent;
@@ -243,7 +436,9 @@ body {
 .selected .handle { display: block; }
 .se { bottom: -5px; right: -5px; cursor: se-resize; }
 
-/* --- CONTAINER BOX --- */
+/* ============================================================
+   CONTAINER BOX
+   ============================================================ */
 .container-box {
     border: 2px dashed var(--container-border) !important;
     background: rgba(74, 144, 217, 0.04);
@@ -273,14 +468,12 @@ body {
     color: var(--accent);
 }
 
-/* Highlight container when dragging image over it */
 .container-box.drop-hover {
     border-color: #27ae60 !important;
     background: rgba(39, 174, 96, 0.08);
     box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.3);
 }
 
-/* Image children inside container */
 .container-child {
     position: absolute;
     background-size: cover;
@@ -293,65 +486,12 @@ body {
     outline: 2px solid var(--accent);
 }
 
-.container-child .handle {
-    display: none;
-}
+.container-child .handle { display: none; }
+.container-child.selected .handle { display: block; }
 
-.container-child.selected .handle {
-    display: block;
-}
-
-/* Container button styling */
-.btn-container {
-    background: transparent !important;
-    border: 2px dashed var(--container-border) !important;
-    color: var(--container-border) !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    transition: all 0.2s;
-}
-
-.btn-container:hover {
-    background: rgba(74, 144, 217, 0.1) !important;
-    border-color: var(--accent) !important;
-    color: var(--accent) !important;
-}
-
-.container-icon {
-    font-size: 16px;
-    line-height: 1;
-}
-
-/* --- UI ELEMENTS --- */
-.sidebar-header {
-    padding: 15px;
-    font-size: 10px;
-    font-weight: 800;
-    border-bottom: 1px solid var(--border-color);
-    color: var(--text-dim);
-    letter-spacing: 1px;
-}
-
-.btn-main {
-    background: var(--accent);
-    color: white;
-    border: none;
-    padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 11px;
-    font-weight: bold;
-}
-
-.btn-main:hover { filter: brightness(1.1); }
-
-.prop-group {
-    padding: 15px;
-    border-bottom: 1px solid var(--border-color);
-}
-
+/* ============================================================
+   LAYER / HISTORY ITEMS
+   ============================================================ */
 .menu-item {
     padding: 8px 15px;
     font-size: 11px;
@@ -367,58 +507,9 @@ body {
     font-weight: 600;
 }
 
-input, select {
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: inherit;
-    padding: 6px;
-    border-radius: 4px;
-    font-size: 12px;
-    width: 100%;
-    box-sizing: border-box;
-    margin-bottom: 8px;
-}
-
-/* --- PREVIEW MODE --- */
-.preview-mode .dashboard-header,
-.preview-mode .top-bar,
-.preview-mode .side-nav,
-.preview-mode .left-sidebar,
-.preview-mode .inspector,
-.preview-mode .handle,
-.preview-mode .container-label { display: none !important; }
-
-.preview-mode #workspace {
-    height: 100vh;
-}
-
-.preview-mode .canvas-container { padding: 0; }
-
-.preview-mode #canvas-area {
-    box-shadow: none;
-    border: none;
-    width: 100% !important;
-    height: 100vh !important;
-}
-
-.preview-mode .container-box {
-    border-color: transparent !important;
-    background: transparent;
-}
-
-/* --- SIDE NAV BUTTONS --- */
-.side-btn {
-    border-radius: 50%;
-    width: 35px;
-    height: 35px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-}
-
-/* --- TEMPLATE SYSTEM --- */
+/* ============================================================
+   TEMPLATE SYSTEM
+   ============================================================ */
 .template-grid {
     padding: 10px 15px;
     display: grid;
@@ -452,9 +543,7 @@ input, select {
     gap: 4px;
 }
 
-.template-preview-brands {
-    background: #F9FAFB;
-}
+.template-preview-brands { background: #F9FAFB; }
 
 .template-preview-brands .tp-nav {
     background: #1F2937;
@@ -511,13 +600,38 @@ input, select {
     padding: 0 8px 8px;
 }
 
-/* --- TEMPLATE ELEMENTS (rendered on canvas) --- */
-/* All template elements use inline styles for pixel-perfect rendering.
-   These rules handle editor-specific overrides only. */
+/* ============================================================
+   PREVIEW MODE — hides all editor chrome
+   ============================================================ */
+.preview-mode .dashboard-header,
+.preview-mode .top-bar,
+.preview-mode .left-sidebar,
+.preview-mode .inspector,
+.preview-mode .handle,
+.preview-mode .container-label { display: none !important; }
 
-/* Preview mode: hide editor chrome on template elements */
+.preview-mode .main-content {
+    height: 100vh;
+}
+
+.preview-mode .canvas-container { padding: 0; }
+
+.preview-mode #canvas-area {
+    box-shadow: none;
+    border: none;
+    width: 100% !important;
+    height: 100vh !important;
+}
+
 .preview-mode .resizable-box { border: none !important; }
 
-/* --- ANIMATIONS --- */
+.preview-mode .container-box {
+    border-color: transparent !important;
+    background: transparent;
+}
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .anim-fade-in { animation: fade-in 1s ease forwards; }

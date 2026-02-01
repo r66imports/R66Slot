@@ -7,7 +7,7 @@
 </head>
 <body>
 
-<!-- Global Dashboard Header — first child of body -->
+<!-- ========== HEADER — direct child of <body>, z-index:9999 ========== -->
 <header class="dashboard-header">
     <div class="header-left">
         <span class="site-logo">R66 Studio</span>
@@ -22,7 +22,6 @@
                 <a href="#">Connect Domain</a>
             </div>
         </div>
-
         <div class="dropdown">
             <button class="dropbtn">Tools <i class="arrow down"></i></button>
             <div class="dropdown-content">
@@ -35,49 +34,54 @@
 
     <div class="header-right">
         <button class="publish-btn">Publish</button>
+        <button id="theme-toggle" class="theme-btn">🌙</button>
     </div>
 </header>
 
-<!-- Workspace: toolbar + panels (fills remaining viewport below header) -->
-<main id="workspace">
-    <!-- Editor Toolbar (full-width row) -->
-    <header class="top-bar">
-        <div style="display:flex; gap:8px;">
+<!-- ========== MAIN CONTENT — everything below the header ========== -->
+<div class="main-content">
+
+    <!-- Editor Toolbar (full-width row below header) -->
+    <div class="top-bar">
+        <div class="top-bar-left">
             <button class="btn-main" onclick="togglePreview()" id="prev-btn">Preview</button>
-            <button class="btn-main" style="background:#27ae60" onclick="exportHTML()">Export</button>
-            <button class="btn-main" style="background:#2980b9" onclick="saveToCloud()">Save</button>
-            <button class="btn-main" style="background:#f39c12" onclick="loadFromCloud()">Load</button>
+            <button class="btn-main btn-green" onclick="exportHTML()">Export</button>
+            <button class="btn-main btn-blue" onclick="saveToCloud()">Save</button>
+            <button class="btn-main btn-orange" onclick="loadFromCloud()">Load</button>
         </div>
-        <div style="display:flex; gap:15px; font-size:18px;">
-            <span onclick="setBreakpoint('desktop')" style="cursor:pointer">🖥️</span>
-            <span onclick="setBreakpoint('tablet')" style="cursor:pointer">📱</span>
-            <span onclick="setBreakpoint('mobile')" style="cursor:pointer">📲</span>
+        <div class="top-bar-center">
+            <span onclick="setBreakpoint('desktop')" class="bp-btn" title="Desktop">🖥️</span>
+            <span onclick="setBreakpoint('tablet')" class="bp-btn" title="Tablet">📱</span>
+            <span onclick="setBreakpoint('mobile')" class="bp-btn" title="Mobile">📲</span>
         </div>
-        <button id="theme-toggle" style="background:none; border:none; cursor:pointer; font-size:20px;">🌙</button>
-    </header>
-
-    <!-- Panel Row: side-nav | left-sidebar | canvas | inspector -->
-    <div class="workspace-panels">
-        <nav class="side-nav">
+        <div class="top-bar-right">
             <button class="btn-main side-btn" title="Add Element" onclick="toggleAddMenu()">+</button>
-            <button class="btn-main side-btn" title="Templates" onclick="toggleTemplateMenu()" style="background:#e67e22; font-size:14px;">T</button>
-        </nav>
+            <button class="btn-main side-btn btn-tpl" title="Templates" onclick="toggleTemplateMenu()">T</button>
+        </div>
+    </div>
 
+    <!-- Panel Row: Toolbar (Left) | Canvas (Center) | Inspector (Right) -->
+    <div class="panels">
+
+        <!-- LEFT: Sidebar Toolbar -->
         <aside class="left-sidebar">
             <!-- Add Element Menu -->
-            <div id="add-menu" style="display:none; padding:15px; border-bottom:1px solid var(--border-color);">
-                <button class="btn-main" style="width:100%; margin-bottom:5px;" onclick="spawn('box')">Rectangle</button>
-                <button class="btn-main" style="width:100%; margin-bottom:5px;" onclick="spawn('text')">Text Block</button>
-                <button class="btn-main" style="width:100%; margin-bottom:5px;" onclick="spawn('img')">Image</button>
-                <button class="btn-main btn-container" style="width:100%;" onclick="addContainer()">
-                    <span class="container-icon">▣</span> Container Box
-                </button>
+            <div id="add-menu" class="sidebar-menu">
+                <div class="sidebar-header">ADD ELEMENT</div>
+                <div class="sidebar-menu-inner">
+                    <button class="btn-main btn-full" onclick="spawn('box')">Rectangle</button>
+                    <button class="btn-main btn-full" onclick="spawn('text')">Text Block</button>
+                    <button class="btn-main btn-full" onclick="spawn('img')">Image</button>
+                    <button class="btn-main btn-full btn-container" onclick="addContainer()">
+                        <span class="container-icon">▣</span> Container Box
+                    </button>
+                </div>
             </div>
 
             <!-- Templates Menu -->
-            <div id="template-menu" style="display:none;">
+            <div id="template-menu" class="sidebar-menu" style="display:none;">
                 <div class="sidebar-header">TEMPLATES</div>
-                <p style="padding:10px 15px; font-size:10px; color:var(--text-dim);">
+                <p class="sidebar-hint">
                     Choose a template to populate the canvas. This replaces current content.
                 </p>
                 <div class="template-grid">
@@ -107,17 +111,19 @@
             <div id="history-stack"></div>
         </aside>
 
+        <!-- CENTER: Canvas -->
         <div class="canvas-container">
             <div id="canvas-area" onclick="deselect(event)"></div>
         </div>
 
+        <!-- RIGHT: Inspector Sidebar -->
         <aside class="inspector">
             <div class="sidebar-header">INSPECTOR</div>
-            <div id="no-sel" style="padding:40px; text-align:center; color:var(--text-dim); font-size:12px;">Select an element</div>
+            <div id="no-sel" class="inspector-empty">Select an element</div>
             <div id="inspector-ui" style="display:none;">
                 <div class="prop-group">
-                    <label style="font-size:9px; color:var(--text-dim)">POSITION & SIZE</label>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                    <label class="prop-label">POSITION & SIZE</label>
+                    <div class="prop-grid-2x2">
                         <div><label>W</label><input type="number" id="in-w" onchange="applyInspector()"></div>
                         <div><label>H</label><input type="number" id="in-h" onchange="applyInspector()"></div>
                         <div><label>X</label><input type="number" id="in-x" onchange="applyInspector()"></div>
@@ -125,52 +131,52 @@
                     </div>
                 </div>
                 <div class="prop-group">
-                    <label style="font-size:9px; color:var(--text-dim)">FILL & OPACITY</label>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                    <label class="prop-label">FILL & OPACITY</label>
+                    <div class="prop-grid-2x2">
                         <div>
                             <label>Fill</label>
-                            <input type="color" id="in-fill" value="#6132ef" onchange="applyFill(this.value)" style="height:32px; padding:2px; cursor:pointer;">
+                            <input type="color" id="in-fill" value="#6132ef" onchange="applyFill(this.value)" class="color-input">
                         </div>
                         <div>
                             <label>Opacity</label>
-                            <input type="range" id="in-opacity" min="0" max="100" value="100" oninput="applyOpacity(this.value)" style="margin-bottom:0;">
-                            <span id="opacity-val" style="font-size:11px; color:var(--text-dim);">100%</span>
+                            <input type="range" id="in-opacity" min="0" max="100" value="100" oninput="applyOpacity(this.value)">
+                            <span id="opacity-val" class="range-label">100%</span>
                         </div>
                     </div>
                 </div>
                 <div class="prop-group">
-                    <label style="font-size:9px; color:var(--text-dim)">MOTION</label>
+                    <label class="prop-label">MOTION</label>
                     <select id="anim-type">
                         <option value="none">No Animation</option>
                         <option value="fade-in">Fade In</option>
                     </select>
-                    <button class="btn-main" style="width:100%; background:#444;" onclick="playAnim()">Preview</button>
+                    <button class="btn-main btn-full btn-dark" onclick="playAnim()">Preview</button>
                 </div>
                 <div class="prop-group">
-                    <label style="font-size:9px; color:var(--text-dim)">ROTATION</label>
-                    <div style="display:flex; align-items:center; gap:10px; margin-top:8px;">
-                        <input type="range" id="in-rotate" min="0" max="360" value="0"
-                               oninput="updateRotation(this.value)">
-                        <span id="rotate-val" style="font-size:12px; min-width:30px;">0°</span>
+                    <label class="prop-label">ROTATION</label>
+                    <div class="rotation-row">
+                        <input type="range" id="in-rotate" min="0" max="360" value="0" oninput="updateRotation(this.value)">
+                        <span id="rotate-val" class="range-label">0°</span>
                     </div>
                 </div>
                 <!-- Container info (shown when a container is selected) -->
                 <div class="prop-group" id="container-info" style="display:none;">
-                    <label style="font-size:9px; color:var(--text-dim)">CONTAINER</label>
-                    <p style="font-size:11px; color:var(--text-dim); margin:8px 0 0;">
+                    <label class="prop-label">CONTAINER</label>
+                    <p class="prop-hint">
                         Drop images inside this container. Children are clipped and bounded.
                     </p>
-                    <div style="margin-top:8px; font-size:11px;">
-                        <span>Children: </span><span id="container-child-count">0</span>
+                    <div class="prop-hint">
+                        Children: <span id="container-child-count">0</span>
                     </div>
                 </div>
                 <div class="prop-group">
-                    <button class="btn-main" style="width:100%; background:#c0392b;" onclick="deleteElement()">Delete Element</button>
+                    <button class="btn-main btn-full btn-danger" onclick="deleteElement()">Delete Element</button>
                 </div>
             </div>
         </aside>
+
     </div>
-</main>
+</div>
 
 <!-- Hidden file input for image uploads -->
 <input type="file" id="image-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
