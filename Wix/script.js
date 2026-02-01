@@ -458,6 +458,192 @@ function deselect(e) {
     }
 }
 
+// ---- TEMPLATE SYSTEM ----
+
+function toggleTemplateMenu() {
+    var addMenu = document.getElementById('add-menu');
+    var tplMenu = document.getElementById('template-menu');
+    addMenu.style.display = 'none';
+    tplMenu.style.display = tplMenu.style.display === 'none' ? 'block' : 'none';
+}
+
+// Override toggleAddMenu to close template menu
+var _origToggleAdd = toggleAddMenu;
+toggleAddMenu = function () {
+    document.getElementById('template-menu').style.display = 'none';
+    _origToggleAdd();
+};
+
+var TEMPLATES = {};
+
+// ---------------------------------------------------------------
+//  BRANDS TEMPLATE — based on r66slot.co.za/brands/nsr
+// ---------------------------------------------------------------
+TEMPLATES.brands = function () {
+    var elements = [];
+
+    // --- NAVBAR ---
+    var nav = document.createElement('div');
+    nav.className = 'resizable-box tpl-nav';
+    nav.dataset.type = 'nav';
+    nav.style.left = '0px';
+    nav.style.top = '0px';
+    nav.style.width = '1280px';
+    nav.style.height = '60px';
+    nav.style.zIndex = ++highestZ;
+    nav.innerHTML =
+        '<span class="tpl-logo">R66SLOT</span>' +
+        '<div class="tpl-nav-links">' +
+            '<span>Products</span>' +
+            '<span>Brands</span>' +
+            '<span>New Arrivals</span>' +
+            '<span>Pre-Orders</span>' +
+            '<span>About</span>' +
+            '<span>Contact</span>' +
+        '</div>';
+    elements.push(nav);
+
+    // --- HERO STRIP ---
+    var hero = document.createElement('div');
+    hero.className = 'resizable-box tpl-hero-strip';
+    hero.dataset.type = 'hero';
+    hero.style.left = '0px';
+    hero.style.top = '60px';
+    hero.style.width = '1280px';
+    hero.style.height = '200px';
+    hero.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
+    hero.style.zIndex = ++highestZ;
+    hero.innerHTML =
+        '<h1 style="font-size:48px; font-weight:800; color:#ffffff; text-align:center;">NSR Slot Cars</h1>' +
+        '<p style="font-size:18px; color:rgba(255,255,255,0.85); text-align:center;">Premium Racing Performance</p>';
+    elements.push(hero);
+
+    // --- BACK LINK ---
+    var back = document.createElement('div');
+    back.className = 'resizable-box tpl-back-link';
+    back.dataset.type = 'text';
+    back.style.left = '40px';
+    back.style.top = '280px';
+    back.style.width = '200px';
+    back.style.height = '30px';
+    back.style.zIndex = ++highestZ;
+    back.innerHTML = '<span style="color:#4b5563; font-size:14px; font-family:Segoe UI,system-ui,sans-serif;">&larr; Back to Home</span>';
+    elements.push(back);
+
+    // --- CARD 1: NSR Slot Cars ---
+    var card1 = document.createElement('div');
+    card1.className = 'resizable-box tpl-card';
+    card1.dataset.type = 'card';
+    card1.style.left = '40px';
+    card1.style.top = '320px';
+    card1.style.width = '590px';
+    card1.style.height = '280px';
+    card1.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
+    card1.style.zIndex = ++highestZ;
+    card1.innerHTML =
+        '<div class="tpl-card-icon">&#127950;</div>' +
+        '<h3 class="tpl-card-title">NSR Slot Cars</h3>' +
+        '<p class="tpl-card-desc">Explore our complete range of NSR racing models</p>' +
+        '<button class="tpl-card-btn" style="background:#dc2626;">View Cars &rarr;</button>';
+    elements.push(card1);
+
+    // --- CARD 2: NSR Parts ---
+    var card2 = document.createElement('div');
+    card2.className = 'resizable-box tpl-card';
+    card2.dataset.type = 'card';
+    card2.style.left = '650px';
+    card2.style.top = '320px';
+    card2.style.width = '590px';
+    card2.style.height = '280px';
+    card2.style.background = 'linear-gradient(135deg, #374151, #111827)';
+    card2.style.zIndex = ++highestZ;
+    card2.innerHTML =
+        '<div class="tpl-card-icon">&#9881;&#65039;</div>' +
+        '<h3 class="tpl-card-title">NSR Parts</h3>' +
+        '<p class="tpl-card-desc">Quality replacement parts and upgrades</p>' +
+        '<button class="tpl-card-btn" style="background:#1f2937;">View Parts &rarr;</button>';
+    elements.push(card2);
+
+    // --- FOOTER ---
+    var footer = document.createElement('div');
+    footer.className = 'resizable-box tpl-footer';
+    footer.dataset.type = 'footer';
+    footer.style.left = '0px';
+    footer.style.top = '640px';
+    footer.style.width = '1280px';
+    footer.style.height = '120px';
+    footer.style.zIndex = ++highestZ;
+    footer.innerHTML =
+        '<div class="tpl-footer-links">' +
+            '<span>Products</span>' +
+            '<span>Brands</span>' +
+            '<span>About</span>' +
+            '<span>Contact</span>' +
+            '<span>Shipping</span>' +
+            '<span>Returns</span>' +
+            '<span>Privacy Policy</span>' +
+        '</div>' +
+        '<div class="tpl-footer-copy">&copy; 2026 R66SLOT. All rights reserved.</div>';
+    elements.push(footer);
+
+    return elements;
+};
+
+// ---------------------------------------------------------------
+//  BLANK TEMPLATE
+// ---------------------------------------------------------------
+TEMPLATES.blank = function () {
+    return []; // Empty canvas
+};
+
+// ---------------------------------------------------------------
+//  loadTemplate — clears canvas and populates from template
+// ---------------------------------------------------------------
+function loadTemplate(name) {
+    if (!TEMPLATES[name]) return;
+
+    // Confirm if canvas has content
+    if (canvas.children.length > 0) {
+        if (!confirm('This will replace your current canvas. Continue?')) return;
+    }
+
+    // Clear
+    canvas.innerHTML = '';
+    containers = [];
+    selectedEl = null;
+    highestZ = 10;
+
+    var elements = TEMPLATES[name]();
+
+    elements.forEach(function (el) {
+        addHandle(el);
+        bindEvents(el);
+
+        // Make inner text editable on double-click
+        el.ondblclick = function (e) {
+            var target = e.target;
+            if (target.tagName === 'H1' || target.tagName === 'H3' ||
+                target.tagName === 'P' || target.tagName === 'SPAN' ||
+                target.tagName === 'BUTTON' || target.tagName === 'DIV') {
+                target.contentEditable = 'true';
+                target.focus();
+                target.style.outline = '2px solid var(--accent)';
+                target.onblur = function () {
+                    target.contentEditable = 'false';
+                    target.style.outline = 'none';
+                };
+            }
+        };
+
+        canvas.appendChild(el);
+    });
+
+    // Close template menu
+    document.getElementById('template-menu').style.display = 'none';
+    updateLayers();
+    saveHistory('Load template: ' + name);
+}
+
 // Theme toggle
 document.getElementById('theme-toggle').onclick = function () {
     document.body.classList.toggle('light-mode');

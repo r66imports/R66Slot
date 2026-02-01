@@ -24,10 +24,12 @@
     </header>
 
     <nav class="side-nav">
-        <button class="btn-main" style="border-radius:50%; width:35px; height:35px; padding:0;" onclick="toggleAddMenu()">+</button>
+        <button class="btn-main side-btn" title="Add Element" onclick="toggleAddMenu()">+</button>
+        <button class="btn-main side-btn" title="Templates" onclick="toggleTemplateMenu()" style="background:#e67e22; font-size:14px;">T</button>
     </nav>
 
     <aside class="left-sidebar">
+        <!-- Add Element Menu -->
         <div id="add-menu" style="display:none; padding:15px; border-bottom:1px solid var(--border-color);">
             <button class="btn-main" style="width:100%; margin-bottom:5px;" onclick="spawn('box')">Rectangle</button>
             <button class="btn-main" style="width:100%; margin-bottom:5px;" onclick="spawn('text')">Text Block</button>
@@ -36,6 +38,32 @@
                 <span class="container-icon">▣</span> Container Box
             </button>
         </div>
+
+        <!-- Templates Menu -->
+        <div id="template-menu" style="display:none;">
+            <div class="sidebar-header">TEMPLATES</div>
+            <p style="padding:10px 15px; font-size:10px; color:var(--text-dim);">
+                Choose a template to populate the canvas. This replaces current content.
+            </p>
+            <div class="template-grid">
+                <button class="template-card" onclick="loadTemplate('brands')">
+                    <div class="template-preview template-preview-brands">
+                        <div class="tp-hero"></div>
+                        <div class="tp-cards"><div class="tp-card"></div><div class="tp-card"></div></div>
+                    </div>
+                    <span class="template-name">Brands Page</span>
+                    <span class="template-desc">Hero + product cards grid</span>
+                </button>
+                <button class="template-card" onclick="loadTemplate('blank')">
+                    <div class="template-preview template-preview-blank">
+                        <div style="width:100%;height:100%;background:#f9f9f9;border-radius:4px;"></div>
+                    </div>
+                    <span class="template-name">Blank Canvas</span>
+                    <span class="template-desc">Start from scratch</span>
+                </button>
+            </div>
+        </div>
+
         <div class="sidebar-header">LAYERS</div>
         <div id="layer-stack"></div>
         <div class="sidebar-header">HISTORY</div>
