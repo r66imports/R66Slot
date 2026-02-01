@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import HeroEditor from '@/components/page-editor/hero-editor'
 import { PageEditorProvider, usePageEditor } from '@/contexts/PageEditorContext'
 import { COMPONENT_LIBRARY } from '@/components/page-editor/component-library'
 import { PAGE_TEMPLATES } from '@/components/page-editor/page-templates'
@@ -203,6 +204,7 @@ function PageEditorPageContent({
                 <>💾 Save Draft</>
               )}
             </Button>
+            <HeroEditor />
             <Button
               onClick={() => handleSave(true)}
               disabled={isSaving}

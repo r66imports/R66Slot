@@ -123,6 +123,21 @@ export default function ProductsPage() {
 
       if (res.ok) {
         const data = await res.json()
+        // Save CSV to suppliers
+        try {
+          await fetch('/api/admin/suppliers', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: `import-${new Date().toISOString().slice(0, 10)}.csv`,
+              csvData: importText,
+              productCount: products.length,
+              source: 'product-import',
+            }),
+          })
+        } catch (e) {
+          console.error('Failed to save to suppliers:', e)
+        }
         alert(`Imported ${data.imported} products`)
         setShowImportModal(false)
         setImportText('')
@@ -176,6 +191,32 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex gap-3">
+          <Button variant="outline" onClick={() => {
+            const headers = ['title','sku','brand','price','quantity','eta','description','productType','status']
+            const csvRows = [headers.join(',')]
+            products.forEach(p => {
+              csvRows.push([
+                `"${(p.title || '').replace(/"/g, '""')}"`,
+                `"${p.sku || ''}"`,
+                `"${p.brand || ''}"`,
+                p.price,
+                p.quantity,
+                `"${p.eta || ''}"`,
+                `"${(p.description || '').replace(/"/g, '""')}"`,
+                `"${p.productType || ''}"`,
+                p.status,
+              ].join(','))
+            })
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `products-${new Date().toISOString().slice(0,10)}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}>
+            Export CSV
+          </Button>
           <Button variant="outline" onClick={() => setShowImportModal(true)}>
             Import
           </Button>

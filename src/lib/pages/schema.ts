@@ -33,6 +33,7 @@ export interface PageComponent {
     | 'strip'
     | 'banner'
     | 'columns'
+    | 'header'
   content: string
   styles: {
     backgroundColor?: string

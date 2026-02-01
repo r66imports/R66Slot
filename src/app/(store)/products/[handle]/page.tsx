@@ -6,6 +6,7 @@ import { getProductByHandle } from '@/lib/shopify'
 import { formatPrice, getShopifyImageUrl } from '@/lib/shopify/client'
 import { Button } from '@/components/ui/button'
 import { AddToCartButton } from '@/components/product/add-to-cart-button'
+import SageInventoryDisplay from '@/components/product/sage-inventory'
 
 interface ProductPageProps {
   params: Promise<{
@@ -178,6 +179,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
                   : 'In stock and ready to ship'}
               </p>
             )}
+            {/* Sage fallback: if Shopify doesn't expose quantity, show Sage CSV value (if available) */}
+            <SageInventoryDisplay sku={mainVariant.sku} />
           </div>
 
           {/* Add to Cart */}

@@ -64,6 +64,48 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
   }
 
   const rendered = (() => { switch (type) {
+    case 'header': {
+      const logoText = (settings.logoText as string) || 'R66SLOT'
+      const menuItemsStr = (settings.menuItems as string) || 'Products,Brands,About,Contact'
+      const menuLinksStr = (settings.menuLinks as string) || '/products,/brands,/about,/contact'
+      const menuItems = menuItemsStr.split(',').map(s => s.trim())
+      const menuLinks = menuLinksStr.split(',').map(s => s.trim())
+      const bgColor = styles.backgroundColor || '#1F2937'
+      return (
+        <header style={{
+          backgroundColor: bgColor,
+          height: styles.height || '64px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 24px',
+          color: styles.textColor || '#FFFFFF',
+          width: '100%',
+        }}>
+          <div style={{ fontSize: '24px', fontWeight: 700 }}>
+            <span style={{ color: '#ffffff' }}>{logoText.substring(0, 3)}</span>
+            <span style={{ color: '#DC2626' }}>{logoText.substring(3)}</span>
+          </div>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+            {menuItems.map((item, i) => (
+              <Link
+                key={i}
+                href={menuLinks[i] || '#'}
+                style={{ color: styles.textColor || '#FFFFFF', fontSize: '14px', textDecoration: 'none', opacity: 0.9 }}
+              >
+                {item}
+              </Link>
+            ))}
+          </nav>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          </div>
+        </header>
+      )
+    }
+
     case 'text':
       return (
         <div style={containerStyle}>
@@ -292,11 +334,20 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         <section style={containerStyle}>
           <div className="container mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {children?.slice(0, 2).map((child) => (
-                <div key={child.id}>
-                  <div dangerouslySetInnerHTML={{ __html: child.content }} />
-                </div>
-              ))}
+              {children?.slice(0, 2).map((child) => {
+                const colContent = (
+                  <div key={child.id}>
+                    {(child.settings.imageUrl as string) && (
+                      <img src={child.settings.imageUrl as string} alt="" className="w-full h-auto rounded-lg mb-3 object-cover" />
+                    )}
+                    <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                  </div>
+                )
+                if (child.settings.link) {
+                  return <Link key={child.id} href={child.settings.link as string} className="block no-underline text-inherit hover:opacity-80 transition-opacity">{colContent}</Link>
+                }
+                return colContent
+              })}
             </div>
           </div>
         </section>
@@ -307,19 +358,28 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         <section style={containerStyle}>
           <div className="container mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {children?.map((child) => (
-                <div
-                  key={child.id}
-                  className={styles.textAlign === 'center' ? 'text-center' : ''}
-                >
-                  {child.settings.icon && (
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
-                      {child.settings.icon}
-                    </div>
-                  )}
-                  <div dangerouslySetInnerHTML={{ __html: child.content }} />
-                </div>
-              ))}
+              {children?.map((child) => {
+                const colContent = (
+                  <div
+                    key={child.id}
+                    className={styles.textAlign === 'center' ? 'text-center' : ''}
+                  >
+                    {child.settings.icon && (
+                      <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
+                        {child.settings.icon}
+                      </div>
+                    )}
+                    {(child.settings.imageUrl as string) && (
+                      <img src={child.settings.imageUrl as string} alt="" className="w-full h-auto rounded-lg mb-3 object-cover" />
+                    )}
+                    <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                  </div>
+                )
+                if (child.settings.link) {
+                  return <Link key={child.id} href={child.settings.link as string} className="block no-underline text-inherit hover:opacity-80 transition-opacity">{colContent}</Link>
+                }
+                return colContent
+              })}
             </div>
           </div>
         </section>
@@ -334,19 +394,36 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               className="grid gap-8"
               style={{ gridTemplateColumns: `repeat(${colCount}, 1fr)` }}
             >
-              {children?.slice(0, colCount).map((child) => (
-                <div
-                  key={child.id}
-                  className={styles.textAlign === 'center' ? 'text-center' : ''}
-                >
-                  {child.settings.icon && (
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
-                      {child.settings.icon}
-                    </div>
-                  )}
-                  <div dangerouslySetInnerHTML={{ __html: child.content }} />
-                </div>
-              ))}
+              {children?.slice(0, colCount).map((child) => {
+                const colContent = (
+                  <div
+                    key={child.id}
+                    className={styles.textAlign === 'center' ? 'text-center' : ''}
+                  >
+                    {child.settings.icon && (
+                      <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
+                        {child.settings.icon}
+                      </div>
+                    )}
+                    {(child.settings.imageUrl as string) && (
+                      <img
+                        src={child.settings.imageUrl as string}
+                        alt=""
+                        className="w-full h-auto rounded-lg mb-3 object-cover"
+                      />
+                    )}
+                    <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                  </div>
+                )
+                if (child.settings.link) {
+                  return (
+                    <Link key={child.id} href={child.settings.link as string} className="block no-underline text-inherit hover:opacity-80 transition-opacity">
+                      {colContent}
+                    </Link>
+                  )
+                }
+                return colContent
+              })}
             </div>
           </div>
         </section>

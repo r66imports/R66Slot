@@ -242,6 +242,14 @@ const COMPONENT_DEFAULTS: Array<{
       settings: { mediaType: 'image', imageUrl: '', videoUrl: '', alt: '', caption: '', aspectRatio: '16/9' },
     },
   },
+  {
+    type: 'header',
+    defaultProps: {
+      content: '',
+      styles: { backgroundColor: '#1F2937', textColor: '#FFFFFF', height: '64px', paddingTop: '0', paddingBottom: '0', paddingLeft: '24px', paddingRight: '24px' },
+      settings: { logoText: 'R66SLOT', menuItems: 'Products,Brands,About,Contact', menuLinks: '/products,/brands,/about,/contact' },
+    },
+  },
 ]
 
 export default function EditorPage({

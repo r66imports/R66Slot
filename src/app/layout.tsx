@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Assistant, Play } from 'next/font/google'
 import { CartProvider } from '@/context/cart-context'
 import { WhatsAppButton } from '@/components/layout/whatsapp-button'
+import { HeroProvider } from '@/contexts/HeroContext'
 import './globals.css'
 
 const assistant = Assistant({
@@ -32,8 +33,10 @@ export default function RootLayout({
     <html lang="en" className={`${assistant.variable} ${play.variable}`}>
       <body className={assistant.className}>
         <CartProvider>
-          {children}
-          <WhatsAppButton />
+          <HeroProvider>
+            {children}
+            <WhatsAppButton />
+          </HeroProvider>
         </CartProvider>
       </body>
     </html>

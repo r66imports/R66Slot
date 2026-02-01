@@ -650,21 +650,48 @@ function ComponentRenderer({
       )
 
     case 'gallery':
+      const rawBg = (component.styles && component.styles.backgroundImage) || ''
+      const bgUrl = rawBg ? String(rawBg).replace(/^url\(("|')?/, '').replace(/("|')?\)$/, '') : ''
+      const overlayOpacity = Number(component.styles?.backgroundOverlayOpacity ?? 0)
+
       return (
-        <div
-          style={{
-            ...style,
-            gridTemplateColumns: `repeat(${component.settings.columns || 3}, 1fr)`,
-          }}
-        >
-          {component.children?.map((child) => (
-            <ComponentRenderer
-              key={child.id}
-              component={child}
-              isEditing={false}
-              onContentChange={() => {}}
+        <div style={{ ...style }}>
+          {bgUrl && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: `url("${bgUrl}")`,
+                backgroundSize: component.styles?.backgroundSize || 'cover',
+                backgroundPosition: component.styles?.backgroundPosition || 'center',
+                zIndex: 0,
+              }}
             />
-          ))}
+          )}
+          {overlayOpacity > 0 && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundColor: component.styles?.backgroundOverlayColor || '#000000',
+                opacity: overlayOpacity,
+                zIndex: 1,
+              }}
+            />
+          )}
+          <div
+            style={{
+              ...style,
+              display: 'grid',
+              gridTemplateColumns: `repeat(${component.settings.columns || 3}, 1fr)`,
+              position: 'relative',
+              zIndex: 2,
+            }}
+          >
+            {component.children?.map((child) => (
+              <ComponentRenderer key={child.id} component={child} isEditing={false} onContentChange={() => {}} />
+            ))}
+          </div>
         </div>
       )
 

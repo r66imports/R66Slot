@@ -78,6 +78,20 @@ const BRAND_PAGES = [
   },
 ]
 
+// Cars pages grouped by brand
+const CARS_PAGES = [
+  { id: 'cars-nsr', brand: 'NSR', slug: 'cars/nsr', description: 'NSR slot cars catalog', icon: '🏎️', editable: true },
+  { id: 'cars-revo', brand: 'Revo', slug: 'cars/revo', description: 'Revo slot cars catalog', icon: '🏎️', editable: true },
+  { id: 'cars-pioneer', brand: 'Pioneer', slug: 'cars/pioneer', description: 'Pioneer slot cars catalog', icon: '🏎️', editable: true },
+  { id: 'cars-sideways', brand: 'Sideways', slug: 'cars/sideways', description: 'Sideways slot cars catalog', icon: '🏎️', editable: true },
+  { id: 'cars-slot-it', brand: 'Slot.it', slug: 'cars/slot-it', description: 'Slot.it slot cars catalog', icon: '🏎️', editable: true },
+  { id: 'cars-policar', brand: 'Policar', slug: 'cars/policar', description: 'Policar slot cars catalog', icon: '🏎️', editable: true },
+  { id: 'cars-thunderslot', brand: 'Thunderslot', slug: 'cars/thunderslot', description: 'Thunderslot slot cars catalog', icon: '🏎️', editable: true },
+  { id: 'cars-scaleauto', brand: 'Scaleauto', slug: 'cars/scaleauto', description: 'Scaleauto slot cars catalog', icon: '🏎️', editable: true },
+]
+
+const CAR_BRANDS = [...new Set(CARS_PAGES.map(p => p.brand))]
+
 function InlineEditableTitle({
   value,
   onSave,
@@ -145,6 +159,7 @@ export default function PagesManagementPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [selectedCarBrand, setSelectedCarBrand] = useState<string>('all')
 
   useEffect(() => {
     fetchCustomPages()
@@ -316,6 +331,14 @@ export default function PagesManagementPage() {
     ...BRAND_PAGES.map((p) => ({
       id: p.id,
       title: p.title,
+      slug: p.slug,
+      type: 'frontend' as const,
+      icon: p.icon,
+      description: p.description,
+    })),
+    ...CARS_PAGES.map((p) => ({
+      id: p.id,
+      title: `${p.brand} Cars`,
       slug: p.slug,
       type: 'frontend' as const,
       icon: p.icon,
@@ -565,6 +588,68 @@ export default function PagesManagementPage() {
                     <p className="text-gray-600 text-sm mb-3">{page.description}</p>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <span>/{page.slug}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-primary hover:bg-primary-dark text-white"
+                      asChild
+                    >
+                      <Link href={`/admin/pages/editor/frontend-${page.id}`}>
+                        Edit Page
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/${page.slug}`} target="_blank">
+                        View Live
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Cars Pages */}
+      <div className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold">Cars Pages</h2>
+            <p className="text-gray-600 text-sm mt-1">
+              Edit car catalog pages by brand
+            </p>
+          </div>
+          <select
+            value={selectedCarBrand}
+            onChange={(e) => setSelectedCarBrand(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Brands</option>
+            {CAR_BRANDS.map((brand) => (
+              <option key={brand} value={brand}>{brand}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {CARS_PAGES
+            .filter((p) => selectedCarBrand === 'all' || p.brand === selectedCarBrand)
+            .map((page) => (
+            <Card key={page.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">{page.icon}</div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold mb-1">{page.brand} Cars</h3>
+                    <p className="text-gray-600 text-sm mb-3">{page.description}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span>/{page.slug}</span>
+                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">
+                        {page.brand}
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">

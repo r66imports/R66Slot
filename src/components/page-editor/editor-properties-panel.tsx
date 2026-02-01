@@ -2398,8 +2398,46 @@ function SettingsTab({
         </div>
       )}
 
+      {/* Header menu settings */}
+      {component.type === 'header' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Logo Text</label>
+            <input
+              type="text"
+              value={(component.settings.logoText as string) || 'R66SLOT'}
+              onChange={(e) => updateSetting('logoText', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+            <p className="text-[10px] text-gray-400 mt-1 font-play">First 3 characters white, rest red</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Menu Items</label>
+            <textarea
+              value={(component.settings.menuItems as string) || ''}
+              onChange={(e) => updateSetting('menuItems', e.target.value)}
+              rows={3}
+              placeholder="Products,Brands,About,Contact"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+            <p className="text-[10px] text-gray-400 mt-1 font-play">Comma-separated menu labels</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Menu Links</label>
+            <textarea
+              value={(component.settings.menuLinks as string) || ''}
+              onChange={(e) => updateSetting('menuLinks', e.target.value)}
+              rows={3}
+              placeholder="/products,/brands,/about,/contact"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+            <p className="text-[10px] text-gray-400 mt-1 font-play">Comma-separated URLs (same order as items)</p>
+          </div>
+        </>
+      )}
+
       {/* Generic info for types with no special settings */}
-      {!['hero', 'divider', 'product-grid', 'gallery', 'section', 'content-block', 'ui-component', 'slot', 'widget', 'media'].includes(component.type) && (
+      {!['hero', 'divider', 'product-grid', 'gallery', 'section', 'content-block', 'ui-component', 'slot', 'widget', 'media', 'header'].includes(component.type) && (
         <div className="text-xs text-gray-400 text-center py-4 font-play">
           No additional settings for this component type.
         </div>

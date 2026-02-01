@@ -53,6 +53,7 @@ const COMPONENT_LIBRARY = [
   { type: 'slot' as const, label: 'Slot', icon: '🔲', desc: 'Placeholder insertion point' },
   { type: 'widget' as const, label: 'Widget', icon: '⚙️', desc: 'Interactive module' },
   { type: 'media' as const, label: 'Media', icon: '🎨', desc: 'Image/video media block' },
+  { type: 'header' as const, label: 'Header Menu', icon: '🧭', desc: 'Navigation header bar' },
 ]
 
 const SNAP_SIZE = 20

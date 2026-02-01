@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Route 66 | Pro Photo Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/fabric@5.3.0/dist/fabric.min.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <header class="top-nav">
+            <div class="logo">R66 Photo</div>
+            <div class="actions">
+                <input type="file" id="upload-img" hidden>
+                <button class="btn" onclick="document.getElementById('upload-img').click()">📂 Open Image</button>
+                <button class="btn primary" onclick="downloadImage()">💾 Export</button>
+            </div>
+        </header>
+
+        <div class="main-workspace">
+            <aside class="toolbar">
+                <button onclick="setMode('select')" title="Select Tool">🖱️</button>
+                <button onclick="addText()" title="Text Tool">T</button>
+                <button onclick="applyFilter('Grayscale')" title="B&W Filter">🌓</button>
+                <button onclick="applyFilter('Sepia')" title="Sepia Filter">📜</button>
+                <button onclick="deleteObject()" title="Delete Layer">🗑️</button>
+            </aside>
+
+            <main class="canvas-holder">
+                <canvas id="editor-canvas"></canvas>
+            </main>
+
+            <aside class="layers-panel">
+                <h3>Filters</h3>
+                <div class="control-group">
+                    <label>Brightness</label>
+                    <input type="range" id="bright" min="-1" max="1" step="0.1" value="0" oninput="adjustBrightness()">
+                </div>
+                <div class="control-group">
+                    <label>Contrast</label>
+                    <input type="range" id="contrast" min="-1" max="1" step="0.1" value="0" oninput="adjustContrast()">
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

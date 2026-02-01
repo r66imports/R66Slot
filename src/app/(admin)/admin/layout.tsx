@@ -37,6 +37,7 @@ export default function AdminLayout({
       { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
       { name: 'Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
+      { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],
     settings: [

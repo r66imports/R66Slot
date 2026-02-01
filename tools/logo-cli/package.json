@@ -1,0 +1,16 @@
+{
+  "name": "r66-logo-cli",
+  "version": "0.1.0",
+  "description": "Minimal terminal logo and image editing CLI using sharp",
+  "main": "index.js",
+  "bin": {
+    "r66-logo": "index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "commander": "^10.0.0",
+    "sharp": "^0.32.0"
+  }
+}
