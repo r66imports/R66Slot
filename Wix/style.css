@@ -1,0 +1,301 @@
+:root {
+    --bg-canvas: #000000;
+    --bg-panel: #1e1e1e;
+    --bg-header: #252525;
+    --bg-input: #2b2b2b;
+    --border-color: #333333;
+    --text-main: #e0e0e0;
+    --text-dim: #a0a0a0;
+    --accent: #6132ef;
+    --handle-size: 8px;
+    --container-border: #4a90d9;
+}
+
+.light-mode {
+    --bg-canvas: #f0f0f0;
+    --bg-panel: #ffffff;
+    --bg-header: #ffffff;
+    --bg-input: #f9f9f9;
+    --border-color: #e2e2e2;
+    --text-main: #121212;
+    --text-dim: #666666;
+    --container-border: #2b6cb0;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #121212;
+    color: var(--text-main);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    overflow: hidden;
+}
+
+/* --- WORKSPACE LAYOUT --- */
+.workspace {
+    display: grid;
+    grid-template-areas: "top top top top" "side left canvas right";
+    grid-template-columns: 60px 240px 1fr 280px;
+    grid-template-rows: 50px 1fr;
+    height: 100vh;
+}
+
+.top-bar {
+    grid-area: top;
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    z-index: 100;
+}
+
+.side-nav {
+    grid-area: side;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 15px;
+    gap: 15px;
+}
+
+.left-sidebar {
+    grid-area: left;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border-color);
+    overflow-y: auto;
+}
+
+.inspector {
+    grid-area: right;
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border-color);
+    overflow-y: auto;
+}
+
+.canvas-container {
+    grid-area: canvas;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    background: var(--bg-canvas);
+    overflow: auto;
+    padding: 40px;
+}
+
+#canvas-area {
+    background: white;
+    width: 1280px;
+    min-height: 800px;
+    position: relative;
+    transition: width 0.3s ease;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    background-image: radial-gradient(#d1d1d1 0.5px, transparent 0.5px);
+    background-size: 20px 20px;
+}
+
+/* --- ELEMENTS --- */
+.resizable-box {
+    position: absolute;
+    border: 1px solid transparent;
+    cursor: move;
+    background-size: cover;
+    background-position: center;
+    user-select: none;
+}
+
+.resizable-box.selected {
+    border: 1px solid var(--accent);
+    z-index: 1000 !important;
+}
+
+.text-element {
+    color: #000;
+    font-size: 24px;
+    padding: 10px;
+    outline: none;
+    min-width: 100px;
+}
+
+.handle {
+    width: 8px;
+    height: 8px;
+    background: white;
+    border: 1px solid var(--accent);
+    position: absolute;
+    border-radius: 50%;
+    display: none;
+}
+
+.selected .handle { display: block; }
+.se { bottom: -5px; right: -5px; cursor: se-resize; }
+
+/* --- CONTAINER BOX --- */
+.container-box {
+    border: 2px dashed var(--container-border) !important;
+    background: rgba(74, 144, 217, 0.04);
+    min-width: 100px;
+    min-height: 100px;
+    overflow: hidden;
+}
+
+.container-box.selected {
+    border: 2px dashed var(--accent) !important;
+    box-shadow: 0 0 0 1px var(--accent);
+}
+
+.container-box .container-label {
+    position: absolute;
+    top: -22px;
+    left: 0;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--container-border);
+    letter-spacing: 0.5px;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.container-box.selected .container-label {
+    color: var(--accent);
+}
+
+/* Highlight container when dragging image over it */
+.container-box.drop-hover {
+    border-color: #27ae60 !important;
+    background: rgba(39, 174, 96, 0.08);
+    box-shadow: 0 0 0 2px rgba(39, 174, 96, 0.3);
+}
+
+/* Image children inside container */
+.container-child {
+    position: absolute;
+    background-size: cover;
+    background-position: center;
+    cursor: move;
+    user-select: none;
+}
+
+.container-child.selected {
+    outline: 2px solid var(--accent);
+}
+
+.container-child .handle {
+    display: none;
+}
+
+.container-child.selected .handle {
+    display: block;
+}
+
+/* Container button styling */
+.btn-container {
+    background: transparent !important;
+    border: 2px dashed var(--container-border) !important;
+    color: var(--container-border) !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.btn-container:hover {
+    background: rgba(74, 144, 217, 0.1) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+}
+
+.container-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* --- UI ELEMENTS --- */
+.sidebar-header {
+    padding: 15px;
+    font-size: 10px;
+    font-weight: 800;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-dim);
+    letter-spacing: 1px;
+}
+
+.btn-main {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.btn-main:hover { filter: brightness(1.1); }
+
+.prop-group {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.menu-item {
+    padding: 8px 15px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.menu-item:hover { background: var(--bg-input); }
+
+.menu-item.is-container {
+    color: var(--container-border);
+    font-weight: 600;
+}
+
+input, select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: inherit;
+    padding: 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+}
+
+/* --- PREVIEW MODE --- */
+.preview-mode .side-nav,
+.preview-mode .left-sidebar,
+.preview-mode .inspector,
+.preview-mode .handle,
+.preview-mode .container-label { display: none !important; }
+
+.preview-mode .workspace {
+    grid-template-areas: "top top top top" "canvas canvas canvas canvas";
+    grid-template-columns: 0 0 1fr 0;
+}
+
+.preview-mode .canvas-container { padding: 0; }
+
+.preview-mode #canvas-area {
+    box-shadow: none;
+    border: none;
+    width: 100% !important;
+    height: 100vh !important;
+}
+
+.preview-mode .container-box {
+    border-color: transparent !important;
+    background: transparent;
+}
+
+/* --- ANIMATIONS --- */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.anim-fade-in { animation: fade-in 1s ease forwards; }
