@@ -90,7 +90,7 @@ body {
 #canvas-area {
     background: white;
     width: 1280px;
-    min-height: 800px;
+    min-height: 1020px;
     position: relative;
     transition: width 0.3s ease;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
@@ -342,10 +342,21 @@ input, select {
     gap: 4px;
 }
 
+.template-preview-brands {
+    background: #F9FAFB;
+}
+
+.template-preview-brands .tp-nav {
+    background: #1F2937;
+    border-radius: 3px 3px 0 0;
+    height: 12px;
+    width: 100%;
+}
+
 .template-preview-brands .tp-hero {
-    background: linear-gradient(135deg, #dc2626, #b91c1c);
-    border-radius: 3px;
-    height: 35px;
+    background: linear-gradient(180deg, #DC2626, #B91C1C);
+    border-radius: 0;
+    height: 25px;
     width: 100%;
 }
 
@@ -353,12 +364,26 @@ input, select {
     display: flex;
     gap: 4px;
     flex: 1;
+    padding: 4px 0;
 }
 
-.template-preview-brands .tp-card {
+.template-preview-brands .tp-card-red {
     flex: 1;
-    background: linear-gradient(135deg, #374151, #1f2937);
+    background: linear-gradient(180deg, #EF4444, #B91C1C);
     border-radius: 3px;
+}
+
+.template-preview-brands .tp-card-dark {
+    flex: 1;
+    background: linear-gradient(180deg, #374151, #111827);
+    border-radius: 3px;
+}
+
+.template-preview-brands .tp-footer {
+    background: #1F2937;
+    border-radius: 0 0 3px 3px;
+    height: 14px;
+    width: 100%;
 }
 
 .template-name {
@@ -376,151 +401,12 @@ input, select {
     padding: 0 8px 8px;
 }
 
-/* --- BRANDS TEMPLATE STYLES (rendered on canvas) --- */
-.tpl-nav {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 60px;
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 40px;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    cursor: move;
-    user-select: none;
-}
+/* --- TEMPLATE ELEMENTS (rendered on canvas) --- */
+/* All template elements use inline styles for pixel-perfect rendering.
+   These rules handle editor-specific overrides only. */
 
-.tpl-nav .tpl-logo {
-    font-size: 22px;
-    font-weight: 900;
-    color: #111;
-    letter-spacing: -0.5px;
-}
-
-.tpl-nav .tpl-nav-links {
-    display: flex;
-    gap: 24px;
-}
-
-.tpl-nav .tpl-nav-links span {
-    font-size: 13px;
-    color: #4b5563;
-    cursor: pointer;
-}
-
-.tpl-hero-strip {
-    position: absolute;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: move;
-    user-select: none;
-}
-
-.tpl-hero-strip h1 {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    margin: 0;
-    line-height: 1.2;
-}
-
-.tpl-hero-strip p {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    margin: 8px 0 0;
-}
-
-.tpl-card {
-    position: absolute;
-    border-radius: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    cursor: move;
-    user-select: none;
-    overflow: hidden;
-}
-
-.tpl-card .tpl-card-icon {
-    font-size: 48px;
-    line-height: 1;
-}
-
-.tpl-card .tpl-card-title {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 22px;
-    font-weight: 700;
-    color: #fff;
-    margin: 0;
-}
-
-.tpl-card .tpl-card-desc {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0;
-    text-align: center;
-    max-width: 80%;
-}
-
-.tpl-card .tpl-card-btn {
-    display: inline-block;
-    padding: 10px 28px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #fff;
-    text-decoration: none;
-    cursor: pointer;
-    border: none;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-}
-
-.tpl-back-link {
-    position: absolute;
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 14px;
-    color: #4b5563;
-    cursor: move;
-    user-select: none;
-}
-
-.tpl-footer {
-    position: absolute;
-    width: 100%;
-    background: #1f2937;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 30px 40px;
-    cursor: move;
-    user-select: none;
-}
-
-.tpl-footer .tpl-footer-links {
-    display: flex;
-    gap: 24px;
-}
-
-.tpl-footer .tpl-footer-links span {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 13px;
-    color: #9ca3af;
-}
-
-.tpl-footer .tpl-footer-copy {
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    font-size: 11px;
-    color: #6b7280;
-}
+/* Preview mode: hide editor chrome on template elements */
+.preview-mode .resizable-box { border: none !important; }
 
 /* --- ANIMATIONS --- */
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }

@@ -477,113 +477,162 @@ toggleAddMenu = function () {
 var TEMPLATES = {};
 
 // ---------------------------------------------------------------
-//  BRANDS TEMPLATE — based on r66slot.co.za/brands/nsr
+//  BRANDS TEMPLATE — pixel-perfect clone of r66slot.co.za/brands/nsr
+//  Colors: primary=#DC2626  secondary=#1F2937  accent=#FBBF24
+//          primary-dark=#991B1B  primary-light=#EF4444
 // ---------------------------------------------------------------
 TEMPLATES.brands = function () {
     var elements = [];
+    var FF = "'Assistant', 'Segoe UI', system-ui, -apple-system, sans-serif";
 
-    // --- NAVBAR ---
+    // ===== 1. HEADER / NAVBAR =====
+    // bg-secondary (#1F2937), h-16 (64px), border-b border-gray-700
     var nav = document.createElement('div');
-    nav.className = 'resizable-box tpl-nav';
-    nav.dataset.type = 'nav';
-    nav.style.left = '0px';
-    nav.style.top = '0px';
-    nav.style.width = '1280px';
-    nav.style.height = '60px';
+    nav.className = 'resizable-box';
+    nav.dataset.type = 'header';
+    nav.style.cssText = 'left:0;top:0;width:1280px;height:64px;background:#1F2937;border-bottom:1px solid #374151;display:flex;align-items:center;justify-content:space-between;padding:0 32px;';
     nav.style.zIndex = ++highestZ;
     nav.innerHTML =
-        '<span class="tpl-logo">R66SLOT</span>' +
-        '<div class="tpl-nav-links">' +
-            '<span>Products</span>' +
-            '<span>Brands</span>' +
-            '<span>New Arrivals</span>' +
-            '<span>Pre-Orders</span>' +
-            '<span>About</span>' +
-            '<span>Contact</span>' +
+        // Logo: R66 white + SLOT primary
+        '<div style="font-size:24px;font-weight:700;font-family:' + FF + ';">' +
+            '<span style="color:#ffffff;">R66</span>' +
+            '<span style="color:#DC2626;">SLOT</span>' +
+        '</div>' +
+        // Nav links
+        '<div style="display:flex;align-items:center;gap:28px;">' +
+            '<span style="color:#fff;font-size:14px;font-family:' + FF + ';cursor:pointer;">Products</span>' +
+            '<span style="color:#fff;font-size:14px;font-family:' + FF + ';cursor:pointer;">Brands</span>' +
+            '<span style="color:#fff;font-size:14px;font-family:' + FF + ';cursor:pointer;">New Arrivals</span>' +
+            '<span style="color:#fff;font-size:14px;font-family:' + FF + ';cursor:pointer;">Slotify Pre-Orders</span>' +
+            '<span style="color:#fff;font-size:14px;font-family:' + FF + ';cursor:pointer;">About</span>' +
+            '<span style="color:#fff;font-size:14px;font-family:' + FF + ';cursor:pointer;">Contact</span>' +
+        '</div>' +
+        // Right icons: search, account, cart
+        '<div style="display:flex;align-items:center;gap:18px;">' +
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>' +
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>' +
+            '<div style="position:relative;">' +
+                '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4zM3 6h18"/><path d="M16 10a4 4 0 01-8 0"/></svg>' +
+                '<span style="position:absolute;top:-8px;right:-8px;background:#DC2626;color:#fff;font-size:10px;font-weight:700;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-family:' + FF + ';">0</span>' +
+            '</div>' +
         '</div>';
     elements.push(nav);
 
-    // --- HERO STRIP ---
+    // ===== 2. HERO SECTION =====
+    // bg-gradient from-red-600(#DC2626) to-red-700(#B91C1C), py-16 (64px top+bottom)
     var hero = document.createElement('div');
-    hero.className = 'resizable-box tpl-hero-strip';
+    hero.className = 'resizable-box';
     hero.dataset.type = 'hero';
-    hero.style.left = '0px';
-    hero.style.top = '60px';
-    hero.style.width = '1280px';
-    hero.style.height = '200px';
-    hero.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
+    hero.style.cssText = 'left:0;top:64px;width:1280px;height:200px;background:linear-gradient(180deg,#DC2626 0%,#B91C1C 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;';
     hero.style.zIndex = ++highestZ;
     hero.innerHTML =
-        '<h1 style="font-size:48px; font-weight:800; color:#ffffff; text-align:center;">NSR Slot Cars</h1>' +
-        '<p style="font-size:18px; color:rgba(255,255,255,0.85); text-align:center;">Premium Racing Performance</p>';
+        '<h1 style="font-family:' + FF + ';font-size:48px;font-weight:700;color:#ffffff;margin:0;text-align:center;line-height:1.1;">NSR Slot Cars</h1>' +
+        '<p style="font-family:' + FF + ';font-size:20px;color:rgba(254,202,202,0.9);margin:10px 0 0;text-align:center;">Premium Racing Performance</p>';
     elements.push(hero);
 
-    // --- BACK LINK ---
+    // ===== 3. PAGE BODY BACKGROUND =====
+    // bg-gray-50 (#F9FAFB) — the content area behind cards
+    var body = document.createElement('div');
+    body.className = 'resizable-box';
+    body.dataset.type = 'section';
+    body.style.cssText = 'left:0;top:264px;width:1280px;height:460px;background:#F9FAFB;';
+    body.style.zIndex = ++highestZ;
+    elements.push(body);
+
+    // ===== 4. BACK LINK =====
+    // text-gray-600 (#4B5563), py-8 area
     var back = document.createElement('div');
-    back.className = 'resizable-box tpl-back-link';
+    back.className = 'resizable-box';
     back.dataset.type = 'text';
-    back.style.left = '40px';
-    back.style.top = '280px';
-    back.style.width = '200px';
-    back.style.height = '30px';
+    back.style.cssText = 'left:80px;top:288px;width:200px;height:32px;display:flex;align-items:center;';
     back.style.zIndex = ++highestZ;
-    back.innerHTML = '<span style="color:#4b5563; font-size:14px; font-family:Segoe UI,system-ui,sans-serif;">&larr; Back to Home</span>';
+    back.innerHTML = '<span style="font-family:' + FF + ';font-size:14px;color:#4B5563;cursor:pointer;">&larr; Back to Home</span>';
     elements.push(back);
 
-    // --- CARD 1: NSR Slot Cars ---
+    // ===== 5. CARD 1 — NSR Slot Cars =====
+    // rounded-lg(8px), shadow-lg, gradient from-red-500(#EF4444) to-red-700(#B91C1C)
     var card1 = document.createElement('div');
-    card1.className = 'resizable-box tpl-card';
+    card1.className = 'resizable-box';
     card1.dataset.type = 'card';
-    card1.style.left = '40px';
-    card1.style.top = '320px';
-    card1.style.width = '590px';
-    card1.style.height = '280px';
-    card1.style.background = 'linear-gradient(135deg, #ef4444, #b91c1c)';
+    card1.style.cssText = 'left:80px;top:340px;width:548px;height:340px;background:linear-gradient(180deg,#EF4444 0%,#B91C1C 100%);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1),0 4px 6px -4px rgba(0,0,0,0.1);overflow:hidden;';
     card1.style.zIndex = ++highestZ;
     card1.innerHTML =
-        '<div class="tpl-card-icon">&#127950;</div>' +
-        '<h3 class="tpl-card-title">NSR Slot Cars</h3>' +
-        '<p class="tpl-card-desc">Explore our complete range of NSR racing models</p>' +
-        '<button class="tpl-card-btn" style="background:#dc2626;">View Cars &rarr;</button>';
+        '<div style="font-size:80px;line-height:1;">&#127950;</div>' +
+        '<h3 style="font-family:' + FF + ';font-size:24px;font-weight:700;color:#ffffff;margin:0;">NSR Slot Cars</h3>' +
+        '<p style="font-family:' + FF + ';font-size:14px;color:rgba(255,255,255,0.8);margin:0;text-align:center;max-width:80%;">Explore our complete range of NSR racing models</p>' +
+        '<button style="font-family:' + FF + ';display:inline-block;padding:12px 32px;background:#DC2626;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;">View Cars &rarr;</button>';
     elements.push(card1);
 
-    // --- CARD 2: NSR Parts ---
+    // ===== 6. CARD 2 — NSR Parts =====
+    // gradient from-gray-700(#374151) to-gray-900(#111827)
     var card2 = document.createElement('div');
-    card2.className = 'resizable-box tpl-card';
+    card2.className = 'resizable-box';
     card2.dataset.type = 'card';
-    card2.style.left = '650px';
-    card2.style.top = '320px';
-    card2.style.width = '590px';
-    card2.style.height = '280px';
-    card2.style.background = 'linear-gradient(135deg, #374151, #111827)';
+    card2.style.cssText = 'left:652px;top:340px;width:548px;height:340px;background:linear-gradient(180deg,#374151 0%,#111827 100%);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;box-shadow:0 10px 15px -3px rgba(0,0,0,0.1),0 4px 6px -4px rgba(0,0,0,0.1);overflow:hidden;';
     card2.style.zIndex = ++highestZ;
     card2.innerHTML =
-        '<div class="tpl-card-icon">&#9881;&#65039;</div>' +
-        '<h3 class="tpl-card-title">NSR Parts</h3>' +
-        '<p class="tpl-card-desc">Quality replacement parts and upgrades</p>' +
-        '<button class="tpl-card-btn" style="background:#1f2937;">View Parts &rarr;</button>';
+        '<div style="font-size:80px;line-height:1;">&#9881;&#65039;</div>' +
+        '<h3 style="font-family:' + FF + ';font-size:24px;font-weight:700;color:#ffffff;margin:0;">NSR Parts</h3>' +
+        '<p style="font-family:' + FF + ';font-size:14px;color:rgba(255,255,255,0.8);margin:0;text-align:center;max-width:80%;">Quality replacement parts and upgrades</p>' +
+        '<button style="font-family:' + FF + ';display:inline-block;padding:12px 32px;background:#1F2937;color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;">View Parts &rarr;</button>';
     elements.push(card2);
 
-    // --- FOOTER ---
+    // ===== 7. FOOTER =====
+    // bg-secondary(#1F2937), border-t border-gray-700(#374151), py-12
     var footer = document.createElement('div');
-    footer.className = 'resizable-box tpl-footer';
+    footer.className = 'resizable-box';
     footer.dataset.type = 'footer';
-    footer.style.left = '0px';
-    footer.style.top = '640px';
-    footer.style.width = '1280px';
-    footer.style.height = '120px';
+    footer.style.cssText = 'left:0;top:724px;width:1280px;height:280px;background:#1F2937;border-top:1px solid #374151;padding:48px 80px 32px;display:flex;flex-direction:column;justify-content:flex-start;';
     footer.style.zIndex = ++highestZ;
     footer.innerHTML =
-        '<div class="tpl-footer-links">' +
-            '<span>Products</span>' +
-            '<span>Brands</span>' +
-            '<span>About</span>' +
-            '<span>Contact</span>' +
-            '<span>Shipping</span>' +
-            '<span>Returns</span>' +
-            '<span>Privacy Policy</span>' +
+        // 4-column grid
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:32px;width:100%;">' +
+            // Col 1: Brand
+            '<div>' +
+                '<div style="font-size:24px;font-weight:700;font-family:' + FF + ';margin-bottom:16px;">' +
+                    '<span style="color:#ffffff;">R66</span><span style="color:#DC2626;">SLOT</span>' +
+                '</div>' +
+                '<p style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;line-height:1.6;margin:0;">Your premium destination for slot car racing. Quality models, fast shipping, expert service.</p>' +
+            '</div>' +
+            // Col 2: Shop
+            '<div>' +
+                '<h4 style="font-family:' + FF + ';font-size:15px;font-weight:600;color:#ffffff;margin:0 0 16px;">Shop</h4>' +
+                '<div style="display:flex;flex-direction:column;gap:10px;">' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">All Products</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Brands</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">New Arrivals</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Pre-Orders</span>' +
+                '</div>' +
+            '</div>' +
+            // Col 3: Information
+            '<div>' +
+                '<h4 style="font-family:' + FF + ';font-size:15px;font-weight:600;color:#ffffff;margin:0 0 16px;">Information</h4>' +
+                '<div style="display:flex;flex-direction:column;gap:10px;">' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">About Us</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Contact</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Shipping Info</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Returns</span>' +
+                '</div>' +
+            '</div>' +
+            // Col 4: Account
+            '<div>' +
+                '<h4 style="font-family:' + FF + ';font-size:15px;font-weight:600;color:#ffffff;margin:0 0 16px;">Account</h4>' +
+                '<div style="display:flex;flex-direction:column;gap:10px;">' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">My Account</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Order History</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Login</span>' +
+                    '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Register</span>' +
+                '</div>' +
+            '</div>' +
         '</div>' +
-        '<div class="tpl-footer-copy">&copy; 2026 R66SLOT. All rights reserved.</div>';
+        // Bottom bar: border-t, copyright + policy links
+        '<div style="margin-top:auto;padding-top:24px;border-top:1px solid #374151;display:flex;justify-content:space-between;align-items:center;width:100%;">' +
+            '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;">&copy; 2026 R66SLOT. All rights reserved.</span>' +
+            '<div style="display:flex;gap:24px;">' +
+                '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Privacy Policy</span>' +
+                '<span style="font-family:' + FF + ';font-size:13px;color:#9CA3AF;cursor:pointer;">Terms of Service</span>' +
+            '</div>' +
+        '</div>';
     elements.push(footer);
 
     return elements;
