@@ -131,17 +131,17 @@ body {
 
 .publish-btn:hover { background: #006abc; }
 
-/* --- WORKSPACE LAYOUT --- */
-.workspace {
-    display: grid;
-    grid-template-areas: "top top top top" "side left canvas right";
-    grid-template-columns: 60px 240px 1fr 280px;
-    grid-template-rows: 50px 1fr;
+/* --- WORKSPACE LAYOUT (flex-based) --- */
+#workspace {
+    display: flex;
+    flex-direction: column;
     height: calc(100vh - 50px);
+    overflow: hidden;
 }
 
 .top-bar {
-    grid-area: top;
+    height: 50px;
+    min-height: 50px;
     background: var(--bg-header);
     border-bottom: 1px solid var(--border-color);
     display: flex;
@@ -151,8 +151,16 @@ body {
     z-index: 100;
 }
 
+/* Panel row: side-nav | left-sidebar | canvas | inspector */
+.workspace-panels {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
 .side-nav {
-    grid-area: side;
+    width: 60px;
+    min-width: 60px;
     background: var(--bg-panel);
     border-right: 1px solid var(--border-color);
     display: flex;
@@ -163,21 +171,23 @@ body {
 }
 
 .left-sidebar {
-    grid-area: left;
+    width: 240px;
+    min-width: 240px;
     background: var(--bg-panel);
     border-right: 1px solid var(--border-color);
     overflow-y: auto;
 }
 
 .inspector {
-    grid-area: right;
+    width: 280px;
+    min-width: 280px;
     background: var(--bg-panel);
     border-left: 1px solid var(--border-color);
     overflow-y: auto;
 }
 
 .canvas-container {
-    grid-area: canvas;
+    flex: 1;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -371,15 +381,14 @@ input, select {
 
 /* --- PREVIEW MODE --- */
 .preview-mode .dashboard-header,
+.preview-mode .top-bar,
 .preview-mode .side-nav,
 .preview-mode .left-sidebar,
 .preview-mode .inspector,
 .preview-mode .handle,
 .preview-mode .container-label { display: none !important; }
 
-.preview-mode .workspace {
-    grid-template-areas: "top top top top" "canvas canvas canvas canvas";
-    grid-template-columns: 0 0 1fr 0;
+.preview-mode #workspace {
     height: 100vh;
 }
 
