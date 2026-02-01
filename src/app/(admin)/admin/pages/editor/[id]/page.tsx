@@ -51,28 +51,105 @@ const COMPONENT_DEFAULTS: Array<{
     },
   },
   {
-    type: 'three-column',
+    type: 'columns',
     defaultProps: {
       content: '',
-      styles: { backgroundColor: '#F9FAFB', paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px', textAlign: 'center' },
-      settings: { columns: 3 },
+      styles: { backgroundColor: '#F9FAFB', paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { columns: 2 },
       children: [
-        { id: `child-1`, type: 'icon-text', content: '<h3>Column 1</h3><p>Edit this text</p>', styles: { textAlign: 'center' }, settings: { icon: '📦' } },
-        { id: `child-2`, type: 'icon-text', content: '<h3>Column 2</h3><p>Edit this text</p>', styles: { textAlign: 'center' }, settings: { icon: '🔒' } },
-        { id: `child-3`, type: 'icon-text', content: '<h3>Column 3</h3><p>Edit this text</p>', styles: { textAlign: 'center' }, settings: { icon: '🔄' } },
+        { id: `child-1`, type: 'text', content: '<h3>Column 1</h3><p>Edit this text</p>', styles: {}, settings: {} },
+        { id: `child-2`, type: 'text', content: '<h3>Column 2</h3><p>Edit this text</p>', styles: {}, settings: {} },
       ],
     },
   },
   {
-    type: 'two-column',
+    type: 'heading',
+    defaultProps: {
+      content: 'Your Heading Here',
+      styles: { paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { level: 'h2' },
+    },
+  },
+  {
+    type: 'spacer',
     defaultProps: {
       content: '',
-      styles: { paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
-      settings: {},
-      children: [
-        { id: `child-1`, type: 'text', content: '<h3>Left Column</h3><p>Content here</p>', styles: {}, settings: {} },
-        { id: `child-2`, type: 'text', content: '<h3>Right Column</h3><p>Content here</p>', styles: {}, settings: {} },
-      ],
+      styles: { paddingTop: '24px', paddingBottom: '24px' },
+      settings: { height: '48px' },
+    },
+  },
+  {
+    type: 'strip',
+    defaultProps: {
+      content: '',
+      styles: { backgroundColor: '#1F2937', paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { fullWidth: true },
+      children: [],
+    },
+  },
+  {
+    type: 'banner',
+    defaultProps: {
+      content: '',
+      styles: { backgroundColor: '#4F46E5', textColor: '#FFFFFF', paddingTop: '32px', paddingBottom: '32px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { title: 'Banner Title', subtitle: 'Banner subtitle text', buttonText: 'Learn More', buttonLink: '#' },
+    },
+  },
+  {
+    type: 'box',
+    defaultProps: {
+      content: '',
+      styles: { backgroundColor: '#FFFFFF', paddingTop: '24px', paddingBottom: '24px', paddingLeft: '24px', paddingRight: '24px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+      settings: { imageUrl: '', imageFit: 'cover' },
+      children: [],
+    },
+  },
+  {
+    type: 'card',
+    defaultProps: {
+      content: '',
+      styles: { backgroundColor: '#FFFFFF', paddingTop: '0', paddingBottom: '16px', paddingLeft: '0', paddingRight: '0', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+      settings: { title: 'Card Title', description: 'Card description text goes here.', imageUrl: '', buttonText: '', buttonLink: '' },
+    },
+  },
+  {
+    type: 'icon-text',
+    defaultProps: {
+      content: '<p>Description text here</p>',
+      styles: { paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px', textAlign: 'center' },
+      settings: { icon: '🧩' },
+    },
+  },
+  {
+    type: 'product-card',
+    defaultProps: {
+      content: 'Product Name',
+      styles: { paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { imageUrl: '', price: '$29.99', showAddToCart: true },
+    },
+  },
+  {
+    type: 'product-carousel',
+    defaultProps: {
+      content: '',
+      styles: { paddingTop: '32px', paddingBottom: '32px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { productCount: 6, showPrice: true },
+    },
+  },
+  {
+    type: 'add-to-cart',
+    defaultProps: {
+      content: 'Add to Cart',
+      styles: { paddingTop: '16px', paddingBottom: '16px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { variant: 'primary', size: 'large' },
+    },
+  },
+  {
+    type: 'price-display',
+    defaultProps: {
+      content: '',
+      styles: { paddingTop: '8px', paddingBottom: '8px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { price: '$49.99', salePrice: '', currency: 'ZAR' },
     },
   },
   {

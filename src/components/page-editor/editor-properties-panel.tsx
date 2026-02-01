@@ -11,6 +11,7 @@ interface EditorPropertiesPanelProps {
   onMoveUp: () => void
   onMoveDown: () => void
   onClose: () => void
+  initialTab?: 'content' | 'style' | 'settings'
 }
 
 type TabId = 'content' | 'style' | 'settings'
@@ -23,8 +24,9 @@ export function EditorPropertiesPanel({
   onMoveUp,
   onMoveDown,
   onClose,
+  initialTab = 'content',
 }: EditorPropertiesPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('content')
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab)
 
   const updateStyle = (key: string, value: string) => {
     onUpdate({ styles: { ...component.styles, [key]: value } })
@@ -1472,6 +1474,13 @@ function VisualGalleryEditor({
     onUpdate({ children: updated })
   }
 
+  const updateImageLink = (index: number, link: string) => {
+    const updated = children.map((child, i) =>
+      i === index ? { ...child, settings: { ...child.settings, link } } : child
+    )
+    onUpdate({ children: updated })
+  }
+
   const moveImage = (fromIndex: number, toIndex: number) => {
     if (toIndex < 0 || toIndex >= children.length) return
     const updated = [...children]
@@ -1498,11 +1507,13 @@ function VisualGalleryEditor({
           <GalleryImageCard
             key={child.id}
             imageUrl={(child.settings.imageUrl as string) || ''}
+            imageLink={(child.settings.link as string) || ''}
             imageWidth={(child.styles?.width as string) || ''}
             imageHeight={(child.styles?.height as string) || ''}
             index={idx}
             total={children.length}
             onChangeUrl={(url) => updateImageUrl(idx, url)}
+            onChangeLink={(link) => updateImageLink(idx, link)}
             onChangeWidth={(w) => updateImageSize(idx, 'width', w)}
             onChangeHeight={(h) => updateImageSize(idx, 'height', h)}
             onRemove={() => removeImage(idx)}
@@ -1530,11 +1541,13 @@ function VisualGalleryEditor({
 // ─── Gallery Image Card (visual thumbnail) ───
 function GalleryImageCard({
   imageUrl,
+  imageLink,
   imageWidth,
   imageHeight,
   index,
   total,
   onChangeUrl,
+  onChangeLink,
   onChangeWidth,
   onChangeHeight,
   onRemove,
@@ -1542,11 +1555,13 @@ function GalleryImageCard({
   onMoveDown,
 }: {
   imageUrl: string
+  imageLink: string
   imageWidth: string
   imageHeight: string
   index: number
   total: number
   onChangeUrl: (url: string) => void
+  onChangeLink: (link: string) => void
   onChangeWidth: (w: string) => void
   onChangeHeight: (h: string) => void
   onRemove: () => void
@@ -1556,6 +1571,7 @@ function GalleryImageCard({
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [showSize, setShowSize] = useState(false)
+  const [showLink, setShowLink] = useState(false)
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1616,6 +1632,13 @@ function GalleryImageCard({
               >
                 ⤡
               </button>
+              <button
+                onClick={() => setShowLink(!showLink)}
+                className={`px-1.5 py-0.5 text-white text-[10px] rounded ${imageLink ? 'bg-green-500' : 'bg-purple-500'}`}
+                title="Link"
+              >
+                🔗
+              </button>
               {index > 0 && (
                 <button onClick={onMoveUp} className="px-1.5 py-0.5 bg-white/80 text-gray-800 text-[10px] rounded">
                   &#8592;
@@ -1654,6 +1677,20 @@ function GalleryImageCard({
             placeholder="H"
             className="flex-1 px-1 py-0.5 border border-gray-200 rounded text-[10px] font-play text-center"
             title="Height (e.g. auto, 200px)"
+          />
+        </div>
+      )}
+
+      {/* Per-image link */}
+      {showLink && imageUrl && (
+        <div>
+          <input
+            type="text"
+            value={imageLink}
+            onChange={(e) => onChangeLink(e.target.value)}
+            placeholder="Page link (e.g. /products)"
+            className="w-full px-1.5 py-0.5 border border-gray-200 rounded text-[10px] font-play"
+            title="Link URL for this image"
           />
         </div>
       )}

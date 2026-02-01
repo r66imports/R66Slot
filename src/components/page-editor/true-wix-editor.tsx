@@ -90,6 +90,7 @@ export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
   const [leftTab, setLeftTab] = useState<'components' | 'layers'>('components')
   const canvasRef = useRef<HTMLDivElement>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; componentId: string } | null>(null)
+  const [propertiesInitialTab, setPropertiesInitialTab] = useState<'content' | 'style' | 'settings'>('content')
 
   // Close context menu on click anywhere
   useEffect(() => {
@@ -434,7 +435,7 @@ ${canvasHTML}
             <LayersPanel
               components={page.components}
               selectedComponentId={selectedComponentId}
-              onSelect={(id) => { setSelectedComponentId(id); setShowPageSettings(false) }}
+              onSelect={(id) => { setPropertiesInitialTab('content'); setSelectedComponentId(id); setShowPageSettings(false) }}
             />
           )}
         </div>
@@ -505,9 +506,10 @@ ${canvasHTML}
                           key={component.id}
                           component={component}
                           isSelected={selectedComponentId === component.id}
-                          onSelect={() => { setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                          onSelect={() => { setPropertiesInitialTab('content'); setSelectedComponentId(component.id); setShowPageSettings(false) }}
                           onContextMenu={(e) => {
                             e.preventDefault()
+                            setPropertiesInitialTab('content')
                             setSelectedComponentId(component.id)
                             setShowPageSettings(false)
                             setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
@@ -536,9 +538,10 @@ ${canvasHTML}
                       component={component}
                       isSelected={selectedComponentId === component.id}
                       snapEnabled={snapEnabled}
-                      onSelect={() => { setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                      onSelect={() => { setPropertiesInitialTab('content'); setSelectedComponentId(component.id); setShowPageSettings(false) }}
                       onContextMenu={(e) => {
                         e.preventDefault()
+                        setPropertiesInitialTab('content')
                         setSelectedComponentId(component.id)
                         setShowPageSettings(false)
                         setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
@@ -589,13 +592,15 @@ ${canvasHTML}
           />
         ) : selectedComponent ? (
           <EditorPropertiesPanel
+            key={`${selectedComponent.id}-${propertiesInitialTab}`}
             component={selectedComponent}
             onUpdate={(updates) => updateComponent(selectedComponent.id, updates)}
             onDelete={() => deleteComponent(selectedComponent.id)}
             onDuplicate={() => duplicateComponent(selectedComponent.id)}
             onMoveUp={() => moveComponent(selectedComponent.id, 'up')}
             onMoveDown={() => moveComponent(selectedComponent.id, 'down')}
-            onClose={() => setSelectedComponentId(null)}
+            onClose={() => { setSelectedComponentId(null); setPropertiesInitialTab('content') }}
+            initialTab={propertiesInitialTab}
           />
         ) : (
           <div className="w-72 bg-white border-l border-gray-200 flex flex-col items-center justify-center text-gray-400 p-6">
@@ -624,7 +629,7 @@ ${canvasHTML}
             {/* Edit Settings */}
             <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-              onClick={() => { setSelectedComponentId(comp.id); setShowPageSettings(false); setContextMenu(null) }}
+              onClick={() => { setPropertiesInitialTab('settings'); setSelectedComponentId(comp.id); setShowPageSettings(false); setContextMenu(null) }}
             >
               <span>⚙️</span> Edit Settings
             </button>
