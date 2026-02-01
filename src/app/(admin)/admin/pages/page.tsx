@@ -42,6 +42,42 @@ const FRONTEND_PAGES = [
   },
 ]
 
+// Brand pages editable via the website editor
+const BRAND_PAGES = [
+  {
+    id: 'brand-nsr',
+    title: 'NSR',
+    slug: 'brands/nsr',
+    description: 'NSR brand page - high-performance racing models',
+    icon: '🏎️',
+    editable: true,
+  },
+  {
+    id: 'brand-revo',
+    title: 'Revo',
+    slug: 'brands/revo',
+    description: 'Revo brand page',
+    icon: '🏎️',
+    editable: true,
+  },
+  {
+    id: 'brand-pioneer',
+    title: 'Pioneer',
+    slug: 'brands/pioneer',
+    description: 'Pioneer brand page',
+    icon: '🏎️',
+    editable: true,
+  },
+  {
+    id: 'brand-sideways',
+    title: 'Sideways',
+    slug: 'brands/sideways',
+    description: 'Sideways brand page',
+    icon: '🏎️',
+    editable: true,
+  },
+]
+
 function InlineEditableTitle({
   value,
   onSave,
@@ -126,14 +162,22 @@ export default function PagesManagementPage() {
 
   const handleRename = async (id: string, newTitle: string) => {
     try {
+      // Generate a new slug from the title
+      const newSlug = newTitle
+        .toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
       const res = await fetch(`/api/admin/pages/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTitle }),
+        body: JSON.stringify({ title: newTitle, slug: newSlug }),
       })
       if (res.ok) {
+        const updated = await res.json()
         setCustomPages((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, title: newTitle } : p))
+          prev.map((p) => (p.id === id ? { ...p, title: updated.title, slug: updated.slug } : p))
         )
       }
     } catch (error) {
@@ -181,33 +225,64 @@ export default function PagesManagementPage() {
     }
   }
 
-  const handleToggleWebsitePage = async (id: string) => {
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
+
+  const handleToggleWebsitePage = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+
     const page = customPages.find((p) => p.id === id)
-    if (!page) return
+    if (!page || togglingIds.has(id)) return
 
     const newValue = !page.isWebsitePage
+
+    // Optimistic update
+    setCustomPages((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, isWebsitePage: newValue } : p))
+    )
+    setTogglingIds((prev) => new Set(prev).add(id))
+
     try {
       const res = await fetch(`/api/admin/pages/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isWebsitePage: newValue }),
       })
-      if (res.ok) {
+      if (!res.ok) {
+        // Revert on failure
         setCustomPages((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isWebsitePage: newValue } : p))
+          prev.map((p) => (p.id === id ? { ...p, isWebsitePage: !newValue } : p))
         )
       }
     } catch (error) {
       console.error('Error toggling website page:', error)
+      // Revert on failure
+      setCustomPages((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, isWebsitePage: !newValue } : p))
+      )
+    } finally {
+      setTogglingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     }
   }
 
   // Website pages = custom pages marked as website pages
   const websitePages = customPages.filter((p) => p.isWebsitePage)
 
-  // Search across all pages (frontend + custom) by URL/slug
+  // Search across all pages (frontend + brand + custom) by URL/slug
   const allSearchablePages = [
     ...FRONTEND_PAGES.map((p) => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      type: 'frontend' as const,
+      icon: p.icon,
+      description: p.description,
+    })),
+    ...BRAND_PAGES.map((p) => ({
       id: p.id,
       title: p.title,
       slug: p.slug,
@@ -420,6 +495,53 @@ export default function PagesManagementPage() {
         </div>
       </div>
 
+      {/* Brand Pages */}
+      <div className="mb-12">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold">Brand Pages</h2>
+            <p className="text-gray-600 text-sm mt-1">
+              Edit brand-specific pages on your website
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {BRAND_PAGES.map((page) => (
+            <Card key={page.id} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">{page.icon}</div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
+                    <p className="text-gray-600 text-sm mb-3">{page.description}</p>
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span>/{page.slug}</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      className="bg-primary hover:bg-primary-dark text-white"
+                      asChild
+                    >
+                      <Link href={`/admin/pages/editor/frontend-${page.id}`}>
+                        Edit Page
+                      </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/${page.slug}`} target="_blank">
+                        View Live
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
       {/* Website Pages Section */}
       {websitePages.length > 0 && (
         <div className="mb-12">
@@ -567,14 +689,15 @@ export default function PagesManagementPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleToggleWebsitePage(page.id)}
+                        onClick={(e) => handleToggleWebsitePage(e, page.id)}
+                        disabled={togglingIds.has(page.id)}
                         className={
                           page.isWebsitePage
                             ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
                             : ''
                         }
                       >
-                        Website Page
+                        {togglingIds.has(page.id) ? '...' : 'Website Page'}
                       </Button>
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>

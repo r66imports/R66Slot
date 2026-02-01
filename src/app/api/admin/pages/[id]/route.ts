@@ -10,6 +10,10 @@ const FRONTEND_PAGE_TEMPLATES: Record<string, { title: string; slug: string }> =
   'frontend-products': { title: 'Products Page', slug: 'products' },
   'frontend-about': { title: 'About Page', slug: 'about' },
   'frontend-contact': { title: 'Contact Page', slug: 'contact' },
+  'frontend-brand-nsr': { title: 'NSR', slug: 'brands/nsr' },
+  'frontend-brand-revo': { title: 'Revo', slug: 'brands/revo' },
+  'frontend-brand-pioneer': { title: 'Pioneer', slug: 'brands/pioneer' },
+  'frontend-brand-sideways': { title: 'Sideways', slug: 'brands/sideways' },
 }
 
 // GET /api/admin/pages/[id] - Get single page
@@ -80,9 +84,16 @@ export async function PUT(
     // Revalidate the frontend page so edits appear immediately
     try {
       revalidatePath('/')
-      if (id.startsWith('frontend-')) {
+      if (id.startsWith('frontend-brand-')) {
+        const brandSlug = id.replace('frontend-brand-', '')
+        revalidatePath(`/brands/${brandSlug}`)
+      } else if (id.startsWith('frontend-')) {
         const slug = id.replace('frontend-', '')
         revalidatePath(`/${slug}`)
+      }
+      // Also revalidate the page's own slug
+      if (page?.slug) {
+        revalidatePath(`/${page.slug}`)
       }
     } catch {
       // Revalidation errors shouldn't block the save

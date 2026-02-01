@@ -96,6 +96,9 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
       styles: template.defaultProps.styles || {},
       settings: template.defaultProps.settings || {},
       children: template.defaultProps.children || [],
+      // preserve positionMode/position from template if provided
+      positionMode: (template.defaultProps as any).positionMode || 'flow',
+      position: (template.defaultProps as any).position,
     }
 
     const newComponents = [...page.components]
@@ -234,20 +237,22 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
 
     setIsSaving(true)
     try {
+      const payload = {
+        ...page,
+        // Only set published: true when explicitly publishing.
+        // When saving a draft, preserve the current published state.
+        published: publish ? true : page.published,
+      }
+
       const response = await fetch(`/api/admin/pages/${page.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...page,
-          published: publish,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (response.ok) {
-        if (publish) {
-          const updated = await response.json()
-          setPage(updated)
-        }
+        const updated = await response.json()
+        setPage(updated)
         return true
       } else {
         console.error('Failed to save page')

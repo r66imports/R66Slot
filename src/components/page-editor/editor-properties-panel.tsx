@@ -1707,19 +1707,44 @@ function VisualColumnEditor({
   onUpdate: (updates: Partial<PageComponent>) => void
 }) {
   const children = component.children || []
+  const fileRefs = useRef<Record<number, HTMLInputElement | null>>({})
 
-  const updateChildContent = (index: number, content: string) => {
+  const updateChild = (index: number, updates: Partial<PageComponent>) => {
     const updated = children.map((child, i) =>
-      i === index ? { ...child, content } : child
+      i === index ? { ...child, ...updates } : child
     )
     onUpdate({ children: updated })
   }
 
+  const updateChildContent = (index: number, content: string) => {
+    updateChild(index, { content })
+  }
+
   const updateChildIcon = (index: number, icon: string) => {
-    const updated = children.map((child, i) =>
-      i === index ? { ...child, settings: { ...child.settings, icon } } : child
-    )
-    onUpdate({ children: updated })
+    const child = children[index]
+    updateChild(index, { settings: { ...child.settings, icon } })
+  }
+
+  const updateChildSetting = (index: number, key: string, value: string) => {
+    const child = children[index]
+    updateChild(index, { settings: { ...child.settings, [key]: value } })
+  }
+
+  const handleColumnImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
+      if (res.ok) {
+        const data = await res.json()
+        updateChildSetting(index, 'imageUrl', data.url)
+      }
+    } catch (err) {
+      console.error('Upload failed:', err)
+    }
+    if (fileRefs.current[index]) fileRefs.current[index]!.value = ''
   }
 
   return (
@@ -1742,6 +1767,60 @@ function VisualColumnEditor({
               />
             </div>
           )}
+
+          {/* Column Image Upload */}
+          <div>
+            <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Image</label>
+            {(child.settings.imageUrl as string) ? (
+              <div className="relative group/colimg">
+                <img
+                  src={child.settings.imageUrl as string}
+                  alt=""
+                  className="w-full h-20 object-cover rounded border border-gray-200"
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/colimg:opacity-100 transition-opacity flex items-center justify-center gap-1 rounded">
+                  <button
+                    onClick={() => fileRefs.current[idx]?.click()}
+                    className="px-2 py-0.5 bg-white text-gray-800 text-[10px] rounded font-play"
+                  >
+                    Change
+                  </button>
+                  <button
+                    onClick={() => updateChildSetting(idx, 'imageUrl', '')}
+                    className="px-2 py-0.5 bg-red-500 text-white text-[10px] rounded"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => fileRefs.current[idx]?.click()}
+                className="w-full py-2 border border-dashed border-gray-300 rounded text-[10px] text-gray-400 hover:text-blue-500 hover:border-blue-300 transition-colors font-play"
+              >
+                + Upload Image
+              </button>
+            )}
+            <input
+              ref={(el) => { fileRefs.current[idx] = el }}
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleColumnImageUpload(idx, e)}
+              className="hidden"
+            />
+          </div>
+
+          {/* Column Link */}
+          <div>
+            <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Link URL</label>
+            <input
+              type="text"
+              value={(child.settings.link as string) || ''}
+              onChange={(e) => updateChildSetting(idx, 'link', e.target.value)}
+              placeholder="/page-slug or https://..."
+              className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+            />
+          </div>
 
           {/* Rich text editor for content */}
           <RichTextEditor

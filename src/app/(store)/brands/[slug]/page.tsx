@@ -1,6 +1,9 @@
 import { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 import { getProducts } from '@/lib/shopify'
+import { getPageById } from '@/lib/pages/storage'
 import { ProductCard } from '@/components/product/product-card'
+import { ComponentRenderer } from '@/components/page-renderer/component-renderer'
 import type { ShopifyProduct } from '@/types/shopify'
 
 interface BrandPageProps {
@@ -31,6 +34,64 @@ export default async function BrandPage({ params }: BrandPageProps) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ')
 
+  // Check if there's an editable page for this brand
+  const editablePage = await getPageById(`frontend-brand-${slug}`)
+
+  // If an editable page exists with components, render it
+  if (editablePage && editablePage.components.length > 0) {
+    const ps = editablePage.pageSettings || {}
+    return (
+      <div
+        style={{
+          backgroundColor: ps.backgroundColor || '#ffffff',
+          position: 'relative',
+          minHeight: '100vh',
+        }}
+      >
+        {ps.backgroundImage && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url("${ps.backgroundImage}")`,
+              backgroundSize: ps.backgroundSize || 'cover',
+              backgroundPosition: ps.backgroundPosition || 'center',
+              backgroundRepeat: 'no-repeat',
+              opacity: typeof ps.backgroundOpacity === 'number' ? ps.backgroundOpacity : 1,
+              zIndex: 0,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          {editablePage.components.map((component) => {
+            if (component.positionMode === 'absolute' && component.position) {
+              const rotation = component.position.rotation || 0
+              return (
+                <div
+                  key={component.id}
+                  style={{
+                    position: 'absolute',
+                    left: component.position.x,
+                    top: component.position.y,
+                    width: component.position.width,
+                    height: component.position.height,
+                    zIndex: component.position.zIndex || 10,
+                    transform: rotation ? `rotate(${rotation}deg)` : undefined,
+                  }}
+                >
+                  <ComponentRenderer component={component} />
+                </div>
+              )
+            }
+            return <ComponentRenderer key={component.id} component={component} />
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // Fallback: Shopify product listing
   let products: ShopifyProduct[]
   try {
     const productsData = await getProducts({
