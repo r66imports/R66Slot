@@ -307,6 +307,43 @@ function syncInspector() {
     const currentRot = selectedEl.getAttribute('data-rotation') || 0;
     document.getElementById('in-rotate').value = currentRot;
     document.getElementById('rotate-val').innerText = currentRot + '\u00B0';
+
+    // Sync fill color
+    const bg = selectedEl.style.backgroundColor;
+    if (bg) {
+        const fillInput = document.getElementById('in-fill');
+        // Convert rgb() to hex for the color input
+        const temp = document.createElement('div');
+        temp.style.color = bg;
+        document.body.appendChild(temp);
+        const computed = getComputedStyle(temp).color;
+        document.body.removeChild(temp);
+        const match = computed.match(/\d+/g);
+        if (match && match.length >= 3) {
+            const hex = '#' + match.slice(0, 3).map(function (v) {
+                return ('0' + parseInt(v).toString(16)).slice(-2);
+            }).join('');
+            fillInput.value = hex;
+        }
+    }
+
+    // Sync opacity
+    const opacityVal = selectedEl.style.opacity !== '' ? Math.round(parseFloat(selectedEl.style.opacity) * 100) : 100;
+    document.getElementById('in-opacity').value = opacityVal;
+    document.getElementById('opacity-val').innerText = opacityVal + '%';
+}
+
+function applyFill(color) {
+    if (!selectedEl) return;
+    selectedEl.style.backgroundColor = color;
+    saveHistory('Change fill');
+}
+
+function applyOpacity(value) {
+    if (!selectedEl) return;
+    selectedEl.style.opacity = value / 100;
+    document.getElementById('opacity-val').innerText = value + '%';
+    saveHistory('Change opacity');
 }
 
 function applyInspector() {

@@ -7,6 +7,36 @@
 </head>
 <body>
 
+<header class="dashboard-header">
+    <div class="header-left">
+        <span class="site-logo">R66 Studio</span>
+    </div>
+
+    <nav class="header-nav">
+        <div class="dropdown">
+            <button class="dropbtn">Site <i class="arrow down"></i></button>
+            <div class="dropdown-content">
+                <a href="#">Site Settings</a>
+                <a href="#">Release History</a>
+                <a href="#">Connect Domain</a>
+            </div>
+        </div>
+
+        <div class="dropdown">
+            <button class="dropbtn">Tools <i class="arrow down"></i></button>
+            <div class="dropdown-content">
+                <a href="#">Grid Overlay</a>
+                <a href="#">Asset Manager</a>
+                <a href="#">Code Console</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="header-right">
+        <button class="publish-btn">Publish</button>
+    </div>
+</header>
+
 <div class="workspace">
     <header class="top-bar">
         <div style="display:flex; gap:8px;">
@@ -87,6 +117,20 @@
                     <div><label>H</label><input type="number" id="in-h" onchange="applyInspector()"></div>
                     <div><label>X</label><input type="number" id="in-x" onchange="applyInspector()"></div>
                     <div><label>Y</label><input type="number" id="in-y" onchange="applyInspector()"></div>
+                </div>
+            </div>
+            <div class="prop-group">
+                <label style="font-size:9px; color:var(--text-dim)">FILL & OPACITY</label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+                    <div>
+                        <label>Fill</label>
+                        <input type="color" id="in-fill" value="#6132ef" onchange="applyFill(this.value)" style="height:32px; padding:2px; cursor:pointer;">
+                    </div>
+                    <div>
+                        <label>Opacity</label>
+                        <input type="range" id="in-opacity" min="0" max="100" value="100" oninput="applyOpacity(this.value)" style="margin-bottom:0;">
+                        <span id="opacity-val" style="font-size:11px; color:var(--text-dim);">100%</span>
+                    </div>
                 </div>
             </div>
             <div class="prop-group">
