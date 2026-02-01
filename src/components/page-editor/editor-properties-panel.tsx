@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import type { PageComponent } from '@/lib/pages/schema'
+import { MediaLibraryPicker } from './media-library-picker'
 
 interface EditorPropertiesPanelProps {
   component: PageComponent
@@ -104,6 +105,7 @@ function ImageField({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
+  const [showMediaPicker, setShowMediaPicker] = useState(false)
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -149,6 +151,12 @@ function ImageField({
               Change
             </button>
             <button
+              onClick={() => setShowMediaPicker(true)}
+              className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded-lg font-play font-medium"
+            >
+              Media Library
+            </button>
+            <button
               onClick={() => onChange('')}
               className="px-3 py-1.5 bg-red-500 text-white text-xs rounded-lg font-play font-medium"
             >
@@ -157,23 +165,31 @@ function ImageField({
           </div>
         </div>
       ) : (
-        <button
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="w-full border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-lg p-6 text-center transition-colors mb-2 group/upload"
-        >
-          {uploading ? (
-            <div className="flex items-center justify-center gap-2">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-              <span className="text-xs text-gray-500 font-play">Uploading...</span>
-            </div>
-          ) : (
-            <>
-              <div className="text-3xl mb-1 text-gray-300 group-hover/upload:text-blue-400 transition-colors">+</div>
-              <p className="text-xs text-gray-400 font-play">Click to upload image</p>
-            </>
-          )}
-        </button>
+        <div className="space-y-2 mb-2">
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="w-full border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-lg p-4 text-center transition-colors group/upload"
+          >
+            {uploading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+                <span className="text-xs text-gray-500 font-play">Uploading...</span>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl mb-1 text-gray-300 group-hover/upload:text-blue-400 transition-colors">+</div>
+                <p className="text-xs text-gray-400 font-play">Upload image</p>
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowMediaPicker(true)}
+            className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs rounded-lg font-play font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            <span>🖼️</span> Choose from Media Library
+          </button>
+        </div>
       )}
 
       {/* URL input (collapsed) */}
@@ -186,6 +202,12 @@ function ImageField({
       />
 
       <input ref={fileRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
+
+      <MediaLibraryPicker
+        open={showMediaPicker}
+        onClose={() => setShowMediaPicker(false)}
+        onSelect={(url) => onChange(url)}
+      />
     </div>
   )
 }

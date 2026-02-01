@@ -143,6 +143,8 @@ export default function PagesManagementPage() {
   const [customPages, setCustomPages] = useState<Page[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
 
   useEffect(() => {
     fetchCustomPages()
@@ -157,6 +159,35 @@ export default function PagesManagementPage() {
       console.error('Error fetching pages:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleSaveAll = async () => {
+    setIsSaving(true)
+    setSaveMessage(null)
+    try {
+      // Save each custom page to persist any inline edits
+      const results = await Promise.all(
+        customPages.map((page) =>
+          fetch(`/api/admin/pages/${page.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(page),
+          })
+        )
+      )
+      const allOk = results.every((r) => r.ok)
+      if (allOk) {
+        setSaveMessage('All pages saved successfully!')
+      } else {
+        setSaveMessage('Some pages failed to save.')
+      }
+    } catch (error) {
+      console.error('Error saving pages:', error)
+      setSaveMessage('Failed to save pages.')
+    } finally {
+      setIsSaving(false)
+      setTimeout(() => setSaveMessage(null), 3000)
     }
   }
 
@@ -332,13 +363,30 @@ export default function PagesManagementPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <span>✏️</span> Edit Site - Frontend Pages
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Edit the pages that your customers see on the website
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <span>✏️</span> Edit Site - Frontend Pages
+          </h1>
+          <p className="text-gray-600 mt-2">
+            Edit the pages that your customers see on the website
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {saveMessage && (
+            <span className={`text-sm font-medium ${saveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+              {saveMessage}
+            </span>
+          )}
+          <Button
+            size="lg"
+            onClick={handleSaveAll}
+            disabled={isSaving}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {isSaving ? 'Saving...' : 'Save All Pages'}
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar */}

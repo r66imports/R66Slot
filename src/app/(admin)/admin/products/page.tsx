@@ -317,6 +317,13 @@ export default function ProductsPage() {
                       {/* Actions */}
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-2">
+                          <Link
+                            href={`/admin/products/${product.id}`}
+                            className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                            title="Edit product"
+                          >
+                            Edit
+                          </Link>
                           <button
                             onClick={() => handlePreOrder(product)}
                             className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700 rounded hover:bg-orange-200"
