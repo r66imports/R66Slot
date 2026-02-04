@@ -1,0 +1,13 @@
+HTTP/1.1 500 Internal Server Error
+Cache-Control: public, max-age=0, must-revalidate
+Content-Type: application/json
+Date: Wed, 04 Feb 2026 03:07:50 GMT
+Server: Vercel
+Strict-Transport-Security: max-age=63072000
+Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+X-Matched-Path: /api/admin/auth/login
+X-Vercel-Cache: MISS
+X-Vercel-Id: iad1::iad1::d7w6f-1770174470403-ad6faf7c9f7b
+Transfer-Encoding: chunked
+
+{"error":"Login failed"}

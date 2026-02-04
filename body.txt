@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+Cache-Control: public, max-age=0, must-revalidate
+Content-Type: application/json
+Date: Wed, 04 Feb 2026 03:07:34 GMT
+Server: Vercel
+Strict-Transport-Security: max-age=63072000
+Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+X-Matched-Path: /api/admin/seed
+X-Vercel-Cache: MISS
+X-Vercel-Id: iad1::iad1::2lx2w-1770174452783-80a7581dfec5
+Transfer-Encoding: chunked
+
+{"message":"Admin user already exists","seeded":false}
