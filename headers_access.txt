@@ -1,0 +1,13 @@
+HTTP/1.1 200 OK
+Age: 0
+Cache-Control: public, max-age=0, must-revalidate
+Content-Type: application/json
+Date: Wed, 04 Feb 2026 03:08:19 GMT
+Server: Vercel
+Strict-Transport-Security: max-age=63072000
+Vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+X-Matched-Path: /api/editor/access
+X-Vercel-Cache: MISS
+X-Vercel-Id: iad1::iad1::fjszd-1770174498923-9aa549857e02
+Transfer-Encoding: chunked
+

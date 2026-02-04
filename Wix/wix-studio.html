@@ -2,189 +2,187 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Wix Studio Editor</title>
+    <title>R66 Studio — Dashboard</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ========== ROOT CONTAINER — all styles scoped to this ID ========== -->
 <div id="r66-root-container">
 
-    <!-- HEADER — z-index:9999, CSS-only dropdown hover -->
-    <header class="dashboard-header">
+    <!-- ===== FIXED HEADER (50px, z-index:1000) ===== -->
+    <header class="wix-header">
         <div class="header-left">
-            <span class="site-logo">R66 Studio</span>
+            <span class="header-logo">R66 <span class="logo-accent">Studio</span></span>
         </div>
 
         <nav class="header-nav">
-            <div class="dropdown">
-                <button class="dropbtn">Site <i class="arrow down"></i></button>
-                <div class="dropdown-content">
-                    <a href="#">Site Settings</a>
-                    <a href="#">Release History</a>
-                    <a href="#">Connect Domain</a>
+            <div class="dropdown" id="dropdown-site">
+                <button class="dropdown-trigger" onclick="toggleDropdown('dropdown-site')">
+                    Site <span class="caret">&#9662;</span>
+                </button>
+                <div class="dropdown-panel">
+                    <a href="#" class="dropdown-item">Site Settings</a>
+                    <a href="#" class="dropdown-item">Release History</a>
+                    <a href="#" class="dropdown-item">Connect Domain</a>
+                    <a href="#" class="dropdown-item">Permissions</a>
                 </div>
             </div>
-            <div class="dropdown">
-                <button class="dropbtn">Tools <i class="arrow down"></i></button>
-                <div class="dropdown-content">
-                    <a href="#">Grid Overlay</a>
-                    <a href="#">Asset Manager</a>
-                    <a href="#">Code Console</a>
+            <div class="dropdown" id="dropdown-tools">
+                <button class="dropdown-trigger" onclick="toggleDropdown('dropdown-tools')">
+                    Tools <span class="caret">&#9662;</span>
+                </button>
+                <div class="dropdown-panel">
+                    <a href="#" class="dropdown-item">Grid Overlay</a>
+                    <a href="#" class="dropdown-item">Asset Manager</a>
+                    <a href="#" class="dropdown-item">Code Console</a>
+                    <a href="#" class="dropdown-item">Dev Mode</a>
                 </div>
             </div>
         </nav>
 
         <div class="header-right">
-            <button class="publish-btn">Publish</button>
-            <button id="theme-toggle" class="theme-btn">🌙</button>
+            <button class="header-btn" onclick="togglePreview()" id="preview-btn">Preview</button>
+            <button class="header-btn btn-publish">Publish</button>
         </div>
     </header>
 
-    <!-- MAIN CONTENT — everything below the header -->
-    <div class="main-content">
+    <!-- ===== BODY: 3-PANE LAYOUT BELOW FIXED HEADER ===== -->
+    <div class="wix-body">
 
-        <!-- Editor Toolbar (full-width row below header) -->
-        <div class="top-bar">
-            <div class="top-bar-left">
-                <button class="btn-main" onclick="togglePreview()" id="prev-btn">Preview</button>
-                <button class="btn-main btn-green" onclick="exportHTML()">Export</button>
-                <button class="btn-main btn-blue" onclick="saveToCloud()">Save</button>
-                <button class="btn-main btn-orange" onclick="loadFromCloud()">Load</button>
-            </div>
-            <div class="top-bar-center">
-                <span onclick="setBreakpoint('desktop')" class="bp-btn" title="Desktop">🖥️</span>
-                <span onclick="setBreakpoint('tablet')" class="bp-btn" title="Tablet">📱</span>
-                <span onclick="setBreakpoint('mobile')" class="bp-btn" title="Mobile">📲</span>
-            </div>
-            <div class="top-bar-right">
-                <button class="btn-main side-btn" title="Add Element" onclick="toggleAddMenu()">+</button>
-                <button class="btn-main side-btn btn-tpl" title="Templates" onclick="toggleTemplateMenu()">T</button>
-            </div>
-        </div>
+        <!-- LEFT: Narrow Toolbar (60px) -->
+        <aside class="toolbar">
+            <button class="tool-btn" onclick="spawn('text')" title="Text">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>
+                <span class="tool-label">Text</span>
+            </button>
+            <button class="tool-btn" onclick="spawn('img')" title="Image">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span class="tool-label">Image</span>
+            </button>
+            <button class="tool-btn" onclick="spawn('box')" title="Rectangle">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                <span class="tool-label">Shape</span>
+            </button>
+            <button class="tool-btn" onclick="addContainer()" title="Container">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                <span class="tool-label">Container</span>
+            </button>
+            <div class="tool-divider"></div>
+            <button class="tool-btn" onclick="saveToCloud()" title="Save">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17,21 17,13 7,13 7,21"/><polyline points="7,3 7,8 15,8"/></svg>
+                <span class="tool-label">Save</span>
+            </button>
+            <button class="tool-btn" onclick="loadFromCloud()" title="Load">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span class="tool-label">Load</span>
+            </button>
+            <button class="tool-btn" onclick="exportHTML()" title="Export">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                <span class="tool-label">Export</span>
+            </button>
+        </aside>
 
-        <!-- Panel Row: Sidebar (Left) | Canvas (Center) | Inspector (Right) -->
-        <div class="panels">
+        <!-- CENTER: Canvas Workspace -->
+        <main class="canvas-area" onclick="canvasClick(event)">
+            <div class="canvas-scroll">
+                <div class="breakpoint-bar">
+                    <span class="bp-btn active" onclick="setBreakpoint('desktop',this)">🖥️ Desktop</span>
+                    <span class="bp-btn" onclick="setBreakpoint('tablet',this)">📑 Tablet</span>
+                    <span class="bp-btn" onclick="setBreakpoint('mobile',this)">📱 Mobile</span>
+                </div>
+                <div id="canvas" class="canvas"></div>
+            </div>
+        </main>
 
-            <!-- LEFT: Sidebar -->
-            <aside class="left-sidebar">
-                <!-- Add Element Menu -->
-                <div id="add-menu" class="sidebar-menu">
-                    <div class="sidebar-header">ADD ELEMENT</div>
-                    <div class="sidebar-menu-inner">
-                        <button class="btn-main btn-full" onclick="spawn('box')">Rectangle</button>
-                        <button class="btn-main btn-full" onclick="spawn('text')">Text Block</button>
-                        <button class="btn-main btn-full" onclick="spawn('img')">Image</button>
-                        <button class="btn-main btn-full btn-container" onclick="addContainer()">
-                            <span class="container-icon">▣</span> Container Box
-                        </button>
+        <!-- RIGHT: Inspector Panel (240px) -->
+        <aside class="inspector" id="inspector">
+            <div class="inspector-header">INSPECTOR</div>
+
+            <!-- Empty state -->
+            <div id="inspector-empty" class="inspector-empty">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--wix-text-dim)" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+                <p>Select an element on the canvas to inspect its properties.</p>
+            </div>
+
+            <!-- Properties (hidden until selection) -->
+            <div id="inspector-props" class="inspector-props">
+
+                <div class="prop-section">
+                    <div class="prop-section-title">POSITION & SIZE</div>
+                    <div class="prop-grid">
+                        <div class="prop-field">
+                            <label>X</label>
+                            <input type="number" id="in-x" onchange="applyInspector()">
+                        </div>
+                        <div class="prop-field">
+                            <label>Y</label>
+                            <input type="number" id="in-y" onchange="applyInspector()">
+                        </div>
+                        <div class="prop-field">
+                            <label>W</label>
+                            <input type="number" id="in-w" onchange="applyInspector()">
+                        </div>
+                        <div class="prop-field">
+                            <label>H</label>
+                            <input type="number" id="in-h" onchange="applyInspector()">
+                        </div>
                     </div>
                 </div>
 
-                <!-- Templates Menu -->
-                <div id="template-menu" class="sidebar-menu" style="display:none;">
-                    <div class="sidebar-header">TEMPLATES</div>
-                    <p class="sidebar-hint">
-                        Choose a template to populate the canvas. This replaces current content.
-                    </p>
-                    <div class="template-grid">
-                        <button class="template-card" onclick="loadTemplate('brands')">
-                            <div class="template-preview template-preview-brands">
-                                <div class="tp-nav"></div>
-                                <div class="tp-hero"></div>
-                                <div class="tp-cards"><div class="tp-card-red"></div><div class="tp-card-dark"></div></div>
-                                <div class="tp-footer"></div>
-                            </div>
-                            <span class="template-name">Brands Page</span>
-                            <span class="template-desc">r66slot.co.za/brands/nsr clone</span>
-                        </button>
-                        <button class="template-card" onclick="loadTemplate('blank')">
-                            <div class="template-preview template-preview-blank">
-                                <div style="width:100%;height:100%;background:#f9f9f9;border-radius:4px;"></div>
-                            </div>
-                            <span class="template-name">Blank Canvas</span>
-                            <span class="template-desc">Start from scratch</span>
-                        </button>
+                <div class="prop-section">
+                    <div class="prop-section-title">FILL & OPACITY</div>
+                    <div class="prop-row">
+                        <div class="prop-field">
+                            <label>Color</label>
+                            <input type="color" id="in-fill" value="#0078d4" onchange="applyFill(this.value)" class="color-swatch">
+                        </div>
+                        <div class="prop-field prop-field-wide">
+                            <label>Opacity <span id="opacity-val" class="prop-value">100%</span></label>
+                            <input type="range" id="in-opacity" min="0" max="100" value="100" oninput="applyOpacity(this.value)">
+                        </div>
                     </div>
                 </div>
 
-                <div class="sidebar-header">LAYERS</div>
-                <div id="layer-stack"></div>
-                <div class="sidebar-header">HISTORY</div>
-                <div id="history-stack"></div>
-            </aside>
-
-            <!-- CENTER: Canvas -->
-            <div class="canvas-container">
-                <div id="canvas-area" onclick="deselect(event)"></div>
-            </div>
-
-            <!-- RIGHT: Inspector Sidebar -->
-            <aside class="inspector">
-                <div class="sidebar-header">INSPECTOR</div>
-                <div id="no-sel" class="inspector-empty">Select an element</div>
-                <div id="inspector-ui" style="display:none;">
-                    <div class="prop-group">
-                        <label class="prop-label">POSITION & SIZE</label>
-                        <div class="prop-grid-2x2">
-                            <div><label>W</label><input type="number" id="in-w" onchange="applyInspector()"></div>
-                            <div><label>H</label><input type="number" id="in-h" onchange="applyInspector()"></div>
-                            <div><label>X</label><input type="number" id="in-x" onchange="applyInspector()"></div>
-                            <div><label>Y</label><input type="number" id="in-y" onchange="applyInspector()"></div>
-                        </div>
-                    </div>
-                    <div class="prop-group">
-                        <label class="prop-label">FILL & OPACITY</label>
-                        <div class="prop-grid-2x2">
-                            <div>
-                                <label>Fill</label>
-                                <input type="color" id="in-fill" value="#6132ef" onchange="applyFill(this.value)" class="color-input">
-                            </div>
-                            <div>
-                                <label>Opacity</label>
-                                <input type="range" id="in-opacity" min="0" max="100" value="100" oninput="applyOpacity(this.value)">
-                                <span id="opacity-val" class="range-label">100%</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="prop-group">
-                        <label class="prop-label">MOTION</label>
-                        <select id="anim-type">
-                            <option value="none">No Animation</option>
-                            <option value="fade-in">Fade In</option>
-                        </select>
-                        <button class="btn-main btn-full btn-dark" onclick="playAnim()">Preview</button>
-                    </div>
-                    <div class="prop-group">
-                        <label class="prop-label">ROTATION</label>
-                        <div class="rotation-row">
+                <div class="prop-section">
+                    <div class="prop-section-title">ROTATION</div>
+                    <div class="prop-row">
+                        <div class="prop-field prop-field-wide">
+                            <label>Angle <span id="rotate-val" class="prop-value">0°</span></label>
                             <input type="range" id="in-rotate" min="0" max="360" value="0" oninput="updateRotation(this.value)">
-                            <span id="rotate-val" class="range-label">0°</span>
                         </div>
-                    </div>
-                    <!-- Container info (shown when a container is selected) -->
-                    <div class="prop-group" id="container-info" style="display:none;">
-                        <label class="prop-label">CONTAINER</label>
-                        <p class="prop-hint">
-                            Drop images inside this container. Children are clipped and bounded.
-                        </p>
-                        <div class="prop-hint">
-                            Children: <span id="container-child-count">0</span>
-                        </div>
-                    </div>
-                    <div class="prop-group">
-                        <button class="btn-main btn-full btn-danger" onclick="deleteElement()">Delete Element</button>
                     </div>
                 </div>
-            </aside>
 
-        </div>
+                <div class="prop-section">
+                    <div class="prop-section-title">ANIMATION</div>
+                    <select id="anim-type">
+                        <option value="none">No Animation</option>
+                        <option value="fade-in">Fade In</option>
+                    </select>
+                    <button class="action-btn" onclick="playAnim()">Preview Animation</button>
+                </div>
+
+                <!-- Container info (conditionally shown) -->
+                <div class="prop-section" id="container-info" style="display:none;">
+                    <div class="prop-section-title">CONTAINER</div>
+                    <p class="prop-hint">Drop images inside. Children are clipped to bounds.</p>
+                    <p class="prop-hint">Children: <strong id="container-child-count">0</strong></p>
+                </div>
+
+                <div class="prop-section prop-section-danger">
+                    <button class="action-btn btn-danger" onclick="deleteElement()">Delete Element</button>
+                </div>
+            </div>
+
+            <!-- Layers (always visible at bottom) -->
+            <div class="inspector-header">LAYERS</div>
+            <div id="layer-stack" class="layer-stack"></div>
+        </aside>
+
     </div>
-
 </div>
-<!-- END #r66-root-container -->
 
-<!-- Hidden file input for image uploads -->
+<!-- Hidden file input -->
 <input type="file" id="image-upload" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
 
 <script src="script.js"></script>

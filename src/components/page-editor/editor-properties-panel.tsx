@@ -6,6 +6,7 @@ import { MediaLibraryPicker } from './media-library-picker'
 
 interface EditorPropertiesPanelProps {
   component: PageComponent
+  viewMode?: 'desktop' | 'tablet' | 'mobile'
   onUpdate: (updates: Partial<PageComponent>) => void
   onDelete: () => void
   onDuplicate: () => void
@@ -19,6 +20,7 @@ type TabId = 'content' | 'style' | 'settings'
 
 export function EditorPropertiesPanel({
   component,
+  viewMode = 'desktop',
   onUpdate,
   onDelete,
   onDuplicate,
@@ -80,7 +82,7 @@ export function EditorPropertiesPanel({
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-4">
         {activeTab === 'content' && (
-          <ContentTab component={component} onUpdate={onUpdate} updateSetting={updateSetting} />
+          <ContentTab component={component} viewMode={viewMode} onUpdate={onUpdate} updateSetting={updateSetting} />
         )}
         {activeTab === 'style' && (
           <StyleTab component={component} updateStyle={updateStyle} />
@@ -335,9 +337,11 @@ function PaddingSlider({ label, value, onChange }: { label: string; value: strin
 // ─── Layout Mode Panel (shown in Content tab for all components) ───
 function LayoutModePanel({
   component,
+  viewMode = 'desktop',
   onUpdate,
 }: {
   component: PageComponent
+  viewMode?: 'desktop' | 'tablet' | 'mobile'
   onUpdate: (updates: Partial<PageComponent>) => void
 }) {
   const updateStyle = (key: string, value: string) => {
@@ -368,10 +372,18 @@ function LayoutModePanel({
           Flow
         </button>
         <button
-          onClick={() => onUpdate({
-            positionMode: 'absolute',
-            position: component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 },
-          })}
+          onClick={() => {
+            const initial = component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 }
+            const existing = (component as any).positionByView || {}
+            onUpdate({
+              positionMode: 'absolute',
+              position: initial,
+              positionByView: {
+                ...existing,
+                [viewMode]: initial,
+              }
+            })
+          }}
           className={`flex-1 py-2 text-xs rounded-lg font-play font-medium transition-colors ${
             isAbsolute
               ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
@@ -516,78 +528,86 @@ function LayoutModePanel({
       )}
 
       {/* Freeform position & size controls */}
-      {isAbsolute && component.position && (
+      {isAbsolute && ((component as any).positionByView?.[viewMode] || component.position) && (
         <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">X</label>
-              <input
-                type="number"
-                value={Math.round(component.position.x)}
-                onChange={(e) => onUpdate({ position: { ...component.position!, x: parseInt(e.target.value) || 0 } })}
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Y</label>
-              <input
-                type="number"
-                value={Math.round(component.position.y)}
-                onChange={(e) => onUpdate({ position: { ...component.position!, y: parseInt(e.target.value) || 0 } })}
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Width</label>
-              <input
-                type="number"
-                value={Math.round(component.position.width)}
-                onChange={(e) => onUpdate({ position: { ...component.position!, width: Math.max(40, parseInt(e.target.value) || 100) } })}
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Height</label>
-              <input
-                type="number"
-                value={Math.round(component.position.height)}
-                onChange={(e) => onUpdate({ position: { ...component.position!, height: Math.max(24, parseInt(e.target.value) || 100) } })}
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Z</label>
-              <input
-                type="number"
-                value={component.position.zIndex || 10}
-                onChange={(e) => onUpdate({ position: { ...component.position!, zIndex: parseInt(e.target.value) || 10 } })}
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-          </div>
-          {/* Rotation */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-[10px] text-gray-500 font-play">Rotation</label>
-              <span className="text-[10px] text-gray-400 font-play">{component.position.rotation || 0}°</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={360}
-              value={component.position.rotation || 0}
-              onChange={(e) => onUpdate({ position: { ...component.position!, rotation: parseInt(e.target.value) || 0 } })}
-              className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
-            />
-            <div className="flex justify-between text-[10px] text-gray-400 font-play mt-0.5">
-              <span>0°</span>
-              <span>180°</span>
-              <span>360°</span>
-            </div>
-          </div>
-          <p className="text-[10px] text-purple-500 font-play">Drag to position, resize from handles</p>
+          {( () => {
+            const pos = (component as any).positionByView?.[viewMode] || component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 }
+            const existing = (component as any).positionByView || {}
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-play">X</label>
+                    <input
+                      type="number"
+                      value={Math.round(pos.x)}
+                      onChange={(e) => onUpdate({ positionByView: { ...existing, [viewMode]: { ...pos, x: parseInt(e.target.value) || 0 } } })}
+                      className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-play">Y</label>
+                    <input
+                      type="number"
+                      value={Math.round(pos.y)}
+                      onChange={(e) => onUpdate({ positionByView: { ...existing, [viewMode]: { ...pos, y: parseInt(e.target.value) || 0 } } })}
+                      className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-play">Width</label>
+                    <input
+                      type="number"
+                      value={Math.round(pos.width)}
+                      onChange={(e) => onUpdate({ positionByView: { ...existing, [viewMode]: { ...pos, width: Math.max(40, parseInt(e.target.value) || 100) } } })}
+                      className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-play">Height</label>
+                    <input
+                      type="number"
+                      value={Math.round(pos.height)}
+                      onChange={(e) => onUpdate({ positionByView: { ...existing, [viewMode]: { ...pos, height: Math.max(24, parseInt(e.target.value) || 100) } } })}
+                      className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-play">Z</label>
+                    <input
+                      type="number"
+                      value={pos.zIndex || 10}
+                      onChange={(e) => onUpdate({ positionByView: { ...existing, [viewMode]: { ...pos, zIndex: parseInt(e.target.value) || 10 } } })}
+                      className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                    />
+                  </div>
+                </div>
+                {/* Rotation */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] text-gray-500 font-play">Rotation</label>
+                    <span className="text-[10px] text-gray-400 font-play">{pos.rotation || 0}°</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={360}
+                    value={pos.rotation || 0}
+                    onChange={(e) => onUpdate({ positionByView: { ...existing, [viewMode]: { ...pos, rotation: parseInt(e.target.value) || 0 } } })}
+                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 font-play mt-0.5">
+                    <span>0°</span>
+                    <span>180°</span>
+                    <span>360°</span>
+                  </div>
+                </div>
+                <p className="text-[10px] text-purple-500 font-play">Drag to position, resize from handles</p>
+              </>
+            )
+          })() }
         </div>
       )}
     </div>
@@ -597,17 +617,19 @@ function LayoutModePanel({
 // ─── Content Tab ───
 function ContentTab({
   component,
+  viewMode = 'desktop',
   onUpdate,
   updateSetting,
 }: {
   component: PageComponent
+  viewMode?: 'desktop' | 'tablet' | 'mobile'
   onUpdate: (updates: Partial<PageComponent>) => void
   updateSetting: (key: string, value: any) => void
 }) {
   return (
     <>
       {/* ─── Layout Mode (all components) ─── */}
-      <LayoutModePanel component={component} onUpdate={onUpdate} />
+      <LayoutModePanel component={component} viewMode={viewMode} onUpdate={onUpdate} />
 
       {/* Rich text content for text type */}
       {component.type === 'text' && (

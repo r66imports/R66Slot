@@ -100,6 +100,12 @@ export interface PageComponent {
     zIndex?: number
     rotation?: number
   }
+  // Optional per-breakpoint positions for freeform editing
+  positionByView?: {
+    desktop?: { x: number; y: number; width: number; height: number; zIndex?: number; rotation?: number }
+    tablet?: { x: number; y: number; width: number; height: number; zIndex?: number; rotation?: number }
+    mobile?: { x: number; y: number; width: number; height: number; zIndex?: number; rotation?: number }
+  }
 }
 
 export interface PageSettings {

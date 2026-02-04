@@ -1,0 +1,13 @@
+{
+  "projectType": "studio-code-sync",
+  "name": "r66slot",
+  "accountId": "REPLACE_ME",
+  "projectId": "REPLACE_ME",
+  "siteId": "REPLACE_ME",
+  "sources": ["Wix"],
+  "studio": {
+    "codeSync": {
+      "enabled": true
+    }
+  }
+}

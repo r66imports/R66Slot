@@ -1,0 +1,60 @@
+----- CLI crash report at 2026-02-03T15:07:04.884Z
+Error Trace
+FailedToIdentifyProgramFlow: FailedToIdentifyProgramFlow
+    at _Command.<anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\program.ts:76:15)
+    at _Command.emit (node:events:508:28)
+    at _Command._parseCommand (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1607:14)
+    at _Command.parseAsync (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1104:16)
+    at <anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\index.tsx:88:39)
+Error Info
+{}
+----- CLI crash report at 2026-02-03T16:01:26.164Z
+Error Trace
+FailedToIdentifyProgramFlow: FailedToIdentifyProgramFlow
+    at _Command.<anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\program.ts:76:15)
+    at _Command.emit (node:events:508:28)
+    at _Command._parseCommand (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1607:14)
+    at _Command.parseAsync (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1104:16)
+    at <anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\index.tsx:88:39)
+Error Info
+{}
+----- CLI crash report at 2026-02-03T16:01:41.437Z
+Error Trace
+FailedToIdentifyProgramFlow: FailedToIdentifyProgramFlow
+    at _Command.<anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\program.ts:76:15)
+    at _Command.emit (node:events:508:28)
+    at _Command._parseCommand (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1607:14)
+    at _Command.parseAsync (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1104:16)
+    at <anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\index.tsx:88:39)
+Error Info
+{}
+----- CLI crash report at 2026-02-03T16:03:02.225Z
+Error Trace
+InvalidConfigSchemaError: InvalidConfigSchemaError
+    at readWixConfig (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\files\wix.config.ts:17:9)
+    at async loadProjectModel (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\model.tsx:13:18)
+    at async runCommand (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\commands\render-command.tsx:81:17)
+    at async renderCommand (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\commands\render-command.tsx:41:3)
+    at async _Command.<anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\commands\dev.tsx:19:7)
+    at async _Command.parseAsync (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1104:5)
+    at async <anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\index.tsx:88:25)
+caused by: ZodError: [
+  {
+    "validation": "uuid",
+    "code": "invalid_string",
+    "message": "Invalid uuid",
+    "path": [
+      "siteId"
+    ]
+  }
+]
+    at Object.get error (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\zod\v3\types.js:39:31)
+    at readWixConfig (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\files\wix.config.ts:20:24)
+    at async loadProjectModel (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\model.tsx:13:18)
+    at async runCommand (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\commands\render-command.tsx:81:17)
+    at async renderCommand (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\commands\render-command.tsx:41:3)
+    at async _Command.<anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli-site\src\commands\dev.tsx:19:7)
+    at async _Command.parseAsync (C:\Users\r66im\AppData\Roaming\npm\node_modules\node_modules\commander\lib\command.js:1104:5)
+    at async <anonymous> (C:\Users\r66im\AppData\Roaming\npm\node_modules\@wix\cli\src\index.tsx:88:25)
+Error Info
+{}
