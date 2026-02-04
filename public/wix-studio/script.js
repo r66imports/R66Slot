@@ -17,11 +17,40 @@
 
     canvas.on('object:modified', function(e){
       const obj = e.target;
-      if (!obj.responsiveData) obj.responsiveData = { desktop:{left:obj.left,top:obj.top,scaleX:obj.scaleX,scaleY:obj.scaleY}, tablet:{left:obj.left,top:obj.top,scaleX:obj.scaleX,scaleY:obj.scaleY}, mobile:{left:obj.left,top:obj.top,scaleX:obj.scaleX,scaleY:obj.scaleY} };
+      if (!obj.responsiveData) obj.responsiveData = {};
       obj.responsiveData[activeView] = { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY };
     });
 
-    window.setBreakpoint = function(view, el){ document.querySelectorAll('.bp-btn').forEach(b=>b.classList.remove('active')); if(el) el.classList.add('active'); canvas.getObjects().forEach(obj=>{ if(!obj.responsiveData){ obj.responsiveData = { desktop:{ left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY }, tablet:{ left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY }, mobile:{ left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY } }; } else { obj.responsiveData[activeView] = { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY }; } }); activeView = view; const newWidth = viewWidths[view]; canvas.setWidth(newWidth); const scrollArea = document.querySelector('.canvas-scroll'); if(scrollArea) scrollArea.style.width = newWidth + 'px'; canvas.getObjects().forEach(obj=>{ if(obj.responsiveData && obj.responsiveData[view]){ obj.set({ left: obj.responsiveData[view].left, top: obj.responsiveData[view].top, scaleX: obj.responsiveData[view].scaleX, scaleY: obj.responsiveData[view].scaleY }); } obj.setCoords(); }); canvas.renderAll(); }
+    window.setBreakpoint = function(view, el){
+      document.querySelectorAll('.bp-btn').forEach(b=>b.classList.remove('active'));
+      if(el) el.classList.add('active');
+
+      // Save current view only
+      canvas.getObjects().forEach(obj=>{
+        if(!obj.responsiveData) obj.responsiveData = {};
+        obj.responsiveData[activeView] = { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY };
+      });
+
+      activeView = view;
+      const newWidth = viewWidths[view];
+      canvas.setWidth(newWidth);
+      const scrollArea = document.querySelector('.canvas-scroll'); if(scrollArea) scrollArea.style.width = newWidth + 'px';
+
+      // Load target view; if missing use scaled desktop as a reasonable fallback
+      canvas.getObjects().forEach(obj=>{
+        if(obj.responsiveData && obj.responsiveData[view]){
+          const r = obj.responsiveData[view];
+          obj.set({ left: r.left, top: r.top, scaleX: r.scaleX, scaleY: r.scaleY });
+        } else if (obj.responsiveData && obj.responsiveData.desktop){
+          const base = obj.responsiveData.desktop;
+          const ratio = viewWidths[view] / viewWidths.desktop;
+          obj.set({ left: base.left * ratio, top: base.top * ratio, scaleX: base.scaleX * ratio, scaleY: base.scaleY * ratio });
+        }
+        obj.setCoords();
+      });
+
+      canvas.renderAll();
+    }
 
     window.spawn = function(type){ if(type==='text'){ const txt = new fabric.Textbox('Edit me',{ left:100, top:100, fontSize:28, fill:'#fff' }); canvas.add(txt).setActiveObject(txt); txt.responsiveData = { desktop:{ left: txt.left, top: txt.top, scaleX: txt.scaleX, scaleY: txt.scaleY }, tablet:{ left: txt.left, top: txt.top, scaleX: txt.scaleX, scaleY: txt.scaleY }, mobile:{ left: txt.left, top: txt.top, scaleX: txt.scaleX, scaleY: txt.scaleY } }; } else if(type==='img'){ document.getElementById('image-upload').click(); } else if(type==='box'){ const rect = new fabric.Rect({ left:120, top:120, width:200, height:120, fill:'#0078d4' }); canvas.add(rect).setActiveObject(rect); rect.responsiveData = { desktop:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY }, tablet:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY }, mobile:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY } }; } };
 

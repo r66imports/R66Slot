@@ -19,17 +19,13 @@ const viewWidths = {
 // Fires every time you finish moving or resizing an object
 canvas.on('object:modified', function(e) {
     const obj = e.target;
-    
-    // 1. Create the memory slots if they don't exist yet
+
+    // Ensure we have a responsiveData container, but DO NOT populate other breakpoints here
     if (!obj.responsiveData) {
-        obj.responsiveData = {
-            desktop: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY },
-            tablet: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY },
-            mobile: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY }
-        };
+        obj.responsiveData = {};
     }
-    
-    // 2. Save the NEW position ONLY to the view you are currently looking at
+
+    // Save the NEW position ONLY to the view you are currently looking at
     obj.responsiveData[activeView] = {
         left: obj.left,
         top: obj.top,
@@ -50,21 +46,17 @@ function setBreakpoint(view, element) {
     // 2. The "Before Switch" Save
     // We MUST save where things are right now before we change the screen size
     canvas.getObjects().forEach(obj => {
-        if (!obj.responsiveData) {
-            obj.responsiveData = {
-                desktop: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY },
-                tablet: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY },
-                mobile: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY }
-            };
-        } else {
-            obj.responsiveData[activeView] = {
-                left: obj.left,
-                top: obj.top,
-                scaleX: obj.scaleX,
-                scaleY: obj.scaleY
-            };
-        }
+        if (!obj.responsiveData) obj.responsiveData = {};
+        obj.responsiveData[activeView] = {
+            left: obj.left,
+            top: obj.top,
+            scaleX: obj.scaleX,
+            scaleY: obj.scaleY
+        };
     });
+
+    // ... later, when loading the view, fallback to scaled desktop if target view missing
+    // This logic is implemented below in the After Switch load section.
 
     // 3. Switch the View
     activeView = view;
