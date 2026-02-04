@@ -58,6 +58,80 @@
 
     window.handleImageUpload = function(e){ const file = e.target.files && e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(ev){ fabric.Image.fromURL(ev.target.result, function(img){ img.set({ left:80, top:80, scaleX:0.5, scaleY:0.5 }); img.responsiveData = { desktop:{ left: img.left, top: img.top, scaleX: img.scaleX, scaleY: img.scaleY }, tablet:{ left: img.left, top: img.top, scaleX: img.scaleX, scaleY: img.scaleY }, mobile:{ left: img.left, top: img.top, scaleX: img.scaleX, scaleY: img.scaleY } }; canvas.add(img).setActiveObject(img); }); }; reader.readAsDataURL(file); };
 
+    // --- Editor helpers: center, align and snap-to-grid + smart guides ---
+    // Center the currently selected object in the canvas (horiz + vert)
+    window.centerSelectedObject = function(){ const obj = canvas.getActiveObject(); if(!obj) return; const cx = canvas.getWidth() / 2; const cy = canvas.getHeight() / 2; // use center origin for predictability
+      obj.set({ originX: 'center', originY: 'center', left: cx, top: cy }); obj.setCoords(); canvas.requestRenderAll(); };
+
+    // Align left edge of objA to left edge of objB
+    window.alignLeftToLeft = function(objA, objB){ if(!objA || !objB) return; const rectA = objA.getBoundingRect(true); const rectB = objB.getBoundingRect(true); const dx = rectB.left - rectA.left; objA.left = (objA.left || 0) + dx; objA.setCoords(); canvas.requestRenderAll(); };
+
+    // Smart snap-to-grid with visual guides
+    (function(){
+      const GRID = 10; // 10px grid
+      const TOLERANCE = 6; // px tolerance for smart guides
+      let guideLines = [];
+
+      function clearGuides(){ guideLines.forEach(l=>canvas.remove(l)); guideLines = []; }
+      function drawVGuide(x){ const line = new fabric.Line([x, 0, x, canvas.getHeight()], { stroke: 'rgba(0,150,255,0.9)', selectable:false, evented:false, excludeFromExport:true }); guideLines.push(line); canvas.add(line); }
+      function drawHGuide(y){ const line = new fabric.Line([0, y, canvas.getWidth(), y], { stroke: 'rgba(0,150,255,0.9)', selectable:false, evented:false, excludeFromExport:true }); guideLines.push(line); canvas.add(line); }
+
+      // Utility to snap a value to grid
+      function snapToGrid(val){ return Math.round(val / GRID) * GRID; }
+
+      canvas.on('object:moving', function(e){ const obj = e.target; if(!obj) return; // allow Alt to bypass snapping
+        const bypass = e.e && e.e.altKey; clearGuides();
+
+        // First apply grid snap unless bypassed
+        if(!bypass){ obj.left = snapToGrid(obj.left); obj.top = snapToGrid(obj.top); }
+
+        const objRect = obj.getBoundingRect(true);
+        const objects = canvas.getObjects().filter(o => o !== obj && o.visible !== false);
+
+        // Canvas edges + center
+        // Left edge
+        if(Math.abs(objRect.left - 0) <= TOLERANCE){ obj.left += (0 - objRect.left); drawVGuide(0); }
+        // Right edge
+        const canvasRight = canvas.getWidth(); if(Math.abs((objRect.left + objRect.width) - canvasRight) <= TOLERANCE){ obj.left += (canvasRight - (objRect.left + objRect.width)); drawVGuide(canvasRight); }
+        // Vertical center
+        const canvasCenterX = canvas.getWidth() / 2; if(Math.abs((objRect.left + objRect.width/2) - canvasCenterX) <= TOLERANCE){ obj.left += (canvasCenterX - (objRect.left + objRect.width/2)); drawVGuide(canvasCenterX); }
+
+        // Top edge
+        if(Math.abs(objRect.top - 0) <= TOLERANCE){ obj.top += (0 - objRect.top); drawHGuide(0); }
+        // Bottom edge
+        const canvasBottom = canvas.getHeight(); if(Math.abs((objRect.top + objRect.height) - canvasBottom) <= TOLERANCE){ obj.top += (canvasBottom - (objRect.top + objRect.height)); drawHGuide(canvasBottom); }
+        // Horizontal center
+        const canvasCenterY = canvas.getHeight() / 2; if(Math.abs((objRect.top + objRect.height/2) - canvasCenterY) <= TOLERANCE){ obj.top += (canvasCenterY - (objRect.top + objRect.height/2)); drawHGuide(canvasCenterY); }
+
+        // Align to other objects (left/right/center/top/bottom)
+        objects.forEach(other => {
+          const r = other.getBoundingRect(true);
+          // left-to-left
+          if(Math.abs(objRect.left - r.left) <= TOLERANCE){ obj.left += (r.left - objRect.left); drawVGuide(r.left); }
+          // right-to-right
+          if(Math.abs((objRect.left + objRect.width) - (r.left + r.width)) <= TOLERANCE){ obj.left += ((r.left + r.width) - (objRect.left + objRect.width)); drawVGuide(r.left + r.width); }
+          // center-x to center-x
+          if(Math.abs((objRect.left + objRect.width/2) - (r.left + r.width/2)) <= TOLERANCE){ obj.left += ((r.left + r.width/2) - (objRect.left + objRect.width/2)); drawVGuide(r.left + r.width/2); }
+
+          // top-to-top
+          if(Math.abs(objRect.top - r.top) <= TOLERANCE){ obj.top += (r.top - objRect.top); drawHGuide(r.top); }
+          // bottom-to-bottom
+          if(Math.abs((objRect.top + objRect.height) - (r.top + r.height)) <= TOLERANCE){ obj.top += ((r.top + r.height) - (objRect.top + objRect.height)); drawHGuide(r.top + r.height); }
+          // center-y to center-y
+          if(Math.abs((objRect.top + objRect.height/2) - (r.top + r.height/2)) <= TOLERANCE){ obj.top += ((r.top + r.height/2) - (objRect.top + objRect.height/2)); drawHGuide(r.top + r.height/2); }
+        });
+
+        obj.setCoords(); canvas.requestRenderAll();
+      });
+
+      // Clear guides when object is modified / mouse up / selection cleared
+      canvas.on('object:modified', clearGuides);
+      canvas.on('mouse:up', clearGuides);
+      canvas.on('selection:cleared', clearGuides);
+    })();
+
+    // --- end helpers ---
+
     function updateInspector(){ const obj = canvas.getActiveObject(); if(!obj){ document.getElementById('inspector-empty').style.display='block'; document.getElementById('inspector-props').style.display='none'; return; } document.getElementById('inspector-empty').style.display='none'; document.getElementById('inspector-props').style.display='block'; document.getElementById('in-x').value = Math.round(obj.left); document.getElementById('in-y').value = Math.round(obj.top); document.getElementById('in-w').value = Math.round(obj.width * (obj.scaleX || 1)); document.getElementById('in-h').value = Math.round(obj.height * (obj.scaleY || 1)); document.getElementById('in-fill').value = obj.fill || '#000000'; document.getElementById('in-opacity').value = Math.round((obj.opacity || 1) * 100); document.getElementById('rotate-val').textContent = Math.round(obj.angle || 0) + '°'; }
 
     canvas.on('selection:created', updateInspector); canvas.on('selection:updated', updateInspector); canvas.on('selection:cleared', ()=>{ document.getElementById('inspector-props').style.display='none'; document.getElementById('inspector-empty').style.display='block'; });
