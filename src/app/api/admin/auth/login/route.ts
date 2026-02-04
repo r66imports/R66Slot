@@ -71,7 +71,7 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ success: true })
     } catch (err) {
-      console.error('Admin login - cookie set failed:', err && err.stack ? err.stack : err)
+      console.error('Admin login - cookie set failed:', err instanceof Error ? err.stack : String(err))
       return NextResponse.json({ error: 'Login failed' }, { status: 500 })
     }
   } catch (error) {
