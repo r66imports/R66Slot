@@ -4,11 +4,11 @@ This project includes a self-hosted, Wix-style editor integrated as a static pag
 
 Feature flag & admin access
 
-- To enable the editor link in the site header, set the environment variable:
+- To enable the editor link in the site header, set the **server-only** environment variable (do NOT use a NEXT_PUBLIC_ variable):
 
-  NEXT_PUBLIC_ENABLE_WIX_EDITOR=1
+  ENABLE_WIX_EDITOR=1
 
-- The header link is only visible to authenticated admins. Admin authentication uses the existing admin session cookie and the endpoint `/api/admin/auth/check`.
+- The header link is only visible to authenticated admins. The site calls `/api/editor/access` (server-side) to determine whether the editor is enabled and whether the current user is an authenticated admin. This avoids exposing the feature flag to the browser.
 
 How to use
 

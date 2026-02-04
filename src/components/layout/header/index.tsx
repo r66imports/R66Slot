@@ -12,24 +12,25 @@ export function Header() {
   const { cart } = useCart()
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
-  const editorEnabled = process.env.NEXT_PUBLIC_ENABLE_WIX_EDITOR === '1'
+  const [editorEnabled, setEditorEnabled] = useState(false)
 
   useEffect(() => {
-    const fetchSettingsAndAuth = async () => {
+    const fetchSettingsAndEditorAccess = async () => {
       try {
-        const [settingsRes, authRes] = await Promise.all([
+        const [settingsRes, accessRes] = await Promise.all([
           fetch('/api/settings'),
-          fetch('/api/admin/auth/check'),
+          fetch('/api/editor/access'),
         ])
         const settingsData = await settingsRes.json()
-        const authData = await authRes.json()
+        const accessData = await accessRes.json()
         setSettings(settingsData)
-        setIsAdmin(!!authData.authenticated)
+        setIsAdmin(!!accessData.authenticated)
+        setEditorEnabled(!!accessData.enabled)
       } catch (error) {
-        console.error('Error fetching settings or auth:', error)
+        console.error('Error fetching settings or editor access:', error)
       }
     }
-    fetchSettingsAndAuth()
+    fetchSettingsAndEditorAccess()
   }, [])
 
   return (
