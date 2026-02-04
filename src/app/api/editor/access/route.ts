@@ -6,7 +6,7 @@ export async function GET() {
   const enabled = process.env.ENABLE_WIX_EDITOR === '1'
 
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const session = cookieStore.get('admin-session')
     const authenticated = !!session
 
