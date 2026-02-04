@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "smoke:editor": "node scripts/smoke-editor.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
