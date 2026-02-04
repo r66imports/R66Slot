@@ -5,14 +5,14 @@ export const metadata = {
   title: 'R66 Studio — Editor'
 }
 
-export default function Page() {
+export default async function Page() {
   // Hide the editor unless the feature flag is explicitly enabled
   if (process.env.NEXT_PUBLIC_ENABLE_WIX_EDITOR !== '1') {
     notFound()
   }
 
   // Server-side admin session check (uses same cookie as admin auth)
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const session = cookieStore.get('admin-session')
 
   if (!session) {
