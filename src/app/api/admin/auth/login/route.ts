@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     const admin = customers.find((c: any) => c.username === 'Admin')
 
     if (!admin) {
+      console.warn('Admin login attempt - admin user not found', { username })
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
 
     // Verify username matches
     if (username !== 'Admin') {
+      console.warn('Admin login attempt - username mismatch', { username })
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
     const isValid = await bcrypt.compare(password, admin.password)
 
     if (!isValid) {
+      console.warn('Admin login attempt - invalid password for', { username })
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
@@ -55,17 +58,22 @@ export async function POST(request: Request) {
       `${username}:${Date.now()}:${process.env.SESSION_SECRET || 'dev-secret'}`
     ).toString('base64')
 
-    // Set httpOnly cookie
-    const cookieStore = await cookies()
-    cookieStore.set('admin-session', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/',
-    })
+    try {
+      // Set httpOnly cookie
+      const cookieStore = await cookies()
+      cookieStore.set('admin-session', sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        path: '/',
+      })
 
-    return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true })
+    } catch (err) {
+      console.error('Admin login - cookie set failed:', err instanceof Error ? err.stack : String(err))
+      return NextResponse.json({ error: 'Login failed' }, { status: 500 })
+    }
   } catch (error) {
     console.error('Admin login error:', error)
     return NextResponse.json({ error: 'Login failed' }, { status: 500 })

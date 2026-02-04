@@ -1,0 +1,16 @@
+/* R66 STUDIO — Wix-style editor styles (copied from local Wix folder) */
+:root{--wix-bg:#1e1e1e;--wix-border:#333;--wix-accent:#0078d4;--wix-bg-deep:#161616;--wix-bg-surface:#252525;--wix-bg-input:#2b2b2b;--wix-text:#e0e0e0;--wix-text-dim:#888;--wix-danger:#e74c3c;--wix-success:#27ae60;--wix-container-border:#4a90d9}
+*{box-sizing:border-box;font-family:Inter, Arial, Helvetica, sans-serif}
+html,body,#r66-root-container{height:100%;margin:0}
+.wix-header{height:50px;background:var(--wix-bg);color:var(--wix-text);display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--wix-border)}
+.header-left .header-logo{font-weight:700}
+.header-right .header-btn{background:transparent;color:var(--wix-text);border:1px solid transparent;padding:6px 10px;border-radius:6px;margin-left:8px}
+.wix-body{display:flex;height:calc(100% - 50px)}
+.toolbar{width:60px;background:var(--wix-bg-surface);border-right:1px solid var(--wix-border);display:flex;flex-direction:column;align-items:center;padding:8px}
+.tool-btn{background:transparent;color:var(--wix-text);border:0;padding:8px;margin-bottom:6px;border-radius:6px;cursor:pointer;width:100%}
+.canvas-area{flex:1;background:linear-gradient(90deg,#0f0f0f,#111);overflow:auto;padding:12px}
+.canvas-scroll{max-width:1200px;margin:18px auto;background:#0b0b0b;border:1px solid rgba(255,255,255,0.03);padding:12px}
+.canvas{width:1200px;height:600px;background:#000;border:1px solid #222}
+.inspector{width:320px;background:var(--wix-bg-surface);border-left:1px solid var(--wix-border);padding:12px}
+.bp-btn{cursor:pointer;padding:6px 10px;border-radius:6px;margin-right:6px;background:transparent;color:var(--wix-text);border:1px solid transparent}
+.bp-btn.active{background:var(--wix-bg-input);border-color:var(--wix-container-border)}

@@ -537,6 +537,7 @@ ${canvasHTML}
                     <FreeformComponent
                       key={component.id}
                       component={component}
+                      viewMode={viewMode}
                       isSelected={selectedComponentId === component.id}
                       snapEnabled={snapEnabled}
                       onSelect={() => { setPropertiesInitialTab('content'); setSelectedComponentId(component.id); setShowPageSettings(false) }}
@@ -547,27 +548,39 @@ ${canvasHTML}
                         setShowPageSettings(false)
                         setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
                       }}
-                      onUpdatePosition={(x, y) => {
+                          onUpdatePosition={(x, y) => {
+                        // Save position for current viewMode (per-breakpoint)
+                        const existing = (component as any).positionByView || {}
+                        const base = existing[viewMode] || component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10, rotation: 0 }
                         updateComponent(component.id, {
-                          position: {
-                            x,
-                            y,
-                            width: component.position?.width || 300,
-                            height: component.position?.height || 200,
-                            zIndex: component.position?.zIndex || 10,
-                            rotation: component.position?.rotation || 0,
+                          positionByView: {
+                            ...existing,
+                            [viewMode]: {
+                              x,
+                              y,
+                              width: base.width,
+                              height: base.height,
+                              zIndex: base.zIndex,
+                              rotation: base.rotation,
+                            }
                           }
                         })
                       }}
                       onUpdateSize={(w, h) => {
+                        // Save size for current viewMode (per-breakpoint)
+                        const existing = (component as any).positionByView || {}
+                        const base = existing[viewMode] || component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10, rotation: 0 }
                         updateComponent(component.id, {
-                          position: {
-                            x: component.position?.x || 50,
-                            y: component.position?.y || 50,
-                            width: w,
-                            height: h,
-                            zIndex: component.position?.zIndex || 10,
-                            rotation: component.position?.rotation || 0,
+                          positionByView: {
+                            ...existing,
+                            [viewMode]: {
+                              x: base.x,
+                              y: base.y,
+                              width: w,
+                              height: h,
+                              zIndex: base.zIndex,
+                              rotation: base.rotation,
+                            }
                           }
                         })
                       }}
@@ -595,6 +608,7 @@ ${canvasHTML}
           <EditorPropertiesPanel
             key={`${selectedComponent.id}-${propertiesInitialTab}`}
             component={selectedComponent}
+            viewMode={viewMode}
             onUpdate={(updates) => updateComponent(selectedComponent.id, updates)}
             onDelete={() => deleteComponent(selectedComponent.id)}
             onDuplicate={() => duplicateComponent(selectedComponent.id)}
@@ -791,6 +805,7 @@ function SortableLiveComponent({
 // ─── Freeform (absolute) Component with Resize ───
 function FreeformComponent({
   component,
+  viewMode,
   isSelected,
   snapEnabled,
   onSelect,
@@ -800,6 +815,7 @@ function FreeformComponent({
   onUpdateSettings,
 }: {
   component: PageComponent
+  viewMode: 'desktop' | 'tablet' | 'mobile'
   isSelected: boolean
   snapEnabled: boolean
   onSelect: () => void
@@ -809,7 +825,7 @@ function FreeformComponent({
   onUpdateSettings?: (key: string, value: any) => void
 }) {
   const nodeRef = useRef<HTMLDivElement>(null)
-  const pos = component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 }
+  const pos = ((component as any).positionByView && (component as any).positionByView[viewMode]) || component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10 }
   const [liveWidth, setLiveWidth] = useState(pos.width)
   const [liveHeight, setLiveHeight] = useState(pos.height)
   const isResizingRef = useRef(false)

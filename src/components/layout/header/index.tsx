@@ -11,18 +11,26 @@ export function Header() {
   const [isCartOpen, setIsCartOpen] = useState(false)
   const { cart } = useCart()
   const [settings, setSettings] = useState<SiteSettings | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [editorEnabled, setEditorEnabled] = useState(false)
 
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchSettingsAndEditorAccess = async () => {
       try {
-        const response = await fetch('/api/settings')
-        const data = await response.json()
-        setSettings(data)
+        const [settingsRes, accessRes] = await Promise.all([
+          fetch('/api/settings'),
+          fetch('/api/editor/access'),
+        ])
+        const settingsData = await settingsRes.json()
+        const accessData = await accessRes.json()
+        setSettings(settingsData)
+        setIsAdmin(!!accessData.authenticated)
+        setEditorEnabled(!!accessData.enabled)
       } catch (error) {
-        console.error('Error fetching settings:', error)
+        console.error('Error fetching settings or editor access:', error)
       }
     }
-    fetchSettings()
+    fetchSettingsAndEditorAccess()
   }, [])
 
   return (
@@ -85,6 +93,15 @@ export function Header() {
             >
               Blog
             </Link>
+
+            {editorEnabled && isAdmin && (
+              <Link
+                href="/wix-studio"
+                className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
+              >
+                Editor
+              </Link>
+            )}
           </nav>
 
           {/* Right Actions */}
@@ -222,6 +239,17 @@ export function Header() {
               >
                 Blog
               </Link>
+
+              {editorEnabled && isAdmin && (
+                <Link
+                  href="/wix-studio"
+                  className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Editor
+                </Link>
+              )}
+
               <Link
                 href="/account"
                 className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
