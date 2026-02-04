@@ -20,6 +20,7 @@ How to use
 Security notes
 
 - Keep the feature flag off in public environments unless you intend editors to be accessible.
+- The `/wix-studio` route is now server-protected: it returns a 404 when `NEXT_PUBLIC_ENABLE_WIX_EDITOR` is not set to `1`, and it redirects non-admin users to `/admin/login`.
 - Review admin authentication and session cookie configurations before enabling in production.
 
 Maintenance
