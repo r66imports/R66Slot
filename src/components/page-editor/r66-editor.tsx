@@ -32,7 +32,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-interface TrueWixEditorProps {
+interface R66EditorProps {
   pageId: string
 }
 
@@ -60,7 +60,7 @@ const COMPONENT_LIBRARY = [
 
 const SNAP_SIZE = 20
 
-export function TrueWixEditor({ pageId }: TrueWixEditorProps) {
+export function R66Editor({ pageId }: R66EditorProps) {
   const router = useRouter()
   const {
     page,

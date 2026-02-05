@@ -1,7 +1,7 @@
 'use client'
 
 import { use } from 'react'
-import { TrueWixEditor } from '@/components/page-editor/true-wix-editor'
+import { R66Editor } from '@/components/page-editor/r66-editor'
 import { PageEditorProvider } from '@/contexts/PageEditorContext'
 import type { PageComponent } from '@/lib/pages/schema'
 
@@ -261,7 +261,7 @@ export default function EditorPage({
 
   return (
     <PageEditorProvider componentLibrary={COMPONENT_DEFAULTS}>
-      <TrueWixEditor pageId={resolvedParams.id} />
+      <R66Editor pageId={resolvedParams.id} />
     </PageEditorProvider>
   )
 }

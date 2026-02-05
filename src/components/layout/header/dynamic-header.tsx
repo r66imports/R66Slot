@@ -141,7 +141,7 @@ export function DynamicHeader() {
               {/* Admin Editor Link (only for authenticated admins) */}
               {editorEnabled && isAdmin && (
                 <Link
-                  href="/wix-studio"
+                  href="/r66-editor"
                   className="text-sm font-medium hover:text-primary transition-colors"
                   style={{ color: headerConfig.textColor }}
                 >
@@ -272,7 +272,7 @@ export function DynamicHeader() {
 
                 {editorEnabled && isAdmin && (
                   <Link
-                    href="/wix-studio"
+                    href="/r66-editor"
                     className="text-sm font-medium hover:text-primary transition-colors"
                     style={{ color: headerConfig.textColor }}
                     onClick={() => setIsMenuOpen(false)}

@@ -103,7 +103,7 @@ export function Header() {
 
             {editorEnabled && isAdmin && (
               <Link
-                href="/wix-studio"
+                href="/r66-editor"
                 className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
               >
                 Editor
@@ -249,7 +249,7 @@ export function Header() {
 
               {editorEnabled && isAdmin && (
                 <Link
-                  href="/wix-studio"
+                  href="/r66-editor"
                   className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
