@@ -1,0 +1,297 @@
+/**
+ * Responsive Canvas Styles
+ *
+ * CSS classes and custom properties for the responsive freeform editor.
+ * Supports percentage-based positioning with zoom-to-fit fallback.
+ */
+
+/* ─── Design Canvas Dimensions (CSS Custom Properties) ─── */
+:root {
+  --canvas-desktop-width: 1200px;
+  --canvas-desktop-height: 800px;
+  --canvas-tablet-width: 768px;
+  --canvas-tablet-height: 1024px;
+  --canvas-mobile-width: 375px;
+  --canvas-mobile-height: 667px;
+
+  /* Grid settings */
+  --grid-percent: 5%;
+  --grid-color: rgba(99, 102, 241, 0.1);
+  --grid-color-strong: rgba(99, 102, 241, 0.2);
+
+  /* Selection colors */
+  --selection-color: #8b5cf6;
+  --selection-color-hover: #a78bfa;
+}
+
+/* ─── Canvas Container ─── */
+.responsive-canvas-container {
+  position: relative;
+  overflow: hidden;
+  background-color: #f3f4f6;
+}
+
+/* Allow horizontal scrolling when canvas is wider than viewport */
+.responsive-canvas-container.allow-scroll {
+  overflow-x: auto;
+}
+
+/* ─── Canvas Element ─── */
+.responsive-canvas {
+  position: relative;
+  background-color: #ffffff;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease-out;
+}
+
+/* Canvas with grid overlay */
+.responsive-canvas.show-grid {
+  background-image:
+    linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+  background-size: var(--grid-percent) var(--grid-percent);
+}
+
+/* Stronger grid lines at 20% intervals */
+.responsive-canvas.show-grid-strong {
+  background-image:
+    linear-gradient(to right, var(--grid-color-strong) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color-strong) 1px, transparent 1px),
+    linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+  background-size:
+    20% 20%,
+    20% 20%,
+    var(--grid-percent) var(--grid-percent),
+    var(--grid-percent) var(--grid-percent);
+}
+
+/* ─── Zoom-to-Fit Mode ─── */
+.responsive-canvas[data-mode="zoom-to-fit"] {
+  transform-origin: top left;
+}
+
+/* Breakpoint-specific canvas sizes */
+.responsive-canvas[data-breakpoint="desktop"] {
+  width: var(--canvas-desktop-width);
+  min-height: var(--canvas-desktop-height);
+}
+
+.responsive-canvas[data-breakpoint="tablet"] {
+  width: var(--canvas-tablet-width);
+  min-height: var(--canvas-tablet-height);
+}
+
+.responsive-canvas[data-breakpoint="mobile"] {
+  width: var(--canvas-mobile-width);
+  min-height: var(--canvas-mobile-height);
+}
+
+/* ─── Freeform Element ─── */
+.freeform-element {
+  position: absolute;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+/* Selection states */
+.freeform-element.selected {
+  outline: 2px solid var(--selection-color);
+  outline-offset: 2px;
+}
+
+.freeform-element:not(.selected):hover {
+  outline: 2px solid var(--selection-color-hover);
+  outline-offset: 2px;
+}
+
+/* Dragging state */
+.freeform-element.dragging {
+  opacity: 0.8;
+  cursor: grabbing !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Resizing state */
+.freeform-element.resizing {
+  opacity: 0.9;
+}
+
+/* ─── Resize Handles ─── */
+.resize-handle {
+  position: absolute;
+  background-color: var(--selection-color);
+  border: 2px solid white;
+  z-index: 40;
+  transition: transform 0.1s ease;
+}
+
+.resize-handle:hover {
+  transform: scale(1.25);
+}
+
+/* Corner handles */
+.resize-handle.corner {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+/* Edge handles */
+.resize-handle.edge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Handle positions */
+.resize-handle.nw { top: 0; left: 0; transform: translate(-50%, -50%); cursor: nw-resize; }
+.resize-handle.n { top: 0; left: 50%; transform: translate(-50%, -50%); cursor: n-resize; }
+.resize-handle.ne { top: 0; right: 0; transform: translate(50%, -50%); cursor: ne-resize; }
+.resize-handle.e { top: 50%; right: 0; transform: translate(50%, -50%); cursor: e-resize; }
+.resize-handle.se { bottom: 0; right: 0; transform: translate(50%, 50%); cursor: se-resize; }
+.resize-handle.s { bottom: 0; left: 50%; transform: translate(-50%, 50%); cursor: s-resize; }
+.resize-handle.sw { bottom: 0; left: 0; transform: translate(-50%, 50%); cursor: sw-resize; }
+.resize-handle.w { top: 50%; left: 0; transform: translate(-50%, -50%); cursor: w-resize; }
+
+/* ─── Smart Guides ─── */
+.smart-guide {
+  position: absolute;
+  background-color: rgba(0, 150, 255, 0.9);
+  pointer-events: none;
+  z-index: 50;
+}
+
+.smart-guide.vertical {
+  width: 1px;
+  top: 0;
+  bottom: 0;
+}
+
+.smart-guide.horizontal {
+  height: 1px;
+  left: 0;
+  right: 0;
+}
+
+/* ─── Element Labels ─── */
+.element-label {
+  position: absolute;
+  top: -28px;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.freeform-element:hover .element-label,
+.freeform-element.selected .element-label {
+  opacity: 1;
+}
+
+.element-label-type {
+  background-color: var(--selection-color);
+  color: white;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.element-label-breakpoint {
+  background-color: #374151;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ─── Position Info ─── */
+.position-info {
+  position: absolute;
+  bottom: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #1f2937;
+  color: white;
+  font-size: 10px;
+  font-family: monospace;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ─── Responsive Breakpoint Indicators ─── */
+.breakpoint-indicator {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #1f2937;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 100;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.breakpoint-indicator .zoom-level {
+  color: #9ca3af;
+}
+
+/* ─── Utility Classes ─── */
+
+/* Percentage-based positioning using CSS variables */
+.pos-percent {
+  position: absolute;
+  left: var(--el-x, 0%);
+  top: var(--el-y, 0%);
+  width: var(--el-w, auto);
+  height: var(--el-h, auto);
+  z-index: var(--el-z, 1);
+  transform: rotate(var(--el-rotate, 0deg));
+}
+
+/* Responsive scaling utilities */
+@media (max-width: 1199px) {
+  .responsive-canvas-container:not(.no-auto-scale) .responsive-canvas[data-breakpoint="desktop"] {
+    --auto-scale: calc(100vw / 1200);
+    transform: scale(var(--auto-scale));
+  }
+}
+
+@media (max-width: 767px) {
+  .responsive-canvas-container:not(.no-auto-scale) .responsive-canvas[data-breakpoint="tablet"] {
+    --auto-scale: calc(100vw / 768);
+    transform: scale(var(--auto-scale));
+  }
+}
+
+/* ─── Animation Classes ─── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.15s ease-out;
+}

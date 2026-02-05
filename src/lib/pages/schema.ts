@@ -92,6 +92,8 @@ export interface PageComponent {
   children?: PageComponent[]
   // Free positioning support
   positionMode?: 'flow' | 'absolute'
+
+  // Legacy pixel-based position (deprecated - use normalizedPosition)
   position?: {
     x: number
     y: number
@@ -100,12 +102,46 @@ export interface PageComponent {
     zIndex?: number
     rotation?: number
   }
-  // Optional per-breakpoint positions for freeform editing
+
+  // Legacy per-breakpoint pixel positions (deprecated - use normalizedPosition)
   positionByView?: {
     desktop?: { x: number; y: number; width: number; height: number; zIndex?: number; rotation?: number }
     tablet?: { x: number; y: number; width: number; height: number; zIndex?: number; rotation?: number }
     mobile?: { x: number; y: number; width: number; height: number; zIndex?: number; rotation?: number }
   }
+
+  // NEW: Normalized percentage-based position (relative to design canvas)
+  // xPercent/yPercent: 0-100 representing position as percentage of canvas
+  // widthPercent/heightPercent: 0-100 representing size as percentage of canvas
+  normalizedPosition?: {
+    desktop: {
+      xPercent: number
+      yPercent: number
+      widthPercent: number
+      heightPercent: number
+      zIndex: number
+      rotation: number
+    }
+    tablet?: {
+      xPercent: number
+      yPercent: number
+      widthPercent: number
+      heightPercent: number
+      zIndex: number
+      rotation: number
+    }
+    mobile?: {
+      xPercent: number
+      yPercent: number
+      widthPercent: number
+      heightPercent: number
+      zIndex: number
+      rotation: number
+    }
+  }
+
+  // Responsive strategy for smaller viewports
+  responsiveStrategy?: 'percentage' | 'zoom-to-fit' | 'stack'
 }
 
 export interface PageSettings {

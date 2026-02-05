@@ -1,5 +1,6 @@
 // Fabric-based editor logic (adapted for public deployment)
 // Keep in sync with src version if you change features
+// Updated: Now uses percentage-based positioning for responsive layouts
 (function(){
   // Minimal safe load of fabric
   const script = document.createElement('script');
@@ -8,55 +9,238 @@
   document.head.appendChild(script);
 
   function init(){
-    const canvas = new fabric.Canvas('canvas', { width:1200, height:600, backgroundColor:'#000000', selection:true, preserveObjectStacking:true });
+    // Design canvas dimensions (reference sizes)
+    const DESIGN_CANVAS = {
+      desktop: { width: 1200, height: 800 },
+      tablet: { width: 768, height: 1024 },
+      mobile: { width: 375, height: 667 }
+    };
+
+    const canvas = new fabric.Canvas('canvas', {
+      width: DESIGN_CANVAS.desktop.width,
+      height: DESIGN_CANVAS.desktop.height,
+      backgroundColor: '#000000',
+      selection: true,
+      preserveObjectStacking: true
+    });
     window.canvas = canvas; // expose for dev console
     let activeView = 'desktop';
-    const viewWidths = { desktop:1200, tablet:768, mobile:375 };
+    const viewWidths = { desktop: 1200, tablet: 768, mobile: 375 };
+
+    // ─── Percentage-based Position Utilities ───
+
+    /**
+     * Convert pixel position to normalized percentages
+     */
+    function pixelsToPercent(obj, breakpoint = 'desktop') {
+      const canvasW = DESIGN_CANVAS[breakpoint].width;
+      const canvasH = DESIGN_CANVAS[breakpoint].height;
+      const objW = (obj.width || 100) * (obj.scaleX || 1);
+      const objH = (obj.height || 100) * (obj.scaleY || 1);
+
+      return {
+        xPercent: ((obj.left || 0) / canvasW) * 100,
+        yPercent: ((obj.top || 0) / canvasH) * 100,
+        widthPercent: (objW / canvasW) * 100,
+        heightPercent: (objH / canvasH) * 100,
+        zIndex: 10,
+        rotation: obj.angle || 0
+      };
+    }
+
+    /**
+     * Convert percentages back to pixels for a specific canvas size
+     */
+    function percentToPixels(normalized, canvasW, canvasH) {
+      return {
+        left: (normalized.xPercent / 100) * canvasW,
+        top: (normalized.yPercent / 100) * canvasH,
+        scaleX: 1,
+        scaleY: 1,
+        // Store actual pixel dimensions for rendering
+        _pxWidth: (normalized.widthPercent / 100) * canvasW,
+        _pxHeight: (normalized.heightPercent / 100) * canvasH
+      };
+    }
+
+    /**
+     * Apply normalized position to a Fabric object
+     */
+    function applyNormalizedPosition(obj, normalized, breakpoint = 'desktop') {
+      const canvasW = DESIGN_CANVAS[breakpoint].width;
+      const canvasH = DESIGN_CANVAS[breakpoint].height;
+      const pixels = percentToPixels(normalized, canvasW, canvasH);
+
+      // Calculate scale to achieve desired size
+      const targetW = pixels._pxWidth;
+      const targetH = pixels._pxHeight;
+      const baseW = obj.width || 100;
+      const baseH = obj.height || 100;
+
+      obj.set({
+        left: pixels.left,
+        top: pixels.top,
+        scaleX: targetW / baseW,
+        scaleY: targetH / baseH,
+        angle: normalized.rotation || 0
+      });
+      obj.setCoords();
+    }
+
+    /**
+     * Initialize normalized position data for a new object
+     */
+    function initNormalizedPosition(obj) {
+      const normalized = pixelsToPercent(obj, 'desktop');
+      obj.normalizedPosition = {
+        desktop: normalized,
+        tablet: { ...normalized },
+        mobile: { ...normalized }
+      };
+      // Also store legacy format for backwards compatibility
+      obj.responsiveData = {
+        desktop: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY },
+        tablet: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY },
+        mobile: { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY }
+      };
+    }
 
     function makeSvg(opts){ /* kept in original project; omitted for brevity in public build */ }
 
+    // ─── Object Modified Handler (saves normalized position) ───
     canvas.on('object:modified', function(e){
       const obj = e.target;
+      if (!obj) return;
+
+      // Save as normalized percentage
+      if (!obj.normalizedPosition) {
+        obj.normalizedPosition = { desktop: null, tablet: null, mobile: null };
+      }
+      obj.normalizedPosition[activeView] = pixelsToPercent(obj, activeView);
+
+      // Also save legacy format for backwards compatibility
       if (!obj.responsiveData) obj.responsiveData = {};
       obj.responsiveData[activeView] = { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY };
     });
 
+    // ─── Breakpoint Switching (uses normalized positions) ───
     window.setBreakpoint = function(view, el){
       document.querySelectorAll('.bp-btn').forEach(b=>b.classList.remove('active'));
       if(el) el.classList.add('active');
 
-      // Save current view only
+      // Save current view as normalized percentages
       canvas.getObjects().forEach(obj=>{
+        if(!obj.normalizedPosition) {
+          obj.normalizedPosition = { desktop: null, tablet: null, mobile: null };
+        }
+        obj.normalizedPosition[activeView] = pixelsToPercent(obj, activeView);
+
+        // Also save legacy format
         if(!obj.responsiveData) obj.responsiveData = {};
         obj.responsiveData[activeView] = { left: obj.left, top: obj.top, scaleX: obj.scaleX, scaleY: obj.scaleY };
       });
 
       activeView = view;
-      const newWidth = viewWidths[view];
+      const newWidth = DESIGN_CANVAS[view].width;
+      const newHeight = DESIGN_CANVAS[view].height;
       canvas.setWidth(newWidth);
-      const scrollArea = document.querySelector('.canvas-scroll'); if(scrollArea) scrollArea.style.width = newWidth + 'px';
+      canvas.setHeight(newHeight);
+      const scrollArea = document.querySelector('.canvas-scroll');
+      if(scrollArea) {
+        scrollArea.style.width = newWidth + 'px';
+        scrollArea.style.minHeight = newHeight + 'px';
+      }
 
-      // Load target view; if missing use scaled desktop as a reasonable fallback
+      // Load target view using normalized positions
       canvas.getObjects().forEach(obj=>{
-        if(obj.responsiveData && obj.responsiveData[view]){
+        // Prefer normalized position data
+        if(obj.normalizedPosition && obj.normalizedPosition[view]){
+          applyNormalizedPosition(obj, obj.normalizedPosition[view], view);
+        }
+        // Fall back to desktop normalized position (percentages stay consistent)
+        else if(obj.normalizedPosition && obj.normalizedPosition.desktop){
+          applyNormalizedPosition(obj, obj.normalizedPosition.desktop, view);
+        }
+        // Legacy fallback: scale pixels (less accurate)
+        else if (obj.responsiveData && obj.responsiveData[view]){
           const r = obj.responsiveData[view];
           obj.set({ left: r.left, top: r.top, scaleX: r.scaleX, scaleY: r.scaleY });
+          obj.setCoords();
         } else if (obj.responsiveData && obj.responsiveData.desktop){
           const base = obj.responsiveData.desktop;
           const ratio = viewWidths[view] / viewWidths.desktop;
           obj.set({ left: base.left * ratio, top: base.top * ratio, scaleX: base.scaleX * ratio, scaleY: base.scaleY * ratio });
+          obj.setCoords();
         }
-        obj.setCoords();
       });
 
       canvas.renderAll();
+
+      // Update zoom indicator if present
+      const zoomIndicator = document.getElementById('zoom-indicator');
+      if(zoomIndicator) {
+        const containerWidth = document.querySelector('.canvas-scroll')?.parentElement?.clientWidth || window.innerWidth;
+        const scale = Math.min(1, containerWidth / newWidth);
+        zoomIndicator.textContent = `${Math.round(scale * 100)}%`;
+      }
     }
 
-    window.spawn = function(type){ if(type==='text'){ const txt = new fabric.Textbox('Edit me',{ left:100, top:100, fontSize:28, fill:'#fff' }); canvas.add(txt).setActiveObject(txt); txt.responsiveData = { desktop:{ left: txt.left, top: txt.top, scaleX: txt.scaleX, scaleY: txt.scaleY }, tablet:{ left: txt.left, top: txt.top, scaleX: txt.scaleX, scaleY: txt.scaleY }, mobile:{ left: txt.left, top: txt.top, scaleX: txt.scaleX, scaleY: txt.scaleY } }; } else if(type==='img'){ document.getElementById('image-upload').click(); } else if(type==='box'){ const rect = new fabric.Rect({ left:120, top:120, width:200, height:120, fill:'#0078d4' }); canvas.add(rect).setActiveObject(rect); rect.responsiveData = { desktop:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY }, tablet:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY }, mobile:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY } }; } };
+    // ─── Spawn Functions (with normalized positioning) ───
+    window.spawn = function(type){
+      if(type === 'text'){
+        const txt = new fabric.Textbox('Edit me', {
+          left: 100,
+          top: 100,
+          fontSize: 28,
+          fill: '#fff',
+          width: 200
+        });
+        canvas.add(txt).setActiveObject(txt);
+        initNormalizedPosition(txt);
+      } else if(type === 'img'){
+        document.getElementById('image-upload').click();
+      } else if(type === 'box'){
+        const rect = new fabric.Rect({
+          left: 120,
+          top: 120,
+          width: 200,
+          height: 120,
+          fill: '#0078d4'
+        });
+        canvas.add(rect).setActiveObject(rect);
+        initNormalizedPosition(rect);
+      }
+    };
 
-    window.addContainer = function(){ const rect = new fabric.Rect({ left:140, top:140, width:400, height:200, fill:'transparent', stroke:'#777', strokeDashArray:[4,2], hasBorders:false }); rect.isContainer = true; canvas.add(rect).setActiveObject(rect); rect.responsiveData = { desktop:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY }, tablet:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY }, mobile:{ left: rect.left, top: rect.top, scaleX: rect.scaleX, scaleY: rect.scaleY } }; };
+    window.addContainer = function(){
+      const rect = new fabric.Rect({
+        left: 140,
+        top: 140,
+        width: 400,
+        height: 200,
+        fill: 'transparent',
+        stroke: '#777',
+        strokeDashArray: [4, 2],
+        hasBorders: false
+      });
+      rect.isContainer = true;
+      canvas.add(rect).setActiveObject(rect);
+      initNormalizedPosition(rect);
+    };
 
-    window.handleImageUpload = function(e){ const file = e.target.files && e.target.files[0]; if(!file) return; const reader = new FileReader(); reader.onload = function(ev){ fabric.Image.fromURL(ev.target.result, function(img){ img.set({ left:80, top:80, scaleX:0.5, scaleY:0.5 }); img.responsiveData = { desktop:{ left: img.left, top: img.top, scaleX: img.scaleX, scaleY: img.scaleY }, tablet:{ left: img.left, top: img.top, scaleX: img.scaleX, scaleY: img.scaleY }, mobile:{ left: img.left, top: img.top, scaleX: img.scaleX, scaleY: img.scaleY } }; canvas.add(img).setActiveObject(img); }); }; reader.readAsDataURL(file); };
+    window.handleImageUpload = function(e){
+      const file = e.target.files && e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        fabric.Image.fromURL(ev.target.result, function(img){
+          img.set({ left: 80, top: 80, scaleX: 0.5, scaleY: 0.5 });
+          canvas.add(img).setActiveObject(img);
+          initNormalizedPosition(img);
+        });
+      };
+      reader.readAsDataURL(file);
+    };
 
     // --- Editor helpers: center, align and snap-to-grid + smart guides ---
     // Center the currently selected object in the canvas (horiz + vert)
@@ -143,8 +327,67 @@
     window.playAnim = function(){ alert('Preview animation (mock)'); };
     window.deleteElement = function(){ const obj = canvas.getActiveObject(); if(!obj) return; canvas.remove(obj); document.getElementById('inspector-props').style.display='none'; document.getElementById('inspector-empty').style.display='block'; };
 
-    window.saveToCloud = function(){ try{ const json = canvas.toJSON(['responsiveData','isContainer']); localStorage.setItem('r66-studio-canvas', JSON.stringify(json)); alert('Saved locally'); } catch(err){ console.error(err); alert('Save failed'); } };
-    window.loadFromCloud = function(){ try{ const raw = localStorage.getItem('r66-studio-canvas'); if(!raw){ alert('No saved canvas found'); return; } canvas.loadFromJSON(JSON.parse(raw), canvas.renderAll.bind(canvas)); alert('Loaded'); } catch(err){ console.error(err); alert('Load failed'); } };
+    // ─── Save/Load (with normalized position data) ───
+    window.saveToCloud = function(){
+      try {
+        // Save current view positions before export
+        canvas.getObjects().forEach(obj => {
+          if(!obj.normalizedPosition) {
+            obj.normalizedPosition = { desktop: null, tablet: null, mobile: null };
+          }
+          obj.normalizedPosition[activeView] = pixelsToPercent(obj, activeView);
+        });
+
+        // Export with both legacy and normalized data
+        const json = canvas.toJSON(['responsiveData', 'normalizedPosition', 'isContainer']);
+        localStorage.setItem('r66-studio-canvas', JSON.stringify(json));
+        alert('Saved locally (with responsive percentages)');
+      } catch(err) {
+        console.error(err);
+        alert('Save failed');
+      }
+    };
+
+    window.loadFromCloud = function(){
+      try {
+        const raw = localStorage.getItem('r66-studio-canvas');
+        if(!raw){
+          alert('No saved canvas found');
+          return;
+        }
+        canvas.loadFromJSON(JSON.parse(raw), function() {
+          // After loading, apply normalized positions for current view
+          canvas.getObjects().forEach(obj => {
+            if(obj.normalizedPosition && obj.normalizedPosition[activeView]) {
+              applyNormalizedPosition(obj, obj.normalizedPosition[activeView], activeView);
+            } else if(obj.normalizedPosition && obj.normalizedPosition.desktop) {
+              applyNormalizedPosition(obj, obj.normalizedPosition.desktop, activeView);
+            }
+          });
+          canvas.renderAll();
+          alert('Loaded');
+        });
+      } catch(err) {
+        console.error(err);
+        alert('Load failed');
+      }
+    };
+
+    // Export normalized position data as JSON (for integration with React editor)
+    window.exportNormalizedData = function() {
+      const objects = canvas.getObjects().map((obj, index) => ({
+        id: `fabric-obj-${index}`,
+        type: obj.type,
+        normalizedPosition: obj.normalizedPosition || {
+          desktop: pixelsToPercent(obj, 'desktop')
+        },
+        // Include other relevant properties
+        fill: obj.fill,
+        text: obj.text || null,
+        src: obj._element?.src || null
+      }));
+      return JSON.stringify(objects, null, 2);
+    };
 
     window.exportHTML = function(){ const data = canvas.toDataURL({ format:'png' }); const html = `<!doctype html><meta charset="utf-8"><title>Export</title><img src="${data}" />`; const w = window.open('about:blank'); w.document.write(html); w.document.close(); };
 

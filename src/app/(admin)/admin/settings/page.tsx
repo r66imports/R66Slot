@@ -188,6 +188,249 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Header Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Header Navigation</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Logo Text"
+                value={settings.header?.logoText || 'R66SLOT'}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    header: { ...settings.header!, logoText: e.target.value },
+                  })
+                }
+              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Logo Style
+                </label>
+                <select
+                  value={settings.header?.logoStyle || 'split'}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      header: {
+                        ...settings.header!,
+                        logoStyle: e.target.value as 'split' | 'solid',
+                      },
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <option value="split">Split (first 3 chars different color)</option>
+                  <option value="solid">Solid color</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Background Color
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={settings.header?.backgroundColor || '#ffffff'}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        header: { ...settings.header!, backgroundColor: e.target.value },
+                      })
+                    }
+                    className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                  />
+                  <Input
+                    value={settings.header?.backgroundColor || '#ffffff'}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        header: { ...settings.header!, backgroundColor: e.target.value },
+                      })
+                    }
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Text Color
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="color"
+                    value={settings.header?.textColor || '#111827'}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        header: { ...settings.header!, textColor: e.target.value },
+                      })
+                    }
+                    className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+                  />
+                  <Input
+                    value={settings.header?.textColor || '#111827'}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        header: { ...settings.header!, textColor: e.target.value },
+                      })
+                    }
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Items Editor */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Navigation Items
+              </label>
+              <div className="space-y-2 border rounded-lg p-4 bg-gray-50">
+                {(settings.header?.navItems || []).map((item, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <Input
+                      value={item.label}
+                      onChange={(e) => {
+                        const newItems = [...(settings.header?.navItems || [])]
+                        newItems[index] = { ...newItems[index], label: e.target.value }
+                        setSettings({
+                          ...settings,
+                          header: { ...settings.header!, navItems: newItems },
+                        })
+                      }}
+                      placeholder="Label"
+                      className="flex-1"
+                    />
+                    <Input
+                      value={item.href}
+                      onChange={(e) => {
+                        const newItems = [...(settings.header?.navItems || [])]
+                        newItems[index] = { ...newItems[index], href: e.target.value }
+                        setSettings({
+                          ...settings,
+                          header: { ...settings.header!, navItems: newItems },
+                        })
+                      }}
+                      placeholder="/path"
+                      className="flex-1"
+                    />
+                    <label className="flex items-center gap-1 text-xs whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={item.isExternal || false}
+                        onChange={(e) => {
+                          const newItems = [...(settings.header?.navItems || [])]
+                          newItems[index] = { ...newItems[index], isExternal: e.target.checked }
+                          setSettings({
+                            ...settings,
+                            header: { ...settings.header!, navItems: newItems },
+                          })
+                        }}
+                      />
+                      External
+                    </label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const newItems = (settings.header?.navItems || []).filter((_, i) => i !== index)
+                        setSettings({
+                          ...settings,
+                          header: { ...settings.header!, navItems: newItems },
+                        })
+                      }}
+                      className="text-red-600 hover:bg-red-50"
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newItems = [...(settings.header?.navItems || []), { label: '', href: '/' }]
+                    setSettings({
+                      ...settings,
+                      header: { ...settings.header!, navItems: newItems },
+                    })
+                  }}
+                  className="mt-2"
+                >
+                  + Add Navigation Item
+                </Button>
+              </div>
+            </div>
+
+            {/* Feature Toggles */}
+            <div className="grid grid-cols-4 gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.header?.showSearch ?? true}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      header: { ...settings.header!, showSearch: e.target.checked },
+                    })
+                  }
+                  className="w-4 h-4"
+                />
+                Show Search
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.header?.showAccount ?? true}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      header: { ...settings.header!, showAccount: e.target.checked },
+                    })
+                  }
+                  className="w-4 h-4"
+                />
+                Show Account
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.header?.showCart ?? true}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      header: { ...settings.header!, showCart: e.target.checked },
+                    })
+                  }
+                  className="w-4 h-4"
+                />
+                Show Cart
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={settings.header?.sticky ?? true}
+                  onChange={(e) =>
+                    setSettings({
+                      ...settings,
+                      header: { ...settings.header!, sticky: e.target.checked },
+                    })
+                  }
+                  className="w-4 h-4"
+                />
+                Sticky Header
+              </label>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Shipping Settings */}
         <Card>
           <CardHeader>
