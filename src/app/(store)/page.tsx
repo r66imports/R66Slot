@@ -1,6 +1,7 @@
 import { ComponentRenderer } from '@/components/page-renderer/component-renderer'
 import { getPageById } from '@/lib/pages/storage'
 import type { PageSettings } from '@/lib/pages/schema'
+import { getPositionStyles } from '@/lib/editor/position-migration'
 
 // Force dynamic rendering so edits from the admin editor appear immediately
 export const dynamic = 'force-dynamic'
@@ -52,16 +53,13 @@ export default async function HomePage() {
 
           {/* Absolute/freeform components */}
           {absoluteComponents.map((component: any) => {
-            const pos = component.position || { x: 0, y: 0, zIndex: 10 }
+            // Use getPositionStyles to properly handle both normalized (percentage)
+            // and legacy (pixel) position formats
+            const positionStyles = getPositionStyles(component, 'desktop')
             return (
               <div
                 key={component.id}
-                style={{
-                  position: 'absolute',
-                  left: pos.x,
-                  top: pos.y,
-                  zIndex: pos.zIndex || 10,
-                }}
+                style={positionStyles}
               >
                 <ComponentRenderer component={component} />
               </div>

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getPageBySlug } from '@/lib/pages/storage'
 import { ComponentRenderer } from '@/components/page-renderer/component-renderer'
+import { getPositionStyles } from '@/lib/editor/position-migration'
 
 export default async function DynamicPage({
   params,
@@ -54,20 +55,14 @@ export default async function DynamicPage({
           </div>
         ) : (
           page.components.map((component) => {
-            if (component.positionMode === 'absolute' && component.position) {
-              const rotation = component.position.rotation || 0
+            if (component.positionMode === 'absolute') {
+              // Use getPositionStyles to properly handle both normalized (percentage)
+              // and legacy (pixel) position formats
+              const positionStyles = getPositionStyles(component, 'desktop')
               return (
                 <div
                   key={component.id}
-                  style={{
-                    position: 'absolute',
-                    left: component.position.x,
-                    top: component.position.y,
-                    width: component.position.width,
-                    height: component.position.height,
-                    zIndex: component.position.zIndex || 10,
-                    transform: rotation ? `rotate(${rotation}deg)` : undefined,
-                  }}
+                  style={positionStyles}
                 >
                   <ComponentRenderer component={component} />
                 </div>

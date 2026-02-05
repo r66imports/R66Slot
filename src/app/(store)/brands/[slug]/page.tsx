@@ -4,6 +4,7 @@ import { getProducts } from '@/lib/shopify'
 import { getPageById } from '@/lib/pages/storage'
 import { ProductCard } from '@/components/product/product-card'
 import { ComponentRenderer } from '@/components/page-renderer/component-renderer'
+import { getPositionStyles } from '@/lib/editor/position-migration'
 import type { ShopifyProduct } from '@/types/shopify'
 
 interface BrandPageProps {
@@ -65,20 +66,14 @@ export default async function BrandPage({ params }: BrandPageProps) {
         )}
         <div style={{ position: 'relative', zIndex: 1 }}>
           {editablePage.components.map((component) => {
-            if (component.positionMode === 'absolute' && component.position) {
-              const rotation = component.position.rotation || 0
+            if (component.positionMode === 'absolute') {
+              // Use getPositionStyles to properly handle both normalized (percentage)
+              // and legacy (pixel) position formats
+              const positionStyles = getPositionStyles(component, 'desktop')
               return (
                 <div
                   key={component.id}
-                  style={{
-                    position: 'absolute',
-                    left: component.position.x,
-                    top: component.position.y,
-                    width: component.position.width,
-                    height: component.position.height,
-                    zIndex: component.position.zIndex || 10,
-                    transform: rotation ? `rotate(${rotation}deg)` : undefined,
-                  }}
+                  style={positionStyles}
                 >
                   <ComponentRenderer component={component} />
                 </div>
