@@ -277,6 +277,96 @@
   }
 }
 
+/* ─── RESPONSIVE BREAKPOINT LAYOUTS FOR FREEFORM ELEMENTS ─── */
+
+/*
+ * CRITICAL: Parent container MUST have position: relative
+ * All freeform children use percentage-based positioning
+ */
+.responsive-canvas,
+.freeform-canvas,
+[data-canvas="true"] {
+  position: relative !important;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Desktop: Full percentage layout */
+@media (min-width: 1024px) {
+  .freeform-element {
+    /* Percentages work relative to parent */
+  }
+}
+
+/* Tablet: Scale down or reposition */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .responsive-canvas[data-breakpoint="desktop"] {
+    /* Scale desktop view to fit tablet */
+    transform: scale(calc(768 / 1200));
+    transform-origin: top left;
+    width: 1200px;
+  }
+
+  /* Alternative: Stack elements vertically on tablet */
+  .freeform-element.stack-on-tablet {
+    position: relative !important;
+    left: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    margin-bottom: 1rem;
+  }
+}
+
+/* Mobile: Stack all freeform elements or use zoom-to-fit */
+@media (max-width: 767px) {
+  /* Zoom-to-fit approach: scale entire canvas */
+  .responsive-canvas[data-breakpoint="desktop"],
+  .responsive-canvas[data-breakpoint="tablet"] {
+    --mobile-scale: calc(100vw / var(--canvas-desktop-width, 1200px));
+    transform: scale(var(--mobile-scale));
+    transform-origin: top left;
+  }
+
+  /* Stacking approach: convert to flow layout */
+  .freeform-element.stack-on-mobile {
+    position: relative !important;
+    left: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100px;
+    margin-bottom: 1rem;
+    transform: none !important;
+  }
+
+  /* Hide resize handles on mobile */
+  .resize-handle {
+    display: none;
+  }
+
+  /* Simplify labels on mobile */
+  .element-label {
+    font-size: 9px;
+  }
+}
+
+/* ─── VIEWPORT UNIT ALTERNATIVES ─── */
+/* Use these classes for viewport-relative sizing */
+.vw-position {
+  position: absolute;
+  left: calc(var(--el-x-vw, 0) * 1vw);
+  top: calc(var(--el-y-vw, 0) * 1vh);
+  width: calc(var(--el-w-vw, 25) * 1vw);
+  height: calc(var(--el-h-vw, 25) * 1vh);
+}
+
+/* Clamp-based responsive sizing */
+.responsive-size {
+  width: clamp(200px, var(--el-w, 25%), 100%);
+  height: clamp(100px, var(--el-h, 25%), 100vh);
+}
+
 /* ─── Animation Classes ─── */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -294,4 +384,17 @@
 
 .animate-scale-in {
   animation: scaleIn 0.15s ease-out;
+}
+
+/* ─── PRINT STYLES ─── */
+@media print {
+  .freeform-element {
+    break-inside: avoid;
+  }
+
+  .resize-handle,
+  .element-label,
+  .position-info {
+    display: none !important;
+  }
 }

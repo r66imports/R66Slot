@@ -5,6 +5,9 @@
 /* React Resizable Styles */
 @import 'react-resizable/css/styles.css';
 
+/* Responsive Canvas Styles for Freeform Editor */
+@import '../styles/responsive-canvas.css';
+
 :root {
   --font-assistant: 'Assistant', system-ui, sans-serif;
 }
