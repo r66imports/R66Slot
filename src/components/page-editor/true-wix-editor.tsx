@@ -11,6 +11,8 @@ import { PageSettingsPanel } from './page-settings-panel'
 import { TemplateChooser } from './template-chooser'
 import { ResizableBox } from '@/components/editor/ResizableBox'
 import { LayersPanel } from './layers-panel'
+import { FreeformElement } from './freeform-element'
+import type { ResponsivePositionData } from '@/lib/editor/responsive-positioning'
 import Draggable, { type DraggableData, type DraggableEvent } from 'react-draggable'
 import {
   DndContext,
@@ -448,13 +450,19 @@ ${canvasHTML}
         >
           <div
             ref={canvasRef}
-            className="mx-auto shadow-lg transition-all duration-300 min-h-screen overflow-hidden"
+            className="mx-auto shadow-lg transition-all duration-300 min-h-screen overflow-hidden responsive-canvas"
+            data-canvas="true"
+            data-breakpoint={viewMode}
+            data-zoom="1"
             style={{
               maxWidth: canvasWidth,
               ...pageBackgroundStyle,
               ...(showGrid ? {
-                backgroundImage: `radial-gradient(circle, #cbd5e1 1px, transparent 1px)`,
-                backgroundSize: `${SNAP_SIZE}px ${SNAP_SIZE}px`,
+                backgroundImage: `
+                  linear-gradient(to right, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+                  linear-gradient(to bottom, rgba(99, 102, 241, 0.1) 1px, transparent 1px)
+                `,
+                backgroundSize: '5% 5%',
               } : {}),
             }}
           >
@@ -532,15 +540,20 @@ ${canvasHTML}
                     </DragOverlay>
                   </DndContext>
 
-                  {/* Absolute/freeform components (draggable + resizable) */}
+                  {/* Absolute/freeform components (using new percentage-based positioning) */}
                   {absoluteComponents.map((component) => (
-                    <FreeformComponent
+                    <FreeformElement
                       key={component.id}
                       component={component}
-                      viewMode={viewMode}
+                      breakpoint={viewMode}
                       isSelected={selectedComponentId === component.id}
                       snapEnabled={snapEnabled}
-                      onSelect={() => { setPropertiesInitialTab('content'); setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                      gridPercent={5}
+                      onSelect={() => {
+                        setPropertiesInitialTab('content')
+                        setSelectedComponentId(component.id)
+                        setShowPageSettings(false)
+                      }}
                       onContextMenu={(e) => {
                         e.preventDefault()
                         setPropertiesInitialTab('content')
@@ -548,41 +561,9 @@ ${canvasHTML}
                         setShowPageSettings(false)
                         setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
                       }}
-                          onUpdatePosition={(x, y) => {
-                        // Save position for current viewMode (per-breakpoint)
-                        const existing = (component as any).positionByView || {}
-                        const base = existing[viewMode] || component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10, rotation: 0 }
-                        updateComponent(component.id, {
-                          positionByView: {
-                            ...existing,
-                            [viewMode]: {
-                              x,
-                              y,
-                              width: base.width,
-                              height: base.height,
-                              zIndex: base.zIndex,
-                              rotation: base.rotation,
-                            }
-                          }
-                        })
-                      }}
-                      onUpdateSize={(w, h) => {
-                        // Save size for current viewMode (per-breakpoint)
-                        const existing = (component as any).positionByView || {}
-                        const base = existing[viewMode] || component.position || { x: 50, y: 50, width: 300, height: 200, zIndex: 10, rotation: 0 }
-                        updateComponent(component.id, {
-                          positionByView: {
-                            ...existing,
-                            [viewMode]: {
-                              x: base.x,
-                              y: base.y,
-                              width: w,
-                              height: h,
-                              zIndex: base.zIndex,
-                              rotation: base.rotation,
-                            }
-                          }
-                        })
+                      onPositionChange={(normalizedPosition: ResponsivePositionData) => {
+                        // Save normalized percentage-based position
+                        updateComponent(component.id, { normalizedPosition })
                       }}
                       onUpdateSettings={(key, value) => {
                         updateComponent(component.id, {
@@ -802,8 +783,10 @@ function SortableLiveComponent({
   )
 }
 
-// ─── Freeform (absolute) Component with Resize ───
-function FreeformComponent({
+// ─── DEPRECATED: Legacy Freeform Component (pixel-based) ───
+// Use FreeformElement from './freeform-element' instead for percentage-based positioning
+// Kept for backwards compatibility with existing code
+function FreeformComponentLegacy({
   component,
   viewMode,
   isSelected,

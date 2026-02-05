@@ -6,6 +6,13 @@ import { useCart } from '@/context/cart-context'
 import { CartDrawer } from '@/components/cart/cart-drawer'
 import type { SiteSettings } from '@/lib/site-settings/schema'
 
+// Re-export DynamicHeader for convenience
+export { DynamicHeader } from './dynamic-header'
+
+/**
+ * @deprecated Use DynamicHeader instead for editable header configuration.
+ * This static header is kept for backwards compatibility.
+ */
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)

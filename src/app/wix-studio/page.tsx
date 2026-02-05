@@ -7,7 +7,7 @@ export const metadata = {
 
 export default async function Page() {
   // Hide the editor unless the feature flag is explicitly enabled
-  if (process.env.NEXT_PUBLIC_ENABLE_WIX_EDITOR !== '1') {
+  if (String(process.env.NEXT_PUBLIC_ENABLE_WIX_EDITOR || '').trim() !== '1') {
     notFound()
   }
 

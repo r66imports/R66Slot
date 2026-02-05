@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   // Server-only feature flag (do NOT prefix with NEXT_PUBLIC_)
-  const enabled = process.env.ENABLE_WIX_EDITOR === '1'
+  const enabled = String(process.env.ENABLE_WIX_EDITOR || '').trim() === '1'
 
   try {
     const cookieStore = await cookies()

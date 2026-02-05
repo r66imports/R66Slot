@@ -35,6 +35,23 @@ export interface SiteSettings {
     type: 'info' | 'warning' | 'success'
   }
 
+  // Header Configuration (editable from admin)
+  header?: {
+    logoText: string
+    logoStyle: 'split' | 'solid' // split = first 3 chars different color
+    backgroundColor: string
+    textColor: string
+    navItems: Array<{
+      label: string
+      href: string
+      isExternal?: boolean
+    }>
+    showSearch: boolean
+    showAccount: boolean
+    showCart: boolean
+    sticky: boolean
+  }
+
   // SEO
   metaTitle?: string
   metaDescription?: string
@@ -64,6 +81,23 @@ export const defaultSettings: SiteSettings = {
     enabled: false,
     message: '',
     type: 'info',
+  },
+  header: {
+    logoText: 'R66SLOT',
+    logoStyle: 'split',
+    backgroundColor: '#ffffff',
+    textColor: '#111827',
+    navItems: [
+      { label: 'Shop All', href: '/products' },
+      { label: 'Brands', href: '/brands' },
+      { label: 'New Arrivals', href: '/collections/new-arrivals' },
+      { label: 'Pre-Orders', href: '/pre-orders' },
+      { label: 'Blog', href: '/blog' },
+    ],
+    showSearch: true,
+    showAccount: true,
+    showCart: true,
+    sticky: true,
   },
   freeShippingThreshold: 100,
   standardShippingCost: 5.99,
