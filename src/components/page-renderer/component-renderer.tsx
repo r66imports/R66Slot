@@ -139,6 +139,18 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       )
 
+      // For freeform images, render directly without container wrappers
+      // to allow proper percentage-based sizing from parent
+      if (isFreeformImg) {
+        return settings.link ? (
+          <a href={settings.link as string} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+            {imageElement}
+          </a>
+        ) : (
+          imageElement
+        )
+      }
+
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">
@@ -281,6 +293,41 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                   </Button>
                 </div>
               )}
+
+              {/* Freeform children elements */}
+              {children?.map((child) => {
+                if (child.positionMode === 'absolute') {
+                  // Use normalized percentage position if available, otherwise fall back to legacy pixels
+                  const hasNormalized = child.normalizedPosition?.desktop
+                  const pos = hasNormalized ? child.normalizedPosition!.desktop : null
+                  const legacyPos = child.position
+
+                  const posStyle: React.CSSProperties = hasNormalized && pos ? {
+                    position: 'absolute',
+                    left: `${pos.xPercent}%`,
+                    top: `${pos.yPercent}%`,
+                    width: `${pos.widthPercent}%`,
+                    height: `${pos.heightPercent}%`,
+                    zIndex: pos.zIndex || 10,
+                    transform: pos.rotation ? `rotate(${pos.rotation}deg)` : undefined,
+                  } : legacyPos ? {
+                    position: 'absolute',
+                    left: `${legacyPos.x}px`,
+                    top: `${legacyPos.y}px`,
+                    width: `${legacyPos.width}px`,
+                    height: `${legacyPos.height}px`,
+                    zIndex: legacyPos.zIndex || 10,
+                    transform: legacyPos.rotation ? `rotate(${legacyPos.rotation}deg)` : undefined,
+                  } : { position: 'absolute' as const }
+
+                  return (
+                    <div key={child.id} style={posStyle}>
+                      <ComponentRenderer component={child} />
+                    </div>
+                  )
+                }
+                return <ComponentRenderer key={child.id} component={child} />
+              })}
             </div>
           ) : (
             <div className="container mx-auto relative z-10">
@@ -323,6 +370,41 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                   )}
                 </div>
               </div>
+
+              {/* Freeform children elements for non-freeform hero layout */}
+              {children?.map((child) => {
+                if (child.positionMode === 'absolute') {
+                  // Use normalized percentage position if available, otherwise fall back to legacy pixels
+                  const hasNormalized = child.normalizedPosition?.desktop
+                  const pos = hasNormalized ? child.normalizedPosition!.desktop : null
+                  const legacyPos = child.position
+
+                  const posStyle: React.CSSProperties = hasNormalized && pos ? {
+                    position: 'absolute',
+                    left: `${pos.xPercent}%`,
+                    top: `${pos.yPercent}%`,
+                    width: `${pos.widthPercent}%`,
+                    height: `${pos.heightPercent}%`,
+                    zIndex: pos.zIndex || 10,
+                    transform: pos.rotation ? `rotate(${pos.rotation}deg)` : undefined,
+                  } : legacyPos ? {
+                    position: 'absolute',
+                    left: `${legacyPos.x}px`,
+                    top: `${legacyPos.y}px`,
+                    width: `${legacyPos.width}px`,
+                    height: `${legacyPos.height}px`,
+                    zIndex: legacyPos.zIndex || 10,
+                    transform: legacyPos.rotation ? `rotate(${legacyPos.rotation}deg)` : undefined,
+                  } : { position: 'absolute' as const }
+
+                  return (
+                    <div key={child.id} style={posStyle}>
+                      <ComponentRenderer component={child} />
+                    </div>
+                  )
+                }
+                return <ComponentRenderer key={child.id} component={child} />
+              })}
             </div>
           )}
         </section>
