@@ -41,6 +41,27 @@ a {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   FIX: Ensure all form inputs and editable content use LTR text direction
+   Prevents text reversal issue (e.g., "rabbit" showing as "tibbar")
+   ═══════════════════════════════════════════════════════════════════════════ */
+input,
+textarea,
+select,
+[contenteditable="true"],
+[contenteditable] {
+  direction: ltr !important;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+
+/* Ensure prose content in editor also uses LTR */
+.prose,
+.prose * {
+  direction: ltr;
+  unicode-bidi: plaintext;
+}
+
 /* Custom Resize Handle Styles */
 .react-resizable-handle {
   background-color: #FFDD00 !important;

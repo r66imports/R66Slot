@@ -299,7 +299,7 @@ function RichTextEditor({
         </button>
       </div>
 
-      {/* Editable area */}
+      {/* Editable area - explicit LTR to prevent text reversal */}
       <div
         ref={editorRef}
         contentEditable
@@ -307,7 +307,14 @@ function RichTextEditor({
         onBlur={handleInput}
         dangerouslySetInnerHTML={{ __html: value }}
         className="w-full px-3 py-2 border border-gray-200 rounded-b-lg text-sm font-play focus:ring-1 focus:ring-blue-400 focus:outline-none overflow-y-auto prose prose-sm max-w-none"
-        style={{ minHeight: rows ? `${rows * 24}px` : '72px', maxHeight: '200px' }}
+        style={{
+          minHeight: rows ? `${rows * 24}px` : '72px',
+          maxHeight: '200px',
+          direction: 'ltr',
+          textAlign: 'left',
+          unicodeBidi: 'plaintext',
+        }}
+        dir="ltr"
       />
     </div>
   )
