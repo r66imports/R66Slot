@@ -210,30 +210,13 @@ export default function PreOrderPosterPage() {
 
       if (!blob) return
 
-      // Upload poster image to server for public URL (Image + Text in one container)
-      const formData = new FormData()
+      // Create file from blob for sharing
       const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
-      formData.append('file', posterFile)
 
-      let posterImageUrl = ''
-      try {
-        const uploadRes = await fetch('/api/admin/media/upload', {
-          method: 'POST',
-          body: formData,
-        })
-        if (uploadRes.ok) {
-          const uploadData = await uploadRes.json()
-          posterImageUrl = `${window.location.origin}${uploadData.url}`
-        }
-      } catch {
-        console.error('Failed to upload poster image')
-      }
-
-      // Build booking link - Book Now linked to Order, opens in new page
+      // Build booking link
       const bookingLink = `${window.location.origin}/book/${currentShortCode}`
 
-      // Build WhatsApp message - Image URL + Text in one container
-      // The poster image URL creates a preview in WhatsApp with image and text together
+      // Build WhatsApp message text (without image URL - image will be attached)
       const message = `🎯 *${orderType === 'pre-order' ? 'PRE-ORDER AVAILABLE' : 'NEW ARRIVAL'}*\n\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `*${itemDescription}*\n` +
@@ -243,45 +226,73 @@ export default function PreOrderPosterPage() {
         `💰 Price: *R${preOrderPrice}*\n` +
         `📅 Est. Delivery: ${estimatedDeliveryDate}\n` +
         `📊 Available: ${availableQty} units\n\n` +
-        (posterImageUrl ? `🖼️ *POSTER IMAGE:*\n${posterImageUrl}\n\n` : '') +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `🛒 *BOOK NOW* _(opens in new page)_\n` +
         `👉 ${bookingLink}\n` +
         `━━━━━━━━━━━━━━━━━━━━\n\n` +
         `_R66SLOT - Premium Slot Cars_`
 
-      // Use wa.me which works on both mobile and desktop
-      // It automatically redirects to WhatsApp Web on desktop or WhatsApp app on mobile
+      // Try Web Share API first (works on mobile - shares image directly)
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [posterFile] })) {
+        try {
+          await navigator.share({
+            files: [posterFile],
+            title: itemDescription,
+            text: message,
+          })
+          return // Success - exit function
+        } catch (shareError) {
+          // User cancelled or share failed - continue to fallback
+          if ((shareError as Error).name !== 'AbortError') {
+            console.log('Web Share failed, using fallback')
+          } else {
+            return // User cancelled
+          }
+        }
+      }
+
+      // Fallback for desktop: Download image + open WhatsApp with text
+      // Download the poster image first
+      const imageUrl = URL.createObjectURL(blob)
+      const downloadLink = document.createElement('a')
+      downloadLink.href = imageUrl
+      downloadLink.download = `preorder-${sku || 'poster'}.jpg`
+      downloadLink.click()
+      URL.revokeObjectURL(imageUrl)
+
+      // Then open WhatsApp with the text message
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
 
-      // Try to open in new window first
+      // Show instruction to user
+      alert(
+        '📥 Poster image downloaded!\n\n' +
+        '📱 WhatsApp will open next.\n\n' +
+        '👉 After sending the text, tap the + button in WhatsApp to attach the downloaded image.'
+      )
+
+      // Open WhatsApp
       const newWindow = window.open(whatsappUrl, '_blank')
 
-      // If popup was blocked, show a modal with the link
       if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        // Create a temporary link and prompt user
         const confirmed = confirm(
-          'WhatsApp could not open automatically (popup blocked).\n\n' +
-          'Click OK to open WhatsApp, or Cancel to copy the message to clipboard.'
+          'WhatsApp could not open automatically.\n\n' +
+          'Click OK to open WhatsApp, or Cancel to copy the message.'
         )
 
         if (confirmed) {
-          // Navigate in same tab as fallback
           window.location.href = whatsappUrl
         } else {
-          // Copy message to clipboard
           try {
             await navigator.clipboard.writeText(message)
-            alert('Message copied to clipboard! Paste it in WhatsApp manually.')
+            alert('Message copied to clipboard! Paste it in WhatsApp with the downloaded image.')
           } catch {
-            // Fallback for older browsers
             const textArea = document.createElement('textarea')
             textArea.value = message
             document.body.appendChild(textArea)
             textArea.select()
             document.execCommand('copy')
             document.body.removeChild(textArea)
-            alert('Message copied to clipboard! Paste it in WhatsApp manually.')
+            alert('Message copied to clipboard! Paste it in WhatsApp with the downloaded image.')
           }
         }
       }
