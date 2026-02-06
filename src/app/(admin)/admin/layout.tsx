@@ -71,7 +71,16 @@ export default function AdminLayout({
           { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
         ]
       },
-      { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
+      {
+        name: 'Inventory Management',
+        href: '/admin/inventory',
+        icon: '📊',
+        submenu: [
+          { name: 'Stock Levels', href: '/admin/catalogue/inventory', icon: '📦' },
+          { name: 'Categories', href: '/admin/catalogue/categories', icon: '🏷️' },
+          { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
+        ]
+      },
       { name: 'Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },

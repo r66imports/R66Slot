@@ -65,6 +65,8 @@ export default function CatalogueCategoriesPage() {
 
   // Filters
   const [brandFilter, setBrandFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [subCategoryFilter, setSubCategoryFilter] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
 
   // Form state
@@ -208,8 +210,22 @@ export default function CatalogueCategoriesPage() {
   const filteredCategories = categories.filter(cat => {
     if (brandFilter && cat.brandId !== brandFilter) return false
     if (supplierFilter && cat.supplierId !== supplierFilter) return false
+    // Category filter - show only this parent category and its children
+    if (categoryFilter) {
+      if (cat.id !== categoryFilter && cat.parentId !== categoryFilter) return false
+    }
+    // Sub Category filter - show only this specific sub category
+    if (subCategoryFilter && cat.id !== subCategoryFilter) return false
     return true
   })
+
+  // Get parent categories for the Category dropdown
+  const parentCategoriesForFilter = categories.filter(c => !c.parentId)
+
+  // Get sub categories based on selected category filter
+  const subCategoriesForFilter = categoryFilter
+    ? categories.filter(c => c.parentId === categoryFilter)
+    : categories.filter(c => c.parentId)
 
   const parentCategories = filteredCategories.filter(c => !c.parentId)
   const getChildCategories = (parentId: string) => filteredCategories.filter(c => c.parentId === parentId)
@@ -249,13 +265,13 @@ export default function CatalogueCategoriesPage() {
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Brand:</label>
             <select
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[160px]"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[140px]"
             >
               <option value="">Select Brand</option>
               {brands.map((brand) => (
@@ -264,11 +280,41 @@ export default function CatalogueCategoriesPage() {
             </select>
           </div>
           <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Category:</label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value)
+                setSubCategoryFilter('') // Reset sub category when category changes
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[140px]"
+            >
+              <option value="">Select Category</option>
+              {parentCategoriesForFilter.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-gray-700">Sub Category:</label>
+            <select
+              value={subCategoryFilter}
+              onChange={(e) => setSubCategoryFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[140px]"
+              disabled={!categoryFilter && subCategoriesForFilter.length === 0}
+            >
+              <option value="">Select Sub Category</option>
+              {subCategoriesForFilter.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
             <label className="text-sm font-medium text-gray-700">Supplier:</label>
             <select
               value={supplierFilter}
               onChange={(e) => setSupplierFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[160px]"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm min-w-[140px]"
             >
               <option value="">Select Supplier</option>
               {suppliers.map((supplier) => (
@@ -276,9 +322,14 @@ export default function CatalogueCategoriesPage() {
               ))}
             </select>
           </div>
-          {(brandFilter || supplierFilter) && (
+          {(brandFilter || categoryFilter || subCategoryFilter || supplierFilter) && (
             <button
-              onClick={() => { setBrandFilter(''); setSupplierFilter('') }}
+              onClick={() => {
+                setBrandFilter('')
+                setCategoryFilter('')
+                setSubCategoryFilter('')
+                setSupplierFilter('')
+              }}
               className="text-sm text-blue-600 hover:text-blue-800"
             >
               Clear Filters
