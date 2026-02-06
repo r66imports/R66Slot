@@ -210,57 +210,25 @@ export default function PreOrderPosterPage() {
 
       if (!blob) return
 
-      // Check if mobile device (has touch and small screen)
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      // Upload poster image to get a public URL
+      const formData = new FormData()
+      const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
+      formData.append('file', posterFile)
 
-      if (isMobile) {
-        // Mobile: Use Web Share API to share image directly to WhatsApp
-        const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [posterFile] })) {
-          try {
-            await navigator.share({ files: [posterFile] })
-            return
-          } catch (shareError) {
-            if ((shareError as Error).name === 'AbortError') return
-          }
-        }
+      const uploadRes = await fetch('/api/admin/media/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!uploadRes.ok) {
+        alert('Failed to upload poster image')
+        return
       }
 
-      // Desktop: Copy image to clipboard and open WhatsApp Desktop app
-      try {
-        // Convert to PNG for clipboard (better compatibility)
-        const pngBlob = await new Promise<Blob | null>((resolve) => {
-          canvas.toBlob((b) => resolve(b), 'image/png')
-        })
+      const uploadData = await uploadRes.json()
 
-        if (pngBlob) {
-          const clipboardItem = new ClipboardItem({ 'image/png': pngBlob })
-          await navigator.clipboard.write([clipboardItem])
-        }
-
-        // Try to open WhatsApp Desktop app first (if installed)
-        // This opens the native app where Ctrl+V paste works better
-        window.location.href = 'whatsapp://send'
-
-        // Small delay then show instructions
-        setTimeout(() => {
-          alert('✅ Image copied!\n\n1. Select a contact/group\n2. Press Ctrl+V to paste\n3. Send!')
-        }, 500)
-
-      } catch (clipboardError) {
-        console.error('Clipboard error:', clipboardError)
-
-        // Fallback: download image and open WhatsApp Web
-        const imageUrl = URL.createObjectURL(blob)
-        const downloadLink = document.createElement('a')
-        downloadLink.href = imageUrl
-        downloadLink.download = `preorder-${sku || 'poster'}.jpg`
-        downloadLink.click()
-        URL.revokeObjectURL(imageUrl)
-
-        window.open('https://web.whatsapp.com/', '_blank')
-        alert('📥 Image downloaded!\n\nDrag it into WhatsApp or click 📎 to attach.')
-      }
+      // Open WhatsApp with the image URL (blob storage returns full URL)
+      window.open(`https://wa.me/?text=${encodeURIComponent(uploadData.url)}`, '_blank')
 
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
