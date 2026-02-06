@@ -57,7 +57,6 @@ export default function AdminLayout({
       },
     ],
     business: [
-      { name: 'Products', href: '/admin/products', icon: '🛍️' },
       { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
       { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
       { name: 'Pre Orders', href: '/admin/slotify-preorders', icon: '📦' },
