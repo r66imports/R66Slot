@@ -151,6 +151,23 @@ export interface PageSettings {
   backgroundPosition?: string
   backgroundOpacity?: number
   fullWidth?: boolean
+  // SEO Basics
+  seoTitle?: string
+  seoDescription?: string
+  seoKeywords?: string
+  seoCanonicalUrl?: string
+  seoNoIndex?: boolean
+  seoNoFollow?: boolean
+  // Social Sharing (Open Graph)
+  ogTitle?: string
+  ogDescription?: string
+  ogImage?: string
+  ogType?: 'website' | 'article' | 'product'
+  // Twitter Card
+  twitterCard?: 'summary' | 'summary_large_image'
+  twitterTitle?: string
+  twitterDescription?: string
+  twitterImage?: string
 }
 
 export interface Page {
