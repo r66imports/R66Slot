@@ -382,21 +382,43 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
           <div className="container mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {children?.map((child) => {
+                const imgObjectFit = (child.settings.objectFit as string) || 'cover'
                 const colContent = (
-                  <div key={child.id} className={styles.textAlign === 'center' ? 'text-center' : ''}>
+                  <div
+                    key={child.id}
+                    className={styles.textAlign === 'center' ? 'text-center' : ''}
+                    style={{ direction: 'ltr' }}
+                  >
                     {child.settings.icon && (
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-red-600 text-white rounded-full mb-4 text-2xl">
                         {child.settings.icon as string}
                       </div>
                     )}
                     {(child.settings.imageUrl as string) && (
-                      <img src={child.settings.imageUrl as string} alt="" className="w-full h-auto rounded-lg mb-3 object-cover" />
+                      <div className="mb-3 overflow-hidden rounded-lg">
+                        <img
+                          src={child.settings.imageUrl as string}
+                          alt={(child.settings.alt as string) || ''}
+                          className="w-full h-auto rounded-lg"
+                          style={{ objectFit: imgObjectFit as any }}
+                        />
+                      </div>
                     )}
-                    <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                    <div style={{ direction: 'ltr', unicodeBidi: 'plaintext' }} dangerouslySetInnerHTML={{ __html: child.content }} />
                   </div>
                 )
                 if (child.settings.link) {
-                  return <a key={child.id} href={child.settings.link as string} className="block no-underline text-inherit hover:opacity-80 transition-opacity">{colContent}</a>
+                  return (
+                    <a
+                      key={child.id}
+                      href={child.settings.link as string}
+                      target={(child.settings.link as string).startsWith('http') ? '_blank' : undefined}
+                      rel={(child.settings.link as string).startsWith('http') ? 'noopener noreferrer' : undefined}
+                      className="block no-underline text-inherit hover:opacity-80 transition-opacity"
+                    >
+                      {colContent}
+                    </a>
+                  )
                 }
                 return colContent
               })}
@@ -411,16 +433,34 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
           <div className="container mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {children?.slice(0, 2).map((child) => {
+                const imgObjectFit = (child.settings.objectFit as string) || 'cover'
                 const colContent = (
-                  <div key={child.id}>
+                  <div key={child.id} style={{ direction: 'ltr' }}>
                     {(child.settings.imageUrl as string) && (
-                      <img src={child.settings.imageUrl as string} alt="" className="w-full h-auto rounded-lg mb-3 object-cover" />
+                      <div className="mb-3 overflow-hidden rounded-lg">
+                        <img
+                          src={child.settings.imageUrl as string}
+                          alt={(child.settings.alt as string) || ''}
+                          className="w-full h-auto rounded-lg"
+                          style={{ objectFit: imgObjectFit as any }}
+                        />
+                      </div>
                     )}
-                    <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                    <div style={{ direction: 'ltr', unicodeBidi: 'plaintext' }} dangerouslySetInnerHTML={{ __html: child.content }} />
                   </div>
                 )
                 if (child.settings.link) {
-                  return <a key={child.id} href={child.settings.link as string} className="block no-underline text-inherit hover:opacity-80 transition-opacity">{colContent}</a>
+                  return (
+                    <a
+                      key={child.id}
+                      href={child.settings.link as string}
+                      target={(child.settings.link as string).startsWith('http') ? '_blank' : undefined}
+                      rel={(child.settings.link as string).startsWith('http') ? 'noopener noreferrer' : undefined}
+                      className="block no-underline text-inherit hover:opacity-80 transition-opacity"
+                    >
+                      {colContent}
+                    </a>
+                  )
                 }
                 return colContent
               })}
@@ -439,26 +479,53 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
               style={{ gridTemplateColumns: `repeat(${colCount}, 1fr)` }}
             >
               {children?.slice(0, colCount).map((child) => {
+                // Get image fit settings
+                const imgObjectFit = (child.settings.objectFit as string) || 'cover'
+
                 const colContent = (
-                  <div key={child.id} className={styles.textAlign === 'center' ? 'text-center' : ''}>
+                  <div
+                    key={child.id}
+                    className={styles.textAlign === 'center' ? 'text-center' : ''}
+                    style={{ direction: 'ltr', textAlign: 'left' }}
+                  >
+                    {/* Column Icon */}
                     {child.settings.icon && (
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-red-600 text-white rounded-full mb-4 text-2xl">
                         {child.settings.icon as string}
                       </div>
                     )}
+                    {/* Column Image with Image Fit */}
                     {(child.settings.imageUrl as string) && (
-                      <img
-                        src={child.settings.imageUrl as string}
-                        alt=""
-                        className="w-full h-auto rounded-lg mb-3 object-cover"
-                      />
+                      <div className="mb-3 overflow-hidden rounded-lg">
+                        <img
+                          src={child.settings.imageUrl as string}
+                          alt={(child.settings.alt as string) || ''}
+                          className="w-full h-auto rounded-lg"
+                          style={{
+                            objectFit: imgObjectFit as any,
+                            maxHeight: imgObjectFit === 'contain' ? '300px' : undefined,
+                          }}
+                        />
+                      </div>
                     )}
-                    <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                    {/* Column Text Content - Fix text direction */}
+                    <div
+                      style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
+                      dangerouslySetInnerHTML={{ __html: child.content }}
+                    />
                   </div>
                 )
+
+                // Wrap in link if URL is set
                 if (child.settings.link) {
                   return (
-                    <a key={child.id} href={child.settings.link as string} className="block no-underline text-inherit hover:opacity-80 transition-opacity">
+                    <a
+                      key={child.id}
+                      href={child.settings.link as string}
+                      target={(child.settings.link as string).startsWith('http') ? '_blank' : undefined}
+                      rel={(child.settings.link as string).startsWith('http') ? 'noopener noreferrer' : undefined}
+                      className="block no-underline text-inherit hover:opacity-80 transition-opacity"
+                    >
                       {colContent}
                     </a>
                   )

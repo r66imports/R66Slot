@@ -87,7 +87,67 @@
   min-height: var(--canvas-mobile-height);
 }
 
-/* ─── Freeform Element ─── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   MASTER CANVAS CONTAINER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The master canvas serves as the positioning reference for all freeform elements.
+ * All absolute-positioned children calculate their x/y relative to this container.
+ */
+.r66-master-canvas {
+  position: relative !important;
+  width: 100%;
+  min-height: 100vh;
+  /* Define origin point for all child elements */
+  transform-origin: top left;
+  /* Contain positioned elements */
+  overflow: visible;
+  /* Ensure this is the positioning context */
+  isolation: isolate;
+}
+
+/* Alias for backwards compatibility */
+.responsive-canvas,
+.freeform-canvas,
+[data-canvas="true"] {
+  position: relative !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FREEFORM IMAGE LAYER - HIGH Z-INDEX
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Freeform image elements must sit ABOVE all static canvas elements.
+ * z-index: 1000+ ensures images remain on top layer.
+ */
+.r66-freeform-image {
+  position: absolute !important;
+  z-index: 1000 !important;
+  box-sizing: border-box;
+  user-select: none;
+  /* Ensure images are above all other content */
+  pointer-events: auto;
+}
+
+/* Additional specificity for nested images */
+.r66-master-canvas .r66-freeform-image,
+.responsive-canvas .r66-freeform-image,
+[data-canvas="true"] .r66-freeform-image {
+  z-index: 1000 !important;
+}
+
+/* Increment z-index for selected/dragging states */
+.r66-freeform-image.selected {
+  z-index: 1001 !important;
+}
+
+.r66-freeform-image.dragging {
+  z-index: 1002 !important;
+}
+
+/* ─── Freeform Element (Base) ─── */
 .freeform-element {
   position: absolute;
   box-sizing: border-box;

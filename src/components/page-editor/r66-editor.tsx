@@ -450,7 +450,7 @@ ${canvasHTML}
         >
           <div
             ref={canvasRef}
-            className="mx-auto shadow-lg transition-all duration-300 min-h-screen overflow-hidden responsive-canvas"
+            className="mx-auto shadow-lg transition-all duration-300 min-h-screen overflow-hidden responsive-canvas r66-master-canvas"
             data-canvas="true"
             data-breakpoint={viewMode}
             data-zoom="1"

@@ -114,20 +114,31 @@ export function FreeformElement({
     return () => window.removeEventListener('resize', handleResize)
   }, [getContainerDimensions])
 
+  // ─── Determine if this is an image element (for high z-index layering) ───
+  const isImageElement = useMemo(() => {
+    return component.type === 'image' ||
+           component.type === 'media' ||
+           component.type === 'gallery' ||
+           (component.settings as any)?.imageUrl ||
+           (component.settings as any)?.backgroundImage
+  }, [component])
+
   // ─── Position Styles (Percentage-based) ───
+  // Images get z-index 1000+ to sit above static canvas elements
   const positionStyles = useMemo((): React.CSSProperties => ({
     position: 'absolute',
     left: `${currentPosition.xPercent}%`,
     top: `${currentPosition.yPercent}%`,
     width: `${currentPosition.widthPercent}%`,
     height: `${currentPosition.heightPercent}%`,
-    zIndex: currentPosition.zIndex,
+    // Images get high z-index (1000+), others use component z-index
+    zIndex: isImageElement ? 1000 + (currentPosition.zIndex || 0) : currentPosition.zIndex,
     transform: currentPosition.rotation ? `rotate(${currentPosition.rotation}deg)` : undefined,
     transformOrigin: 'center center',
     cursor: isDragging ? 'grabbing' : isSelected ? 'grab' : 'pointer',
     userSelect: 'none',
     boxSizing: 'border-box',
-  }), [currentPosition, isDragging, isSelected])
+  }), [currentPosition, isDragging, isSelected, isImageElement])
 
   // ─── Save Position ───
   const savePosition = useCallback((newPosition: NormalizedPosition) => {
@@ -277,8 +288,9 @@ export function FreeformElement({
       style={positionStyles}
       className={`
         freeform-element group
-        ${isSelected ? 'ring-2 ring-purple-500 ring-offset-1' : 'hover:ring-2 hover:ring-purple-300'}
-        ${isDragging ? 'opacity-80 shadow-xl' : ''}
+        ${isImageElement ? 'r66-freeform-image' : ''}
+        ${isSelected ? 'ring-2 ring-purple-500 ring-offset-1 selected' : 'hover:ring-2 hover:ring-purple-300'}
+        ${isDragging ? 'opacity-80 shadow-xl dragging' : ''}
         ${isResizing ? 'opacity-90' : ''}
         transition-shadow
       `}

@@ -1852,6 +1852,23 @@ function VisualColumnEditor({
               onChange={(e) => handleColumnImageUpload(idx, e)}
               className="hidden"
             />
+            {/* Image Fit Option (Freeform Box) */}
+            {(child.settings.imageUrl as string) && (
+              <div className="mt-1.5">
+                <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Image Fit</label>
+                <select
+                  value={(child.settings.objectFit as string) || 'cover'}
+                  onChange={(e) => updateChildSetting(idx, 'objectFit', e.target.value)}
+                  className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+                >
+                  <option value="cover">Cover (fill, may crop)</option>
+                  <option value="contain">Contain (fit, may letterbox)</option>
+                  <option value="fill">Fill (stretch to fit)</option>
+                  <option value="none">None (original size)</option>
+                  <option value="scale-down">Scale Down (shrink only)</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Column Link */}

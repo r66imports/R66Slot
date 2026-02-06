@@ -9,7 +9,11 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "smoke:editor": "node scripts/smoke-editor.js"
+    "test": "npm run lint && npm run type-check && npm run test:freeform",
+    "test:freeform": "node scripts/test-freeform-positioning.js",
+    "smoke:editor": "node scripts/smoke-editor.js",
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
