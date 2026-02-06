@@ -58,13 +58,13 @@ export default function AdminLayout({
     ],
     business: [
       { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
+      { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
       { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
       { name: 'Pre Orders', href: '/admin/slotify-preorders', icon: '📦' },
       { name: 'Orders', href: '/admin/slotify-orders', icon: '🎰' },
       { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
       { name: 'Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
-      { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],
     settings: [

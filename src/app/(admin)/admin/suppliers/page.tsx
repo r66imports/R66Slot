@@ -145,7 +145,20 @@ export default function SuppliersPage() {
   const [newShipment, setNewShipment] = useState({
     supplierId: '',
     trackingNumber: '',
+    trackingUrl: '',
     shipper: 'fedex' as 'fedex' | 'dhl',
+    estimatedDelivery: '',
+    notes: ''
+  })
+  const [showTrackingModal, setShowTrackingModal] = useState(false)
+  const [showEditShipmentModal, setShowEditShipmentModal] = useState(false)
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null)
+  const [editingShipment, setEditingShipment] = useState({
+    supplierId: '',
+    trackingNumber: '',
+    trackingUrl: '',
+    shipper: 'fedex' as 'fedex' | 'dhl',
+    status: 'pending' as 'pending' | 'in_transit' | 'delivered',
     estimatedDelivery: '',
     notes: ''
   })
@@ -791,14 +804,16 @@ export default function SuppliersPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <a
-                            href={shipment.trackingUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium text-blue-600 hover:underline"
+                          <button
+                            onClick={() => {
+                              setSelectedShipment(shipment)
+                              setShowTrackingModal(true)
+                            }}
+                            className="font-medium text-blue-600 hover:underline flex items-center gap-1"
                           >
                             {shipment.trackingNumber}
-                          </a>
+                            <span className="text-xs">🔗</span>
+                          </button>
                         </td>
                         <td className="px-6 py-4 text-gray-600">{supplier?.name || 'Unknown'}</td>
                         <td className="px-6 py-4">
@@ -819,27 +834,34 @@ export default function SuppliersPage() {
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2">
-                            <a
-                              href={shipment.trackingUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Button variant="outline" size="sm">
-                                Track
-                              </Button>
-                            </a>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => {
-                                setShipments(shipments.map(s =>
-                                  s.id === shipment.id
-                                    ? { ...s, status: s.status === 'pending' ? 'in_transit' : s.status === 'in_transit' ? 'delivered' : 'pending' }
-                                    : s
-                                ))
+                                setSelectedShipment(shipment)
+                                setShowTrackingModal(true)
                               }}
                             >
-                              Update
+                              🔗 Track
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedShipment(shipment)
+                                setEditingShipment({
+                                  supplierId: shipment.supplierId,
+                                  trackingNumber: shipment.trackingNumber,
+                                  trackingUrl: shipment.trackingUrl,
+                                  shipper: shipment.shipper,
+                                  status: shipment.status,
+                                  estimatedDelivery: shipment.estimatedDelivery || '',
+                                  notes: shipment.notes
+                                })
+                                setShowEditShipmentModal(true)
+                              }}
+                            >
+                              ✏️ Edit
                             </Button>
                             <Button
                               variant="outline"
@@ -949,18 +971,34 @@ export default function SuppliersPage() {
                   </p>
                 </div>
 
+                {/* Custom Tracking URL (Optional) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Custom Tracking URL <span className="text-gray-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="url"
+                    value={newShipment.trackingUrl}
+                    onChange={(e) => setNewShipment({ ...newShipment, trackingUrl: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Leave empty for auto-generated URL"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter a custom URL or leave empty to use the default carrier tracking URL
+                  </p>
+                </div>
+
                 {/* Preview Tracking URL */}
-                {newShipment.trackingNumber && (
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Tracking URL Preview:</p>
-                    <code className="text-xs text-blue-600 break-all">
-                      {newShipment.shipper === 'fedex'
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Tracking URL {newShipment.trackingUrl ? '(Custom)' : '(Auto-generated)'}:</p>
+                  <code className="text-xs text-blue-600 break-all">
+                    {newShipment.trackingUrl || (newShipment.trackingNumber ? (
+                      newShipment.shipper === 'fedex'
                         ? `https://www.fedex.com/fedextrack/?trknbr=${newShipment.trackingNumber}`
                         : `https://www.dhl.com/en/express/tracking.html?AWB=${newShipment.trackingNumber}`
-                      }
-                    </code>
-                  </div>
-                )}
+                    ) : 'Enter tracking number to preview URL')}
+                  </code>
+                </div>
 
                 {/* Estimated Delivery */}
                 <div>
@@ -991,14 +1029,14 @@ export default function SuppliersPage() {
                   variant="outline"
                   onClick={() => {
                     setShowShipmentModal(false)
-                    setNewShipment({ supplierId: '', trackingNumber: '', shipper: 'fedex', estimatedDelivery: '', notes: '' })
+                    setNewShipment({ supplierId: '', trackingNumber: '', trackingUrl: '', shipper: 'fedex', estimatedDelivery: '', notes: '' })
                   }}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={() => {
-                    const trackingUrl = newShipment.shipper === 'fedex'
+                    const defaultUrl = newShipment.shipper === 'fedex'
                       ? `https://www.fedex.com/fedextrack/?trknbr=${newShipment.trackingNumber}`
                       : `https://www.dhl.com/en/express/tracking.html?AWB=${newShipment.trackingNumber}`
 
@@ -1006,7 +1044,7 @@ export default function SuppliersPage() {
                       id: Date.now().toString(),
                       supplierId: newShipment.supplierId,
                       trackingNumber: newShipment.trackingNumber,
-                      trackingUrl,
+                      trackingUrl: newShipment.trackingUrl || defaultUrl,
                       shipper: newShipment.shipper,
                       status: 'pending',
                       createdAt: new Date().toISOString(),
@@ -1015,7 +1053,7 @@ export default function SuppliersPage() {
                     }
                     setShipments([shipment, ...shipments])
                     setShowShipmentModal(false)
-                    setNewShipment({ supplierId: '', trackingNumber: '', shipper: 'fedex', estimatedDelivery: '', notes: '' })
+                    setNewShipment({ supplierId: '', trackingNumber: '', trackingUrl: '', shipper: 'fedex', estimatedDelivery: '', notes: '' })
                     setActiveTab('shipments')
                   }}
                   className="bg-gradient-to-r from-[#4b2d83] to-[#ff6600] text-white hover:opacity-90"
@@ -1242,6 +1280,284 @@ export default function SuppliersPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Tracking Popup Modal */}
+      {showTrackingModal && selectedShipment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                  selectedShipment.shipper === 'fedex' ? 'bg-[#4b2d83]' : 'bg-[#D40511]'
+                }`}>
+                  <span className="text-white text-xl">🔗</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Tracking Details</h2>
+                  <p className="text-sm text-gray-500">View and access shipment tracking</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Shipper Badge */}
+                <div className="flex items-center gap-3">
+                  {selectedShipment.shipper === 'fedex' ? (
+                    <div className="px-4 py-2 bg-gradient-to-r from-[#4b2d83] to-[#ff6600] text-white rounded-lg font-bold">
+                      FedEx
+                    </div>
+                  ) : (
+                    <div className="px-4 py-2 bg-[#D40511] text-white rounded-lg font-bold">
+                      DHL
+                    </div>
+                  )}
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    selectedShipment.status === 'delivered'
+                      ? 'bg-green-100 text-green-700'
+                      : selectedShipment.status === 'in_transit'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {selectedShipment.status === 'in_transit' ? 'In Transit' : selectedShipment.status.charAt(0).toUpperCase() + selectedShipment.status.slice(1)}
+                  </span>
+                </div>
+
+                {/* Tracking Number */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Tracking Number</p>
+                  <p className="text-2xl font-bold text-gray-900 font-mono">{selectedShipment.trackingNumber}</p>
+                </div>
+
+                {/* Tracking URL */}
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-600 mb-1">Tracking URL</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 bg-white px-3 py-2 rounded border text-xs break-all">
+                      {selectedShipment.trackingUrl}
+                    </code>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(selectedShipment.trackingUrl)}
+                      className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                      title="Copy URL"
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+
+                {/* Supplier */}
+                <div className="p-3 border rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Supplier</p>
+                  <p className="font-medium">{suppliers.find(s => s.id === selectedShipment.supplierId)?.name || 'Unknown'}</p>
+                </div>
+
+                {/* Open Tracking Button */}
+                <a
+                  href={selectedShipment.trackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`block w-full text-center px-4 py-3 text-white rounded-lg font-medium ${
+                    selectedShipment.shipper === 'fedex'
+                      ? 'bg-gradient-to-r from-[#4b2d83] to-[#ff6600] hover:opacity-90'
+                      : 'bg-[#D40511] hover:bg-[#b8040f]'
+                  }`}
+                >
+                  Open Tracking Page →
+                </a>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedShipment(selectedShipment)
+                    setEditingShipment({
+                      supplierId: selectedShipment.supplierId,
+                      trackingNumber: selectedShipment.trackingNumber,
+                      trackingUrl: selectedShipment.trackingUrl,
+                      shipper: selectedShipment.shipper,
+                      status: selectedShipment.status,
+                      estimatedDelivery: selectedShipment.estimatedDelivery || '',
+                      notes: selectedShipment.notes
+                    })
+                    setShowTrackingModal(false)
+                    setShowEditShipmentModal(true)
+                  }}
+                >
+                  ✏️ Edit Shipment
+                </Button>
+                <Button variant="outline" onClick={() => { setShowTrackingModal(false); setSelectedShipment(null) }}>
+                  Close
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Shipment Modal */}
+      {showEditShipmentModal && selectedShipment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl">✏️</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Edit Shipment</h2>
+                  <p className="text-sm text-gray-500">Update shipment details and tracking</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Supplier */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                  <select
+                    value={editingShipment.supplierId}
+                    onChange={(e) => setEditingShipment({ ...editingShipment, supplierId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Shipper */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Shipper</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditingShipment({ ...editingShipment, shipper: 'fedex' })}
+                      className={`p-3 border-2 rounded-lg flex items-center justify-center gap-2 transition-all ${
+                        editingShipment.shipper === 'fedex'
+                          ? 'border-[#4b2d83] bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-[#4b2d83] font-bold">Fed</span>
+                      <span className="text-[#ff6600] font-bold">Ex</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingShipment({ ...editingShipment, shipper: 'dhl' })}
+                      className={`p-3 border-2 rounded-lg flex items-center justify-center transition-all ${
+                        editingShipment.shipper === 'dhl'
+                          ? 'border-[#D40511] bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="bg-[#D40511] text-white font-bold px-2 py-0.5 rounded">DHL</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tracking Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tracking Number</label>
+                  <input
+                    type="text"
+                    value={editingShipment.trackingNumber}
+                    onChange={(e) => setEditingShipment({ ...editingShipment, trackingNumber: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono"
+                    placeholder="e.g., 794644790138"
+                  />
+                </div>
+
+                {/* Custom Tracking URL */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tracking URL</label>
+                  <input
+                    type="url"
+                    value={editingShipment.trackingUrl}
+                    onChange={(e) => setEditingShipment({ ...editingShipment, trackingUrl: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    placeholder="https://..."
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Custom tracking URL - modify to point to specific tracking page
+                  </p>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={editingShipment.status}
+                    onChange={(e) => setEditingShipment({ ...editingShipment, status: e.target.value as 'pending' | 'in_transit' | 'delivered' })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in_transit">In Transit</option>
+                    <option value="delivered">Delivered</option>
+                  </select>
+                </div>
+
+                {/* Estimated Delivery */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Delivery</label>
+                  <input
+                    type="date"
+                    value={editingShipment.estimatedDelivery}
+                    onChange={(e) => setEditingShipment({ ...editingShipment, estimatedDelivery: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={editingShipment.notes}
+                    onChange={(e) => setEditingShipment({ ...editingShipment, notes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    rows={2}
+                    placeholder="Additional notes..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditShipmentModal(false)
+                    setSelectedShipment(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShipments(shipments.map(s =>
+                      s.id === selectedShipment.id
+                        ? {
+                            ...s,
+                            supplierId: editingShipment.supplierId,
+                            trackingNumber: editingShipment.trackingNumber,
+                            trackingUrl: editingShipment.trackingUrl,
+                            shipper: editingShipment.shipper,
+                            status: editingShipment.status,
+                            estimatedDelivery: editingShipment.estimatedDelivery || undefined,
+                            notes: editingShipment.notes
+                          }
+                        : s
+                    ))
+                    setShowEditShipmentModal(false)
+                    setSelectedShipment(null)
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Save Changes
+                </Button>
               </div>
             </CardContent>
           </Card>
