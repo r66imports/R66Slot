@@ -61,11 +61,16 @@ export default function AdminLayout({
       { name: 'Orders', href: '/admin/slotify-preorders', icon: '📦' },
       { name: 'Order List', href: '/admin/preorder-list', icon: '📋' },
     ],
-    socialMedia: [
-      { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
-      { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
-    ],
     business: [
+      {
+        name: 'Social Media',
+        href: '/admin/social-media',
+        icon: '📱',
+        submenu: [
+          { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
+          { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
+        ]
+      },
       { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
       { name: 'Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
@@ -277,33 +282,6 @@ export default function AdminLayout({
               </div>
             </div>
 
-            {/* Social Media Section */}
-            <div>
-              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
-                Social Media
-              </p>
-              <div className="space-y-1">
-                {navigation.socialMedia.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
-                        isActive
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      )}
-                    >
-                      <span className="text-base">{item.icon}</span>
-                      {item.name}
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
             {/* Business Section */}
             <div>
               <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
@@ -312,6 +290,62 @@ export default function AdminLayout({
               <div className="space-y-1">
                 {navigation.business.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const isExpanded = expandedMenus.includes(item.name)
+
+                  // Handle submenu items (like Social Media)
+                  if (hasSubmenu) {
+                    return (
+                      <div key={item.name}>
+                        <button
+                          onClick={() => toggleSubmenu(item.name)}
+                          className={cn(
+                            'flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                            isActive
+                              ? 'bg-gray-100 text-gray-900'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-base">{item.icon}</span>
+                            {item.name}
+                          </div>
+                          <svg
+                            className={cn('w-4 h-4 transition-transform', isExpanded ? 'rotate-180' : '')}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {isExpanded && (
+                          <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
+                            {item.submenu!.map((subItem) => {
+                              const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
+                              return (
+                                <Link
+                                  key={subItem.name}
+                                  href={subItem.href}
+                                  className={cn(
+                                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play',
+                                    isSubActive
+                                      ? 'bg-blue-50 text-blue-700 font-medium'
+                                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                  )}
+                                >
+                                  <span className="text-sm">{subItem.icon}</span>
+                                  {subItem.name}
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  // Handle modal items (like Costing Calculator)
                   if ((item as any).isModal) {
                     return (
                       <button
@@ -327,6 +361,8 @@ export default function AdminLayout({
                       </button>
                     )
                   }
+
+                  // Handle regular link items
                   return (
                     <Link
                       key={item.name}
