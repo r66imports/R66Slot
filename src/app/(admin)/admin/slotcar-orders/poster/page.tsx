@@ -210,11 +210,9 @@ export default function PreOrderPosterPage() {
 
       if (!blob) return
 
-      // Create poster file for sharing
-      const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
-
-      // Upload poster image to server for public URL
+      // Upload poster image to server for public URL (Image + Text in one container)
       const formData = new FormData()
+      const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
       formData.append('file', posterFile)
 
       let posterImageUrl = ''
@@ -231,11 +229,11 @@ export default function PreOrderPosterPage() {
         console.error('Failed to upload poster image')
       }
 
-      // Build booking link - opens order page in new tab
+      // Build booking link - Book Now linked to Order, opens in new page
       const bookingLink = `${window.location.origin}/book/${currentShortCode}`
 
-      // Build WhatsApp message - Image + Text in one container
-      // The message includes all details with the booking link prominently displayed
+      // Build WhatsApp message - Image URL + Text in one container
+      // The poster image URL creates a preview in WhatsApp with image and text together
       const message = `🎯 *${orderType === 'pre-order' ? 'PRE-ORDER AVAILABLE' : 'NEW ARRIVAL'}*\n\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `*${itemDescription}*\n` +
@@ -245,47 +243,18 @@ export default function PreOrderPosterPage() {
         `💰 Price: *R${preOrderPrice}*\n` +
         `📅 Est. Delivery: ${estimatedDeliveryDate}\n` +
         `📊 Available: ${availableQty} units\n\n` +
-        (posterImageUrl ? `🖼️ *View Poster:*\n${posterImageUrl}\n\n` : '') +
+        (posterImageUrl ? `🖼️ *POSTER IMAGE:*\n${posterImageUrl}\n\n` : '') +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🛒 *BOOK NOW* (Opens in new page)\n` +
+        `🛒 *BOOK NOW* _(opens in new page)_\n` +
         `👉 ${bookingLink}\n` +
         `━━━━━━━━━━━━━━━━━━━━\n\n` +
         `_R66SLOT - Premium Slot Cars_`
 
-      // Try Web Share API first (mobile - shares image + text together in one container)
-      if (navigator.share && navigator.canShare) {
-        const shareData = {
-          text: message,
-          files: [posterFile],
-        }
+      // DIRECT to WhatsApp Web - NO Share API
+      // Opens WhatsApp Web directly with pre-filled message
+      const whatsappWebUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`
+      window.open(whatsappWebUrl, '_blank', 'noopener,noreferrer')
 
-        if (navigator.canShare(shareData)) {
-          try {
-            await navigator.share(shareData)
-            return
-          } catch (err) {
-            if ((err as Error).name === 'AbortError') return
-          }
-        }
-      }
-
-      // Fallback: Download image first, then open WhatsApp
-      // This ensures image and text are shared together
-      const downloadUrl = URL.createObjectURL(blob)
-      const downloadLink = document.createElement('a')
-      downloadLink.href = downloadUrl
-      downloadLink.download = `preorder-${sku || 'poster'}.jpg`
-      downloadLink.click()
-      URL.revokeObjectURL(downloadUrl)
-
-      // Small delay then open WhatsApp with message
-      setTimeout(() => {
-        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`
-        window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
-      }, 500)
-
-      // Show instruction to user
-      alert('Poster image downloaded! WhatsApp will open - please attach the downloaded image to send with your message.')
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
       alert('Failed to export poster')
