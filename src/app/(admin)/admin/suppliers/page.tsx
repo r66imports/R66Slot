@@ -29,6 +29,18 @@ interface SupplierImport {
   importedAt: string
 }
 
+interface Shipment {
+  id: string
+  supplierId: string
+  trackingNumber: string
+  trackingUrl: string
+  shipper: 'fedex' | 'dhl'
+  status: 'pending' | 'in_transit' | 'delivered'
+  createdAt: string
+  estimatedDelivery?: string
+  notes: string
+}
+
 // Default suppliers
 const defaultSuppliers: Supplier[] = [
   {
@@ -111,12 +123,14 @@ const defaultSuppliers: Supplier[] = [
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>(defaultSuppliers)
   const [imports, setImports] = useState<SupplierImport[]>([])
+  const [shipments, setShipments] = useState<Shipment[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'network' | 'list' | 'imports'>('network')
+  const [activeTab, setActiveTab] = useState<'network' | 'list' | 'imports' | 'shipments'>('network')
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showWorksheetModal, setShowWorksheetModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [showShipmentModal, setShowShipmentModal] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [newSupplier, setNewSupplier] = useState({
     name: '',
@@ -126,6 +140,13 @@ export default function SuppliersPage() {
     country: '',
     website: '',
     googleSheetUrl: '',
+    notes: ''
+  })
+  const [newShipment, setNewShipment] = useState({
+    supplierId: '',
+    trackingNumber: '',
+    shipper: 'fedex' as 'fedex' | 'dhl',
+    estimatedDelivery: '',
     notes: ''
   })
 
@@ -235,7 +256,7 @@ export default function SuppliersPage() {
     })
 
     // Draw FedEx connection
-    const fedexX = centerX
+    const fedexX = centerX - 80
     const fedexY = height - 60
     ctx.beginPath()
     ctx.moveTo(centerX, centerY + 50)
@@ -248,13 +269,35 @@ export default function SuppliersPage() {
 
     // Draw FedEx node
     ctx.beginPath()
-    ctx.roundRect(fedexX - 50, fedexY - 25, 100, 50, 8)
+    ctx.roundRect(fedexX - 45, fedexY - 25, 90, 50, 8)
     ctx.fillStyle = '#4b2d83'
     ctx.fill()
     ctx.fillStyle = '#ff6600'
-    ctx.font = 'bold 16px Arial'
+    ctx.font = 'bold 14px Arial'
     ctx.textAlign = 'center'
     ctx.fillText('FedEx', fedexX, fedexY)
+
+    // Draw DHL connection
+    const dhlX = centerX + 80
+    const dhlY = height - 60
+    ctx.beginPath()
+    ctx.moveTo(centerX, centerY + 50)
+    ctx.lineTo(dhlX, dhlY - 25)
+    ctx.strokeStyle = '#D40511'
+    ctx.lineWidth = 3
+    ctx.setLineDash([8, 4])
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // Draw DHL node
+    ctx.beginPath()
+    ctx.roundRect(dhlX - 45, dhlY - 25, 90, 50, 8)
+    ctx.fillStyle = '#D40511'
+    ctx.fill()
+    ctx.fillStyle = '#FFCC00'
+    ctx.font = 'bold 14px Arial'
+    ctx.textAlign = 'center'
+    ctx.fillText('DHL', dhlX, dhlY)
   }
 
   const handleAddSupplier = () => {
@@ -368,45 +411,84 @@ export default function SuppliersPage() {
           <Button variant="outline" onClick={handleExportAllSuppliers}>
             Export All CSV
           </Button>
+          <Button
+            onClick={() => setShowShipmentModal(true)}
+            className="bg-gradient-to-r from-[#4b2d83] to-[#ff6600] hover:opacity-90 text-white"
+          >
+            📦 Import Shipment
+          </Button>
           <Button onClick={() => setShowAddModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
             + Add Supplier
           </Button>
         </div>
       </div>
 
-      {/* FedEx Banner */}
-      <a
-        href="https://www.fedex.com/en-za/home.html"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block mb-6"
-      >
-        <Card className="bg-gradient-to-r from-[#4b2d83] to-[#ff6600] hover:shadow-lg transition-shadow cursor-pointer">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="bg-white rounded-lg p-2">
-                <svg width="80" height="30" viewBox="0 0 960 430" className="text-[#4b2d83]">
-                  <path fill="#4b2d83" d="M0 430V0h251.3c65.7 0 115 8.3 148 24.9 33 16.6 49.5 42.5 49.5 77.7 0 23.3-8.3 42.5-24.9 57.5-16.6 15-39.4 24.9-68.4 29.6v1.3c35 4.7 62.4 16.6 82.3 35.7 19.9 19.1 29.6 43.5 29.6 73.1 0 42.5-16.6 75.6-49.5 99.3-32.9 24.9-79.7 31-140.3 31H0zm115.9-173.5h120.4c33 0 58.6-5.7 76.7-17.3 18.1-11.6 27.1-29.6 27.1-54.1 0-24.5-9-41.5-27.1-51-18.1-9.5-45.5-14.3-82.3-14.3H115.9v136.7zm0 89.2v124.4h135.7c35 0 61.3-6.2 79-18.6 17.6-12.4 26.5-31.5 26.5-57.5 0-25.4-9.5-44-28.4-55.7-18.9-11.7-46.6-17.6-83.2-17.6H115.9z"/>
-                  <path fill="#ff6600" d="M580 430V0h115.9v192.1L854.8 0H1000L804.8 172.1 1000 430H854.8L695.9 220.5l-115.9 95.6V430H580z"/>
+      {/* Shipping Partners Banners */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* FedEx Banner */}
+        <a
+          href="https://www.fedex.com/en-za/home.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+        >
+          <Card className="bg-gradient-to-r from-[#4b2d83] to-[#ff6600] hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="bg-white rounded-lg p-2">
+                  <div className="flex items-center">
+                    <span className="text-[#4b2d83] font-bold text-2xl">Fed</span>
+                    <span className="text-[#ff6600] font-bold text-2xl">Ex</span>
+                  </div>
+                </div>
+                <div className="text-white">
+                  <p className="font-bold text-lg">FedEx Shipping</p>
+                  <p className="text-sm opacity-90">International Express</p>
+                </div>
+              </div>
+              <div className="text-white flex items-center gap-2">
+                <span className="text-sm">Track</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </div>
-              <div className="text-white">
-                <p className="font-bold text-lg">FedEx Shipping Partner</p>
-                <p className="text-sm opacity-90">Track shipments and manage deliveries</p>
+            </CardContent>
+          </Card>
+        </a>
+
+        {/* DHL Banner */}
+        <a
+          href="https://www.dhl.com/za-en/home.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+        >
+          <Card className="bg-gradient-to-r from-[#D40511] to-[#FFCC00] hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="bg-white rounded-lg p-2">
+                  <div className="bg-[#D40511] text-[#FFCC00] font-bold text-2xl px-3 py-1 rounded">
+                    DHL
+                  </div>
+                </div>
+                <div className="text-white">
+                  <p className="font-bold text-lg">DHL Express</p>
+                  <p className="text-sm opacity-90">Worldwide Shipping</p>
+                </div>
               </div>
-            </div>
-            <div className="text-white flex items-center gap-2">
-              <span className="text-sm">Access Account</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </div>
-          </CardContent>
-        </Card>
-      </a>
+              <div className="text-white flex items-center gap-2">
+                <span className="text-sm">Track</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </div>
+            </CardContent>
+          </Card>
+        </a>
+      </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <Card>
           <CardContent className="p-4">
             <p className="text-sm text-gray-500">Total Suppliers</p>
@@ -431,11 +513,17 @@ export default function SuppliersPage() {
             <p className="text-2xl font-bold text-purple-600">{imports.length}</p>
           </CardContent>
         </Card>
+        <Card className="bg-gradient-to-r from-[#4b2d83]/10 to-[#ff6600]/10">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-500">Active Shipments</p>
+            <p className="text-2xl font-bold text-[#4b2d83]">{shipments.filter(s => s.status !== 'delivered').length}</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b">
-        {(['network', 'list', 'imports'] as const).map((tab) => (
+        {(['network', 'list', 'imports', 'shipments'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -445,7 +533,7 @@ export default function SuppliersPage() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {tab === 'network' ? 'Network View' : tab === 'list' ? 'Supplier List' : 'Import History'}
+            {tab === 'network' ? 'Network View' : tab === 'list' ? 'Supplier List' : tab === 'imports' ? 'Import History' : 'Shipments'}
           </button>
         ))}
       </div>
@@ -466,7 +554,7 @@ export default function SuppliersPage() {
                 className="border border-gray-200 rounded-lg"
               />
             </div>
-            <div className="flex justify-center gap-6 mt-4 text-sm">
+            <div className="flex justify-center gap-6 mt-4 text-sm flex-wrap">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-full bg-blue-500"></div>
                 <span>R66 Slot Hub</span>
@@ -481,7 +569,11 @@ export default function SuppliersPage() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-[#4b2d83]"></div>
-                <span>FedEx Shipping</span>
+                <span>FedEx</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded bg-[#D40511]"></div>
+                <span>DHL</span>
               </div>
             </div>
           </CardContent>
@@ -654,6 +746,287 @@ export default function SuppliersPage() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Shipments Tab */}
+      {activeTab === 'shipments' && (
+        <Card>
+          <CardContent className="p-0">
+            {shipments.length === 0 ? (
+              <div className="p-12 text-center">
+                <div className="text-5xl mb-4">📦</div>
+                <h3 className="text-xl font-semibold mb-2">No Shipments Yet</h3>
+                <p className="text-gray-600 mb-4">Track incoming shipments from your suppliers.</p>
+                <Button
+                  onClick={() => setShowShipmentModal(true)}
+                  className="bg-gradient-to-r from-[#4b2d83] to-[#ff6600] text-white"
+                >
+                  Import First Shipment
+                </Button>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Shipper</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tracking #</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Supplier</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Est. Delivery</th>
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {shipments.map((shipment) => {
+                    const supplier = suppliers.find(s => s.id === shipment.supplierId)
+                    return (
+                      <tr key={shipment.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {shipment.shipper === 'fedex' ? (
+                              <div className="px-2 py-1 bg-[#4b2d83] text-white rounded text-xs font-bold">FedEx</div>
+                            ) : (
+                              <div className="px-2 py-1 bg-[#D40511] text-white rounded text-xs font-bold">DHL</div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <a
+                            href={shipment.trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-blue-600 hover:underline"
+                          >
+                            {shipment.trackingNumber}
+                          </a>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">{supplier?.name || 'Unknown'}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            shipment.status === 'delivered'
+                              ? 'bg-green-100 text-green-700'
+                              : shipment.status === 'in_transit'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {shipment.status === 'in_transit' ? 'In Transit' : shipment.status.charAt(0).toUpperCase() + shipment.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {shipment.estimatedDelivery
+                            ? new Date(shipment.estimatedDelivery).toLocaleDateString()
+                            : '-'}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <a
+                              href={shipment.trackingUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Button variant="outline" size="sm">
+                                Track
+                              </Button>
+                            </a>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setShipments(shipments.map(s =>
+                                  s.id === shipment.id
+                                    ? { ...s, status: s.status === 'pending' ? 'in_transit' : s.status === 'in_transit' ? 'delivered' : 'pending' }
+                                    : s
+                                ))
+                              }}
+                            >
+                              Update
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-red-600"
+                              onClick={() => setShipments(shipments.filter(s => s.id !== shipment.id))}
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Import Shipment Modal */}
+      {showShipmentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-12 h-12 bg-gradient-to-r from-[#4b2d83] to-[#ff6600] rounded-lg flex items-center justify-center">
+                  <span className="text-white text-xl">📦</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Import Shipment</h2>
+                  <p className="text-sm text-gray-500">Track incoming deliveries from suppliers</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Supplier Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier *</label>
+                  <select
+                    value={newShipment.supplierId}
+                    onChange={(e) => setNewShipment({ ...newShipment, supplierId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Supplier</option>
+                    {suppliers.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Shipper Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Shipper *</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setNewShipment({ ...newShipment, shipper: 'fedex' })}
+                      className={`p-4 border-2 rounded-lg flex flex-col items-center gap-2 transition-all ${
+                        newShipment.shipper === 'fedex'
+                          ? 'border-[#4b2d83] bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1">
+                        <span className="text-[#4b2d83] font-bold text-xl">Fed</span>
+                        <span className="text-[#ff6600] font-bold text-xl">Ex</span>
+                      </div>
+                      <span className="text-xs text-gray-500">International Express</span>
+                      {newShipment.shipper === 'fedex' && (
+                        <span className="text-xs text-[#4b2d83] font-medium">Selected</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewShipment({ ...newShipment, shipper: 'dhl' })}
+                      className={`p-4 border-2 rounded-lg flex flex-col items-center gap-2 transition-all ${
+                        newShipment.shipper === 'dhl'
+                          ? 'border-[#D40511] bg-red-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="bg-[#D40511] text-white font-bold text-xl px-3 py-1 rounded">
+                        DHL
+                      </div>
+                      <span className="text-xs text-gray-500">Express Worldwide</span>
+                      {newShipment.shipper === 'dhl' && (
+                        <span className="text-xs text-[#D40511] font-medium">Selected</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tracking Number */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tracking Number *</label>
+                  <input
+                    type="text"
+                    value={newShipment.trackingNumber}
+                    onChange={(e) => setNewShipment({ ...newShipment, trackingNumber: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="e.g., 794644790138"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Tracking URL will be auto-generated based on shipper
+                  </p>
+                </div>
+
+                {/* Preview Tracking URL */}
+                {newShipment.trackingNumber && (
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Tracking URL Preview:</p>
+                    <code className="text-xs text-blue-600 break-all">
+                      {newShipment.shipper === 'fedex'
+                        ? `https://www.fedex.com/fedextrack/?trknbr=${newShipment.trackingNumber}`
+                        : `https://www.dhl.com/en/express/tracking.html?AWB=${newShipment.trackingNumber}`
+                      }
+                    </code>
+                  </div>
+                )}
+
+                {/* Estimated Delivery */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Delivery</label>
+                  <input
+                    type="date"
+                    value={newShipment.estimatedDelivery}
+                    onChange={(e) => setNewShipment({ ...newShipment, estimatedDelivery: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea
+                    value={newShipment.notes}
+                    onChange={(e) => setNewShipment({ ...newShipment, notes: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    rows={2}
+                    placeholder="Additional notes about this shipment..."
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowShipmentModal(false)
+                    setNewShipment({ supplierId: '', trackingNumber: '', shipper: 'fedex', estimatedDelivery: '', notes: '' })
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    const trackingUrl = newShipment.shipper === 'fedex'
+                      ? `https://www.fedex.com/fedextrack/?trknbr=${newShipment.trackingNumber}`
+                      : `https://www.dhl.com/en/express/tracking.html?AWB=${newShipment.trackingNumber}`
+
+                    const shipment: Shipment = {
+                      id: Date.now().toString(),
+                      supplierId: newShipment.supplierId,
+                      trackingNumber: newShipment.trackingNumber,
+                      trackingUrl,
+                      shipper: newShipment.shipper,
+                      status: 'pending',
+                      createdAt: new Date().toISOString(),
+                      estimatedDelivery: newShipment.estimatedDelivery || undefined,
+                      notes: newShipment.notes
+                    }
+                    setShipments([shipment, ...shipments])
+                    setShowShipmentModal(false)
+                    setNewShipment({ supplierId: '', trackingNumber: '', shipper: 'fedex', estimatedDelivery: '', notes: '' })
+                    setActiveTab('shipments')
+                  }}
+                  className="bg-gradient-to-r from-[#4b2d83] to-[#ff6600] text-white hover:opacity-90"
+                  disabled={!newShipment.supplierId || !newShipment.trackingNumber}
+                >
+                  Import Shipment
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {/* Add Supplier Modal */}
