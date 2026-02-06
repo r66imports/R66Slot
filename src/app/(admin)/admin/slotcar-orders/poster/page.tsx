@@ -226,16 +226,29 @@ export default function PreOrderPosterPage() {
         }
       }
 
-      // Desktop: Download image then open WhatsApp Web
-      const imageUrl = URL.createObjectURL(blob)
-      const downloadLink = document.createElement('a')
-      downloadLink.href = imageUrl
-      downloadLink.download = `preorder-${sku || 'poster'}.jpg`
-      downloadLink.click()
-      URL.revokeObjectURL(imageUrl)
+      // Desktop: Copy image to clipboard, then open WhatsApp Web
+      try {
+        // Copy image to clipboard
+        const clipboardItem = new ClipboardItem({ 'image/png': blob })
+        await navigator.clipboard.write([clipboardItem])
 
-      // Open WhatsApp Web directly
-      window.open('https://web.whatsapp.com/', '_blank')
+        // Open WhatsApp Web
+        window.open('https://web.whatsapp.com/', '_blank')
+
+        // Alert user
+        alert('✅ Image copied to clipboard!\n\n1. Select a contact or group in WhatsApp\n2. Press Ctrl+V to paste the image\n3. Send!')
+      } catch (clipboardError) {
+        // Fallback: download image if clipboard fails
+        const imageUrl = URL.createObjectURL(blob)
+        const downloadLink = document.createElement('a')
+        downloadLink.href = imageUrl
+        downloadLink.download = `preorder-${sku || 'poster'}.jpg`
+        downloadLink.click()
+        URL.revokeObjectURL(imageUrl)
+
+        window.open('https://web.whatsapp.com/', '_blank')
+        alert('📥 Image downloaded!\n\nDrag the downloaded image into WhatsApp or click + to attach it.')
+      }
 
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
