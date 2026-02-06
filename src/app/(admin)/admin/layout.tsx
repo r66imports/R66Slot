@@ -57,9 +57,9 @@ export default function AdminLayout({
       },
     ],
     orderNetwork: [
-      { name: 'Orders', href: '/admin/slotify-orders', icon: '🛒' },
-      { name: 'Pre Orders', href: '/admin/slotify-preorders', icon: '📦' },
-      { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
+      { name: 'Store Orders', href: '/admin/slotify-orders', icon: '🛒' },
+      { name: 'Orders', href: '/admin/slotify-preorders', icon: '📦' },
+      { name: 'Order List', href: '/admin/preorder-list', icon: '📋' },
     ],
     socialMedia: [
       { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
