@@ -196,10 +196,11 @@ export default function PreOrderPosterPage() {
     }
 
     try {
-      // Generate poster image and upload to server
+      // Generate poster image (includes "BOOK NOW" button in the image)
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff',
         scale: 2,
+        useCORS: true,
       })
 
       // Convert canvas to blob
@@ -209,9 +210,11 @@ export default function PreOrderPosterPage() {
 
       if (!blob) return
 
-      // Upload poster image to server so it has a public URL
-      const formData = new FormData()
+      // Create poster file for sharing
       const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
+
+      // Upload poster image to server for public URL
+      const formData = new FormData()
       formData.append('file', posterFile)
 
       let posterImageUrl = ''
@@ -228,20 +231,28 @@ export default function PreOrderPosterPage() {
         console.error('Failed to upload poster image')
       }
 
-      // Build booking link
+      // Build booking link - opens order page in new tab
       const bookingLink = `${window.location.origin}/book/${currentShortCode}`
 
-      // Build WhatsApp message with image URL included
-      const message = `🎯 *${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'}*\n\n` +
+      // Build WhatsApp message - Image + Text in one container
+      // The message includes all details with the booking link prominently displayed
+      const message = `🎯 *${orderType === 'pre-order' ? 'PRE-ORDER AVAILABLE' : 'NEW ARRIVAL'}*\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
         `*${itemDescription}*\n` +
-        `Brand: ${brand}\n` +
-        `SKU: ${sku}\n` +
-        `Price: R${preOrderPrice}\n` +
-        `Est. Delivery: ${estimatedDeliveryDate}\n\n` +
-        (posterImageUrl ? `📸 View poster: ${posterImageUrl}\n\n` : '') +
-        `*Book Here* 👇\n${bookingLink}`
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `🏷️ Brand: ${brand}\n` +
+        `📦 SKU: ${sku}\n` +
+        `💰 Price: *R${preOrderPrice}*\n` +
+        `📅 Est. Delivery: ${estimatedDeliveryDate}\n` +
+        `📊 Available: ${availableQty} units\n\n` +
+        (posterImageUrl ? `🖼️ *View Poster:*\n${posterImageUrl}\n\n` : '') +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `🛒 *BOOK NOW* (Opens in new page)\n` +
+        `👉 ${bookingLink}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `_R66SLOT - Premium Slot Cars_`
 
-      // Try Web Share API first (mobile - shares image + text together)
+      // Try Web Share API first (mobile - shares image + text together in one container)
       if (navigator.share && navigator.canShare) {
         const shareData = {
           text: message,
@@ -258,10 +269,23 @@ export default function PreOrderPosterPage() {
         }
       }
 
-      // Fallback: open WhatsApp with message (image URL will show as link preview)
-      const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_DEFAULT_NUMBER || '27615898921'
-      const whatsappUrl = `https://web.whatsapp.com/send?phone=${whatsappNumber}&text=${encodeURIComponent(message)}`
-      window.open(whatsappUrl, '_blank')
+      // Fallback: Download image first, then open WhatsApp
+      // This ensures image and text are shared together
+      const downloadUrl = URL.createObjectURL(blob)
+      const downloadLink = document.createElement('a')
+      downloadLink.href = downloadUrl
+      downloadLink.download = `preorder-${sku || 'poster'}.jpg`
+      downloadLink.click()
+      URL.revokeObjectURL(downloadUrl)
+
+      // Small delay then open WhatsApp with message
+      setTimeout(() => {
+        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`
+        window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
+      }, 500)
+
+      // Show instruction to user
+      alert('Poster image downloaded! WhatsApp will open - please attach the downloaded image to send with your message.')
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
       alert('Failed to export poster')
@@ -623,13 +647,13 @@ export default function PreOrderPosterPage() {
                       </div>
                     </div>
 
-                    {/* Book Here Link */}
-                    <p className="text-center pt-2">
+                    {/* BOOK NOW Button - Links to Order, Opens in New Page */}
+                    <div className="pt-3">
                       <a
                         href={shortCode ? `/book/${shortCode}` : '#'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-600 font-bold font-play text-lg underline hover:text-blue-800"
+                        className="block w-full bg-green-600 hover:bg-green-700 text-white text-center py-3 px-4 rounded-lg font-bold font-play text-lg transition-colors"
                         onClick={(e) => {
                           if (!shortCode) {
                             e.preventDefault()
@@ -637,11 +661,16 @@ export default function PreOrderPosterPage() {
                           }
                         }}
                       >
-                        Book Here
+                        🛒 BOOK NOW
                       </a>
-                    </p>
+                      {shortCode && (
+                        <p className="text-xs text-center text-gray-500 mt-1 font-play">
+                          Opens order page in new tab
+                        </p>
+                      )}
+                    </div>
 
-                    <p className="text-xs text-center text-gray-400 font-play">
+                    <p className="text-xs text-center text-gray-400 font-play pt-2">
                       R66SLOT - Premium Slot Cars
                     </p>
                   </div>
