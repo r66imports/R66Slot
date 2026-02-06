@@ -203,36 +203,27 @@ export default function PreOrderPosterPage() {
         useCORS: true,
       })
 
-      // Convert canvas to blob
+      // Convert to PNG blob for clipboard
       const blob = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.95)
+        canvas.toBlob((b) => resolve(b), 'image/png')
       })
 
       if (!blob) return
 
-      // Upload poster image to get a public URL
-      const formData = new FormData()
-      const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
-      formData.append('file', posterFile)
+      // Copy image to clipboard
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ])
 
-      const uploadRes = await fetch('/api/admin/media/upload', {
-        method: 'POST',
-        body: formData,
-      })
+      // Open WhatsApp
+      window.open('https://web.whatsapp.com/', '_blank')
 
-      if (!uploadRes.ok) {
-        alert('Failed to upload poster image')
-        return
-      }
-
-      const uploadData = await uploadRes.json()
-
-      // Open WhatsApp with the image URL (blob storage returns full URL)
-      window.open(`https://wa.me/?text=${encodeURIComponent(uploadData.url)}`, '_blank')
+      // Notify user
+      alert('✅ Poster copied to clipboard!\n\n1. Select a contact in WhatsApp\n2. Press Ctrl+V to paste\n3. Send!')
 
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
-      alert('Failed to export poster. Please try again.')
+      alert('Failed to copy poster. Please try again.')
     }
   }
 
