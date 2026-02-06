@@ -226,19 +226,31 @@ export default function PreOrderPosterPage() {
         }
       }
 
-      // Desktop: Copy image to clipboard, then open WhatsApp Web
+      // Desktop: Copy image to clipboard and open WhatsApp Desktop app
       try {
-        // Copy image to clipboard
-        const clipboardItem = new ClipboardItem({ 'image/png': blob })
-        await navigator.clipboard.write([clipboardItem])
+        // Convert to PNG for clipboard (better compatibility)
+        const pngBlob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((b) => resolve(b), 'image/png')
+        })
 
-        // Open WhatsApp Web
-        window.open('https://web.whatsapp.com/', '_blank')
+        if (pngBlob) {
+          const clipboardItem = new ClipboardItem({ 'image/png': pngBlob })
+          await navigator.clipboard.write([clipboardItem])
+        }
 
-        // Alert user
-        alert('✅ Image copied to clipboard!\n\n1. Select a contact or group in WhatsApp\n2. Press Ctrl+V to paste the image\n3. Send!')
+        // Try to open WhatsApp Desktop app first (if installed)
+        // This opens the native app where Ctrl+V paste works better
+        window.location.href = 'whatsapp://send'
+
+        // Small delay then show instructions
+        setTimeout(() => {
+          alert('✅ Image copied!\n\n1. Select a contact/group\n2. Press Ctrl+V to paste\n3. Send!')
+        }, 500)
+
       } catch (clipboardError) {
-        // Fallback: download image if clipboard fails
+        console.error('Clipboard error:', clipboardError)
+
+        // Fallback: download image and open WhatsApp Web
         const imageUrl = URL.createObjectURL(blob)
         const downloadLink = document.createElement('a')
         downloadLink.href = imageUrl
@@ -247,7 +259,7 @@ export default function PreOrderPosterPage() {
         URL.revokeObjectURL(imageUrl)
 
         window.open('https://web.whatsapp.com/', '_blank')
-        alert('📥 Image downloaded!\n\nDrag the downloaded image into WhatsApp or click + to attach it.')
+        alert('📥 Image downloaded!\n\nDrag it into WhatsApp or click 📎 to attach.')
       }
 
     } catch (error) {
