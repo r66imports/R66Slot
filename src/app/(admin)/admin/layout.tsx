@@ -56,13 +56,17 @@ export default function AdminLayout({
         ]
       },
     ],
-    business: [
-      { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
-      { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
-      { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
+    orderNetwork: [
+      { name: 'Orders', href: '/admin/slotify-orders', icon: '🛒' },
       { name: 'Pre Orders', href: '/admin/slotify-preorders', icon: '📦' },
-      { name: 'Orders', href: '/admin/slotify-orders', icon: '🎰' },
+      { name: 'List of Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
+    ],
+    socialMedia: [
+      { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
       { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
+    ],
+    business: [
+      { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
       { name: 'Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
@@ -227,6 +231,60 @@ export default function AdminLayout({
                     )
                   }
 
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                        isActive
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      )}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Order Network Section */}
+            <div>
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
+                Order Network
+              </p>
+              <div className="space-y-1">
+                {navigation.orderNetwork.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                        isActive
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      )}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Social Media Section */}
+            <div>
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
+                Social Media
+              </p>
+              <div className="space-y-1">
+                {navigation.socialMedia.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
                     <Link
                       key={item.name}
