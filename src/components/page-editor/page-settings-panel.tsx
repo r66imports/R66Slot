@@ -358,6 +358,260 @@ export function PageSettingsPanel({ pageSettings, onUpdate, onClose }: PageSetti
         ═══════════════════════════════════════════════════════════════ */}
         {activeTab === 'background' && (
           <>
+        {/* Canvas Selection with Measurement Bars */}
+        <div className="bg-gray-50 rounded-lg p-3 mb-3">
+          <h4 className="text-xs font-semibold text-gray-700 mb-2 font-play flex items-center gap-2">
+            <span>📐</span> Canvas Settings
+          </h4>
+
+          {/* Canvas Preview with Measurement Bars */}
+          <div className="relative mb-3">
+            {/* Top Ruler */}
+            <div className="flex mb-1">
+              <div className="w-6"></div>
+              <div className="flex-1 h-4 bg-gray-200 rounded-t relative overflow-hidden">
+                <div className="absolute inset-0 flex items-end">
+                  {[0, 25, 50, 75, 100].map((tick) => (
+                    <div key={tick} className="flex-1 flex flex-col items-center">
+                      <div className="w-px h-2 bg-gray-400"></div>
+                      <span className="text-[8px] text-gray-500">{Math.round((pageSettings.canvasWidth || 1200) * tick / 100)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex">
+              {/* Left Ruler */}
+              <div className="w-4 bg-gray-200 rounded-l relative mr-1">
+                <div className="absolute inset-0 flex flex-col">
+                  {[0, 25, 50, 75, 100].map((tick) => (
+                    <div key={tick} className="flex-1 flex items-center">
+                      <div className="h-px w-2 bg-gray-400"></div>
+                      <span className="text-[7px] text-gray-500 ml-0.5 rotate-[-90deg] origin-left">{Math.round((pageSettings.canvasHeight || 800) * tick / 100)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Canvas Preview */}
+              <div
+                className="flex-1 h-32 border-2 border-dashed border-gray-300 rounded relative"
+                style={{
+                  backgroundColor: pageSettings.backgroundColor || '#ffffff',
+                  backgroundImage: pageSettings.backgroundImage ? `url(${pageSettings.backgroundImage})` : undefined,
+                  backgroundSize: pageSettings.backgroundSize || 'cover',
+                  backgroundPosition: pageSettings.backgroundPosition || 'center',
+                  opacity: pageSettings.backgroundOpacity ?? 1
+                }}
+              >
+                {/* Grid Overlay */}
+                {pageSettings.showGrid && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      backgroundImage: `
+                        linear-gradient(to right, rgba(156,163,175,0.3) 1px, transparent 1px),
+                        linear-gradient(to bottom, rgba(156,163,175,0.3) 1px, transparent 1px)
+                      `,
+                      backgroundSize: `${(pageSettings.gridSize || 20) / 2}px ${(pageSettings.gridSize || 20) / 2}px`
+                    }}
+                  />
+                )}
+
+                {/* Canvas Info Overlay */}
+                <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-play">
+                  {pageSettings.canvasWidth || 1200} × {pageSettings.canvasHeight || 800}
+                </div>
+
+                {/* Origin Marker */}
+                <div
+                  className="absolute w-3 h-3 border-2 border-blue-500 rounded-full bg-blue-500/30"
+                  style={{
+                    left: `${((pageSettings.canvasX || 0) / (pageSettings.canvasWidth || 1200)) * 100}%`,
+                    top: `${((pageSettings.canvasY || 0) / (pageSettings.canvasHeight || 800)) * 100}%`,
+                    transform: 'translate(-50%, -50%)'
+                  }}
+                />
+              </div>
+
+              {/* Right Ruler */}
+              <div className="w-4 bg-gray-200 rounded-r ml-1 relative">
+                <div className="absolute inset-y-0 left-0 w-px bg-gray-400"></div>
+              </div>
+            </div>
+
+            {/* Bottom Ruler */}
+            <div className="flex mt-1">
+              <div className="w-6"></div>
+              <div className="flex-1 h-2 bg-gray-200 rounded-b relative">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gray-400"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Canvas Preset Selector */}
+          <div className="mb-3">
+            <label className="block text-[10px] font-medium text-gray-500 mb-1 font-play">Canvas Preset</label>
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { id: 'desktop', label: '🖥️', size: '1200×800', w: 1200, h: 800 },
+                { id: 'tablet', label: '📱', size: '768×1024', w: 768, h: 1024 },
+                { id: 'mobile', label: '📲', size: '375×667', w: 375, h: 667 },
+                { id: 'custom', label: '✏️', size: 'Custom', w: null, h: null },
+              ].map((preset) => (
+                <button
+                  key={preset.id}
+                  onClick={() => {
+                    if (preset.w && preset.h) {
+                      onUpdate({
+                        canvasPreset: preset.id as any,
+                        canvasWidth: preset.w,
+                        canvasHeight: preset.h
+                      })
+                    } else {
+                      onUpdate({ canvasPreset: 'custom' })
+                    }
+                  }}
+                  className={`py-1.5 px-1 rounded text-center transition-colors ${
+                    (pageSettings.canvasPreset || 'desktop') === preset.id
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className="block text-sm">{preset.label}</span>
+                  <span className="block text-[8px]">{preset.size}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Canvas Dimensions */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label className="block text-[10px] font-medium text-gray-500 mb-1 font-play">Width (px)</label>
+              <input
+                type="number"
+                value={pageSettings.canvasWidth || 1200}
+                onChange={(e) => onUpdate({ canvasWidth: parseInt(e.target.value) || 1200, canvasPreset: 'custom' })}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+                min={320}
+                max={3840}
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-medium text-gray-500 mb-1 font-play">Height (px)</label>
+              <input
+                type="number"
+                value={pageSettings.canvasHeight || 800}
+                onChange={(e) => onUpdate({ canvasHeight: parseInt(e.target.value) || 800, canvasPreset: 'custom' })}
+                className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+                min={320}
+                max={3840}
+              />
+            </div>
+          </div>
+
+          {/* X, Y Position Controls */}
+          <div className="border-t border-gray-200 pt-3">
+            <h5 className="text-[10px] font-semibold text-gray-600 mb-2 font-play flex items-center gap-1">
+              <span>📍</span> Origin Point (X, Y)
+            </h5>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 mb-1 font-play">X Position</label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={pageSettings.canvasX || 0}
+                    onChange={(e) => onUpdate({ canvasX: parseInt(e.target.value) || 0 })}
+                    className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+                    min={0}
+                    max={pageSettings.canvasWidth || 1200}
+                  />
+                  <span className="text-[10px] text-gray-400">px</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 mb-1 font-play">Y Position</label>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={pageSettings.canvasY || 0}
+                    onChange={(e) => onUpdate({ canvasY: parseInt(e.target.value) || 0 })}
+                    className="flex-1 px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+                    min={0}
+                    max={pageSettings.canvasHeight || 800}
+                  />
+                  <span className="text-[10px] text-gray-400">px</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Position Buttons */}
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { label: '↖', x: 0, y: 0 },
+                { label: '↑', x: (pageSettings.canvasWidth || 1200) / 2, y: 0 },
+                { label: '↗', x: pageSettings.canvasWidth || 1200, y: 0 },
+                { label: '←', x: 0, y: (pageSettings.canvasHeight || 800) / 2 },
+                { label: '⊙', x: (pageSettings.canvasWidth || 1200) / 2, y: (pageSettings.canvasHeight || 800) / 2 },
+                { label: '→', x: pageSettings.canvasWidth || 1200, y: (pageSettings.canvasHeight || 800) / 2 },
+                { label: '↙', x: 0, y: pageSettings.canvasHeight || 800 },
+                { label: '↓', x: (pageSettings.canvasWidth || 1200) / 2, y: pageSettings.canvasHeight || 800 },
+                { label: '↘', x: pageSettings.canvasWidth || 1200, y: pageSettings.canvasHeight || 800 },
+              ].map((pos, i) => (
+                <button
+                  key={i}
+                  onClick={() => onUpdate({ canvasX: Math.round(pos.x), canvasY: Math.round(pos.y) })}
+                  className="py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs transition-colors"
+                  title={`Set to ${pos.label}`}
+                >
+                  {pos.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Grid Settings */}
+          <div className="border-t border-gray-200 pt-3 mt-3">
+            <div className="flex items-center justify-between mb-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={pageSettings.showGrid || false}
+                  onChange={(e) => onUpdate({ showGrid: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-[10px] text-gray-600 font-play">Show Grid</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={pageSettings.snapToGrid || false}
+                  onChange={(e) => onUpdate({ snapToGrid: e.target.checked })}
+                  className="rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-[10px] text-gray-600 font-play">Snap to Grid</span>
+              </label>
+            </div>
+            {pageSettings.showGrid && (
+              <div>
+                <label className="block text-[10px] font-medium text-gray-500 mb-1 font-play">Grid Size: {pageSettings.gridSize || 20}px</label>
+                <input
+                  type="range"
+                  min={5}
+                  max={50}
+                  step={5}
+                  value={pageSettings.gridSize || 20}
+                  onChange={(e) => onUpdate({ gridSize: parseInt(e.target.value) })}
+                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Background Color */}
         <div>
           <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Background Color</label>

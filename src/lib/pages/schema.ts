@@ -151,6 +151,15 @@ export interface PageSettings {
   backgroundPosition?: string
   backgroundOpacity?: number
   fullWidth?: boolean
+  // Canvas Settings
+  canvasWidth?: number
+  canvasHeight?: number
+  canvasX?: number
+  canvasY?: number
+  canvasPreset?: 'desktop' | 'tablet' | 'mobile' | 'custom'
+  showGrid?: boolean
+  gridSize?: number
+  snapToGrid?: boolean
   // SEO Basics
   seoTitle?: string
   seoDescription?: string
