@@ -163,9 +163,26 @@ export default function SuppliersPage() {
     notes: ''
   })
 
+  // Load shipments from localStorage on mount
   useEffect(() => {
+    const savedShipments = localStorage.getItem('r66_shipments')
+    if (savedShipments) {
+      try {
+        const parsed = JSON.parse(savedShipments)
+        setShipments(parsed)
+      } catch (e) {
+        console.error('Error loading shipments from localStorage:', e)
+      }
+    }
     fetchData()
   }, [])
+
+  // Save shipments to localStorage whenever they change
+  useEffect(() => {
+    if (shipments.length > 0 || localStorage.getItem('r66_shipments')) {
+      localStorage.setItem('r66_shipments', JSON.stringify(shipments))
+    }
+  }, [shipments])
 
   useEffect(() => {
     if (activeTab === 'network' && canvasRef.current) {
@@ -817,15 +834,23 @@ export default function SuppliersPage() {
                         </td>
                         <td className="px-6 py-4 text-gray-600">{supplier?.name || 'Unknown'}</td>
                         <td className="px-6 py-4">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            shipment.status === 'delivered'
-                              ? 'bg-green-100 text-green-700'
-                              : shipment.status === 'in_transit'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {shipment.status === 'in_transit' ? 'In Transit' : shipment.status.charAt(0).toUpperCase() + shipment.status.slice(1)}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className={`px-2 py-1 rounded text-xs font-medium inline-block w-fit ${
+                              shipment.status === 'delivered'
+                                ? 'bg-green-100 text-green-700'
+                                : shipment.status === 'in_transit'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {shipment.status === 'in_transit' ? 'In Transit' : shipment.status.charAt(0).toUpperCase() + shipment.status.slice(1)}
+                            </span>
+                            {/* Mini Status Bar */}
+                            <div className="flex items-center gap-1 w-24">
+                              <div className={`h-1.5 flex-1 rounded-l ${shipment.status !== '' ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+                              <div className={`h-1.5 flex-1 ${shipment.status === 'in_transit' || shipment.status === 'delivered' ? 'bg-blue-500' : 'bg-gray-200'}`}></div>
+                              <div className={`h-1.5 flex-1 rounded-r ${shipment.status === 'delivered' ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-gray-600">
                           {shipment.estimatedDelivery
@@ -1289,70 +1314,209 @@ export default function SuppliersPage() {
       {/* Tracking Popup Modal */}
       {showTrackingModal && selectedShipment && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-lg">
             <CardContent className="p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
                   selectedShipment.shipper === 'fedex' ? 'bg-[#4b2d83]' : 'bg-[#D40511]'
                 }`}>
-                  <span className="text-white text-xl">🔗</span>
+                  <span className="text-white text-xl">📦</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">Tracking Details</h2>
-                  <p className="text-sm text-gray-500">View and access shipment tracking</p>
+                  <h2 className="text-xl font-bold">Shipment Tracking</h2>
+                  <p className="text-sm text-gray-500">Real-time shipment status</p>
                 </div>
               </div>
 
               <div className="space-y-4">
-                {/* Shipper Badge */}
-                <div className="flex items-center gap-3">
-                  {selectedShipment.shipper === 'fedex' ? (
-                    <div className="px-4 py-2 bg-gradient-to-r from-[#4b2d83] to-[#ff6600] text-white rounded-lg font-bold">
-                      FedEx
+                {/* Status Progress Bar */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-gray-700">Shipment Status</span>
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                      selectedShipment.status === 'delivered'
+                        ? 'bg-green-500 text-white'
+                        : selectedShipment.status === 'in_transit'
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-yellow-500 text-white'
+                    }`}>
+                      {selectedShipment.status === 'in_transit' ? 'IN TRANSIT' : selectedShipment.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between">
+                      {/* Step 1: Order Placed */}
+                      <div className="flex flex-col items-center">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          selectedShipment.status !== '' ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-500'
+                        }`}>
+                          📋
+                        </div>
+                        <span className="text-xs mt-1 text-gray-600">Ordered</span>
+                      </div>
+
+                      {/* Connector 1 */}
+                      <div className={`flex-1 h-1 mx-2 ${
+                        selectedShipment.status === 'in_transit' || selectedShipment.status === 'delivered'
+                          ? 'bg-green-500' : 'bg-gray-300'
+                      }`}></div>
+
+                      {/* Step 2: In Transit */}
+                      <div className="flex flex-col items-center">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          selectedShipment.status === 'in_transit' || selectedShipment.status === 'delivered'
+                            ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-500'
+                        }`}>
+                          🚚
+                        </div>
+                        <span className="text-xs mt-1 text-gray-600">In Transit</span>
+                      </div>
+
+                      {/* Connector 2 */}
+                      <div className={`flex-1 h-1 mx-2 ${
+                        selectedShipment.status === 'delivered' ? 'bg-green-500' : 'bg-gray-300'
+                      }`}></div>
+
+                      {/* Step 3: Delivered */}
+                      <div className="flex flex-col items-center">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                          selectedShipment.status === 'delivered'
+                            ? 'bg-green-500 text-white' : 'bg-gray-300 text-gray-500'
+                        }`}>
+                          ✅
+                        </div>
+                        <span className="text-xs mt-1 text-gray-600">Delivered</span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="px-4 py-2 bg-[#D40511] text-white rounded-lg font-bold">
-                      DHL
-                    </div>
-                  )}
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  </div>
+                </div>
+
+                {/* Shipment Location Visual */}
+                <div className="p-4 border rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">📍</span>
+                    <span className="font-medium">Current Location</span>
+                  </div>
+                  <div className={`p-3 rounded-lg ${
                     selectedShipment.status === 'delivered'
-                      ? 'bg-green-100 text-green-700'
+                      ? 'bg-green-50 border border-green-200'
                       : selectedShipment.status === 'in_transit'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-yellow-100 text-yellow-700'
+                      ? 'bg-blue-50 border border-blue-200'
+                      : 'bg-yellow-50 border border-yellow-200'
                   }`}>
-                    {selectedShipment.status === 'in_transit' ? 'In Transit' : selectedShipment.status.charAt(0).toUpperCase() + selectedShipment.status.slice(1)}
-                  </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">
+                        {selectedShipment.status === 'delivered' ? '🏠' : selectedShipment.status === 'in_transit' ? '✈️' : '📦'}
+                      </span>
+                      <div>
+                        <p className="font-medium">
+                          {selectedShipment.status === 'delivered'
+                            ? 'Package Delivered!'
+                            : selectedShipment.status === 'in_transit'
+                            ? 'Package in Transit'
+                            : 'Awaiting Pickup'}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {selectedShipment.status === 'delivered'
+                            ? 'Your shipment has been delivered successfully'
+                            : selectedShipment.status === 'in_transit'
+                            ? `On the way from ${suppliers.find(s => s.id === selectedShipment.supplierId)?.country || 'Supplier'}`
+                            : 'Waiting for carrier to pick up package'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Shipper and Tracking Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Carrier</p>
+                    {selectedShipment.shipper === 'fedex' ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[#4b2d83] font-bold">Fed</span>
+                        <span className="text-[#ff6600] font-bold">Ex</span>
+                      </div>
+                    ) : (
+                      <div className="bg-[#D40511] text-white font-bold px-2 py-0.5 rounded inline-block">
+                        DHL
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Est. Delivery</p>
+                    <p className="font-medium">
+                      {selectedShipment.estimatedDelivery
+                        ? new Date(selectedShipment.estimatedDelivery).toLocaleDateString()
+                        : 'Not set'}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Tracking Number */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500 mb-1">Tracking Number</p>
-                  <p className="text-2xl font-bold text-gray-900 font-mono">{selectedShipment.trackingNumber}</p>
-                </div>
-
-                {/* Tracking URL */}
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-xs text-blue-600 mb-1">Tracking URL</p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 bg-white px-3 py-2 rounded border text-xs break-all">
-                      {selectedShipment.trackingUrl}
-                    </code>
-                    <button
-                      onClick={() => navigator.clipboard.writeText(selectedShipment.trackingUrl)}
-                      className="px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-                      title="Copy URL"
-                    >
-                      📋
-                    </button>
-                  </div>
+                <div className="p-4 bg-gray-900 rounded-lg">
+                  <p className="text-xs text-gray-400 mb-1">Tracking Number</p>
+                  <p className="text-xl font-bold text-white font-mono">{selectedShipment.trackingNumber}</p>
                 </div>
 
                 {/* Supplier */}
                 <div className="p-3 border rounded-lg">
                   <p className="text-xs text-gray-500 mb-1">Supplier</p>
                   <p className="font-medium">{suppliers.find(s => s.id === selectedShipment.supplierId)?.name || 'Unknown'}</p>
+                </div>
+
+                {/* Quick Status Update */}
+                <div className="p-3 border rounded-lg">
+                  <p className="text-xs text-gray-500 mb-2">Quick Status Update</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        setShipments(shipments.map(s =>
+                          s.id === selectedShipment.id ? { ...s, status: 'pending' } : s
+                        ))
+                        setSelectedShipment({ ...selectedShipment, status: 'pending' })
+                      }}
+                      className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        selectedShipment.status === 'pending'
+                          ? 'bg-yellow-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Pending
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShipments(shipments.map(s =>
+                          s.id === selectedShipment.id ? { ...s, status: 'in_transit' } : s
+                        ))
+                        setSelectedShipment({ ...selectedShipment, status: 'in_transit' })
+                      }}
+                      className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        selectedShipment.status === 'in_transit'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      In Transit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShipments(shipments.map(s =>
+                          s.id === selectedShipment.id ? { ...s, status: 'delivered' } : s
+                        ))
+                        setSelectedShipment({ ...selectedShipment, status: 'delivered' })
+                      }}
+                      className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                        selectedShipment.status === 'delivered'
+                          ? 'bg-green-500 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Delivered
+                    </button>
+                  </div>
                 </div>
 
                 {/* Open Tracking Button */}
@@ -1366,7 +1530,7 @@ export default function SuppliersPage() {
                       : 'bg-[#D40511] hover:bg-[#b8040f]'
                   }`}
                 >
-                  Open Tracking Page →
+                  Open Carrier Tracking Page →
                 </a>
               </div>
 
