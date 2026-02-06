@@ -250,14 +250,45 @@ export default function PreOrderPosterPage() {
         `━━━━━━━━━━━━━━━━━━━━\n\n` +
         `_R66SLOT - Premium Slot Cars_`
 
-      // DIRECT to WhatsApp Web - NO Share API
-      // Opens WhatsApp Web directly with pre-filled message
-      const whatsappWebUrl = `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`
-      window.open(whatsappWebUrl, '_blank', 'noopener,noreferrer')
+      // Use wa.me which works on both mobile and desktop
+      // It automatically redirects to WhatsApp Web on desktop or WhatsApp app on mobile
+      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
+
+      // Try to open in new window first
+      const newWindow = window.open(whatsappUrl, '_blank')
+
+      // If popup was blocked, show a modal with the link
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+        // Create a temporary link and prompt user
+        const confirmed = confirm(
+          'WhatsApp could not open automatically (popup blocked).\n\n' +
+          'Click OK to open WhatsApp, or Cancel to copy the message to clipboard.'
+        )
+
+        if (confirmed) {
+          // Navigate in same tab as fallback
+          window.location.href = whatsappUrl
+        } else {
+          // Copy message to clipboard
+          try {
+            await navigator.clipboard.writeText(message)
+            alert('Message copied to clipboard! Paste it in WhatsApp manually.')
+          } catch {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea')
+            textArea.value = message
+            document.body.appendChild(textArea)
+            textArea.select()
+            document.execCommand('copy')
+            document.body.removeChild(textArea)
+            alert('Message copied to clipboard! Paste it in WhatsApp manually.')
+          }
+        }
+      }
 
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
-      alert('Failed to export poster')
+      alert('Failed to export poster. Please try again.')
     }
   }
 
