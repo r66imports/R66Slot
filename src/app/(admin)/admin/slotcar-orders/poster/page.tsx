@@ -210,27 +210,23 @@ export default function PreOrderPosterPage() {
 
       if (!blob) return
 
-      // Create file from blob for sharing
-      const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
+      // Check if mobile device (has touch and small screen)
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 
-      // Try Web Share API first (works on mobile - shares image only)
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [posterFile] })) {
-        try {
-          await navigator.share({
-            files: [posterFile],
-          })
-          return // Success - exit function
-        } catch (shareError) {
-          // User cancelled or share failed - continue to fallback
-          if ((shareError as Error).name !== 'AbortError') {
-            console.log('Web Share failed, using fallback')
-          } else {
-            return // User cancelled
+      if (isMobile) {
+        // Mobile: Use Web Share API to share image directly to WhatsApp
+        const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [posterFile] })) {
+          try {
+            await navigator.share({ files: [posterFile] })
+            return
+          } catch (shareError) {
+            if ((shareError as Error).name === 'AbortError') return
           }
         }
       }
 
-      // Fallback for desktop: Download the poster image
+      // Desktop: Download image then open WhatsApp Web
       const imageUrl = URL.createObjectURL(blob)
       const downloadLink = document.createElement('a')
       downloadLink.href = imageUrl
@@ -238,12 +234,8 @@ export default function PreOrderPosterPage() {
       downloadLink.click()
       URL.revokeObjectURL(imageUrl)
 
-      // Show instruction to user
-      alert(
-        '📥 Poster image downloaded!\n\n' +
-        '📱 Open WhatsApp and share the downloaded image.\n\n' +
-        '👉 The poster contains the "Book Here" link.'
-      )
+      // Open WhatsApp Web directly
+      window.open('https://web.whatsapp.com/', '_blank')
 
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
