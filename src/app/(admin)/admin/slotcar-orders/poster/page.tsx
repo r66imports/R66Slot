@@ -196,7 +196,7 @@ export default function PreOrderPosterPage() {
     }
 
     try {
-      // Generate poster image (includes "BOOK NOW" button in the image)
+      // Generate poster image
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff',
         scale: 2,
@@ -213,32 +213,11 @@ export default function PreOrderPosterPage() {
       // Create file from blob for sharing
       const posterFile = new File([blob], `preorder-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
 
-      // Build booking link
-      const bookingLink = `${window.location.origin}/book/${currentShortCode}`
-
-      // Build WhatsApp message text (without image URL - image will be attached)
-      const message = `🎯 *${orderType === 'pre-order' ? 'PRE-ORDER AVAILABLE' : 'NEW ARRIVAL'}*\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `*${itemDescription}*\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `🏷️ Brand: ${brand}\n` +
-        `📦 SKU: ${sku}\n` +
-        `💰 Price: *R${preOrderPrice}*\n` +
-        `📅 Est. Delivery: ${estimatedDeliveryDate}\n` +
-        `📊 Available: ${availableQty} units\n\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n` +
-        `🛒 *BOOK NOW* _(opens in new page)_\n` +
-        `👉 ${bookingLink}\n` +
-        `━━━━━━━━━━━━━━━━━━━━\n\n` +
-        `_R66SLOT - Premium Slot Cars_`
-
-      // Try Web Share API first (works on mobile - shares image directly)
+      // Try Web Share API first (works on mobile - shares image only)
       if (navigator.share && navigator.canShare && navigator.canShare({ files: [posterFile] })) {
         try {
           await navigator.share({
             files: [posterFile],
-            title: itemDescription,
-            text: message,
           })
           return // Success - exit function
         } catch (shareError) {
@@ -251,8 +230,7 @@ export default function PreOrderPosterPage() {
         }
       }
 
-      // Fallback for desktop: Download image + open WhatsApp with text
-      // Download the poster image first
+      // Fallback for desktop: Download the poster image
       const imageUrl = URL.createObjectURL(blob)
       const downloadLink = document.createElement('a')
       downloadLink.href = imageUrl
@@ -260,42 +238,12 @@ export default function PreOrderPosterPage() {
       downloadLink.click()
       URL.revokeObjectURL(imageUrl)
 
-      // Then open WhatsApp with the text message
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`
-
       // Show instruction to user
       alert(
         '📥 Poster image downloaded!\n\n' +
-        '📱 WhatsApp will open next.\n\n' +
-        '👉 After sending the text, tap the + button in WhatsApp to attach the downloaded image.'
+        '📱 Open WhatsApp and share the downloaded image.\n\n' +
+        '👉 The poster contains the "Book Here" link.'
       )
-
-      // Open WhatsApp
-      const newWindow = window.open(whatsappUrl, '_blank')
-
-      if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-        const confirmed = confirm(
-          'WhatsApp could not open automatically.\n\n' +
-          'Click OK to open WhatsApp, or Cancel to copy the message.'
-        )
-
-        if (confirmed) {
-          window.location.href = whatsappUrl
-        } else {
-          try {
-            await navigator.clipboard.writeText(message)
-            alert('Message copied to clipboard! Paste it in WhatsApp with the downloaded image.')
-          } catch {
-            const textArea = document.createElement('textarea')
-            textArea.value = message
-            document.body.appendChild(textArea)
-            textArea.select()
-            document.execCommand('copy')
-            document.body.removeChild(textArea)
-            alert('Message copied to clipboard! Paste it in WhatsApp with the downloaded image.')
-          }
-        }
-      }
 
     } catch (error) {
       console.error('Error exporting to WhatsApp:', error)
@@ -652,19 +600,19 @@ export default function PreOrderPosterPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-500 font-play">Price</p>
-                        <p className="text-2xl font-bold text-primary font-play">
+                        <p className="text-2xl font-bold text-red-500 font-play">
                           R{preOrderPrice || '0.00'}
                         </p>
                       </div>
                     </div>
 
-                    {/* BOOK NOW Button - Links to Order, Opens in New Page */}
-                    <div className="pt-3">
+                    {/* Book Here Link - Blue underlined text */}
+                    <div className="pt-4 text-center">
                       <a
                         href={shortCode ? `/book/${shortCode}` : '#'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block w-full bg-green-600 hover:bg-green-700 text-white text-center py-3 px-4 rounded-lg font-bold font-play text-lg transition-colors"
+                        className="text-blue-600 hover:text-blue-700 font-bold font-play text-xl underline"
                         onClick={(e) => {
                           if (!shortCode) {
                             e.preventDefault()
@@ -672,16 +620,11 @@ export default function PreOrderPosterPage() {
                           }
                         }}
                       >
-                        🛒 BOOK NOW
+                        Book Here
                       </a>
-                      {shortCode && (
-                        <p className="text-xs text-center text-gray-500 mt-1 font-play">
-                          Opens order page in new tab
-                        </p>
-                      )}
                     </div>
 
-                    <p className="text-xs text-center text-gray-400 font-play pt-2">
+                    <p className="text-xs text-center text-gray-400 font-play pt-3">
                       R66SLOT - Premium Slot Cars
                     </p>
                   </div>
