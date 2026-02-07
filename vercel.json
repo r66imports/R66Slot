@@ -11,6 +11,12 @@
       "master": true
     }
   },
+  "crons": [
+    {
+      "path": "/api/auctions/cron",
+      "schedule": "0 0 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
