@@ -23,6 +23,8 @@ export default function CatalogueProductsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     fetchProducts()
@@ -39,6 +41,66 @@ export default function CatalogueProductsPage() {
       console.error('Error fetching products:', error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p.id)))
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return
+    const count = selectedIds.size
+    if (!confirm(`Are you sure you want to delete ${count} product${count > 1 ? 's' : ''}? This action cannot be undone.`)) return
+
+    setIsDeleting(true)
+    let failed = 0
+    for (const id of selectedIds) {
+      try {
+        const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+        if (!res.ok) failed++
+      } catch {
+        failed++
+      }
+    }
+    setProducts(prev => prev.filter(p => !selectedIds.has(p.id) || failed > 0))
+    if (failed === 0) {
+      setProducts(prev => prev.filter(p => !selectedIds.has(p.id)))
+    } else {
+      await fetchProducts()
+      alert(`${failed} product(s) failed to delete`)
+    }
+    setSelectedIds(new Set())
+    setIsDeleting(false)
+  }
+
+  const handleDeleteSingle = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) return
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setProducts(prev => prev.filter(p => p.id !== id))
+        setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next })
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Failed to delete product')
+      }
+    } catch (error) {
+      console.error('Error deleting product:', error)
+      alert('Failed to delete product')
     }
   }
 
@@ -92,6 +154,28 @@ export default function CatalogueProductsPage() {
         </select>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="flex items-center gap-4 mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <span className="text-sm font-medium text-blue-800">
+            {selectedIds.size} product{selectedIds.size > 1 ? 's' : ''} selected
+          </span>
+          <button
+            onClick={handleDeleteSelected}
+            disabled={isDeleting}
+            className="px-4 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors disabled:opacity-50"
+          >
+            {isDeleting ? 'Deleting...' : `Delete Selected (${selectedIds.size})`}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
       {/* Products Table */}
       {isLoading ? (
         <div className="text-center py-12">
@@ -113,6 +197,14 @@ export default function CatalogueProductsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
+                  <th className="px-3 py-3 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={filteredProducts.length > 0 && selectedIds.size === filteredProducts.length}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Product</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SKU</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Price</th>
@@ -123,7 +215,15 @@ export default function CatalogueProductsPage() {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {filteredProducts.map((product) => (
-                  <tr key={product.id} className="hover:bg-gray-50">
+                  <tr key={product.id} className={`hover:bg-gray-50 ${selectedIds.has(product.id) ? 'bg-blue-50' : ''}`}>
+                    <td className="px-3 py-4 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(product.id)}
+                        onChange={() => toggleSelect(product.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
@@ -166,12 +266,20 @@ export default function CatalogueProductsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Link
-                        href={`/admin/products/${product.id}`}
-                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      >
-                        Edit
-                      </Link>
+                      <div className="flex items-center justify-end gap-3">
+                        <Link
+                          href={`/admin/products/${product.id}`}
+                          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() => handleDeleteSingle(product.id, product.title)}
+                          className="text-red-500 hover:text-red-700 text-sm font-medium"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -361,6 +361,22 @@ export default function CatalogueInventoryPage() {
     setNewBrand({ name: '', code: '' })
   }
 
+  const deleteItem = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) return
+    try {
+      const res = await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setInventory(prev => prev.filter(item => item.id !== id))
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Failed to delete item')
+      }
+    } catch (error) {
+      console.error('Error deleting item:', error)
+      alert('Failed to delete item')
+    }
+  }
+
   const hasActiveFilters = supplierFilter || brandFilter || categoryFilter || stockFilter || filter
 
   return (
@@ -559,6 +575,7 @@ export default function CatalogueInventoryPage() {
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Stock</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Adjust</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Delete</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -632,6 +649,14 @@ export default function CatalogueInventoryPage() {
                           +
                         </button>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => deleteItem(item.id, item.title)}
+                        className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-300 rounded-lg transition-colors"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
