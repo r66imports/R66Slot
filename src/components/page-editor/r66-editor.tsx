@@ -368,6 +368,16 @@ ${canvasHTML}
           >
             Export HTML
           </Button>
+
+          {/* View Live */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(`/${page.slug || ''}`, '_blank')}
+            className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+          >
+            View Live
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">

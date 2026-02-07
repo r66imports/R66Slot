@@ -166,6 +166,12 @@ export default function EditProductPage({
             </div>
             <div className="flex items-center gap-3">
               <button
+                onClick={() => window.open(`/products/${id}`, '_blank')}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg"
+              >
+                View Live
+              </button>
+              <button
                 onClick={() => router.push('/admin/products')}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
                 disabled={saving}

@@ -192,6 +192,13 @@ export default function EditBlogPost({
           <div className="flex gap-3">
             <Button
               variant="outline"
+              onClick={() => window.open(`/blog/${formData.slug}`, '_blank')}
+              className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+            >
+              View Live
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => router.push('/admin/blog')}
             >
               Cancel

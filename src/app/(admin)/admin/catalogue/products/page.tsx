@@ -76,7 +76,6 @@ export default function CatalogueProductsPage() {
         failed++
       }
     }
-    setProducts(prev => prev.filter(p => !selectedIds.has(p.id) || failed > 0))
     if (failed === 0) {
       setProducts(prev => prev.filter(p => !selectedIds.has(p.id)))
     } else {
