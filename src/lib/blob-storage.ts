@@ -13,11 +13,18 @@ export async function blobRead<T = unknown>(key: string, fallback: T): Promise<T
     if (!blob) return fallback
 
     const response = await fetch(blob.url, { cache: 'no-store' })
-    if (!response.ok) return fallback
+    if (!response.ok) {
+      console.error(`[blobRead] fetch failed for "${key}": ${response.status} ${response.statusText}`)
+      return fallback
+    }
 
     const text = await response.text()
     return JSON.parse(text) as T
-  } catch {
+  } catch (err: any) {
+    // BlobNotFoundError is expected for pages that don't exist yet — don't log those
+    if (err?.name !== 'BlobNotFoundError') {
+      console.error(`[blobRead] error reading "${key}":`, err?.message || err)
+    }
     return fallback
   }
 }
@@ -60,7 +67,8 @@ export async function blobListWithUrls(prefix: string): Promise<{ pathname: stri
   try {
     const { blobs } = await list({ prefix, limit: 1000 })
     return blobs.map(b => ({ pathname: b.pathname, url: b.url }))
-  } catch {
+  } catch (err: any) {
+    console.error(`[blobListWithUrls] error listing "${prefix}":`, err?.message || err)
     return []
   }
 }

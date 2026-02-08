@@ -14,6 +14,14 @@ const FRONTEND_PAGE_TEMPLATES: Record<string, { title: string; slug: string }> =
   'frontend-brand-revo': { title: 'Revo', slug: 'brands/revo' },
   'frontend-brand-pioneer': { title: 'Pioneer', slug: 'brands/pioneer' },
   'frontend-brand-sideways': { title: 'Sideways', slug: 'brands/sideways' },
+  'frontend-cars-nsr': { title: 'NSR Cars', slug: 'cars/nsr' },
+  'frontend-cars-revo': { title: 'Revo Cars', slug: 'cars/revo' },
+  'frontend-cars-pioneer': { title: 'Pioneer Cars', slug: 'cars/pioneer' },
+  'frontend-cars-sideways': { title: 'Sideways Cars', slug: 'cars/sideways' },
+  'frontend-cars-slot-it': { title: 'Slot.it Cars', slug: 'cars/slot-it' },
+  'frontend-cars-policar': { title: 'Policar Cars', slug: 'cars/policar' },
+  'frontend-cars-thunderslot': { title: 'Thunderslot Cars', slug: 'cars/thunderslot' },
+  'frontend-cars-scaleauto': { title: 'Scaleauto Cars', slug: 'cars/scaleauto' },
 }
 
 // GET /api/admin/pages/[id] - Get single page
@@ -28,29 +36,33 @@ export async function GET(
     // Auto-create frontend pages that don't exist yet
     if (!page && id.startsWith('frontend-')) {
       const template = FRONTEND_PAGE_TEMPLATES[id]
-      if (template) {
-        const now = new Date().toISOString()
-        const newPage: Page = {
-          id,
-          title: template.title,
-          slug: template.slug,
-          published: false,
-          components: [],
-          pageSettings: {
-            backgroundColor: '#ffffff',
-          },
-          seo: {
-            metaTitle: template.title,
-            metaDescription: '',
-            metaKeywords: '',
-          },
-          createdAt: now,
-          updatedAt: now,
-        }
+      // Use template if available, otherwise generate title/slug from the ID
+      const fallbackName = id.replace('frontend-', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      const fallbackSlug = id.replace('frontend-', '').replace(/-/g, '/')
+      const title = template?.title || fallbackName
+      const slug = template?.slug ?? fallbackSlug
 
-        await blobWrite(`data/pages/${id}.json`, newPage)
-        page = newPage
+      const now = new Date().toISOString()
+      const newPage: Page = {
+        id,
+        title,
+        slug,
+        published: false,
+        components: [],
+        pageSettings: {
+          backgroundColor: '#ffffff',
+        },
+        seo: {
+          metaTitle: title,
+          metaDescription: '',
+          metaKeywords: '',
+        },
+        createdAt: now,
+        updatedAt: now,
       }
+
+      await blobWrite(`data/pages/${id}.json`, newPage)
+      page = newPage
     }
 
     if (!page) {

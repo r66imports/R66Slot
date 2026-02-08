@@ -273,23 +273,36 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     }
   }, [page])
 
-  // Load page
+  // Load page with retry
   const loadPage = useCallback(async (pageId: string) => {
     setLoadError(null)
-    try {
-      const response = await fetch(`/api/admin/pages/${pageId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPage(data)
-        setHistory([])
-        setHistoryIndex(-1)
-      } else {
-        const err = await response.json().catch(() => ({ error: 'Unknown error' }))
-        setLoadError(err.error || `Failed to load page (${response.status})`)
+    const MAX_RETRIES = 3
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await fetch(`/api/admin/pages/${pageId}`, { cache: 'no-store' })
+        if (response.ok) {
+          const data = await response.json()
+          setPage(data)
+          setHistory([])
+          setHistoryIndex(-1)
+          return
+        }
+        // On last attempt, show the error
+        if (attempt === MAX_RETRIES) {
+          const err = await response.json().catch(() => ({ error: 'Unknown error' }))
+          setLoadError(err.error || `Failed to load page (${response.status})`)
+          return
+        }
+      } catch (error) {
+        if (attempt === MAX_RETRIES) {
+          console.error('Error loading page:', error)
+          setLoadError('Network error — could not reach the server')
+          return
+        }
       }
-    } catch (error) {
-      console.error('Error loading page:', error)
-      setLoadError('Network error — could not reach the server')
+      // Wait before retrying (500ms, 1000ms)
+      await new Promise(r => setTimeout(r, attempt * 500))
     }
   }, [])
 

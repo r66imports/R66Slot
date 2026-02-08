@@ -167,9 +167,13 @@ export default function PagesManagementPage() {
 
   const fetchCustomPages = async () => {
     try {
-      const response = await fetch('/api/admin/pages')
+      const response = await fetch('/api/admin/pages', { cache: 'no-store' })
+      if (!response.ok) {
+        console.error('Error fetching pages:', response.status, response.statusText)
+        return
+      }
       const data = await response.json()
-      setCustomPages(data)
+      setCustomPages(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching pages:', error)
     } finally {
