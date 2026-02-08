@@ -12,7 +12,7 @@ export async function blobRead<T = unknown>(key: string, fallback: T): Promise<T
     const blob = await head(key)
     if (!blob) return fallback
 
-    const response = await fetch(blob.url, { next: { revalidate: 5 } })
+    const response = await fetch(blob.url, { cache: 'no-store' })
     if (!response.ok) return fallback
 
     const text = await response.text()
@@ -24,7 +24,8 @@ export async function blobRead<T = unknown>(key: string, fallback: T): Promise<T
 
 // Write a JSON file to blob storage
 export async function blobWrite(key: string, data: unknown): Promise<void> {
-  await put(key, JSON.stringify(data, null, 2), {
+  const json = JSON.stringify(data, null, 2)
+  await put(key, json, {
     access: 'public',
     addRandomSuffix: false,
     allowOverwrite: true,
@@ -77,10 +78,13 @@ export async function blobExists(key: string): Promise<boolean> {
 // Upload a binary file (for media uploads)
 export async function blobUploadFile(
   key: string,
-  data: Buffer | ArrayBuffer,
+  data: Buffer | ArrayBuffer | Uint8Array,
   contentType: string
 ): Promise<string> {
-  const blob = await put(key, data, {
+  // Ensure we pass a Buffer for maximum compatibility
+  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data)
+
+  const blob = await put(key, buffer, {
     access: 'public',
     addRandomSuffix: false,
     allowOverwrite: true,

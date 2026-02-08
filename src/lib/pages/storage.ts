@@ -17,7 +17,7 @@ export async function getAllPages(): Promise<Page[]> {
     const pages = await Promise.all(
       jsonEntries.map(async (entry) => {
         try {
-          const response = await fetch(entry.url, { next: { revalidate: 5 } })
+          const response = await fetch(entry.url, { cache: 'no-store' })
           if (!response.ok) return null
           return (await response.json()) as Page
         } catch {

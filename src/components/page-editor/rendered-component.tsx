@@ -224,6 +224,20 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                   width: '100%',
                   height: isFreeformImage ? '100%' : (styles.height || 'auto'),
                 }}
+                crossOrigin="anonymous"
+                loading="lazy"
+                onError={(e) => {
+                  const img = e.target as HTMLImageElement
+                  if (!img.dataset.retried) {
+                    img.dataset.retried = '1'
+                    img.src = settings.imageUrl as string
+                  } else {
+                    img.style.display = 'none'
+                    if (img.parentElement) {
+                      img.parentElement.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:2rem;background:#f3f4f6;border-radius:8px;min-height:120px"><span style="color:#9ca3af;font-size:14px">Image failed to load</span></div>'
+                    }
+                  }
+                }}
               />
             ) : (
               <div className="bg-gray-100 border-2 border-dashed border-gray-300 flex flex-col items-center justify-center p-16 rounded-lg">

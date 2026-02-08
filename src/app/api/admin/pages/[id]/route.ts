@@ -58,10 +58,10 @@ export async function GET(
     }
 
     return NextResponse.json(page)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching page:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch page' },
+      { error: 'Failed to fetch page', details: error?.message },
       { status: 500 }
     )
   }
@@ -74,11 +74,44 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
+
+    let body: any
+    try {
+      body = await request.json()
+    } catch (parseErr: any) {
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body', details: parseErr?.message },
+        { status: 400 }
+      )
+    }
+
+    // Validate required fields
+    if (!body.title && !body.components) {
+      return NextResponse.json(
+        { error: 'Missing required fields (title or components)' },
+        { status: 400 }
+      )
+    }
+
     const page = await updatePage(id, body)
 
     if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 })
+      // Page not found — auto-create it with the provided data
+      const now = new Date().toISOString()
+      const newPage: Page = {
+        id,
+        title: body.title || 'Untitled Page',
+        slug: body.slug || `page-${id}`,
+        published: body.published || false,
+        components: body.components || [],
+        pageSettings: body.pageSettings || { backgroundColor: '#ffffff' },
+        seo: body.seo || { metaTitle: body.title || '', metaDescription: '', metaKeywords: '' },
+        createdAt: now,
+        updatedAt: now,
+      }
+      await blobWrite(`data/pages/${id}.json`, newPage)
+
+      return NextResponse.json(newPage)
     }
 
     // Revalidate the frontend page so edits appear immediately
@@ -91,7 +124,6 @@ export async function PUT(
         const slug = id.replace('frontend-', '')
         revalidatePath(`/${slug}`)
       }
-      // Also revalidate the page's own slug
       if (page?.slug) {
         revalidatePath(`/${page.slug}`)
       }
@@ -100,10 +132,10 @@ export async function PUT(
     }
 
     return NextResponse.json(page)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating page:', error)
     return NextResponse.json(
-      { error: 'Failed to update page' },
+      { error: 'Failed to update page', details: error?.message },
       { status: 500 }
     )
   }
@@ -123,10 +155,10 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting page:', error)
     return NextResponse.json(
-      { error: 'Failed to delete page' },
+      { error: 'Failed to delete page', details: error?.message },
       { status: 500 }
     )
   }

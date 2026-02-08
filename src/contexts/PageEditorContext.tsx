@@ -239,15 +239,15 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     try {
       const payload = {
         ...page,
-        // Only set published: true when explicitly publishing.
-        // When saving a draft, preserve the current published state.
         published: publish ? true : page.published,
       }
+
+      const jsonBody = JSON.stringify(payload)
 
       const response = await fetch(`/api/admin/pages/${page.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: jsonBody,
       })
 
       if (response.ok) {
@@ -255,11 +255,18 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
         setPage(updated)
         return true
       } else {
-        console.error('Failed to save page')
+        let errorMsg = `Save failed (${response.status})`
+        try {
+          const err = await response.json()
+          errorMsg = err.error || err.details || errorMsg
+        } catch {}
+        console.error('Failed to save page:', errorMsg)
+        alert(`Save failed: ${errorMsg}`)
         return false
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving page:', error)
+      alert(`Save error: ${error?.message || 'Network error — check your connection'}`)
       return false
     } finally {
       setIsSaving(false)
