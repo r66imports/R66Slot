@@ -44,7 +44,6 @@ export default function AdminLayout({
     ],
     content: [
       { name: 'Homepage', href: '/admin/homepage', icon: '🏠' },
-      { name: 'Blog', href: '/admin/blog', icon: '📝' },
       {
         name: 'Catalogue',
         href: '/admin/catalogue',
@@ -53,6 +52,20 @@ export default function AdminLayout({
           { name: 'Products', href: '/admin/catalogue/products', icon: '🛍️' },
           { name: 'Inventory', href: '/admin/catalogue/inventory', icon: '📦' },
           { name: 'Categories', href: '/admin/catalogue/categories', icon: '🏷️' },
+        ]
+      },
+    ],
+    blog: [
+      { name: 'Blog', href: '/admin/blog', icon: '📝' },
+    ],
+    auctions: [
+      {
+        name: 'Auctions',
+        href: '/admin/auctions',
+        icon: '🔨',
+        submenu: [
+          { name: 'All Auctions', href: '/admin/auctions', icon: '📋' },
+          { name: 'Create Auction', href: '/admin/auctions/new', icon: '➕' },
         ]
       },
     ],
@@ -264,34 +277,7 @@ export default function AdminLayout({
               </div>
             </div>
 
-            {/* Order Network Section */}
-            <div>
-              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
-                Order Network
-              </p>
-              <div className="space-y-1">
-                {navigation.orderNetwork.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      className={cn(
-                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
-                        isActive
-                          ? 'bg-gray-100 text-gray-900'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      )}
-                    >
-                      <span className="text-base">{item.icon}</span>
-                      {item.name}
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Business Section */}
+            {/* Business & Store Section */}
             <div>
               <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
                 Business &amp; Store
@@ -372,6 +358,141 @@ export default function AdminLayout({
                   }
 
                   // Handle regular link items
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                        isActive
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      )}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Order Network Section */}
+            <div>
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
+                Order Network
+              </p>
+              <div className="space-y-1">
+                {navigation.orderNetwork.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                        isActive
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      )}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Auctions Section */}
+            <div>
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
+                Auctions
+              </p>
+              <div className="space-y-1">
+                {navigation.auctions.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const isExpanded = expandedMenus.includes(item.name)
+
+                  if (hasSubmenu) {
+                    return (
+                      <div key={item.name}>
+                        <button
+                          onClick={() => toggleSubmenu(item.name)}
+                          className={cn(
+                            'flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                            isActive
+                              ? 'bg-gray-100 text-gray-900'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-base">{item.icon}</span>
+                            {item.name}
+                          </div>
+                          <svg
+                            className={cn('w-4 h-4 transition-transform', isExpanded ? 'rotate-180' : '')}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {isExpanded && (
+                          <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
+                            {item.submenu!.map((subItem) => {
+                              const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
+                              return (
+                                <Link
+                                  key={subItem.name}
+                                  href={subItem.href}
+                                  className={cn(
+                                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play',
+                                    isSubActive
+                                      ? 'bg-blue-50 text-blue-700 font-medium'
+                                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                  )}
+                                >
+                                  <span className="text-sm">{subItem.icon}</span>
+                                  {subItem.name}
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                        isActive
+                          ? 'bg-gray-100 text-gray-900'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      )}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Blog Section */}
+            <div>
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
+                Blog
+              </p>
+              <div className="space-y-1">
+                {navigation.blog.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
                     <Link
                       key={item.name}
