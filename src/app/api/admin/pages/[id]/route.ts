@@ -61,7 +61,12 @@ export async function GET(
         updatedAt: now,
       }
 
-      await blobWrite(`data/pages/${id}.json`, newPage)
+      // Try to persist, but return the page even if blob storage fails
+      try {
+        await blobWrite(`data/pages/${id}.json`, newPage)
+      } catch (writeErr: any) {
+        console.error(`[pages/${id}] blob write failed (store may be suspended):`, writeErr?.message)
+      }
       page = newPage
     }
 
@@ -121,7 +126,12 @@ export async function PUT(
         createdAt: now,
         updatedAt: now,
       }
-      await blobWrite(`data/pages/${id}.json`, newPage)
+      try {
+        await blobWrite(`data/pages/${id}.json`, newPage)
+      } catch (writeErr: any) {
+        console.error(`[pages/${id}] blob write failed:`, writeErr?.message)
+        // Still return the page so the editor doesn't break
+      }
 
       return NextResponse.json(newPage)
     }
