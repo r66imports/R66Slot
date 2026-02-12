@@ -145,6 +145,33 @@ export default function NewProductPage() {
   }
 
   const [saveError, setSaveError] = useState('')
+  const [uploadingImages, setUploadingImages] = useState(false)
+
+  // Upload base64 images to server and return real URLs
+  const uploadPendingImages = async (): Promise<string[]> => {
+    const uploadedUrls: string[] = []
+    for (const file of mediaFiles) {
+      if (file.url.startsWith('data:')) {
+        // Convert base64 data URI to File and upload
+        try {
+          const res = await fetch(file.url)
+          const blob = await res.blob()
+          const formData = new FormData()
+          formData.append('file', blob, file.name || 'image.jpg')
+          const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
+          if (uploadRes.ok) {
+            const data = await uploadRes.json()
+            uploadedUrls.push(data.url)
+          }
+        } catch (err) {
+          console.error('Image upload failed:', err)
+        }
+      } else {
+        uploadedUrls.push(file.url)
+      }
+    }
+    return uploadedUrls
+  }
 
   const handleSave = async (publishStatus: string) => {
     setSaving(true)
@@ -161,45 +188,49 @@ export default function NewProductPage() {
     const cleanFloat = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
     const cleanInt = (v: string) => { const n = parseInt(v); return isNaN(n) ? 0 : n }
 
-    const productData = {
-      title: title.trim(),
-      description,
-      price: cleanFloat(price),
-      compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
-      costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
-      sku,
-      barcode,
-      trackQuantity,
-      quantity: cleanInt(quantity),
-      weight: weight ? cleanFloat(weight) : null,
-      weightUnit,
-      brand,
-      productType,
-      carType,
-      partType,
-      scale,
-      supplier,
-      collections,
-      tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-      status: publishStatus,
-      boxSize,
-      dimensions: {
-        length: dimLength ? cleanFloat(dimLength) : null,
-        width: dimWidth ? cleanFloat(dimWidth) : null,
-        height: dimHeight ? cleanFloat(dimHeight) : null,
-      },
-      // Only send URL strings, not huge base64 data URIs (Vercel has 4.5MB body limit)
-      mediaFiles: mediaFiles.map(f => f.url).filter(u => !u.startsWith('data:')),
-      imageUrl: mediaFiles.length > 0 ? mediaFiles[0].url : '',
-      pageId,
-      seo: {
-        metaTitle: seoTitle,
-        metaDescription: seoDescription,
-        metaKeywords: seoKeywords,
-      },
-    }
-
     try {
+      // Upload any base64 images first
+      setUploadingImages(true)
+      const imageUrls = await uploadPendingImages()
+      setUploadingImages(false)
+
+      const productData = {
+        title: title.trim(),
+        description,
+        price: cleanFloat(price),
+        compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
+        costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
+        sku,
+        barcode,
+        trackQuantity,
+        quantity: cleanInt(quantity),
+        weight: weight ? cleanFloat(weight) : null,
+        weightUnit,
+        brand,
+        productType,
+        carType,
+        partType,
+        scale,
+        supplier,
+        collections,
+        tags: tags.split(',').map(t => t.trim()).filter(Boolean),
+        status: publishStatus,
+        boxSize,
+        dimensions: {
+          length: dimLength ? cleanFloat(dimLength) : null,
+          width: dimWidth ? cleanFloat(dimWidth) : null,
+          height: dimHeight ? cleanFloat(dimHeight) : null,
+        },
+        mediaFiles: imageUrls,
+        imageUrl: imageUrls.length > 0 ? imageUrls[0] : '',
+        pageId,
+        seo: {
+          metaTitle: seoTitle,
+          metaDescription: seoDescription,
+          metaKeywords: seoKeywords,
+        },
+      }
+
       const res = await fetch('/api/admin/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -220,6 +251,7 @@ export default function NewProductPage() {
     } catch (error) {
       console.error('Error saving product:', error)
       setSaveError('Network error - check your connection')
+      setUploadingImages(false)
       setSaving(false)
     }
   }
@@ -295,7 +327,7 @@ export default function NewProductPage() {
                 className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
                 disabled={saving}
               >
-                {saving ? 'Saving...' : 'Save'}
+                {uploadingImages ? 'Uploading images...' : saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
