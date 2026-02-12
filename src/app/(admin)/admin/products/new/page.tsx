@@ -35,6 +35,23 @@ export default function NewProductPage() {
   const [dimWidth, setDimWidth] = useState('')
   const [dimHeight, setDimHeight] = useState('')
   const [mediaFiles, setMediaFiles] = useState<{ name: string; url: string; type: string }[]>([])
+  const [pageId, setPageId] = useState('')
+  const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
+  const [seoTitle, setSeoTitle] = useState('')
+  const [seoDescription, setSeoDescription] = useState('')
+  const [seoKeywords, setSeoKeywords] = useState('')
+
+  // Load available pages for assignment
+  useEffect(() => {
+    fetch('/api/admin/pages')
+      .then(res => res.json())
+      .then(pages => {
+        if (Array.isArray(pages)) {
+          setAvailablePages(pages.map((p: any) => ({ id: p.id, title: p.title })))
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   // Load data from poster page if passed via URL params
   useEffect(() => {
@@ -158,6 +175,12 @@ export default function NewProductPage() {
         height: dimHeight ? parseFloat(dimHeight) : null,
       },
       mediaFiles: mediaFiles.map(f => f.url),
+      pageId,
+      seo: {
+        metaTitle: seoTitle,
+        metaDescription: seoDescription,
+        metaKeywords: seoKeywords,
+      },
     }
 
     try {
@@ -739,6 +762,78 @@ export default function NewProductPage() {
                     placeholder="Separate with commas"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
+                </div>
+
+                {/* Page Assignment */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assign to Page
+                  </label>
+                  <select
+                    value={pageId}
+                    onChange={(e) => setPageId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  >
+                    <option value="">No page assigned</option>
+                    {availablePages.map((p) => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Select a page where this product will appear
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* SEO Settings */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-4">SEO Settings</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Meta Title
+                  </label>
+                  <input
+                    type="text"
+                    value={seoTitle}
+                    onChange={(e) => setSeoTitle(e.target.value)}
+                    placeholder={title || 'Product title'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {seoTitle.length}/70 characters
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Meta Description
+                  </label>
+                  <textarea
+                    value={seoDescription}
+                    onChange={(e) => setSeoDescription(e.target.value)}
+                    placeholder={description ? description.slice(0, 160) : 'Brief product description for search engines'}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {seoDescription.length}/160 characters
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Meta Keywords
+                  </label>
+                  <input
+                    type="text"
+                    value={seoKeywords}
+                    onChange={(e) => setSeoKeywords(e.target.value)}
+                    placeholder="slot car, 1/32, racing"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Separate with commas
+                  </p>
                 </div>
               </div>
             </div>
