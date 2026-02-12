@@ -66,7 +66,17 @@ export async function GET() {
 // POST /api/admin/products
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
+    let body: any
+    try {
+      body = await request.json()
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON in request body' }, { status: 400 })
+    }
+
+    if (!body.title || !body.title.trim()) {
+      return NextResponse.json({ error: 'Product title is required' }, { status: 400 })
+    }
+
     const products = await getProducts()
 
     const newProduct: Product = {
@@ -106,9 +116,9 @@ export async function POST(request: Request) {
     await saveProducts(products)
 
     return NextResponse.json(newProduct, { status: 201 })
-  } catch (error) {
-    console.error('Error creating product:', error)
-    return NextResponse.json({ error: 'Failed to create product' }, { status: 500 })
+  } catch (error: any) {
+    console.error('Error creating product:', error?.message || error)
+    return NextResponse.json({ error: `Failed to create product: ${error?.message || 'Unknown error'}` }, { status: 500 })
   }
 }
 

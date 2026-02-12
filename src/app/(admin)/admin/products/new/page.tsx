@@ -144,20 +144,34 @@ export default function NewProductPage() {
     }
   }
 
+  const [saveError, setSaveError] = useState('')
+
   const handleSave = async (publishStatus: string) => {
     setSaving(true)
+    setSaveError('')
+
+    // Validate required field
+    if (!title.trim()) {
+      setSaveError('Product title is required')
+      setSaving(false)
+      return
+    }
+
+    // Clean numeric values - avoid NaN
+    const cleanFloat = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+    const cleanInt = (v: string) => { const n = parseInt(v); return isNaN(n) ? 0 : n }
 
     const productData = {
-      title,
+      title: title.trim(),
       description,
-      price: parseFloat(price),
-      compareAtPrice: compareAtPrice ? parseFloat(compareAtPrice) : null,
-      costPerItem: costPerItem ? parseFloat(costPerItem) : null,
+      price: cleanFloat(price),
+      compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
+      costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
       sku,
       barcode,
       trackQuantity,
-      quantity: parseInt(quantity),
-      weight: parseFloat(weight),
+      quantity: cleanInt(quantity),
+      weight: weight ? cleanFloat(weight) : null,
       weightUnit,
       brand,
       productType,
@@ -170,11 +184,13 @@ export default function NewProductPage() {
       status: publishStatus,
       boxSize,
       dimensions: {
-        length: dimLength ? parseFloat(dimLength) : null,
-        width: dimWidth ? parseFloat(dimWidth) : null,
-        height: dimHeight ? parseFloat(dimHeight) : null,
+        length: dimLength ? cleanFloat(dimLength) : null,
+        width: dimWidth ? cleanFloat(dimWidth) : null,
+        height: dimHeight ? cleanFloat(dimHeight) : null,
       },
-      mediaFiles: mediaFiles.map(f => f.url),
+      // Only send URL strings, not huge base64 data URIs (Vercel has 4.5MB body limit)
+      mediaFiles: mediaFiles.map(f => f.url).filter(u => !u.startsWith('data:')),
+      imageUrl: mediaFiles.length > 0 ? mediaFiles[0].url : '',
       pageId,
       seo: {
         metaTitle: seoTitle,
@@ -189,15 +205,21 @@ export default function NewProductPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(productData),
       })
+
       if (res.ok) {
         router.push('/admin/products')
       } else {
-        alert('Failed to save product')
+        let errMsg = `Server error (${res.status})`
+        try {
+          const errData = await res.json()
+          if (errData.error) errMsg = errData.error
+        } catch {}
+        setSaveError(errMsg)
         setSaving(false)
       }
     } catch (error) {
       console.error('Error saving product:', error)
-      alert('Failed to save product')
+      setSaveError('Network error - check your connection')
       setSaving(false)
     }
   }
@@ -279,6 +301,16 @@ export default function NewProductPage() {
           </div>
         </div>
       </div>
+
+      {/* Error Banner */}
+      {saveError && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
+            <span className="text-red-600 font-medium text-sm">Error: {saveError}</span>
+            <button onClick={() => setSaveError('')} className="ml-auto text-red-400 hover:text-red-600 text-lg">&times;</button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
