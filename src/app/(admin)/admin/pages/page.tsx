@@ -160,6 +160,8 @@ export default function PagesManagementPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [selectedCarBrand, setSelectedCarBrand] = useState<string>('all')
+  const [deletedBrandIds, setDeletedBrandIds] = useState<Set<string>>(new Set())
+  const [deletedCarsIds, setDeletedCarsIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchCustomPages()
@@ -308,18 +310,18 @@ export default function PagesManagementPage() {
 
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
 
-  const handleToggleWebsitePage = async (e: React.MouseEvent, id: string) => {
+  const handleTogglePageGroup = async (e: React.MouseEvent, id: string, group: 'isBrandPage' | 'isCarsPage') => {
     e.preventDefault()
     e.stopPropagation()
 
     const page = customPages.find((p) => p.id === id)
     if (!page || togglingIds.has(id)) return
 
-    const newValue = !page.isWebsitePage
+    const newValue = !page[group]
 
     // Optimistic update
     setCustomPages((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, isWebsitePage: newValue } : p))
+      prev.map((p) => (p.id === id ? { ...p, [group]: newValue } : p))
     )
     setTogglingIds((prev) => new Set(prev).add(id))
 
@@ -327,19 +329,17 @@ export default function PagesManagementPage() {
       const res = await fetch(`/api/admin/pages/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isWebsitePage: newValue }),
+        body: JSON.stringify({ [group]: newValue }),
       })
       if (!res.ok) {
-        // Revert on failure
         setCustomPages((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, isWebsitePage: !newValue } : p))
+          prev.map((p) => (p.id === id ? { ...p, [group]: !newValue } : p))
         )
       }
     } catch (error) {
-      console.error('Error toggling website page:', error)
-      // Revert on failure
+      console.error('Error toggling page group:', error)
       setCustomPages((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, isWebsitePage: !newValue } : p))
+        prev.map((p) => (p.id === id ? { ...p, [group]: !newValue } : p))
       )
     } finally {
       setTogglingIds((prev) => {
@@ -350,7 +350,31 @@ export default function PagesManagementPage() {
     }
   }
 
-  // Website pages = custom pages marked as website pages
+  const handleDeleteBrandPage = async (id: string, title: string) => {
+    if (!confirm(`Delete "${title}" from Brand Pages?`)) return
+    setDeletedBrandIds((prev) => new Set(prev).add(id))
+    try {
+      await fetch(`/api/admin/pages/frontend-${id}`, { method: 'DELETE' })
+    } catch {
+      // Ignore - the page may not have been persisted yet
+    }
+  }
+
+  const handleDeleteCarsPage = async (id: string, brand: string) => {
+    if (!confirm(`Delete "${brand} Cars" from Cars Pages?`)) return
+    setDeletedCarsIds((prev) => new Set(prev).add(id))
+    try {
+      await fetch(`/api/admin/pages/frontend-${id}`, { method: 'DELETE' })
+    } catch {
+      // Ignore
+    }
+  }
+
+  // Custom pages marked for Brand or Cars groups
+  const brandCustomPages = customPages.filter((p) => p.isBrandPage)
+  const carsCustomPages = customPages.filter((p) => p.isCarsPage)
+
+  // Website pages = custom pages marked as website pages (legacy)
   const websitePages = customPages.filter((p) => p.isWebsitePage)
 
   // Search across all pages (frontend + brand + custom) by URL/slug
@@ -613,7 +637,7 @@ export default function PagesManagementPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {BRAND_PAGES.map((page) => (
+          {BRAND_PAGES.filter((p) => !deletedBrandIds.has(p.id)).map((page) => (
             <Card key={page.id} className="hover:shadow-lg transition-shadow">
               <CardContent className="p-6">
                 <div className="flex items-start gap-4">
@@ -639,6 +663,46 @@ export default function PagesManagementPage() {
                       <Link href={`/${page.slug}`} target="_blank">
                         View Live
                       </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteBrandPage(page.id, page.title)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {brandCustomPages.map((page) => (
+            <Card key={page.id} className="hover:shadow-lg transition-shadow border-purple-200 bg-purple-50">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">🏎️</div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                      <span>/{page.slug}</span>
+                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">Custom</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
+                      <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/${page.slug}`} target="_blank">View Live</Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(page.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Delete
                     </Button>
                   </div>
                 </div>
@@ -671,6 +735,7 @@ export default function PagesManagementPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {CARS_PAGES
+            .filter((p) => !deletedCarsIds.has(p.id))
             .filter((p) => selectedCarBrand === 'all' || p.brand === selectedCarBrand)
             .map((page) => (
             <Card key={page.id} className="hover:shadow-lg transition-shadow">
@@ -701,6 +766,48 @@ export default function PagesManagementPage() {
                       <Link href={`/${page.slug}`} target="_blank">
                         View Live
                       </Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDeleteCarsPage(page.id, page.brand)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+          {carsCustomPages
+            .filter((p) => selectedCarBrand === 'all' || p.title.toLowerCase().includes(selectedCarBrand.toLowerCase()))
+            .map((page) => (
+            <Card key={page.id} className="hover:shadow-lg transition-shadow border-orange-200 bg-orange-50">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">🏎️</div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
+                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                      <span>/{page.slug}</span>
+                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">Custom</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
+                      <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/${page.slug}`} target="_blank">View Live</Link>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(page.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Delete
                     </Button>
                   </div>
                 </div>
@@ -814,8 +921,10 @@ export default function PagesManagementPage() {
               <Card
                 key={page.id}
                 className={
-                  page.isWebsitePage
-                    ? 'border-green-300 bg-green-50'
+                  page.isBrandPage
+                    ? 'border-purple-300 bg-purple-50'
+                    : page.isCarsPage
+                    ? 'border-orange-300 bg-orange-50'
                     : ''
                 }
               >
@@ -838,9 +947,14 @@ export default function PagesManagementPage() {
                             Published
                           </span>
                         )}
-                        {page.isWebsitePage && (
-                          <span className="px-2 py-1 bg-green-200 text-green-800 text-xs rounded font-medium">
-                            Website Page
+                        {page.isBrandPage && (
+                          <span className="px-2 py-1 bg-purple-200 text-purple-800 text-xs rounded font-medium">
+                            Brand Page
+                          </span>
+                        )}
+                        {page.isCarsPage && (
+                          <span className="px-2 py-1 bg-orange-200 text-orange-800 text-xs rounded font-medium">
+                            Cars Page
                           </span>
                         )}
                       </div>
@@ -853,19 +967,32 @@ export default function PagesManagementPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="flex gap-2 ml-4">
+                    <div className="flex gap-2 ml-4 flex-wrap justify-end">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={(e) => handleToggleWebsitePage(e, page.id)}
+                        onClick={(e) => handleTogglePageGroup(e, page.id, 'isBrandPage')}
                         disabled={togglingIds.has(page.id)}
                         className={
-                          page.isWebsitePage
-                            ? 'bg-green-600 text-white hover:bg-green-700 border-green-600'
+                          page.isBrandPage
+                            ? 'bg-purple-600 text-white hover:bg-purple-700 border-purple-600'
                             : ''
                         }
                       >
-                        {togglingIds.has(page.id) ? '...' : 'Website Page'}
+                        {togglingIds.has(page.id) ? '...' : 'Brand Pages'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => handleTogglePageGroup(e, page.id, 'isCarsPage')}
+                        disabled={togglingIds.has(page.id)}
+                        className={
+                          page.isCarsPage
+                            ? 'bg-orange-600 text-white hover:bg-orange-700 border-orange-600'
+                            : ''
+                        }
+                      >
+                        {togglingIds.has(page.id) ? '...' : 'Cars Pages'}
                       </Button>
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>
@@ -914,7 +1041,7 @@ export default function PagesManagementPage() {
                 <li>• Use drag & drop to rearrange sections and components</li>
                 <li>• Double-click any custom page name to rename it</li>
                 <li>• Create custom pages for landing pages, promotions, or special content</li>
-                <li>• Click &ldquo;Website Page&rdquo; to link a custom page to the Website Pages section</li>
+                <li>• Click &ldquo;Brand Pages&rdquo; or &ldquo;Cars Pages&rdquo; to add a custom page to those sections</li>
                 <li>• Use the search bar to quickly find pages by URL or name</li>
               </ul>
             </div>

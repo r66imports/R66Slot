@@ -185,6 +185,8 @@ export interface Page {
   slug: string
   published: boolean
   isWebsitePage?: boolean
+  isBrandPage?: boolean
+  isCarsPage?: boolean
   components: PageComponent[]
   pageSettings?: PageSettings
   seo: {

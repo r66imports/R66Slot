@@ -234,8 +234,8 @@ export async function PUT(
       )
     }
 
-    // Validate required fields
-    if (!body.title && !body.components) {
+    // Validate required fields (allow group toggles through)
+    if (!body.title && !body.components && body.isBrandPage === undefined && body.isCarsPage === undefined && body.isWebsitePage === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields (title or components)' },
         { status: 400 }
