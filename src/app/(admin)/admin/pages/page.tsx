@@ -275,6 +275,37 @@ export default function PagesManagementPage() {
     }
   }
 
+  const handleDuplicatePage = async (page: Page) => {
+    try {
+      const response = await fetch('/api/admin/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `${page.title} (Copy)`,
+          slug: `${page.slug}-copy-${Date.now()}`,
+          published: false,
+          components: page.components,
+          pageSettings: page.pageSettings,
+          seo: {
+            metaTitle: `${page.seo?.metaTitle || page.title} (Copy)`,
+            metaDescription: page.seo?.metaDescription || '',
+            metaKeywords: page.seo?.metaKeywords || '',
+          },
+        }),
+      })
+
+      if (response.ok) {
+        const newPage = await response.json()
+        setCustomPages((prev) => [...prev, newPage])
+      } else {
+        alert('Failed to duplicate page')
+      }
+    } catch (error) {
+      console.error('Error duplicating page:', error)
+      alert('Failed to duplicate page')
+    }
+  }
+
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
 
   const handleToggleWebsitePage = async (e: React.MouseEvent, id: string) => {
@@ -838,6 +869,14 @@ export default function PagesManagementPage() {
                       </Button>
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDuplicatePage(page)}
+                        className="text-blue-600 hover:text-blue-700"
+                      >
+                        Duplicate
                       </Button>
                       {page.published && (
                         <Button variant="outline" size="sm" asChild>
