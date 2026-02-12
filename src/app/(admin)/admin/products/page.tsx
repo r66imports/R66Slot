@@ -32,6 +32,8 @@ export default function ProductsPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [importText, setImportText] = useState('')
   const [importing, setImporting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -60,6 +62,67 @@ export default function ProductsPage() {
     } catch (error) {
       console.error('Error deleting product:', error)
     }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(p => p.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Delete ${selectedIds.size} selected product(s)?`)) return
+    setBulkDeleting(true)
+    try {
+      for (const id of selectedIds) {
+        await fetch(`/api/admin/products/${id}`, { method: 'DELETE' })
+      }
+      setProducts(products.filter(p => !selectedIds.has(p.id)))
+      setSelectedIds(new Set())
+    } catch (error) {
+      console.error('Bulk delete error:', error)
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const handleBulkExportCSV = () => {
+    const selected = products.filter(p => selectedIds.has(p.id))
+    if (selected.length === 0) return
+    const headers = ['title','sku','brand','price','quantity','eta','description','productType','status']
+    const csvRows = [headers.join(',')]
+    selected.forEach(p => {
+      csvRows.push([
+        `"${(p.title || '').replace(/"/g, '""')}"`,
+        `"${p.sku || ''}"`,
+        `"${p.brand || ''}"`,
+        p.price,
+        p.quantity,
+        `"${p.eta || ''}"`,
+        `"${(p.description || '').replace(/"/g, '""')}"`,
+        `"${p.productType || ''}"`,
+        p.status,
+      ].join(','))
+    })
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `products-selected-${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleInlineUpdate = async (id: string, field: string, value: string | number) => {
@@ -249,6 +312,32 @@ export default function ProductsPage() {
         </select>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mb-4 flex items-center gap-3 bg-gray-900 text-white rounded-lg px-4 py-3">
+          <span className="text-sm font-medium">{selectedIds.size} selected</span>
+          <button
+            onClick={handleBulkExportCSV}
+            className="px-3 py-1.5 text-xs font-medium bg-white text-gray-900 rounded hover:bg-gray-100"
+          >
+            Export Selected CSV
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
+            className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+          >
+            {bulkDeleting ? 'Deleting...' : 'Delete Selected'}
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="ml-auto px-3 py-1.5 text-xs font-medium text-gray-300 hover:text-white"
+          >
+            Clear Selection
+          </button>
+        </div>
+      )}
+
       {/* Product Table */}
       {filtered.length === 0 ? (
         <Card>
@@ -276,6 +365,14 @@ export default function ProductsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-gray-50">
+                    <th className="py-3 px-3 w-10">
+                      <input
+                        type="checkbox"
+                        checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 cursor-pointer"
+                      />
+                    </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Product</th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">SKU</th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Brand</th>
@@ -288,7 +385,16 @@ export default function ProductsPage() {
                 </thead>
                 <tbody>
                   {filtered.map((product) => (
-                    <tr key={product.id} className="border-b hover:bg-gray-50">
+                    <tr key={product.id} className={`border-b hover:bg-gray-50 ${selectedIds.has(product.id) ? 'bg-blue-50' : ''}`}>
+                      {/* Checkbox */}
+                      <td className="py-3 px-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(product.id)}
+                          onChange={() => toggleSelect(product.id)}
+                          className="h-4 w-4 text-gray-900 border-gray-300 rounded focus:ring-gray-900 cursor-pointer"
+                        />
+                      </td>
                       {/* Product Name + Image */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
