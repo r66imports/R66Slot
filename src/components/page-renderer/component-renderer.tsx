@@ -880,19 +880,22 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     case 'section': {
       const sectionTitle = (settings.sectionTitle as string) || ''
       const sectionSubtitle = (settings.sectionSubtitle as string) || ''
-      const sectionHasOnlyImages = children && children.length > 0 && children.every(c => c.type === 'image')
+      // Split children into flow and absolute (freeform) children
+      const flowChildren = children?.filter(c => c.positionMode !== 'absolute') || []
+      const absoluteChildren = children?.filter(c => c.positionMode === 'absolute') || []
+      const sectionHasOnlyImages = flowChildren.length > 0 && flowChildren.every(c => c.type === 'image')
       return (
         <section style={{ ...containerStyle, position: 'relative', overflow: 'hidden' }}>
-          <div className="container mx-auto">
+          <div className="container mx-auto" style={{ position: 'relative' }}>
             {sectionTitle && (
               <h2 className="text-3xl font-bold mb-2 text-center">{sectionTitle}</h2>
             )}
             {sectionSubtitle && (
               <p className="text-lg opacity-70 mb-8 text-center max-w-2xl mx-auto">{sectionSubtitle}</p>
             )}
-            {children && children.length > 0 ? (
+            {flowChildren.length > 0 ? (
               <div className={sectionHasOnlyImages ? 'w-full' : 'space-y-4'}>
-                {children.map((child) => {
+                {flowChildren.map((child) => {
                   if (child.type === 'image') {
                     const filledChild = {
                       ...child,
@@ -909,6 +912,36 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               </div>
             ) : null}
           </div>
+          {/* Freeform absolute-positioned children */}
+          {absoluteChildren.map((child) => {
+            const hasNormalized = child.normalizedPosition?.desktop
+            const pos = hasNormalized ? child.normalizedPosition!.desktop : null
+            const legacyPos = child.position
+
+            const posStyle: React.CSSProperties = hasNormalized && pos ? {
+              position: 'absolute',
+              left: `${pos.xPercent}%`,
+              top: `${pos.yPercent}%`,
+              width: `${pos.widthPercent}%`,
+              height: `${pos.heightPercent}%`,
+              zIndex: pos.zIndex || 10,
+              transform: pos.rotation ? `rotate(${pos.rotation}deg)` : undefined,
+            } : legacyPos ? {
+              position: 'absolute',
+              left: `${legacyPos.x}px`,
+              top: `${legacyPos.y}px`,
+              width: `${legacyPos.width}px`,
+              height: `${legacyPos.height}px`,
+              zIndex: legacyPos.zIndex || 10,
+              transform: legacyPos.rotation ? `rotate(${legacyPos.rotation}deg)` : undefined,
+            } : { position: 'absolute' as const }
+
+            return (
+              <div key={child.id} style={posStyle}>
+                <ComponentRenderer component={child} />
+              </div>
+            )
+          })}
         </section>
       )
     }
@@ -1125,6 +1158,8 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     }
 
     case 'strip': {
+      const stripFlowChildren = children?.filter(c => c.positionMode !== 'absolute') || []
+      const stripAbsoluteChildren = children?.filter(c => c.positionMode === 'absolute') || []
       return (
         <div
           style={{
@@ -1147,14 +1182,44 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
             />
           )}
           <div className="container mx-auto relative z-10">
-            {children && children.length > 0 ? (
+            {stripFlowChildren.length > 0 ? (
               <div className="space-y-4">
-                {children.map((child) => (
+                {stripFlowChildren.map((child) => (
                   <ComponentRenderer key={child.id} component={child} />
                 ))}
               </div>
             ) : null}
           </div>
+          {/* Freeform absolute-positioned children */}
+          {stripAbsoluteChildren.map((child) => {
+            const hasNormalized = child.normalizedPosition?.desktop
+            const pos = hasNormalized ? child.normalizedPosition!.desktop : null
+            const legacyPos = child.position
+
+            const posStyle: React.CSSProperties = hasNormalized && pos ? {
+              position: 'absolute',
+              left: `${pos.xPercent}%`,
+              top: `${pos.yPercent}%`,
+              width: `${pos.widthPercent}%`,
+              height: `${pos.heightPercent}%`,
+              zIndex: pos.zIndex || 10,
+              transform: pos.rotation ? `rotate(${pos.rotation}deg)` : undefined,
+            } : legacyPos ? {
+              position: 'absolute',
+              left: `${legacyPos.x}px`,
+              top: `${legacyPos.y}px`,
+              width: `${legacyPos.width}px`,
+              height: `${legacyPos.height}px`,
+              zIndex: legacyPos.zIndex || 10,
+              transform: legacyPos.rotation ? `rotate(${legacyPos.rotation}deg)` : undefined,
+            } : { position: 'absolute' as const }
+
+            return (
+              <div key={child.id} style={posStyle}>
+                <ComponentRenderer component={child} />
+              </div>
+            )
+          })}
         </div>
       )
     }
