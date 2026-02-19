@@ -21,6 +21,17 @@ const nextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return {
+      // Fallback rewrites: only trigger if no local file matches
+      fallback: [
+        {
+          source: '/uploads/:path*',
+          destination: 'https://nmzmqclsndjoijpucflt.supabase.co/storage/v1/object/public/uploads/:path*',
+        },
+      ],
+    }
+  },
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },

@@ -27,7 +27,7 @@ export default function AdminLayout({
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showCostingModal, setShowCostingModal] = useState(false)
   const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['Catalogue']) // Default expanded
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['Inventory Management']) // Default expanded
 
   const toggleSubmenu = (name: string) => {
     setExpandedMenus(prev =>
@@ -45,13 +45,12 @@ export default function AdminLayout({
     content: [
       { name: 'Homepage', href: '/admin/homepage', icon: '🏠' },
       {
-        name: 'Catalogue',
-        href: '/admin/catalogue',
-        icon: '📚',
+        name: 'Inventory Management',
+        href: '/admin/products',
+        icon: '📦',
         submenu: [
-          { name: 'Products', href: '/admin/catalogue/products', icon: '🛍️' },
-          { name: 'Inventory', href: '/admin/catalogue/inventory', icon: '📦' },
-          { name: 'Categories', href: '/admin/catalogue/categories', icon: '🏷️' },
+          { name: 'Products', href: '/admin/products', icon: '🛍️' },
+          { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
         ]
       },
     ],
@@ -84,17 +83,7 @@ export default function AdminLayout({
           { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
         ]
       },
-      {
-        name: 'Inventory Management',
-        href: '/admin/inventory',
-        icon: '📊',
-        submenu: [
-          { name: 'Stock Levels', href: '/admin/catalogue/inventory', icon: '📦' },
-          { name: 'Categories', href: '/admin/catalogue/categories', icon: '🏷️' },
-          { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
-        ]
-      },
-      { name: 'Shipping', href: '/admin/shipping', icon: '🚚' },
+      { name: 'Local Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],

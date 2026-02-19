@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
 import type { Page, PageComponent, PageSettings } from '@/lib/pages/schema'
 
 interface PageEditorContextType {
@@ -11,6 +11,7 @@ interface PageEditorContextType {
   historyIndex: number
   isSaving: boolean
   loadError: string | null
+  hasUnsavedChanges: boolean
 
   // Actions
   setPage: (page: Page | null) => void
@@ -26,6 +27,7 @@ interface PageEditorContextType {
   redo: () => void
   savePage: (publish?: boolean) => Promise<boolean>
   loadPage: (pageId: string) => Promise<void>
+  dismissRecovery: () => void
 
   // Computed
   selectedComponent: PageComponent | null
@@ -51,6 +53,13 @@ interface PageEditorProviderProps {
   }>
 }
 
+const AUTOSAVE_DELAY = 30_000 // 30 seconds
+const BACKUP_KEY_PREFIX = 'r66editor-backup-'
+
+function getBackupKey(pageId: string) {
+  return `${BACKUP_KEY_PREFIX}${pageId}`
+}
+
 export function PageEditorProvider({ children, componentLibrary }: PageEditorProviderProps) {
   const [page, setPage] = useState<Page | null>(null)
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null)
@@ -58,6 +67,9 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
   const [historyIndex, setHistoryIndex] = useState(-1)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedJsonRef = useRef<string>('')
 
   // Save to history
   const saveToHistory = useCallback((newPage: Page) => {
@@ -81,6 +93,62 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
       saveToHistory(page)
     }
   }, [page?.id])
+
+  // ─── localStorage backup on every page change ───
+  useEffect(() => {
+    if (!page) return
+    try {
+      const json = JSON.stringify(page)
+      localStorage.setItem(getBackupKey(page.id), json)
+      localStorage.setItem(`${getBackupKey(page.id)}-ts`, Date.now().toString())
+    } catch {
+      // localStorage may be full or unavailable
+    }
+  }, [page])
+
+  // ─── Track unsaved changes ───
+  useEffect(() => {
+    if (!page) return
+    const currentJson = JSON.stringify(page)
+    if (lastSavedJsonRef.current && currentJson !== lastSavedJsonRef.current) {
+      setHasUnsavedChanges(true)
+    }
+  }, [page])
+
+  // ─── Auto-save after inactivity ───
+  useEffect(() => {
+    if (!hasUnsavedChanges || !page) return
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(async () => {
+      if (!page) return
+      console.log('[r66editor] auto-saving...')
+      const success = await savePageInternal(false)
+      if (success) console.log('[r66editor] auto-save complete')
+    }, AUTOSAVE_DELAY)
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    }
+  }, [hasUnsavedChanges, page])
+
+  // ─── Warn before closing with unsaved changes ───
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault()
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?'
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [hasUnsavedChanges])
+
+  // Dismiss recovery backup
+  const dismissRecovery = useCallback(() => {
+    if (page) {
+      try { localStorage.removeItem(getBackupKey(page.id)) } catch {}
+      try { localStorage.removeItem(`${getBackupKey(page.id)}-ts`) } catch {}
+    }
+  }, [page])
 
   // Add component
   const addComponent = useCallback((type: PageComponent['type'], index?: number) => {
@@ -231,7 +299,52 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     }
   }, [history, historyIndex])
 
-  // Save page
+  // Internal save (used by auto-save, doesn't show alerts)
+  const savePageInternal = useCallback(async (publish: boolean = false) => {
+    if (!page) return false
+
+    setIsSaving(true)
+    try {
+      const payload = {
+        ...page,
+        published: publish ? true : page.published,
+      }
+
+      const jsonBody = JSON.stringify(payload)
+
+      const response = await fetch(`/api/admin/pages/${page.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: jsonBody,
+      })
+
+      if (response.ok) {
+        const updated = await response.json()
+        setPage(updated)
+        lastSavedJsonRef.current = JSON.stringify(updated)
+        setHasUnsavedChanges(false)
+        // Clear localStorage backup on successful save
+        try { localStorage.removeItem(getBackupKey(page.id)) } catch {}
+        try { localStorage.removeItem(`${getBackupKey(page.id)}-ts`) } catch {}
+        return true
+      } else {
+        let errorMsg = `Save failed (${response.status})`
+        try {
+          const err = await response.json()
+          errorMsg = err.error || err.details || errorMsg
+        } catch {}
+        console.error('Failed to save page:', errorMsg)
+        return false
+      }
+    } catch (error: any) {
+      console.error('Error saving page:', error)
+      return false
+    } finally {
+      setIsSaving(false)
+    }
+  }, [page])
+
+  // Save page (user-facing, shows alerts)
   const savePage = useCallback(async (publish: boolean = false) => {
     if (!page) return false
 
@@ -253,6 +366,11 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
       if (response.ok) {
         const updated = await response.json()
         setPage(updated)
+        lastSavedJsonRef.current = JSON.stringify(updated)
+        setHasUnsavedChanges(false)
+        // Clear localStorage backup on successful save
+        try { localStorage.removeItem(getBackupKey(page.id)) } catch {}
+        try { localStorage.removeItem(`${getBackupKey(page.id)}-ts`) } catch {}
         return true
       } else {
         let errorMsg = `Save failed (${response.status})`
@@ -273,7 +391,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     }
   }, [page])
 
-  // Load page with retry
+  // Load page with retry + localStorage crash recovery
   const loadPage = useCallback(async (pageId: string) => {
     setLoadError(null)
     const MAX_RETRIES = 3
@@ -283,7 +401,45 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
         const response = await fetch(`/api/admin/pages/${pageId}`, { cache: 'no-store' })
         if (response.ok) {
           const data = await response.json()
-          setPage(data)
+
+          // Check for localStorage backup that's newer
+          let useBackup = false
+          try {
+            const backupJson = localStorage.getItem(getBackupKey(pageId))
+            const backupTs = localStorage.getItem(`${getBackupKey(pageId)}-ts`)
+            if (backupJson && backupTs) {
+              const backup = JSON.parse(backupJson) as Page
+              const backupTime = parseInt(backupTs)
+              const serverTime = new Date(data.updatedAt).getTime()
+              // If backup is newer than server data by more than 5 seconds AND has components
+              if (backupTime > serverTime + 5000 && backup.components?.length > 0) {
+                const backupDate = new Date(backupTime).toLocaleString()
+                if (window.confirm(
+                  `Unsaved changes from ${backupDate} were found.\n\nRestore them? (Cancel to discard and use the saved version)`
+                )) {
+                  setPage(backup)
+                  setHasUnsavedChanges(true)
+                  useBackup = true
+                } else {
+                  // User chose to discard - clear backup
+                  localStorage.removeItem(getBackupKey(pageId))
+                  localStorage.removeItem(`${getBackupKey(pageId)}-ts`)
+                }
+              } else {
+                // Backup is stale, clean up
+                localStorage.removeItem(getBackupKey(pageId))
+                localStorage.removeItem(`${getBackupKey(pageId)}-ts`)
+              }
+            }
+          } catch {
+            // Ignore localStorage errors
+          }
+
+          if (!useBackup) {
+            setPage(data)
+            setHasUnsavedChanges(false)
+          }
+          lastSavedJsonRef.current = JSON.stringify(data)
           setHistory([])
           setHistoryIndex(-1)
           return
@@ -319,6 +475,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     historyIndex,
     isSaving,
     loadError,
+    hasUnsavedChanges,
 
     // Actions
     setPage,
@@ -334,6 +491,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     redo,
     savePage,
     loadPage,
+    dismissRecovery,
 
     // Computed
     selectedComponent,

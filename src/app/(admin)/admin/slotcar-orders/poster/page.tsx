@@ -29,6 +29,7 @@ export default function PreOrderPosterPage() {
   const [imageUrl, setImageUrl] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [shortCode, setShortCode] = useState('')
+  const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
 
   // Form fields
   const [orderType, setOrderType] = useState<'new-order' | 'pre-order'>('pre-order')
@@ -145,85 +146,126 @@ export default function PreOrderPosterPage() {
   }
 
   const handleExportToWhatsApp = async () => {
-    if (!posterRef.current) return
-
-    // Generate short code if not exists
-    const currentShortCode = shortCode || generateShortCode()
-
-    // Save poster first to ensure shortCode is stored
-    if (!shortCode) {
-      try {
-        let finalImageUrl = imageUrl
-        if (imageFile) {
-          const formData = new FormData()
-          formData.append('file', imageFile)
-          const uploadResponse = await fetch('/api/admin/media/upload', {
-            method: 'POST',
-            body: formData,
-          })
-          if (uploadResponse.ok) {
-            const uploadData = await uploadResponse.json()
-            finalImageUrl = uploadData.url
-          }
-        }
-
-        const posterData = {
-          id: editId || `poster_${Date.now()}`,
-          shortCode: currentShortCode,
-          orderType,
-          sku,
-          itemDescription,
-          estimatedDeliveryDate,
-          brand,
-          description,
-          preOrderPrice,
-          availableQty,
-          imageUrl: finalImageUrl,
-          createdAt: new Date().toISOString(),
-          published: true,
-        }
-
-        await fetch('/api/admin/slotcar-orders', {
-          method: editId ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(posterData),
-        })
-
-        setShortCode(currentShortCode)
-      } catch (error) {
-        console.error('Error saving poster:', error)
-      }
+    if (!posterRef.current) {
+      alert('Poster preview not available')
+      return
     }
 
+    setSendingWhatsapp(true)
+
     try {
-      // Generate poster image
+      // Step 1: Generate poster image from the preview
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
+        allowTaint: true,
       })
 
-      // Convert to PNG blob for clipboard
+      // Step 2: Convert to JPEG blob
       const blob = await new Promise<Blob | null>((resolve) => {
-        canvas.toBlob((b) => resolve(b), 'image/png')
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
       })
 
-      if (!blob) return
+      if (!blob) {
+        alert('Failed to generate poster image')
+        setSendingWhatsapp(false)
+        return
+      }
 
-      // Copy image to clipboard
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob })
-      ])
+      // Step 3: Create a File from the blob
+      const file = new File([blob], `R66SLOT-${itemDescription || 'poster'}.jpg`, { type: 'image/jpeg' })
 
-      // Open WhatsApp
-      window.open('https://web.whatsapp.com/', '_blank')
+      // Step 4: Use Web Share API to share the image file directly
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}`,
+          text: `${itemDescription} - R${preOrderPrice}\nBook here: https://r66slot.co.za/book/${shortCode || 'shop'}`,
+        })
+      } else {
+        // Fallback: download the image and copy to clipboard
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `R66SLOT-${itemDescription || 'poster'}.jpg`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
 
-      // Notify user
-      alert('✅ Poster copied to clipboard!\n\n1. Select a contact in WhatsApp\n2. Press Ctrl+V to paste\n3. Send!')
-
+        try {
+          // Clipboard requires PNG, so convert for clipboard only
+          const pngBlob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob((b) => resolve(b), 'image/png')
+          })
+          if (pngBlob) {
+            await navigator.clipboard.write([
+              new ClipboardItem({ 'image/png': pngBlob })
+            ])
+          }
+          alert('Poster image downloaded & copied to clipboard!\n\nOpen WhatsApp → Select contact → Ctrl+V to paste the image')
+        } catch {
+          alert('Poster image downloaded!\n\nOpen WhatsApp → Select contact → Click the attach icon → Attach the downloaded image')
+        }
+      }
     } catch (error) {
-      console.error('Error exporting to WhatsApp:', error)
-      alert('Failed to copy poster. Please try again.')
+      // User cancelled the share dialog - that's fine
+      if ((error as Error)?.name !== 'AbortError') {
+        console.error('Error sharing poster:', error)
+        alert('Failed to share poster. Please try again.')
+      }
+    } finally {
+      setSendingWhatsapp(false)
+    }
+  }
+
+  const handleDownloadPoster = async () => {
+    if (!posterRef.current) return
+
+    try {
+      const canvas = await html2canvas(posterRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+      })
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
+      })
+
+      if (!blob) {
+        alert('Failed to generate image')
+        return
+      }
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `poster-${shortCode || 'new'}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      // Also copy to clipboard (clipboard requires PNG)
+      try {
+        const pngBlob = await new Promise<Blob | null>((resolve) => {
+          canvas.toBlob((b) => resolve(b), 'image/png')
+        })
+        if (pngBlob) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': pngBlob })
+          ])
+        }
+        alert('Poster downloaded & copied to clipboard!')
+      } catch {
+        alert('Poster downloaded!')
+      }
+    } catch (error) {
+      console.error('Error downloading poster:', error)
+      alert('Failed to download poster')
     }
   }
 
@@ -310,6 +352,14 @@ export default function PreOrderPosterPage() {
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                 </svg>
                 Export to Facebook
+              </Button>
+              <Button
+                onClick={handleDownloadPoster}
+                variant="outline"
+                className="font-play"
+                disabled={!itemDescription || !preOrderPrice}
+              >
+                Download Poster
               </Button>
               <Button
                 onClick={handleAddToProducts}
@@ -610,6 +660,7 @@ export default function PreOrderPosterPage() {
           </div>
         </div>
       </div>
+
     </div>
   )
 }

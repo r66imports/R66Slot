@@ -23,6 +23,9 @@ export default function AccountLayout({
     { name: 'Orders', href: '/account/orders', icon: '📦' },
     { name: 'Addresses', href: '/account/addresses', icon: '📍' },
     { name: 'Profile', href: '/account/profile', icon: '👤' },
+    { name: 'My Bids', href: '/account/auctions', icon: '🔨' },
+    { name: 'Won Auctions', href: '/account/auctions/won', icon: '🏆' },
+    { name: 'Watchlist', href: '/account/auctions/watchlist', icon: '❤️' },
   ]
 
   return (

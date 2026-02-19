@@ -1,4 +1,11 @@
 import { blobRead, blobWrite, blobDelete, blobListWithUrls } from '@/lib/blob-storage'
+import {
+  supaGetAllPages,
+  supaGetPageById,
+  supaGetPageBySlug,
+  supaUpsertPage,
+  supaDeletePage,
+} from './supabase-storage'
 import type { Page } from './schema'
 
 const PAGES_PREFIX = 'data/pages/'
@@ -26,39 +33,76 @@ export async function getAllPages(): Promise<Page[]> {
       })
     )
 
-    return pages
+    const result = pages
       .filter((p): p is Page => p !== null)
       .sort((a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )
+
+    if (result.length > 0) return result
+    // Blob returned empty (possibly blocked) — fall through to Supabase
   } catch {
+    // Blob list failed entirely
+  }
+
+  // ---- Supabase fallback ----
+  try {
+    console.log('[storage] blob getAllPages failed/empty, falling back to Supabase')
+    return await supaGetAllPages()
+  } catch (err: any) {
+    console.error('[storage] Supabase fallback getAllPages failed:', err?.message)
     return []
   }
 }
 
 export async function getPageById(id: string): Promise<Page | null> {
   try {
-    return await blobRead<Page | null>(`${PAGES_PREFIX}${id}.json`, null)
+    const page = await blobRead<Page | null>(`${PAGES_PREFIX}${id}.json`, null)
+    if (page) return page
   } catch {
+    // blob read failed
+  }
+
+  // ---- Supabase fallback ----
+  try {
+    return await supaGetPageById(id)
+  } catch (err: any) {
+    console.error('[storage] Supabase fallback getPageById failed:', err?.message)
     return null
   }
 }
 
 export async function getPageBySlug(slug: string): Promise<Page | null> {
-  // Try slug index first for O(1) lookup
-  const index = await blobRead<SlugIndex>(SLUG_INDEX_KEY, {})
-  if (index[slug]) {
-    const page = await getPageById(index[slug])
-    if (page && page.slug === slug) return page
+  // Try slug index + blob first
+  try {
+    const index = await blobRead<SlugIndex>(SLUG_INDEX_KEY, {})
+    if (index[slug]) {
+      const page = await getPageById(index[slug])
+      if (page && page.slug === slug) return page
+    }
+    // Fallback: scan all (which itself falls back to Supabase)
+    const pages = await getAllPages()
+    const found = pages.find((p) => p.slug === slug) || null
+
+    // Rebuild slug index (best-effort)
+    if (pages.length > 0) {
+      const newIndex: SlugIndex = {}
+      for (const p of pages) newIndex[p.slug] = p.id
+      await blobWrite(SLUG_INDEX_KEY, newIndex).catch(() => {})
+    }
+
+    if (found) return found
+  } catch {
+    // blob path failed entirely
   }
-  // Fallback: scan all pages (and rebuild index)
-  const pages = await getAllPages()
-  const newIndex: SlugIndex = {}
-  for (const p of pages) {
-    newIndex[p.slug] = p.id
+
+  // ---- Direct Supabase slug lookup ----
+  try {
+    return await supaGetPageBySlug(slug)
+  } catch (err: any) {
+    console.error('[storage] Supabase fallback getPageBySlug failed:', err?.message)
+    return null
   }
-  await blobWrite(SLUG_INDEX_KEY, newIndex).catch(() => {})
-  return pages.find((p) => p.slug === slug) || null
 }
 
 export async function createPage(data: Partial<Page>): Promise<Page> {
@@ -80,11 +124,23 @@ export async function createPage(data: Partial<Page>): Promise<Page> {
     updatedAt: now,
   }
 
-  await blobWrite(`${PAGES_PREFIX}${id}.json`, page)
-  // Update slug index
-  const index = await blobRead<SlugIndex>(SLUG_INDEX_KEY, {})
-  index[page.slug] = page.id
-  await blobWrite(SLUG_INDEX_KEY, index).catch(() => {})
+  // Write to blob (best-effort)
+  try {
+    await blobWrite(`${PAGES_PREFIX}${id}.json`, page)
+    const index = await blobRead<SlugIndex>(SLUG_INDEX_KEY, {})
+    index[page.slug] = page.id
+    await blobWrite(SLUG_INDEX_KEY, index).catch(() => {})
+  } catch (err: any) {
+    console.error('[storage] blob createPage failed:', err?.message)
+  }
+
+  // Dual-write to Supabase
+  try {
+    await supaUpsertPage(page)
+  } catch (err: any) {
+    console.error('[storage] Supabase createPage failed:', err?.message)
+  }
+
   return page
 }
 
@@ -103,17 +159,41 @@ export async function updatePage(
     updatedAt: new Date().toISOString(),
   }
 
-  await blobWrite(`${PAGES_PREFIX}${id}.json`, updated)
-  // Update slug index (handle slug changes)
-  const index = await blobRead<SlugIndex>(SLUG_INDEX_KEY, {})
-  if (existing.slug !== updated.slug) {
-    delete index[existing.slug]
+  // Write to blob (best-effort)
+  try {
+    await blobWrite(`${PAGES_PREFIX}${id}.json`, updated)
+    const index = await blobRead<SlugIndex>(SLUG_INDEX_KEY, {})
+    if (existing.slug !== updated.slug) delete index[existing.slug]
+    index[updated.slug] = updated.id
+    await blobWrite(SLUG_INDEX_KEY, index).catch(() => {})
+  } catch (err: any) {
+    console.error('[storage] blob updatePage failed:', err?.message)
   }
-  index[updated.slug] = updated.id
-  await blobWrite(SLUG_INDEX_KEY, index).catch(() => {})
+
+  // Dual-write to Supabase
+  try {
+    await supaUpsertPage(updated)
+  } catch (err: any) {
+    console.error('[storage] Supabase updatePage failed:', err?.message)
+  }
+
   return updated
 }
 
 export async function deletePage(id: string): Promise<boolean> {
-  return await blobDelete(`${PAGES_PREFIX}${id}.json`)
+  let blobResult = false
+  try {
+    blobResult = await blobDelete(`${PAGES_PREFIX}${id}.json`)
+  } catch {
+    // blob delete failed
+  }
+
+  let supaResult = false
+  try {
+    supaResult = await supaDeletePage(id)
+  } catch (err: any) {
+    console.error('[storage] Supabase deletePage failed:', err?.message)
+  }
+
+  return blobResult || supaResult
 }

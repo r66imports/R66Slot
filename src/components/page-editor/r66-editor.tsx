@@ -82,6 +82,7 @@ export function R66Editor({ pageId }: R66EditorProps) {
     isSaving,
     loadError,
     selectedComponent,
+    hasUnsavedChanges,
   } = usePageEditor()
 
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
@@ -386,9 +387,9 @@ ${canvasHTML}
             size="sm"
             onClick={() => handleSave(false)}
             disabled={isSaving}
-            className="font-play"
+            className={`font-play ${hasUnsavedChanges ? 'border-orange-400 text-orange-600' : ''}`}
           >
-            {isSaving ? 'Saving...' : 'Save Draft'}
+            {isSaving ? 'Saving...' : hasUnsavedChanges ? 'Save Draft *' : 'Save Draft'}
           </Button>
           <Button
             size="sm"

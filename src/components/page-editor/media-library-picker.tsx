@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface MediaFile {
   id: string
@@ -26,8 +26,11 @@ interface MediaLibraryPickerProps {
 export function MediaLibraryPicker({ open, onClose, onSelect }: MediaLibraryPickerProps) {
   const [library, setLibrary] = useState<MediaLibrary | null>(null)
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedFolder, setSelectedFolder] = useState('All Files')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (open && !library) {
@@ -47,6 +50,35 @@ export function MediaLibraryPicker({ open, onClose, onSelect }: MediaLibraryPick
       console.error('Failed to load media library:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setUploading(true)
+    setUploadError(null)
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Upload failed' }))
+          setUploadError(errData.error || `Upload failed for ${file.name}`)
+        }
+      }
+      // Reload library after all uploads
+      await loadLibrary()
+    } catch (err) {
+      console.error('Upload failed:', err)
+      setUploadError('Network error during upload')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
     }
   }
 
@@ -77,7 +109,7 @@ export function MediaLibraryPicker({ open, onClose, onSelect }: MediaLibraryPick
           </button>
         </div>
 
-        {/* Search + Folder Filter */}
+        {/* Search + Upload + Folder Filter */}
         <div className="px-6 py-3 border-b border-gray-100 flex items-center gap-3">
           <input
             type="text"
@@ -98,12 +130,34 @@ export function MediaLibraryPicker({ open, onClose, onSelect }: MediaLibraryPick
             </select>
           )}
           <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            className="px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-play font-medium disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            {uploading ? 'Uploading...' : '+ Upload'}
+          </button>
+          <button
             onClick={loadLibrary}
             className="px-3 py-2 text-sm text-blue-600 hover:text-blue-700 font-play font-medium"
           >
             Refresh
           </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleUpload}
+            className="hidden"
+          />
         </div>
+
+        {/* Upload Error */}
+        {uploadError && (
+          <div className="px-6 py-2 bg-red-50 border-b border-red-200">
+            <p className="text-xs text-red-600 font-play">{uploadError}</p>
+          </div>
+        )}
 
         {/* Image Grid */}
         <div className="flex-1 overflow-y-auto p-6">
@@ -118,9 +172,12 @@ export function MediaLibraryPicker({ open, onClose, onSelect }: MediaLibraryPick
               <p className="text-sm text-gray-500 font-play">
                 {search ? 'No images match your search' : 'No images in media library'}
               </p>
-              <p className="text-xs text-gray-400 font-play mt-1">
-                Upload images at <a href="/admin/media" target="_blank" className="text-blue-500 hover:underline">/admin/media</a>
-              </p>
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="mt-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-play font-medium transition-colors"
+              >
+                Upload Your First Image
+              </button>
             </div>
           ) : (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
