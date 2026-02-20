@@ -586,9 +586,14 @@ export default function PreOrderPosterPage() {
                   </div>
 
                   {/* Product Image */}
-                  <div className="aspect-square bg-gray-100 flex items-center justify-center">
+                  <div className="bg-gray-100 flex items-center justify-center" style={{ maxHeight: '400px', overflow: 'hidden' }}>
                     {imageUrl ? (
-                      <img src={imageUrl} alt="Product" className="w-full h-full object-contain" />
+                      <img
+                        src={imageUrl}
+                        alt="Product"
+                        className="max-w-full max-h-[400px]"
+                        style={{ objectFit: 'contain', width: 'auto', height: 'auto' }}
+                      />
                     ) : (
                       <div className="text-gray-400 text-center p-8">
                         <svg className="mx-auto h-16 w-16 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -632,25 +637,7 @@ export default function PreOrderPosterPage() {
                       </div>
                     </div>
 
-                    {/* Book Here Link - Blue underlined text */}
-                    <div className="pt-4 text-center">
-                      <a
-                        href={shortCode ? `/book/${shortCode}` : '#'}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700 font-bold font-play text-xl underline"
-                        onClick={(e) => {
-                          if (!shortCode) {
-                            e.preventDefault()
-                            alert('Save the poster first to generate a booking link')
-                          }
-                        }}
-                      >
-                        Book Here
-                      </a>
-                    </div>
-
-                    <p className="text-xs text-center text-gray-400 font-play pt-3">
+                    <p className="text-xs text-center text-gray-400 font-play pt-4">
                       R66SLOT - Premium Slot Cars
                     </p>
                   </div>

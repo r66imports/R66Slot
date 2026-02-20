@@ -36,7 +36,7 @@ export default async function DynamicPage({
       {ps.backgroundImage && (
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             inset: 0,
             backgroundImage: `url("${ps.backgroundImage}")`,
             backgroundSize: ps.backgroundSize || 'cover',

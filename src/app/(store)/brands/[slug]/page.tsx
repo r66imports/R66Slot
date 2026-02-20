@@ -52,7 +52,7 @@ export default async function BrandPage({ params }: BrandPageProps) {
         {ps.backgroundImage && (
           <div
             style={{
-              position: 'absolute',
+              position: 'fixed',
               inset: 0,
               backgroundImage: `url("${ps.backgroundImage}")`,
               backgroundSize: ps.backgroundSize || 'cover',

@@ -417,10 +417,25 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
           <div className="container mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {children?.slice(0, 2).map((child) => {
+                const imgFitTC = (child.settings.objectFit as string) || 'cover'
                 const colContent = (
                   <div key={child.id}>
                     {(child.settings.imageUrl as string) && (
-                      <img src={child.settings.imageUrl as string} alt="" className="w-full h-auto rounded-lg mb-3 object-cover" />
+                      <div className="mb-3 overflow-hidden rounded-lg">
+                        <img
+                          src={child.settings.imageUrl as string}
+                          alt={(child.settings.alt as string) || ''}
+                          className="rounded-lg"
+                          style={{
+                            width: child.styles?.width || '100%',
+                            height: child.styles?.height || 'auto',
+                            objectFit: imgFitTC as any,
+                            objectPosition: (child.settings.objectPosition as string) || 'center center',
+                            maxWidth: '100%',
+                            maxHeight: imgFitTC === 'contain' ? '300px' : undefined,
+                          }}
+                        />
+                      </div>
                     )}
                     <div dangerouslySetInnerHTML={{ __html: child.content }} />
                   </div>
@@ -441,6 +456,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
           <div className="container mx-auto">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {children?.map((child) => {
+                const imgFit3C = (child.settings.objectFit as string) || 'cover'
                 const colContent = (
                   <div
                     key={child.id}
@@ -452,7 +468,21 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       </div>
                     )}
                     {(child.settings.imageUrl as string) && (
-                      <img src={child.settings.imageUrl as string} alt="" className="w-full h-auto rounded-lg mb-3 object-cover" />
+                      <div className="mb-3 overflow-hidden rounded-lg">
+                        <img
+                          src={child.settings.imageUrl as string}
+                          alt={(child.settings.alt as string) || ''}
+                          className="rounded-lg"
+                          style={{
+                            width: child.styles?.width || '100%',
+                            height: child.styles?.height || 'auto',
+                            objectFit: imgFit3C as any,
+                            objectPosition: (child.settings.objectPosition as string) || 'center center',
+                            maxWidth: '100%',
+                            maxHeight: imgFit3C === 'contain' ? '300px' : undefined,
+                          }}
+                        />
+                      </div>
                     )}
                     <div dangerouslySetInnerHTML={{ __html: child.content }} />
                   </div>
@@ -477,6 +507,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               style={{ gridTemplateColumns: `repeat(${colCount}, 1fr)` }}
             >
               {children?.slice(0, colCount).map((child) => {
+                const imgFitCol = (child.settings.objectFit as string) || 'cover'
                 const colContent = (
                   <div
                     key={child.id}
@@ -488,11 +519,21 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       </div>
                     )}
                     {(child.settings.imageUrl as string) && (
-                      <img
-                        src={child.settings.imageUrl as string}
-                        alt=""
-                        className="w-full h-auto rounded-lg mb-3 object-cover"
-                      />
+                      <div className="mb-3 overflow-hidden rounded-lg">
+                        <img
+                          src={child.settings.imageUrl as string}
+                          alt={(child.settings.alt as string) || ''}
+                          className="rounded-lg"
+                          style={{
+                            width: child.styles?.width || '100%',
+                            height: child.styles?.height || 'auto',
+                            objectFit: imgFitCol as any,
+                            objectPosition: (child.settings.objectPosition as string) || 'center center',
+                            maxWidth: '100%',
+                            maxHeight: imgFitCol === 'contain' ? '300px' : undefined,
+                          }}
+                        />
+                      </div>
                     )}
                     <div dangerouslySetInnerHTML={{ __html: child.content }} />
                   </div>

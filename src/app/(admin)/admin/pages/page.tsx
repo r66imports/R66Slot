@@ -40,6 +40,14 @@ const FRONTEND_PAGES = [
     icon: '📧',
     editable: true,
   },
+  {
+    id: 'book-now',
+    title: 'Book Now Page',
+    slug: 'book',
+    description: 'Pre-order booking page for customers',
+    icon: '📋',
+    editable: true,
+  },
 ]
 
 // Brand pages editable via the website editor
