@@ -3,6 +3,7 @@ import { blobRead, blobWrite } from '@/lib/blob-storage'
 
 const ORDERS_KEY = 'data/preorder-list.json'
 const POSTERS_KEY = 'data/slotcar-orders.json'
+const CONTACTS_KEY = 'data/contacts.json'
 
 async function getOrders() {
   return await blobRead<any[]>(ORDERS_KEY, [])
@@ -68,6 +69,35 @@ export async function POST(request: Request) {
     // Update poster available quantity
     posters[posterIndex].availableQty -= orderData.quantity
     await savePosters(posters)
+
+    // Auto-add customer to contacts if not already there
+    try {
+      const contacts = await blobRead<any[]>(CONTACTS_KEY, [])
+      const exists = contacts.find(
+        (c: any) =>
+          (orderData.customerEmail && c.email === orderData.customerEmail) ||
+          (orderData.customerPhone && c.phone === orderData.customerPhone)
+      )
+      if (!exists) {
+        const nameParts = (orderData.customerName || '').split(' ')
+        contacts.push({
+          id: `contact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || '',
+          email: orderData.customerEmail || '',
+          phone: orderData.customerPhone || '',
+          source: 'book-now',
+          notes: '',
+          totalOrders: 0,
+          totalSpent: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        })
+        await blobWrite(CONTACTS_KEY, contacts)
+      }
+    } catch {
+      // Don't fail the order if contact save fails
+    }
 
     return NextResponse.json({
       success: true,

@@ -71,7 +71,7 @@ export default function AdminLayout({
     orderNetwork: [
       { name: 'Store Orders', href: '/admin/slotify-orders', icon: '🛒' },
       { name: 'Orders', href: '/admin/slotify-preorders', icon: '📦' },
-      { name: 'Order List', href: '/admin/preorder-list', icon: '📋' },
+      { name: 'Book Now Orders', href: '/admin/preorder-list', icon: '📋' },
     ],
     business: [
       {
@@ -83,6 +83,7 @@ export default function AdminLayout({
           { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
         ]
       },
+      { name: 'Contacts', href: '/admin/contacts', icon: '👥' },
       { name: 'Local Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },

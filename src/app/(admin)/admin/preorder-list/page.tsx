@@ -142,12 +142,12 @@ export default function PreOrderListPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold font-play">
-            {showArchived ? 'Archived Pre-Orders' : 'List of Pre-Orders'}
+            {showArchived ? 'Archived Orders' : 'Book Now Orders'}
           </h1>
           <p className="text-gray-600 mt-1 font-play">
             {showArchived
-              ? 'Shipped and archived pre-orders'
-              : 'Manage customer pre-orders placed through posters'}
+              ? 'Shipped and archived orders'
+              : 'Orders placed by customers through Book Now'}
           </p>
         </div>
         <div className="flex items-center gap-3">
