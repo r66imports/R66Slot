@@ -17,6 +17,8 @@ interface Supplier {
   code: string
 }
 
+const RACING_CLASSES = ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA']
+
 interface Category {
   id: string
   name: string
@@ -30,6 +32,7 @@ interface Category {
   brandId?: string
   supplierId?: string
   pageUrl?: string
+  class?: string
 }
 
 // Default brands
@@ -79,6 +82,7 @@ export default function CatalogueCategoriesPage() {
     supplierId: '',
     pageUrl: '',
     isActive: true,
+    class: '',
   })
 
   useEffect(() => {
@@ -125,26 +129,39 @@ export default function CatalogueCategoriesPage() {
       supplierId: '',
       pageUrl: '',
       isActive: true,
+      class: '',
     })
   }
 
   const handleAddCategory = async () => {
     const slug = formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-')
-    const category: Category = {
-      id: Date.now().toString(),
+    const payload = {
       name: formData.name,
       slug,
       description: formData.description,
       parentId: formData.parentId || null,
-      productCount: 0,
-      imageUrl: '',
       isActive: formData.isActive,
-      order: categories.length + 1,
       brandId: formData.brandId,
       supplierId: formData.supplierId,
       pageUrl: formData.pageUrl || `/products/${slug}`,
+      class: formData.class,
     }
-    setCategories([...categories, category])
+
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setCategories([...categories, created])
+      }
+    } catch {
+      // Fallback: add locally
+      const category: Category = { id: Date.now().toString(), productCount: 0, imageUrl: '', order: categories.length + 1, ...payload }
+      setCategories([...categories, category])
+    }
     setShowAddModal(false)
     resetForm()
   }
@@ -160,29 +177,37 @@ export default function CatalogueCategoriesPage() {
       supplierId: category.supplierId || '',
       pageUrl: category.pageUrl || '',
       isActive: category.isActive,
+      class: category.class || '',
     })
     setShowEditModal(true)
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!selectedCategory) return
+    const payload = {
+      id: selectedCategory.id,
+      name: formData.name,
+      slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-'),
+      description: formData.description,
+      parentId: formData.parentId || null,
+      brandId: formData.brandId,
+      supplierId: formData.supplierId,
+      pageUrl: formData.pageUrl,
+      isActive: formData.isActive,
+      class: formData.class,
+    }
 
-    const updatedCategories = categories.map(cat => {
-      if (cat.id === selectedCategory.id) {
-        return {
-          ...cat,
-          name: formData.name,
-          slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-'),
-          description: formData.description,
-          parentId: formData.parentId || null,
-          brandId: formData.brandId,
-          supplierId: formData.supplierId,
-          pageUrl: formData.pageUrl,
-          isActive: formData.isActive,
-        }
-      }
-      return cat
-    })
+    try {
+      await fetch('/api/admin/categories', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+    } catch { /* non-fatal */ }
+
+    const updatedCategories = categories.map(cat =>
+      cat.id === selectedCategory.id ? { ...cat, ...payload } : cat
+    )
     setCategories(updatedCategories)
     setShowEditModal(false)
     setSelectedCategory(null)
@@ -194,10 +219,12 @@ export default function CatalogueCategoriesPage() {
     setShowUrlModal(true)
   }
 
-  const handleDeleteCategory = (id: string) => {
-    if (confirm('Are you sure you want to delete this category?')) {
-      setCategories(categories.filter(c => c.id !== id))
-    }
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this category?')) return
+    try {
+      await fetch(`/api/admin/categories?id=${id}`, { method: 'DELETE' })
+    } catch { /* non-fatal */ }
+    setCategories(categories.filter(c => c.id !== id && c.parentId !== id))
   }
 
   const handleToggleActive = (id: string) => {
@@ -252,15 +279,29 @@ export default function CatalogueCategoriesPage() {
             <span>/</span>
             <span className="text-gray-900">Categories</span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
-          <p className="text-gray-500 mt-1">Organize your products into categories</p>
+          <h1 className="text-3xl font-bold text-gray-900">Product Categories</h1>
+          <p className="text-gray-500 mt-1">Organize products by Brand (Unit), Class and Category</p>
         </div>
-        <Button
-          onClick={() => { resetForm(); setShowAddModal(true) }}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          + Add Category
-        </Button>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/slotcar-orders"
+            className="px-4 py-2 text-sm font-medium bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200"
+          >
+            🎨 Slotcar Orders
+          </Link>
+          <Link
+            href="/admin/products/new"
+            className="px-4 py-2 text-sm font-medium bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
+          >
+            ➕ New Product
+          </Link>
+          <Button
+            onClick={() => { resetForm(); setShowAddModal(true) }}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            + Add Category
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -386,7 +427,7 @@ export default function CatalogueCategoriesPage() {
                           )}
                         </div>
                         <p className="text-sm text-gray-500">{category.description}</p>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2 mt-1 flex-wrap">
                           {getBrandName(category.brandId) && (
                             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
                               {getBrandName(category.brandId)}
@@ -395,6 +436,11 @@ export default function CatalogueCategoriesPage() {
                           {getSupplierName(category.supplierId) && (
                             <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
                               {getSupplierName(category.supplierId)}
+                            </span>
+                          )}
+                          {category.class && (
+                            <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded font-semibold">
+                              {category.class}
                             </span>
                           )}
                         </div>
@@ -596,6 +642,21 @@ export default function CatalogueCategoriesPage() {
                     />
                   </div>
                 </div>
+                {/* Class (Racing Class) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Racing Class</label>
+                  <select
+                    value={formData.class}
+                    onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">None</option>
+                    {RACING_CLASSES.map((cls) => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">GT, GT 1, GT 2, GT 3, Group 2, Group 5, GT/IUMSA</p>
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -713,6 +774,20 @@ export default function CatalogueCategoriesPage() {
                       placeholder="/products/category-slug"
                     />
                   </div>
+                </div>
+                {/* Class (Racing Class) - Edit */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Racing Class</label>
+                  <select
+                    value={formData.class}
+                    onChange={(e) => setFormData({ ...formData, class: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">None</option>
+                    {RACING_CLASSES.map((cls) => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center gap-2">
                   <input

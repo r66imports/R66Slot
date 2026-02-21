@@ -29,6 +29,9 @@ export default function NewProductPage() {
   const [supplier, setSupplier] = useState('')
   const [collections, setCollections] = useState<string[]>([])
   const [tags, setTags] = useState('')
+  const [carClass, setCarClass] = useState('')
+  const [categories, setCategories] = useState<{ id: string; name: string; slug: string; class?: string }[]>([])
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [status, setStatus] = useState('draft')
   const [boxSize, setBoxSize] = useState('')
   const [dimLength, setDimLength] = useState('')
@@ -41,13 +44,22 @@ export default function NewProductPage() {
   const [seoDescription, setSeoDescription] = useState('')
   const [seoKeywords, setSeoKeywords] = useState('')
 
-  // Load available pages for assignment
+  // Load available pages and categories on mount
   useEffect(() => {
     fetch('/api/admin/pages')
       .then(res => res.json())
       .then(pages => {
         if (Array.isArray(pages)) {
           setAvailablePages(pages.map((p: any) => ({ id: p.id, title: p.title })))
+        }
+      })
+      .catch(() => {})
+
+    fetch('/api/admin/categories')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setCategories(data.map((c: any) => ({ id: c.id, name: c.name, slug: c.slug, class: c.class })))
         }
       })
       .catch(() => {})
@@ -212,7 +224,9 @@ export default function NewProductPage() {
         partType,
         scale,
         supplier,
-        collections,
+        collections: [...collections, ...selectedCategories.filter(c => !collections.includes(c))],
+        categories: selectedCategories,
+        carClass,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
         status: publishStatus,
         boxSize,
@@ -674,12 +688,12 @@ export default function NewProductPage() {
 
             {/* Product Organization */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Product organization</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-4">Product Organization</h3>
               <div className="space-y-4">
-                {/* Brand */}
+                {/* Unit (Brand) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Brand
+                    Unit (Brand)
                   </label>
                   <select
                     value={brand}
@@ -740,6 +754,66 @@ export default function NewProductPage() {
                     <option value="white-body-kit">White Body Kit</option>
                     <option value="white-body">White Body</option>
                   </select>
+                </div>
+
+                {/* Racing Class */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Class
+                  </label>
+                  <select
+                    value={carClass}
+                    onChange={(e) => setCarClass(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  >
+                    <option value="">Select class...</option>
+                    <option value="GT">GT</option>
+                    <option value="GT 1">GT 1</option>
+                    <option value="GT 2">GT 2</option>
+                    <option value="GT 3">GT 3</option>
+                    <option value="Group 2">Group 2</option>
+                    <option value="Group 5">Group 5</option>
+                    <option value="GT/IUMSA">GT/IUMSA</option>
+                  </select>
+                </div>
+
+                {/* Categories — multi-select */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Categories <span className="text-xs text-gray-400">(select multiple)</span>
+                  </label>
+                  <div className="border border-gray-300 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+                    {categories.length === 0 ? (
+                      <p className="text-xs text-gray-400 px-2 py-1">Loading categories...</p>
+                    ) : (
+                      categories.map((cat) => (
+                        <label key={cat.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCategories.includes(cat.slug)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCategories(prev => [...prev, cat.slug])
+                              } else {
+                                setSelectedCategories(prev => prev.filter(s => s !== cat.slug))
+                              }
+                            }}
+                            className="h-3.5 w-3.5 text-gray-900 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">{cat.name}</span>
+                          {cat.class && <span className="text-xs text-red-600 font-medium">({cat.class})</span>}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {selectedCategories.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">{selectedCategories.length} selected: {selectedCategories.join(', ')}</p>
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    <a href="/admin/catalogue/categories" target="_blank" className="text-xs text-blue-600 hover:text-blue-800">
+                      Manage Categories →
+                    </a>
+                  </div>
                 </div>
 
                 {/* Part Type */}
