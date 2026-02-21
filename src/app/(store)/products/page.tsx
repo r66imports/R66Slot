@@ -20,11 +20,107 @@ interface Product {
   eta: string
   carType: string
   carClass?: string
+  sku?: string
 }
 
 const BOOK_NOW_URL = 'https://r66slot.co.za/book'
 
 const RACING_CLASSES = ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA']
+
+// ─── Pre-Order PDF builder ────────────────────────────────────────────────────
+function buildPreOrderPDF(product: Product): string {
+  const chips = [product.carClass, product.scale, product.carType]
+    .filter(Boolean)
+    .map(c => `<span style="display:inline-block;background:#111;color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;margin:0 3px;">${c}</span>`)
+    .join('')
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  @page { size: A5; margin: 0; }
+  body { font-family: 'Arial', sans-serif; width:148mm; min-height:210mm; background:#fff; }
+  .header { background:#111; color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+  .logo { font-size:22px; font-weight:900; letter-spacing:1px; }
+  .logo span { color:#e53e3e; }
+  .badge { background:#e53e3e; color:#fff; font-size:9px; font-weight:700; padding:3px 10px; border-radius:12px; letter-spacing:1px; }
+  .img-wrap { background:#f5f5f5; display:flex; align-items:center; justify-content:center; height:140px; overflow:hidden; }
+  .img-wrap img { max-height:130px; max-width:100%; object-fit:contain; }
+  .body { padding:16px 20px; }
+  .brand { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .title { font-size:16px; font-weight:900; color:#111; margin-bottom:8px; line-height:1.3; }
+  .chips { margin-bottom:12px; }
+  .price-row { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; }
+  .price { font-size:26px; font-weight:900; color:#e53e3e; }
+  .compare { font-size:14px; color:#aaa; text-decoration:line-through; }
+  .eta { font-size:11px; color:#666; margin-bottom:16px; }
+  .cta { text-align:center; background:#e53e3e; border-radius:10px; padding:14px; margin-top:8px; }
+  .cta a { color:#fff; text-decoration:none; font-size:15px; font-weight:900; letter-spacing:1px; display:block; }
+  .cta small { display:block; font-size:10px; color:rgba(255,255,255,0.8); margin-top:4px; }
+  .footer { background:#111; color:#666; font-size:9px; text-align:center; padding:8px; position:absolute; bottom:0; width:100%; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">R66<span>SLOT</span></div>
+    <div class="badge">PRE-ORDER</div>
+  </div>
+  ${product.imageUrl ? `<div class="img-wrap"><img src="${product.imageUrl}" alt="${product.title}"/></div>` : ''}
+  <div class="body">
+    ${product.brand ? `<div class="brand">${product.brand}</div>` : ''}
+    <div class="title">${product.title}</div>
+    ${chips ? `<div class="chips">${chips}</div>` : ''}
+    <div class="price-row">
+      <div class="price">${product.price > 0 ? `R${product.price.toFixed(2)}` : 'POA'}</div>
+      ${product.compareAtPrice && product.compareAtPrice > product.price ? `<div class="compare">R${product.compareAtPrice.toFixed(2)}</div>` : ''}
+    </div>
+    ${product.eta ? `<div class="eta">Estimated Delivery: ${product.eta}</div>` : ''}
+    <div class="cta">
+      <a href="${BOOK_NOW_URL}">
+        <span>BOOK NOW</span>
+        <small>r66slot.co.za/book</small>
+      </a>
+    </div>
+  </div>
+  <div class="footer">r66slot.co.za &nbsp;|&nbsp; Route 66 Slot Cars &nbsp;|&nbsp; South Africa's Premier Slot Car Store</div>
+</body>
+</html>`
+}
+
+// ─── Open pre-order via WhatsApp + PDF ───────────────────────────────────────
+function handlePreOrder(product: Product) {
+  // 1. Open printable PDF
+  const html = buildPreOrderPDF(product)
+  const win = window.open('', '_blank')
+  if (win) {
+    win.document.write(html)
+    win.document.close()
+    setTimeout(() => win.print(), 600)
+  }
+
+  // 2. Open WhatsApp after a short delay
+  const priceStr = product.price > 0 ? `R${product.price.toFixed(2)}` : 'POA'
+  const etaStr = product.eta ? `\nETA: ${product.eta}` : ''
+  const msg = [
+    `🏎️ *PRE-ORDER ENQUIRY — R66SLOT*`,
+    ``,
+    `*${product.title}*`,
+    product.brand ? `Brand: ${product.brand}` : '',
+    product.carClass ? `Class: ${product.carClass}` : '',
+    product.scale ? `Scale: ${product.scale}` : '',
+    `Price: ${priceStr}${etaStr}`,
+    ``,
+    `Please reserve this item for me.`,
+    ``,
+    `📋 Book Now: ${BOOK_NOW_URL}`,
+  ].filter(l => l !== null).join('\n')
+
+  setTimeout(() => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
+  }, 400)
+}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -32,6 +128,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('')
   const [filterBrand, setFilterBrand] = useState('')
   const [filterClass, setFilterClass] = useState('')
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/products')
@@ -50,16 +147,6 @@ export default function ProductsPage() {
   const brands = useMemo(() => {
     const set = new Set(products.map((p) => p.brand).filter(Boolean))
     return Array.from(set).sort()
-  }, [products])
-
-  // Build class list — use classes that actually exist in products, plus always show all racing classes
-  const activeClasses = useMemo(() => {
-    const fromProducts = new Set(
-      products.map((p) => p.carClass).filter(Boolean) as string[]
-    )
-    return RACING_CLASSES.filter(
-      (c) => fromProducts.has(c) || products.some((p) => p.tags?.includes(c))
-    )
   }, [products])
 
   const filtered = useMemo(() => {
@@ -94,7 +181,61 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* ─── Header ───────────────────────────────────────────── */}
+
+      {/* ─── Site Nav Header ─────────────────────────────────── */}
+      <header className="bg-black text-white sticky top-0 z-50 border-b border-gray-800">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-14">
+            {/* Logo */}
+            <Link href="/" className="text-xl font-bold font-play flex-shrink-0">
+              <span className="text-white">R66</span>
+              <span className="text-red-500">SLOT</span>
+            </Link>
+
+            {/* Desktop nav */}
+            <nav className="hidden md:flex items-center gap-6">
+              <Link href="/" className="text-sm text-gray-300 hover:text-white transition-colors">Home</Link>
+              <span className="text-sm text-white font-bold border-b-2 border-red-500 pb-0.5">Products</span>
+              <Link href="/book" className="text-sm text-gray-300 hover:text-white transition-colors">Book Now</Link>
+              <Link href="/brands" className="text-sm text-gray-300 hover:text-white transition-colors">Brands</Link>
+              <Link href="/account" className="text-sm text-gray-300 hover:text-white transition-colors">Account</Link>
+            </nav>
+
+            {/* Book Now CTA + mobile menu */}
+            <div className="flex items-center gap-3">
+              <Link
+                href="/book"
+                className="hidden md:inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Book Now →
+              </Link>
+              <button
+                className="md:hidden p-2 text-gray-300 hover:text-white"
+                onClick={() => setMenuOpen(!menuOpen)}
+                aria-label="Menu"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d={menuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'} />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile menu */}
+          {menuOpen && (
+            <nav className="md:hidden py-4 border-t border-gray-800 flex flex-col gap-3">
+              <Link href="/" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Home</Link>
+              <span className="text-sm text-white font-bold">Products</span>
+              <Link href="/book" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Book Now</Link>
+              <Link href="/brands" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Brands</Link>
+              <Link href="/account" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Account</Link>
+            </nav>
+          )}
+        </div>
+      </header>
+
+      {/* ─── Page Header / Filters ───────────────────────────── */}
       <div className="bg-black text-white py-10">
         <div className="container mx-auto px-4">
 
@@ -380,12 +521,23 @@ function ProductCard({
           )}
         </div>
 
-        <a
-          href={BOOK_NOW_URL}
-          className="mt-3 block text-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
-        >
-          Book Now
-        </a>
+        {/* Buttons */}
+        <div className={`mt-3 flex gap-2 ${isPreOrder ? 'flex-col' : ''}`}>
+          {isPreOrder && (
+            <button
+              onClick={() => handlePreOrder(p)}
+              className="w-full text-center bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+            >
+              Pre Order → WhatsApp
+            </button>
+          )}
+          <a
+            href={BOOK_NOW_URL}
+            className="flex-1 block text-center bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg transition-colors text-sm"
+          >
+            Book Now
+          </a>
+        </div>
       </div>
     </div>
   )

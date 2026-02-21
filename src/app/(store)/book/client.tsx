@@ -17,11 +17,21 @@ type Product = {
   imageUrl: string
 }
 
+type LoggedInUser = {
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+}
+
 export default function BookNowClient() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filterBrand, setFilterBrand] = useState('all')
   const [filterType, setFilterType] = useState<'all' | 'new-order' | 'pre-order'>('all')
+
+  // Logged-in user for auto-fill
+  const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null)
 
   // Booking modal state
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -35,7 +45,25 @@ export default function BookNowClient() {
 
   useEffect(() => {
     fetchProducts()
+    checkAuth()
   }, [])
+
+  const checkAuth = async () => {
+    try {
+      const res = await fetch('/api/auth/me')
+      if (res.ok) {
+        const data = await res.json()
+        setLoggedInUser({
+          firstName: data.firstName || '',
+          lastName: data.lastName || '',
+          email: data.email || '',
+          phone: data.phone || '',
+        })
+      }
+    } catch {
+      // not logged in — that's fine
+    }
+  }
 
   const fetchProducts = async () => {
     try {
@@ -62,10 +90,11 @@ export default function BookNowClient() {
   const openBookingModal = (product: Product) => {
     setSelectedProduct(product)
     setSelectedQty(1)
-    setFirstName('')
-    setLastName('')
-    setEmail('')
-    setPhone('')
+    // Auto-fill from logged-in user if available
+    setFirstName(loggedInUser?.firstName || '')
+    setLastName(loggedInUser?.lastName || '')
+    setEmail(loggedInUser?.email || '')
+    setPhone(loggedInUser?.phone || '')
     setOrderSuccess(false)
   }
 
@@ -109,7 +138,6 @@ export default function BookNowClient() {
 
       if (response.ok) {
         setOrderSuccess(true)
-        // Refresh products to update available quantities
         fetchProducts()
       } else {
         const data = await response.json()
@@ -141,6 +169,15 @@ export default function BookNowClient() {
             <span className="text-sm text-white font-bold font-play border-b-2 border-red-500 pb-1">
               Book Now
             </span>
+            {loggedInUser ? (
+              <Link href="/account" className="text-sm text-green-400 hover:text-green-300 font-play flex items-center gap-1">
+                <span>●</span> {loggedInUser.firstName}
+              </Link>
+            ) : (
+              <Link href="/account/login" className="text-sm text-gray-300 hover:text-white font-play">
+                Login
+              </Link>
+            )}
           </nav>
         </div>
       </header>
@@ -329,7 +366,14 @@ export default function BookNowClient() {
               <>
                 {/* Modal Header */}
                 <div className="flex items-center justify-between p-4 border-b">
-                  <h2 className="text-lg font-bold font-play">Book Your Order</h2>
+                  <div>
+                    <h2 className="text-lg font-bold font-play">Book Your Order</h2>
+                    {loggedInUser && (
+                      <p className="text-xs text-green-600 font-play mt-0.5 flex items-center gap-1">
+                        <span>●</span> Logged in — details auto-filled
+                      </p>
+                    )}
+                  </div>
                   <button
                     onClick={closeModal}
                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500"
@@ -402,7 +446,14 @@ export default function BookNowClient() {
 
                 {/* Customer Details */}
                 <div className="p-4 space-y-3">
-                  <h3 className="font-bold font-play text-sm text-gray-700">Your Details</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold font-play text-sm text-gray-700">Your Details</h3>
+                    {loggedInUser && (
+                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-play">
+                        Auto-filled from account
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1 font-play">First Name *</label>
@@ -445,6 +496,11 @@ export default function BookNowClient() {
                       className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm font-play focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
+                  {!loggedInUser && (
+                    <p className="text-xs text-gray-400 font-play text-center pt-1">
+                      <Link href="/account/login" className="text-red-600 hover:underline">Login</Link> to auto-fill your details
+                    </p>
+                  )}
                 </div>
 
                 {/* Place Order Button */}
