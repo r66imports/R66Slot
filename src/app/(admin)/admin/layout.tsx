@@ -27,7 +27,7 @@ export default function AdminLayout({
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showCostingModal, setShowCostingModal] = useState(false)
   const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['Inventory Management']) // Default expanded
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['Inventory Management', 'Order Network']) // Default expanded
 
   const toggleSubmenu = (name: string) => {
     setExpandedMenus(prev =>
@@ -69,9 +69,16 @@ export default function AdminLayout({
       },
     ],
     orderNetwork: [
-      { name: 'Store Orders', href: '/admin/slotify-orders', icon: '🛒' },
-      { name: 'Orders', href: '/admin/slotify-preorders', icon: '📦' },
-      { name: 'Book Now Orders', href: '/admin/preorder-list', icon: '📋' },
+      {
+        name: 'Order Network',
+        href: '/admin/preorder-list',
+        icon: '🌐',
+        submenu: [
+          { name: 'Store Orders', href: '/admin/slotify-orders', icon: '🛒' },
+          { name: 'Orders', href: '/admin/slotify-preorders', icon: '📦' },
+          { name: 'Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
+        ],
+      },
     ],
     business: [
       {
@@ -375,6 +382,60 @@ export default function AdminLayout({
               <div className="space-y-1">
                 {navigation.orderNetwork.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const isExpanded = expandedMenus.includes(item.name)
+
+                  if (hasSubmenu) {
+                    return (
+                      <div key={item.name}>
+                        <button
+                          onClick={() => toggleSubmenu(item.name)}
+                          className={cn(
+                            'flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                            isActive
+                              ? 'bg-gray-100 text-gray-900'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-base">{item.icon}</span>
+                            {item.name}
+                          </div>
+                          <svg
+                            className={cn('w-4 h-4 transition-transform', isExpanded ? 'rotate-180' : '')}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {isExpanded && (
+                          <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
+                            {item.submenu!.map((subItem) => {
+                              const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
+                              return (
+                                <Link
+                                  key={subItem.name}
+                                  href={subItem.href}
+                                  className={cn(
+                                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play',
+                                    isSubActive
+                                      ? 'bg-blue-50 text-blue-700 font-medium'
+                                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                  )}
+                                >
+                                  <span className="text-sm">{subItem.icon}</span>
+                                  {subItem.name}
+                                </Link>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
                   return (
                     <Link
                       key={item.name}

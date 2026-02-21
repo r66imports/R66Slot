@@ -1,7 +1,12 @@
+'use client'
+
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import type { PageComponent } from '@/lib/pages/schema'
 import { AnimatedWrapper, type AnimationType } from './animated-wrapper'
+
+const BookingFormWidget = dynamic(() => import('./booking-form-widget'), { ssr: false })
 
 interface ComponentRendererProps {
   component: PageComponent
@@ -1305,6 +1310,29 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                 {btnText}
               </Link>
             )}
+          </div>
+        </div>
+      )
+    }
+
+    case 'booking-form': {
+      const bfTitle = (settings.bookingTitle as string) || 'Pre-Order Now'
+      const bfSubtitle = (settings.bookingSubtitle as string) || 'Browse available items and place your pre-order'
+      const bfAccent = styles.textColor || '#DC2626'
+      const bfLayout = (settings.bookingLayout as 'grid' | 'list') || 'grid'
+      const bfBrandFilter = settings.showBrandFilter !== false
+      return (
+        <div style={containerStyle}>
+          <div className="container mx-auto">
+            <BookingFormWidget
+              title={bfTitle}
+              subtitle={bfSubtitle}
+              accentColor={bfAccent}
+              backgroundColor={styles.backgroundColor || '#ffffff'}
+              textColor={styles.textColor || '#1F2937'}
+              layout={bfLayout}
+              showBrandFilter={bfBrandFilter}
+            />
           </div>
         </div>
       )
