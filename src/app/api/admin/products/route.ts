@@ -35,6 +35,7 @@ export interface Product {
   imageUrl: string
   images: string[]
   pageId: string
+  pageUrl: string
   seo: {
     metaTitle: string
     metaDescription: string
@@ -107,6 +108,7 @@ export async function POST(request: Request) {
       imageUrl: body.imageUrl || body.mediaFiles?.[0] || '',
       images: Array.isArray(body.mediaFiles) ? body.mediaFiles : [],
       pageId: body.pageId || '',
+      pageUrl: body.pageUrl || '',
       seo: body.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
