@@ -917,9 +917,31 @@ export default function NewProductPage() {
                       <option key={p.id} value={p.id}>{p.title}</option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Select a page where this product will appear
-                  </p>
+                  {pageId ? (
+                    <div className="mt-2 flex items-center gap-3">
+                      <a
+                        href={`/admin/pages/editor/${pageId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        View Page →
+                      </a>
+                      <span className="text-gray-300">|</span>
+                      <a
+                        href={`/admin/pages/frontend/${pageId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-800 hover:underline"
+                      >
+                        Preview Live →
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Select a page where this product will appear
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
