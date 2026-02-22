@@ -97,6 +97,7 @@ export default function AdminLayout({
     ],
     settings: [
       { name: 'Site Settings', href: '/admin/settings', icon: '⚙️' },
+      { name: 'My Account', href: '/admin/account', icon: '👤' },
     ],
   }
 

@@ -34,6 +34,7 @@ export interface PageComponent {
     | 'banner'
     | 'columns'
     | 'header'
+    | 'booking-form'
   content: string
   styles: {
     backgroundColor?: string

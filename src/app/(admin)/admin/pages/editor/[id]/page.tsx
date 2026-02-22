@@ -250,6 +250,14 @@ const COMPONENT_DEFAULTS: Array<{
       settings: { logoText: 'R66SLOT', menuItems: 'Products,Brands,About,Contact', menuLinks: '/products,/brands,/about,/contact' },
     },
   },
+  {
+    type: 'booking-form',
+    defaultProps: {
+      content: '',
+      styles: { backgroundColor: '#F9FAFB', textColor: '#DC2626', paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: { bookingTitle: 'Pre-Order Now', bookingSubtitle: 'Browse available items and place your pre-order', bookingLayout: 'grid', showBrandFilter: true },
+    },
+  },
 ]
 
 export default function EditorPage({

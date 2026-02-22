@@ -1366,6 +1366,55 @@ function ContentTab({
         </>
       )}
 
+      {/* Booking Form */}
+      {component.type === 'booking-form' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Section Title</label>
+            <input
+              type="text"
+              value={(component.settings.bookingTitle as string) || ''}
+              onChange={(e) => updateSetting('bookingTitle', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              placeholder="Pre-Order Now"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Subtitle</label>
+            <textarea
+              value={(component.settings.bookingSubtitle as string) || ''}
+              onChange={(e) => updateSetting('bookingSubtitle', e.target.value)}
+              rows={2}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play resize-none"
+              placeholder="Browse available items..."
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Layout</label>
+            <select
+              value={(component.settings.bookingLayout as string) || 'grid'}
+              onChange={(e) => updateSetting('bookingLayout', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="grid">Grid</option>
+              <option value="list">List</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="bfBrandFilter"
+              type="checkbox"
+              checked={component.settings.showBrandFilter !== false}
+              onChange={(e) => updateSetting('showBrandFilter', e.target.checked)}
+              className="rounded"
+            />
+            <label htmlFor="bfBrandFilter" className="text-xs font-medium text-gray-500 font-play cursor-pointer">
+              Show Brand Filter
+            </label>
+          </div>
+        </>
+      )}
+
       {/* Widget */}
       {component.type === 'widget' && (
         <>
