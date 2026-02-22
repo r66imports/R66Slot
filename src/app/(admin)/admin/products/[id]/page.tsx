@@ -86,6 +86,8 @@ export default function EditProductPage({
   const [mediaFiles, setMediaFiles] = useState<{ name: string; url: string; type: string }[]>([])
   const [eta, setEta] = useState('')
   const [pageId, setPageId] = useState('')
+  const [pageUrl, setPageUrl] = useState('')
+  const [carClass, setCarClass] = useState('')
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
@@ -168,6 +170,8 @@ export default function EditProductPage({
           setDimWidth(found.dimensions?.width?.toString() || '')
           setDimHeight(found.dimensions?.height?.toString() || '')
           setPageId(found.pageId || '')
+          setPageUrl((found as any).pageUrl || '')
+          setCarClass((found as any).carClass || '')
           setSeoTitle(found.seo?.metaTitle || '')
           setSeoDescription(found.seo?.metaDescription || '')
           setSeoKeywords(found.seo?.metaKeywords || '')
@@ -301,6 +305,7 @@ export default function EditProductPage({
         weightUnit,
         brand,
         productType,
+        carClass,
         carType,
         partType,
         scale,
@@ -318,6 +323,7 @@ export default function EditProductPage({
         images: imageUrls,
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : '',
         pageId,
+        pageUrl,
         seo: {
           metaTitle: seoTitle,
           metaDescription: seoDescription,
@@ -750,6 +756,33 @@ export default function EditProductPage({
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Product organization</h3>
               <div className="space-y-4">
+                {/* Racing Class */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Racing Class</label>
+                  <div className="flex flex-wrap gap-2 mb-1">
+                    {['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'].map(cls => (
+                      <button
+                        key={cls}
+                        type="button"
+                        onClick={() => setCarClass(carClass === cls ? '' : cls)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                          carClass === cls
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-600'
+                        }`}
+                      >
+                        {cls}
+                      </button>
+                    ))}
+                  </div>
+                  {carClass && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Selected: <span className="font-semibold text-red-600">{carClass}</span>
+                      <button type="button" onClick={() => setCarClass('')} className="ml-2 text-gray-400 hover:text-gray-600">✕ Clear</button>
+                    </p>
+                  )}
+                </div>
+
                 {/* Brand */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
@@ -881,7 +914,37 @@ export default function EditProductPage({
                       <option key={p.id} value={p.id}>{p.title}</option>
                     ))}
                   </select>
-                  <p className="mt-1 text-xs text-gray-500">Select a page where this product will appear</p>
+                  {pageId ? (
+                    <div className="mt-2 flex items-center gap-3">
+                      <a href={`/admin/pages/editor/${pageId}`} target="_blank" className="text-xs text-blue-600 hover:underline">View Page →</a>
+                      <a href={`/admin/pages/frontend/${pageId}`} target="_blank" className="text-xs text-green-600 hover:underline">Preview Live →</a>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">Select a page where this product will appear</p>
+                  )}
+
+                  {/* Custom Page URL */}
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Custom Page URL</label>
+                    <input
+                      type="text"
+                      value={pageUrl}
+                      onChange={(e) => setPageUrl(e.target.value)}
+                      placeholder="/products/my-product or https://..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">Manually set a custom URL for this product</p>
+                    {pageUrl && (
+                      <a
+                        href={pageUrl.startsWith('http') ? pageUrl : `${pageUrl}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 hover:underline mt-1 block"
+                      >
+                        Open URL →
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

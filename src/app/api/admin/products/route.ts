@@ -14,6 +14,7 @@ export interface Product {
   barcode: string
   brand: string
   productType: string
+  carClass: string
   carType: string
   partType: string
   scale: string
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
       barcode: body.barcode || '',
       brand: body.brand || '',
       productType: body.productType || '',
+      carClass: body.carClass || '',
       carType: body.carType || '',
       partType: body.partType || '',
       scale: body.scale || '',

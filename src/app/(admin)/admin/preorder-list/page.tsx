@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -29,6 +29,9 @@ type PreOrderItem = {
 }
 
 type DocType = 'quote' | 'sales-order' | 'invoice'
+
+type SortKey = 'customerName' | 'createdAt' | 'brand' | 'price' | 'quantity'
+type SortDir = 'asc' | 'desc'
 
 const DOC_LABELS: Record<DocType, string> = {
   'quote': 'Quote',
@@ -271,7 +274,6 @@ function DocumentModal({
         setSendStatus({ type: 'success', message: `${docLabel} sent to ${order.customerEmail}` })
         onMarkSent(docType)
       } else if (data.mailto) {
-        // Open mailto as fallback
         window.open(data.mailto, '_blank')
         setSendStatus({ type: 'info', message: 'SMTP not configured — opened your email client instead.' })
         onMarkSent(docType)
@@ -297,37 +299,26 @@ function DocumentModal({
             <p className="text-sm text-gray-500 font-play">{docNumber}</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Send Email */}
             <button
               onClick={handleSendEmail}
               disabled={isSending}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors font-play"
             >
-              {isSending ? (
-                <span className="animate-spin text-xs">⟳</span>
-              ) : (
-                <span>✉️</span>
-              )}
+              {isSending ? <span className="animate-spin text-xs">⟳</span> : <span>✉️</span>}
               {isSending ? 'Sending...' : `Email ${docLabel}`}
             </button>
-
-            {/* Download */}
             <button
               onClick={handleDownload}
               className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors font-play"
             >
               ⬇️ Download
             </button>
-
-            {/* Print/PDF */}
             <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:opacity-90 transition-colors font-play"
             >
               🖨️ Print / PDF
             </button>
-
-            {/* Close */}
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-700 transition-colors text-xl font-bold"
@@ -337,7 +328,6 @@ function DocumentModal({
           </div>
         </div>
 
-        {/* Status Banner */}
         {sendStatus && (
           <div className={`mx-6 mt-4 px-4 py-3 rounded-lg text-sm font-play font-medium ${
             sendStatus.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
@@ -349,7 +339,6 @@ function DocumentModal({
           </div>
         )}
 
-        {/* Document Preview via iframe */}
         <div className="p-6">
           <iframe
             ref={iframeRef}
@@ -364,11 +353,40 @@ function DocumentModal({
   )
 }
 
+// ─── Sort helpers ─────────────────────────────────────────────────────────────
+function SortIcon({ col, sortKey, sortDir }: { col: string; sortKey: string; sortDir: SortDir }) {
+  if (sortKey !== col) return <span className="ml-1 text-gray-300">↕</span>
+  return <span className="ml-1 text-gray-700">{sortDir === 'asc' ? '↑' : '↓'}</span>
+}
+
+function sortOrders(orders: PreOrderItem[], key: SortKey, dir: SortDir) {
+  return [...orders].sort((a, b) => {
+    let aVal: string | number = ''
+    let bVal: string | number = ''
+    switch (key) {
+      case 'customerName': aVal = a.customerName; bVal = b.customerName; break
+      case 'createdAt':    aVal = new Date(a.createdAt).getTime(); bVal = new Date(b.createdAt).getTime(); break
+      case 'brand':        aVal = a.brand || ''; bVal = b.brand || ''; break
+      case 'price':        aVal = parseFloat(a.price || '0'); bVal = parseFloat(b.price || '0'); break
+      case 'quantity':     aVal = a.quantity; bVal = b.quantity; break
+    }
+    if (aVal < bVal) return dir === 'asc' ? -1 : 1
+    if (aVal > bVal) return dir === 'asc' ? 1 : -1
+    return 0
+  })
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function PreOrderListPage() {
   const [orders, setOrders] = useState<PreOrderItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showArchived, setShowArchived] = useState(false)
   const [activeDoc, setActiveDoc] = useState<{ order: PreOrderItem; type: DocType } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Sorting state
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt')
+  const [sortDir, setSortDir] = useState<SortDir>('desc')
 
   useEffect(() => {
     fetchOrders()
@@ -395,21 +413,43 @@ export default function PreOrderListPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(fields),
       })
-
       if (response.ok) {
         const updated = await response.json()
-        setOrders(orders.map(order =>
-          order.id === orderId ? { ...order, ...updated } : order
-        ))
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updated } : o))
       }
     } catch (error) {
       console.error('Error updating order:', error)
     }
   }
 
-  const handleOpenDoc = (order: PreOrderItem, type: DocType) => {
-    setActiveDoc({ order, type })
+  // ── Delete ────────────────────────────────────────────────────────────────
+  const handleDelete = async (order: PreOrderItem) => {
+    if (!confirm(`Permanently delete the order for "${order.customerName}" (${order.itemDescription})?\n\nThis cannot be undone.`)) return
+    setDeletingId(order.id)
+    try {
+      const res = await fetch(`/api/admin/preorder-list/${order.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setOrders(prev => prev.filter(o => o.id !== order.id))
+      } else {
+        alert('Failed to delete order.')
+      }
+    } catch {
+      alert('Network error. Could not delete.')
+    } finally {
+      setDeletingId(null)
+    }
   }
+
+  // ── Archive ───────────────────────────────────────────────────────────────
+  const handleArchive = (order: PreOrderItem) => {
+    updateOrderField(order.id, { archivedAt: new Date().toISOString() })
+  }
+
+  const handleUnarchive = (order: PreOrderItem) => {
+    updateOrderField(order.id, { archivedAt: null })
+  }
+
+  const handleOpenDoc = (order: PreOrderItem, type: DocType) => setActiveDoc({ order, type })
 
   const handleMarkSent = (type: DocType) => {
     if (!activeDoc) return
@@ -418,11 +458,7 @@ export default function PreOrderListPage() {
   }
 
   const handleShipped = (order: PreOrderItem) => {
-    updateOrderField(order.id, {
-      shipped: true,
-      archivedAt: new Date().toISOString(),
-      status: 'shipped',
-    })
+    updateOrderField(order.id, { shipped: true, archivedAt: new Date().toISOString(), status: 'shipped' })
   }
 
   const handleExportCSV = () => {
@@ -457,9 +493,20 @@ export default function PreOrderListPage() {
     a.click()
   }
 
+  // ── Sort toggle ───────────────────────────────────────────────────────────
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortDir('asc')
+    }
+  }
+
   const activeOrders = orders.filter(o => !o.archivedAt)
   const archivedOrders = orders.filter(o => !!o.archivedAt)
-  const displayedOrders = showArchived ? archivedOrders : activeOrders
+  const baseOrders = showArchived ? archivedOrders : activeOrders
+  const displayedOrders = useMemo(() => sortOrders(baseOrders, sortKey, sortDir), [baseOrders, sortKey, sortDir])
 
   if (isLoading) {
     return (
@@ -468,6 +515,17 @@ export default function PreOrderListPage() {
       </div>
     )
   }
+
+  // ── Sortable TH helper ────────────────────────────────────────────────────
+  const SortTH = ({ col, label }: { col: SortKey; label: string }) => (
+    <th
+      className="py-3 px-3 font-semibold text-xs font-play text-gray-500 cursor-pointer select-none whitespace-nowrap hover:text-gray-800 transition-colors"
+      onClick={() => toggleSort(col)}
+    >
+      {label}
+      <SortIcon col={col} sortKey={sortKey} sortDir={sortDir} />
+    </th>
+  )
 
   return (
     <div className="font-play">
@@ -495,11 +553,7 @@ export default function PreOrderListPage() {
         </div>
         <div className="flex items-center gap-3">
           {orders.length > 0 && (
-            <Button
-              onClick={handleExportCSV}
-              variant="outline"
-              className="font-play"
-            >
+            <Button onClick={handleExportCSV} variant="outline" className="font-play">
               Export CSV
             </Button>
           )}
@@ -582,41 +636,44 @@ export default function PreOrderListPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b text-left">
-                    <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">Client Name</th>
-                    <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">Date Ordered</th>
-                    <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">Brand</th>
+                  <tr className="border-b text-left bg-gray-50">
+                    <SortTH col="customerName" label="Client Name" />
+                    <SortTH col="createdAt" label="Date Ordered" />
+                    <SortTH col="brand" label="Brand" />
                     <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">SKU</th>
                     <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">Item Description</th>
                     <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">ETA</th>
-                    <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">Est Retail Price</th>
-                    <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500">Qty</th>
-                    <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500 min-w-[280px]">Actions</th>
+                    <SortTH col="price" label="Price" />
+                    <SortTH col="quantity" label="Qty" />
+                    <th className="py-3 px-3 font-semibold text-xs font-play text-gray-500 min-w-[340px]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayedOrders.map((order) => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                    <tr key={order.id} className={`border-b hover:bg-gray-50 ${deletingId === order.id ? 'opacity-40 pointer-events-none' : ''}`}>
                       <td className="py-3 px-3">
                         <p className="font-medium text-sm font-play">{order.customerName}</p>
                         <p className="text-xs text-gray-500 font-play">{order.customerEmail}</p>
+                        {order.customerPhone && (
+                          <p className="text-xs text-gray-400 font-play">{order.customerPhone}</p>
+                        )}
                       </td>
-                      <td className="py-3 px-3 text-sm font-play">
+                      <td className="py-3 px-3 text-sm font-play whitespace-nowrap">
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-3 text-sm font-play">{order.brand}</td>
-                      <td className="py-3 px-3 text-sm font-play">{order.sku}</td>
+                      <td className="py-3 px-3 text-sm font-play font-mono text-xs">{order.sku}</td>
                       <td className="py-3 px-3 text-sm font-play">{order.itemDescription}</td>
-                      <td className="py-3 px-3 text-sm font-play">
+                      <td className="py-3 px-3 text-sm font-play whitespace-nowrap">
                         {order.estimatedDeliveryDate || '—'}
                       </td>
-                      <td className="py-3 px-3 text-sm font-bold font-play">
+                      <td className="py-3 px-3 text-sm font-bold font-play whitespace-nowrap">
                         R{order.price}
                       </td>
-                      <td className="py-3 px-3 text-sm font-play">{order.quantity}</td>
+                      <td className="py-3 px-3 text-sm font-play text-center">{order.quantity}</td>
                       <td className="py-3 px-3">
                         <div className="flex flex-wrap gap-1.5">
-                          {/* Generate Quote */}
+                          {/* Quote */}
                           <button
                             onClick={() => handleOpenDoc(order, 'quote')}
                             className={`px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors ${
@@ -628,37 +685,31 @@ export default function PreOrderListPage() {
                             {order.quoteSent ? '✓ Quote' : 'Quote'}
                           </button>
 
-                          {/* Generate Sales Order */}
+                          {/* Sales Order */}
                           <button
                             onClick={() => handleOpenDoc(order, 'sales-order')}
-                            disabled={order.quantity <= 0}
                             className={`px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors ${
                               order.salesOrderSent
                                 ? 'bg-green-500 text-white border border-green-600'
-                                : order.quantity <= 0
-                                ? 'bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed'
                                 : 'bg-white text-black border-2 border-black hover:bg-gray-100'
                             }`}
                           >
                             {order.salesOrderSent ? '✓ Sales Order' : 'Sales Order'}
                           </button>
 
-                          {/* Generate Invoice */}
+                          {/* Invoice */}
                           <button
                             onClick={() => handleOpenDoc(order, 'invoice')}
-                            disabled={order.quantity <= 0}
                             className={`px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors ${
                               order.invoiceSent
                                 ? 'bg-green-500 text-white border border-green-600'
-                                : order.quantity <= 0
-                                ? 'bg-gray-200 text-gray-400 border border-gray-300 cursor-not-allowed'
                                 : 'bg-white text-black border-2 border-black hover:bg-gray-100'
                             }`}
                           >
                             {order.invoiceSent ? '✓ Invoice' : 'Invoice'}
                           </button>
 
-                          {/* Shipped */}
+                          {/* Shipped (active only) */}
                           {!showArchived && (
                             <button
                               onClick={() => handleShipped(order)}
@@ -672,6 +723,32 @@ export default function PreOrderListPage() {
                               {order.shipped ? '✓ Shipped' : 'Shipped'}
                             </button>
                           )}
+
+                          {/* Archive / Unarchive */}
+                          {showArchived ? (
+                            <button
+                              onClick={() => handleUnarchive(order)}
+                              className="px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors bg-blue-100 text-blue-700 border border-blue-300 hover:bg-blue-200"
+                            >
+                              Unarchive
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleArchive(order)}
+                              className="px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200"
+                            >
+                              Archive
+                            </button>
+                          )}
+
+                          {/* Delete */}
+                          <button
+                            onClick={() => handleDelete(order)}
+                            disabled={deletingId === order.id}
+                            className="px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors bg-red-100 text-red-700 border border-red-300 hover:bg-red-600 hover:text-white"
+                          >
+                            {deletingId === order.id ? '...' : 'Delete'}
+                          </button>
                         </div>
                       </td>
                     </tr>
