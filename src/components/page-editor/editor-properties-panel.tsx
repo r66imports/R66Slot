@@ -2375,6 +2375,37 @@ function SettingsTab({
       {/* Product Grid settings */}
       {component.type === 'product-grid' && (
         <>
+          {/* Racing Class filter */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">
+              Racing Class Filter
+            </label>
+            <select
+              value={(component.settings.carClass as string) || ''}
+              onChange={(e) => updateSetting('carClass', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="">All Classes (no filter)</option>
+              <option value="GT">GT</option>
+              <option value="GT 1">GT 1</option>
+              <option value="GT 2">GT 2</option>
+              <option value="GT 3">GT 3</option>
+              <option value="Group 2">Group 2</option>
+              <option value="Group 5">Group 5</option>
+              <option value="GT/IUMSA">GT/IUMSA</option>
+            </select>
+            {component.settings.carClass && (
+              <p className="text-[10px] text-red-600 mt-1 font-play font-medium">
+                Showing only: {component.settings.carClass as string}
+              </p>
+            )}
+            {!component.settings.carClass && (
+              <p className="text-[10px] text-gray-400 mt-1 font-play">
+                Select a class to filter products by racing category
+              </p>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Product Count</label>
             <input
@@ -2402,7 +2433,7 @@ function SettingsTab({
               onChange={(e) => updateSetting('showAddToCart', e.target.checked)}
               className="rounded"
             />
-            <label className="text-xs text-gray-600 font-play">Show Add to Cart</label>
+            <label className="text-xs text-gray-600 font-play">Show Book Now</label>
           </div>
         </>
       )}

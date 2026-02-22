@@ -188,6 +188,7 @@ export interface Page {
   isWebsitePage?: boolean
   isBrandPage?: boolean
   isCarsPage?: boolean
+  isRevoPage?: boolean
   components: PageComponent[]
   pageSettings?: PageSettings
   seo: {

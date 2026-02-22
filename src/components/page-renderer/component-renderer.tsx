@@ -2,9 +2,119 @@
 
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import type { PageComponent } from '@/lib/pages/schema'
 import { AnimatedWrapper, type AnimationType } from './animated-wrapper'
+
+// ─── Live Product Grid — fetches real products filtered by class ──────────────
+function ProductGridLive({
+  settings,
+  containerStyle,
+}: {
+  settings: PageComponent['settings']
+  containerStyle: React.CSSProperties
+}) {
+  const [products, setProducts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/admin/products')
+      .then((r) => r.json())
+      .then((data) => {
+        let list = Array.isArray(data) ? data.filter((p: any) => p.status === 'active') : []
+        if (settings.carClass) {
+          list = list.filter(
+            (p: any) =>
+              p.carClass === settings.carClass ||
+              p.tags?.includes(settings.carClass)
+          )
+        }
+        setProducts(list.slice(0, (settings.productCount as number) || 8))
+      })
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false))
+  }, [settings.carClass, settings.productCount])
+
+  return (
+    <div style={containerStyle}>
+      <div className="container mx-auto">
+        {/* Class badge header */}
+        {settings.carClass && (
+          <div className="mb-5 flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-600">Class:</span>
+            <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full tracking-wide">
+              {settings.carClass as string}
+            </span>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-4xl mb-3">🏎️</p>
+            <p className="text-sm">
+              {settings.carClass
+                ? `No active products for class "${settings.carClass as string}"`
+                : 'No active products found'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {products.map((p) => (
+              <div
+                key={p.id}
+                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+              >
+                <div className="relative aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                  {p.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.imageUrl}
+                      alt={p.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-gray-400 text-4xl">🏎️</span>
+                  )}
+                  {p.carClass && (
+                    <span className="absolute top-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                      {p.carClass}
+                    </span>
+                  )}
+                </div>
+                <div className="p-4">
+                  {p.brand && (
+                    <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">
+                      {p.brand}
+                    </p>
+                  )}
+                  <h3 className="font-semibold text-sm mb-2 line-clamp-2">{p.title}</h3>
+                  {settings.showPrice && (
+                    <p className="text-red-600 font-bold mb-3 text-sm">
+                      {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
+                    </p>
+                  )}
+                  {settings.showAddToCart && (
+                    <a
+                      href="https://r66slot.co.za/book"
+                      className="block w-full text-center bg-red-600 text-white font-semibold py-2 px-4 rounded text-sm hover:bg-red-700 transition-colors"
+                    >
+                      Book Now
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const BookingFormWidget = dynamic(() => import('./booking-form-widget'), { ssr: false })
 
@@ -738,28 +848,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
 
     case 'product-grid':
       return (
-        <div style={containerStyle}>
-          <div className="container mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {Array.from({ length: (settings.productCount as number) || 8 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                  <div className="aspect-square bg-gray-200 flex items-center justify-center">
-                    <span className="text-gray-400 text-4xl">🏎️</span>
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-lg mb-2">Product {i + 1}</h3>
-                    {settings.showPrice && <p className="text-primary font-bold mb-3">$99.99</p>}
-                    {settings.showAddToCart && (
-                      <button className="w-full bg-primary text-black font-semibold py-2 px-4 rounded hover:bg-primary/90">
-                        Add to Cart
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <ProductGridLive settings={settings} containerStyle={containerStyle} />
       )
 
     case 'product-card':

@@ -318,7 +318,7 @@ export default function PagesManagementPage() {
 
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
 
-  const handleTogglePageGroup = async (e: React.MouseEvent, id: string, group: 'isBrandPage' | 'isCarsPage') => {
+  const handleTogglePageGroup = async (e: React.MouseEvent, id: string, group: 'isBrandPage' | 'isCarsPage' | 'isRevoPage') => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -378,9 +378,10 @@ export default function PagesManagementPage() {
     }
   }
 
-  // Custom pages marked for Brand or Cars groups
+  // Custom pages marked for Brand, Cars, or Revo groups
   const brandCustomPages = customPages.filter((p) => p.isBrandPage)
   const carsCustomPages = customPages.filter((p) => p.isCarsPage)
+  const revoCustomPages = customPages.filter((p) => p.isRevoPage)
 
   // Website pages = custom pages marked as website pages (legacy)
   const websitePages = customPages.filter((p) => p.isWebsitePage)
@@ -825,6 +826,63 @@ export default function PagesManagementPage() {
         </div>
       </div>
 
+      {/* Revo Pages */}
+      {revoCustomPages.length > 0 && (
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold">Revo Pages</h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Custom pages assigned to the Revo section
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {revoCustomPages.map((page) => (
+              <Card key={page.id} className="hover:shadow-lg transition-shadow border-teal-200 bg-teal-50">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="text-4xl">🏁</div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                        <span>/{page.slug}</span>
+                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded">Revo</span>
+                        {page.published ? (
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">Published</span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded">Draft</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500">{page.components.length} components</p>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
+                        <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
+                      </Button>
+                      {page.published && (
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/${page.slug}`} target="_blank">View Live</Link>
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDelete(page.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Website Pages Section */}
       {websitePages.length > 0 && (
         <div className="mb-12">
@@ -933,6 +991,8 @@ export default function PagesManagementPage() {
                     ? 'border-purple-300 bg-purple-50'
                     : page.isCarsPage
                     ? 'border-orange-300 bg-orange-50'
+                    : page.isRevoPage
+                    ? 'border-teal-300 bg-teal-50'
                     : ''
                 }
               >
@@ -963,6 +1023,11 @@ export default function PagesManagementPage() {
                         {page.isCarsPage && (
                           <span className="px-2 py-1 bg-orange-200 text-orange-800 text-xs rounded font-medium">
                             Cars Page
+                          </span>
+                        )}
+                        {page.isRevoPage && (
+                          <span className="px-2 py-1 bg-teal-200 text-teal-800 text-xs rounded font-medium">
+                            Revo Page
                           </span>
                         )}
                       </div>
@@ -1001,6 +1066,19 @@ export default function PagesManagementPage() {
                         }
                       >
                         {togglingIds.has(page.id) ? '...' : 'Cars Pages'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => handleTogglePageGroup(e, page.id, 'isRevoPage')}
+                        disabled={togglingIds.has(page.id)}
+                        className={
+                          page.isRevoPage
+                            ? 'bg-teal-600 text-white hover:bg-teal-700 border-teal-600'
+                            : ''
+                        }
+                      >
+                        {togglingIds.has(page.id) ? '...' : 'Revo Pages'}
                       </Button>
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>
@@ -1049,7 +1127,7 @@ export default function PagesManagementPage() {
                 <li>• Use drag & drop to rearrange sections and components</li>
                 <li>• Double-click any custom page name to rename it</li>
                 <li>• Create custom pages for landing pages, promotions, or special content</li>
-                <li>• Click &ldquo;Brand Pages&rdquo; or &ldquo;Cars Pages&rdquo; to add a custom page to those sections</li>
+                <li>• Click &ldquo;Brand Pages&rdquo;, &ldquo;Cars Pages&rdquo;, or &ldquo;Revo Pages&rdquo; to add a custom page to those sections</li>
                 <li>• Use the search bar to quickly find pages by URL or name</li>
               </ul>
             </div>
