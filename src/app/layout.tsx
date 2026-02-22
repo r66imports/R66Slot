@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Assistant, Play } from 'next/font/google'
 import { CartProvider } from '@/context/cart-context'
+import { LocalCartProvider } from '@/context/local-cart-context'
 import { WhatsAppButton } from '@/components/layout/whatsapp-button'
 import { HeroProvider } from '@/contexts/HeroContext'
 import './globals.css'
@@ -33,10 +34,12 @@ export default function RootLayout({
     <html lang="en" className={`${assistant.variable} ${play.variable}`}>
       <body className={assistant.className}>
         <CartProvider>
-          <HeroProvider>
-            {children}
-            <WhatsAppButton />
-          </HeroProvider>
+          <LocalCartProvider>
+            <HeroProvider>
+              {children}
+              <WhatsAppButton />
+            </HeroProvider>
+          </LocalCartProvider>
         </CartProvider>
       </body>
     </html>

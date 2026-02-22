@@ -1,11 +1,9 @@
 'use client'
 
-import { useCart } from '@/context/cart-context'
-import { formatPrice, getShopifyImageUrl } from '@/lib/shopify/client'
-import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useEffect } from 'react'
+import { useLocalCart } from '@/context/local-cart-context'
 
 interface CartDrawerProps {
   isOpen: boolean
@@ -13,9 +11,8 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
-  const { cart, isLoading, updateCartLine, removeFromCart } = useCart()
+  const { items, totalItems, subtotal, updateQuantity, removeItem } = useLocalCart()
 
-  // Prevent body scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden'
@@ -26,9 +23,6 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
       document.body.style.overflow = 'unset'
     }
   }, [isOpen])
-
-  const cartLines = cart?.lines.edges || []
-  const subtotal = cart?.cost.subtotalAmount
 
   return (
     <>
@@ -50,7 +44,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b">
             <h2 className="text-lg font-semibold">
-              Shopping Cart {cart && `(${cart.totalQuantity})`}
+              Shopping Cart {totalItems > 0 && `(${totalItems})`}
             </h2>
             <button
               onClick={onClose}
@@ -76,11 +70,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
 
           {/* Cart Items */}
           <div className="flex-1 overflow-y-auto p-4">
-            {isLoading ? (
-              <div className="text-center py-8">
-                <p className="text-gray-500">Loading...</p>
-              </div>
-            ) : cartLines.length === 0 ? (
+            {items.length === 0 ? (
               <div className="text-center py-8">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -103,90 +93,61 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {cartLines.map(({ node: line }) => (
-                  <div key={line.id} className="flex gap-4">
-                    {/* Product Image */}
-                    <Link
-                      href={`/products/${line.merchandise.product.handle}`}
-                      className="relative w-20 h-20 bg-gray-100 rounded-md flex-shrink-0 overflow-hidden"
-                      onClick={onClose}
-                    >
-                      {line.merchandise.product.featuredImage ? (
-                        <Image
-                          src={getShopifyImageUrl(
-                            line.merchandise.product.featuredImage.url,
-                            160
-                          )}
-                          alt={
-                            line.merchandise.product.featuredImage.altText ||
-                            line.merchandise.product.title
-                          }
-                          fill
-                          className="object-cover"
-                          sizes="80px"
+                {items.map((item) => (
+                  <div key={item.id} className="flex gap-3">
+                    {/* Image */}
+                    <div className="relative w-20 h-20 bg-gray-100 rounded-md flex-shrink-0 overflow-hidden">
+                      {item.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                          No image
+                        <div className="w-full h-full flex items-center justify-center text-2xl">
+                          🏎️
                         </div>
                       )}
-                    </Link>
+                    </div>
 
-                    {/* Product Info */}
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <Link
-                        href={`/products/${line.merchandise.product.handle}`}
-                        className="font-medium text-sm hover:text-primary line-clamp-2"
-                        onClick={onClose}
-                      >
-                        {line.merchandise.product.title}
-                      </Link>
-                      {line.merchandise.title !== 'Default Title' && (
-                        <p className="text-xs text-gray-600 mt-1">
-                          {line.merchandise.title}
+                      {item.brand && (
+                        <p className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">
+                          {item.brand}
                         </p>
                       )}
-                      <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              updateCartLine(line.id, line.quantity - 1)
-                            }
-                            disabled={line.quantity <= 1}
-                            className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            -
-                          </button>
-                          <span className="text-sm w-8 text-center">
-                            {line.quantity}
-                          </span>
-                          <button
-                            onClick={() =>
-                              updateCartLine(line.id, line.quantity + 1)
-                            }
-                            className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
-                          >
-                            +
-                          </button>
-                        </div>
-                        <span className="text-sm font-semibold">
-                          {formatPrice(
-                            line.cost.totalAmount.amount,
-                            line.cost.totalAmount.currencyCode
-                          )}
-                        </span>
+                      <p className="font-medium text-sm line-clamp-2">{item.title}</p>
+                      <p className="text-sm font-bold text-red-600 mt-0.5">
+                        {item.price > 0 ? `R${item.price.toFixed(2)}` : 'POA'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm w-6 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="w-6 h-6 flex items-center justify-center border rounded hover:bg-gray-100"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
 
-                    {/* Remove Button */}
+                    {/* Remove */}
                     <button
-                      onClick={() => removeFromCart(line.id)}
-                      className="text-gray-400 hover:text-red-600 transition-colors"
+                      onClick={() => removeItem(item.id)}
+                      className="text-gray-400 hover:text-red-600 transition-colors self-start mt-1"
                       aria-label="Remove item"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="h-5 w-5"
+                        className="h-4 w-4"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -195,7 +156,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                           strokeLinecap="round"
                           strokeLinejoin="round"
                           strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                          d="M6 18L18 6M6 6l12 12"
                         />
                       </svg>
                     </button>
@@ -206,21 +167,20 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
           </div>
 
           {/* Footer */}
-          {cart && cartLines.length > 0 && (
-            <div className="border-t p-4 space-y-4">
+          {items.length > 0 && (
+            <div className="border-t p-4 space-y-3">
               <div className="flex items-center justify-between text-lg font-semibold">
                 <span>Subtotal:</span>
-                <span>
-                  {subtotal &&
-                    formatPrice(subtotal.amount, subtotal.currencyCode)}
-                </span>
+                <span>R{subtotal.toFixed(2)}</span>
               </div>
-              <p className="text-xs text-gray-600">
-                Shipping and taxes calculated at checkout
-              </p>
               <div className="space-y-2">
-                <Button size="lg" className="w-full" asChild>
-                  <a href={cart.checkoutUrl}>Proceed to Checkout</a>
+                <Button
+                  size="lg"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                  onClick={onClose}
+                  asChild
+                >
+                  <Link href="/cart">View Cart</Link>
                 </Button>
                 <Button
                   size="lg"
@@ -229,7 +189,7 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                   onClick={onClose}
                   asChild
                 >
-                  <Link href="/cart">View Cart</Link>
+                  <Link href="/book">Book Now</Link>
                 </Button>
               </div>
             </div>

@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
-import { useCart } from '@/context/cart-context'
+import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef } from 'react'
+import { useLocalCart } from '@/context/local-cart-context'
 import { CartDrawer } from '@/components/cart/cart-drawer'
 import type { SiteSettings } from '@/lib/site-settings/schema'
 
@@ -15,11 +16,15 @@ import type { SiteSettings } from '@/lib/site-settings/schema'
 export function DynamicHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)
-  const { cart } = useCart()
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const { totalItems } = useLocalCart()
   const [settings, setSettings] = useState<SiteSettings | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editorEnabled, setEditorEnabled] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const router = useRouter()
 
   useEffect(() => {
     const fetchSettingsAndEditorAccess = async () => {
@@ -41,6 +46,21 @@ export function DynamicHeader() {
     }
     fetchSettingsAndEditorAccess()
   }, [])
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus()
+    }
+  }, [isSearchOpen])
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/products?q=${encodeURIComponent(searchQuery.trim())}`)
+      setIsSearchOpen(false)
+      setSearchQuery('')
+    }
+  }
 
   // Extract header config with defaults
   const headerConfig = settings?.header || {
@@ -116,6 +136,49 @@ export function DynamicHeader() {
         className={`${headerConfig.sticky ? 'sticky top-0' : ''} z-50 w-full border-b border-gray-200`}
         style={{ backgroundColor: headerConfig.backgroundColor }}
       >
+        {/* Search overlay bar */}
+        {isSearchOpen && (
+          <div className="border-b border-gray-200 bg-white px-4 py-3">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-3 container mx-auto">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 text-gray-400 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search products, brands, or collections..."
+                className="flex-1 text-sm outline-none bg-transparent"
+              />
+              <button
+                type="button"
+                onClick={() => { setIsSearchOpen(false); setSearchQuery('') }}
+                className="text-gray-400 hover:text-gray-600 p-1"
+                aria-label="Close search"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              {searchQuery.trim() && (
+                <button
+                  type="submit"
+                  className="text-sm font-semibold text-red-600 hover:text-red-700 px-3 py-1 border border-red-600 rounded"
+                >
+                  Search
+                </button>
+              )}
+            </form>
+          </div>
+        )}
+
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
@@ -151,11 +214,12 @@ export function DynamicHeader() {
             </nav>
 
             {/* Right Actions */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-1">
               {/* Search Icon */}
               {headerConfig.showSearch && (
                 <button
-                  className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+                  onClick={() => setIsSearchOpen((prev) => !prev)}
+                  className={`p-2 rounded-md transition-colors ${isSearchOpen ? 'bg-gray-100' : 'hover:bg-gray-100'}`}
                   aria-label="Search"
                 >
                   <svg
@@ -179,7 +243,7 @@ export function DynamicHeader() {
               {headerConfig.showAccount && (
                 <Link
                   href="/account"
-                  className="hidden md:block p-2 hover:bg-gray-100 rounded-md transition-colors"
+                  className="hidden md:flex p-2 hover:bg-gray-100 rounded-md transition-colors"
                   aria-label="Account"
                 >
                   <svg
@@ -204,7 +268,7 @@ export function DynamicHeader() {
                 <button
                   onClick={() => setIsCartOpen(true)}
                   className="relative p-2 hover:bg-gray-100 rounded-md transition-colors"
-                  aria-label="Cart"
+                  aria-label={`Cart${totalItems > 0 ? ` (${totalItems} items)` : ''}`}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -220,9 +284,9 @@ export function DynamicHeader() {
                       d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                     />
                   </svg>
-                  {cart && cart.totalQuantity > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-primary text-black text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                      {cart.totalQuantity}
+                  {totalItems > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {totalItems > 9 ? '9+' : totalItems}
                     </span>
                   )}
                 </button>
@@ -290,6 +354,21 @@ export function DynamicHeader() {
                   >
                     Account
                   </Link>
+                )}
+
+                {headerConfig.showCart && (
+                  <button
+                    className="text-sm font-medium hover:text-primary transition-colors text-left flex items-center gap-2"
+                    style={{ color: headerConfig.textColor }}
+                    onClick={() => { setIsMenuOpen(false); setIsCartOpen(true) }}
+                  >
+                    Cart
+                    {totalItems > 0 && (
+                      <span className="bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                        {totalItems}
+                      </span>
+                    )}
+                  </button>
                 )}
               </div>
             </nav>

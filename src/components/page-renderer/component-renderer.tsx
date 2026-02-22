@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { useLocalCart } from '@/context/local-cart-context'
 import type { PageComponent } from '@/lib/pages/schema'
 import { AnimatedWrapper, type AnimationType } from './animated-wrapper'
 
@@ -17,6 +18,8 @@ function ProductGridLive({
 }) {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [addedId, setAddedId] = useState<string | null>(null)
+  const { addItem } = useLocalCart()
 
   useEffect(() => {
     fetch('/api/admin/products')
@@ -35,6 +38,19 @@ function ProductGridLive({
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
   }, [settings.carClass, settings.productCount])
+
+  const handleAddToCart = (p: any) => {
+    addItem({
+      id: p.id,
+      title: p.title,
+      brand: p.brand || '',
+      price: p.price || 0,
+      imageUrl: p.imageUrl || '',
+      pageUrl: p.pageUrl || '',
+    })
+    setAddedId(p.id)
+    setTimeout(() => setAddedId(null), 1500)
+  }
 
   return (
     <div style={containerStyle}>
@@ -99,12 +115,16 @@ function ProductGridLive({
                     </p>
                   )}
                   {settings.showAddToCart && (
-                    <a
-                      href="https://r66slot.co.za/book"
-                      className="block w-full text-center bg-red-600 text-white font-semibold py-2 px-4 rounded text-sm hover:bg-red-700 transition-colors"
+                    <button
+                      onClick={() => handleAddToCart(p)}
+                      className={`block w-full text-center font-semibold py-2 px-4 rounded text-sm transition-all duration-300 ${
+                        addedId === p.id
+                          ? 'bg-green-600 text-white scale-95'
+                          : 'bg-red-600 text-white hover:bg-red-700'
+                      }`}
                     >
-                      Book Now
-                    </a>
+                      {addedId === p.id ? '✓ Added!' : 'Add to Cart'}
+                    </button>
                   )}
                 </div>
               </div>

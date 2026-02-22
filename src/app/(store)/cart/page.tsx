@@ -1,32 +1,13 @@
 'use client'
 
-import { useCart } from '@/context/cart-context'
-import { formatPrice, getShopifyImageUrl } from '@/lib/shopify/client'
-import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { useLocalCart } from '@/context/local-cart-context'
 
 export default function CartPage() {
-  const { cart, isLoading, updateCartLine, removeFromCart } = useCart()
+  const { items, totalItems, subtotal, updateQuantity, removeItem, clearCart } = useLocalCart()
 
-  const cartLines = cart?.lines.edges || []
-  const subtotal = cart?.cost.subtotalAmount
-  const estimatedTotal = cart?.cost.totalAmount
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-8">Shopping Cart</h1>
-          <div className="text-center py-12">
-            <p className="text-gray-500">Loading...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!cart || cartLines.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-4xl mx-auto">
@@ -48,7 +29,7 @@ export default function CartPage() {
             </svg>
             <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
             <p className="text-gray-600 mb-6">
-              Looks like you haven&apos;t added anything to your cart yet.
+              Browse our products and add items to your cart.
             </p>
             <Button size="lg" asChild>
               <Link href="/products">Start Shopping</Link>
@@ -62,87 +43,74 @@ export default function CartPage() {
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Shopping Cart ({cart.totalQuantity} {cart.totalQuantity === 1 ? 'item' : 'items'})</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold">
+            Shopping Cart ({totalItems} {totalItems === 1 ? 'item' : 'items'})
+          </h1>
+          <button
+            onClick={clearCart}
+            className="text-sm text-gray-500 hover:text-red-600 transition-colors"
+          >
+            Clear Cart
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2">
             <div className="bg-white border rounded-lg divide-y">
-              {cartLines.map(({ node: line }) => (
-                <div key={line.id} className="p-6">
+              {items.map((item) => (
+                <div key={item.id} className="p-6">
                   <div className="flex gap-6">
-                    {/* Product Image */}
-                    <Link
-                      href={`/products/${line.merchandise.product.handle}`}
-                      className="relative w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden"
-                    >
-                      {line.merchandise.product.featuredImage ? (
-                        <Image
-                          src={getShopifyImageUrl(
-                            line.merchandise.product.featuredImage.url,
-                            256
-                          )}
-                          alt={
-                            line.merchandise.product.featuredImage.altText ||
-                            line.merchandise.product.title
-                          }
-                          fill
-                          className="object-cover"
-                          sizes="(max-width: 640px) 96px, 128px"
+                    {/* Image */}
+                    <div className="relative w-24 h-24 sm:w-32 sm:h-32 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
+                      {item.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.imageUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                          No image
+                        <div className="w-full h-full flex items-center justify-center text-4xl">
+                          🏎️
                         </div>
                       )}
-                    </Link>
+                    </div>
 
-                    {/* Product Info */}
+                    {/* Info */}
                     <div className="flex-1 min-w-0">
-                      <Link
-                        href={`/products/${line.merchandise.product.handle}`}
-                        className="font-semibold text-lg hover:text-primary line-clamp-2"
-                      >
-                        {line.merchandise.product.title}
-                      </Link>
-                      {line.merchandise.title !== 'Default Title' && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          {line.merchandise.title}
+                      {item.brand && (
+                        <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">
+                          {item.brand}
                         </p>
                       )}
-                      <p className="text-lg font-bold mt-2">
-                        {formatPrice(
-                          line.merchandise.price.amount,
-                          line.merchandise.price.currencyCode
-                        )}
+                      <h3 className="font-semibold text-lg mb-1 line-clamp-2">{item.title}</h3>
+                      <p className="text-lg font-bold text-red-600">
+                        {item.price > 0 ? `R${item.price.toFixed(2)}` : 'POA'}
                       </p>
 
-                      {/* Quantity Controls */}
+                      {/* Qty Controls */}
                       <div className="flex items-center gap-4 mt-4">
                         <div className="flex items-center gap-3 border rounded-lg p-1">
                           <button
-                            onClick={() =>
-                              updateCartLine(line.id, line.quantity - 1)
-                            }
-                            disabled={line.quantity <= 1}
-                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded transition-colors"
                           >
                             -
                           </button>
                           <span className="text-sm font-medium w-8 text-center">
-                            {line.quantity}
+                            {item.quantity}
                           </span>
                           <button
-                            onClick={() =>
-                              updateCartLine(line.id, line.quantity + 1)
-                            }
+                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded transition-colors"
                           >
                             +
                           </button>
                         </div>
                         <button
-                          onClick={() => removeFromCart(line.id)}
+                          onClick={() => removeItem(item.id)}
                           className="text-sm text-red-600 hover:text-red-700 font-medium"
                         >
                           Remove
@@ -153,10 +121,9 @@ export default function CartPage() {
                     {/* Line Total */}
                     <div className="hidden sm:block text-right">
                       <p className="text-lg font-bold">
-                        {formatPrice(
-                          line.cost.totalAmount.amount,
-                          line.cost.totalAmount.currencyCode
-                        )}
+                        {item.price > 0
+                          ? `R${(item.price * item.quantity).toFixed(2)}`
+                          : 'POA'}
                       </p>
                     </div>
                   </div>
@@ -172,48 +139,30 @@ export default function CartPage() {
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-semibold">
-                    {subtotal &&
-                      formatPrice(subtotal.amount, subtotal.currencyCode)}
-                  </span>
+                  <span className="text-gray-600">Items ({totalItems})</span>
+                  <span className="font-semibold">R{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Shipping</span>
-                  <span className="text-sm text-gray-500">
-                    Calculated at checkout
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Taxes</span>
-                  <span className="text-sm text-gray-500">
-                    Calculated at checkout
-                  </span>
+                  <span className="text-sm text-gray-500">TBD</span>
                 </div>
                 <div className="border-t pt-4">
                   <div className="flex items-center justify-between text-lg font-bold">
-                    <span>Estimated Total</span>
-                    <span>
-                      {estimatedTotal &&
-                        formatPrice(
-                          estimatedTotal.amount,
-                          estimatedTotal.currencyCode
-                        )}
-                    </span>
+                    <span>Subtotal</span>
+                    <span>R{subtotal.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 space-y-3">
-                <Button size="lg" className="w-full" asChild>
-                  <a href={cart.checkoutUrl}>Proceed to Checkout</a>
-                </Button>
                 <Button
                   size="lg"
-                  variant="outline"
-                  className="w-full"
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
                   asChild
                 >
+                  <Link href="/book">Proceed to Book Now</Link>
+                </Button>
+                <Button size="lg" variant="outline" className="w-full" asChild>
                   <Link href="/products">Continue Shopping</Link>
                 </Button>
               </div>
@@ -234,7 +183,7 @@ export default function CartPage() {
                       d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
                     />
                   </svg>
-                  <span>Secure checkout powered by Shopify</span>
+                  <span>Secure booking powered by R66SLOT</span>
                 </div>
               </div>
             </div>
