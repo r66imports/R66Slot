@@ -5,10 +5,19 @@ const BACKORDERS_KEY = 'data/backorders.json'
 
 export interface Backorder {
   id: string
+  // Client reference
+  clientId?: string
   // Client Details
   clientName: string
   clientEmail: string
   clientPhone: string
+  // Club Info
+  clubName: string
+  clubMemberId: string
+  // Company Info
+  companyName: string
+  companyVAT: string
+  companyAddress: string
   // Product Details
   sku: string
   description: string
@@ -69,9 +78,15 @@ export async function POST(request: Request) {
     const now = new Date().toISOString()
     const newBackorder: Backorder = {
       id: `bo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      clientId: body.clientId || undefined,
       clientName: body.clientName?.trim() || '',
       clientEmail: body.clientEmail?.trim() || '',
       clientPhone: body.clientPhone?.trim() || '',
+      clubName: body.clubName?.trim() || '',
+      clubMemberId: body.clubMemberId?.trim() || '',
+      companyName: body.companyName?.trim() || '',
+      companyVAT: body.companyVAT?.trim() || '',
+      companyAddress: body.companyAddress?.trim() || '',
       sku: body.sku?.trim() || '',
       description: body.description?.trim() || '',
       brand: body.brand?.trim() || '',

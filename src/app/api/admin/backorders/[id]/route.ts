@@ -12,7 +12,7 @@ async function saveBackorders(backorders: Backorder[]): Promise<void> {
   await blobWrite(BACKORDERS_KEY, backorders)
 }
 
-// PATCH — update any allowed fields, including phase checkboxes
+// PATCH — update any allowed fields including phase checkboxes and client info
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -29,7 +29,10 @@ export async function PATCH(
     }
 
     const allowedFields = [
+      'clientId',
       'clientName', 'clientEmail', 'clientPhone',
+      'clubName', 'clubMemberId',
+      'companyName', 'companyVAT', 'companyAddress',
       'sku', 'description', 'brand', 'supplierLink', 'qty', 'price',
       'phaseQuote', 'phaseQuoteDate',
       'phaseSalesOrder', 'phaseSalesOrderDate',
