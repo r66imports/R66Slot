@@ -77,6 +77,7 @@ export default function AdminLayout({
           { name: 'Store Orders', href: '/admin/slotify-orders', icon: '🛒' },
           { name: 'Orders', href: '/admin/slotify-preorders', icon: '📦' },
           { name: 'Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
+          { name: 'Back Orders', href: '/admin/backorders', icon: '🔄' },
         ],
       },
     ],
