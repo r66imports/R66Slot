@@ -2,14 +2,34 @@ import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 
 const CONTACTS_KEY = 'data/contacts.json'
-const ORDERS_KEY = 'data/preorder-list.json'
+const ORDERS_KEY   = 'data/preorder-list.json'
 
 export interface Contact {
   id: string
+  // Personal
   firstName: string
   lastName: string
   email: string
   phone: string
+  // Address
+  addressStreet: string
+  addressCity: string
+  addressProvince: string
+  addressPostalCode: string
+  addressCountry: string
+  // Club
+  clubName: string
+  clubMemberId: string
+  // Business
+  companyName: string
+  companyVAT: string
+  companyAddress: string
+  // Delivery Options
+  deliveryDoorToDoor: boolean
+  deliveryKioskToKiosk: boolean
+  deliveryPudoLocker: boolean
+  deliveryPostnetAramex: boolean
+  // Meta
   source: 'book-now' | 'manual' | 'import'
   notes: string
   totalOrders: number
@@ -30,18 +50,18 @@ async function saveContacts(contacts: Contact[]): Promise<void> {
 export async function GET() {
   try {
     const contacts = await getContacts()
+    const orders   = await blobRead<any[]>(ORDERS_KEY, [])
 
-    // Enrich contacts with order data
-    const orders = await blobRead<any[]>(ORDERS_KEY, [])
-
-    const enriched = contacts.map(contact => {
+    const enriched = contacts.map(c => {
       const contactOrders = orders.filter(
-        (o: any) => o.customerEmail === contact.email || o.customerPhone === contact.phone
+        (o: any) => o.customerEmail === c.email || o.customerPhone === c.phone
       )
       return {
-        ...contact,
+        ...c,
         totalOrders: contactOrders.length,
-        totalSpent: contactOrders.reduce((sum: number, o: any) => sum + parseFloat(o.totalAmount || '0'), 0),
+        totalSpent: contactOrders.reduce(
+          (sum: number, o: any) => sum + parseFloat(o.totalAmount || '0'), 0
+        ),
       }
     })
 
@@ -52,37 +72,55 @@ export async function GET() {
   }
 }
 
-// POST /api/admin/contacts - Add new contact
+// POST /api/admin/contacts — create new contact
 export async function POST(request: Request) {
   try {
     const body = await request.json()
 
-    if (!body.firstName?.trim() || !body.phone?.trim()) {
-      return NextResponse.json({ error: 'First name and phone are required' }, { status: 400 })
+    if (!body.firstName?.trim()) {
+      return NextResponse.json({ error: 'First name is required' }, { status: 400 })
     }
 
     const contacts = await getContacts()
 
-    // Check for duplicate by email or phone
-    const existing = contacts.find(
-      c => (body.email && c.email === body.email) || (body.phone && c.phone === body.phone)
-    )
-    if (existing) {
-      return NextResponse.json({ error: 'Contact with this email or phone already exists' }, { status: 409 })
+    // Soft duplicate check on email
+    if (body.email?.trim()) {
+      const dup = contacts.find(c => c.email === body.email.trim())
+      if (dup) {
+        return NextResponse.json(
+          { error: 'A contact with this email already exists' },
+          { status: 409 }
+        )
+      }
     }
 
+    const now = new Date().toISOString()
     const newContact: Contact = {
-      id: `contact-${Date.now()}`,
-      firstName: body.firstName?.trim() || '',
-      lastName: body.lastName?.trim() || '',
-      email: body.email?.trim() || '',
-      phone: body.phone?.trim() || '',
-      source: body.source || 'manual',
-      notes: body.notes?.trim() || '',
+      id: `contact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      firstName:            body.firstName?.trim()      || '',
+      lastName:             body.lastName?.trim()       || '',
+      email:                body.email?.trim()          || '',
+      phone:                body.phone?.trim()          || '',
+      addressStreet:        body.addressStreet?.trim()  || '',
+      addressCity:          body.addressCity?.trim()    || '',
+      addressProvince:      body.addressProvince?.trim() || '',
+      addressPostalCode:    body.addressPostalCode?.trim() || '',
+      addressCountry:       body.addressCountry?.trim() || 'South Africa',
+      clubName:             body.clubName?.trim()       || '',
+      clubMemberId:         body.clubMemberId?.trim()   || '',
+      companyName:          body.companyName?.trim()    || '',
+      companyVAT:           body.companyVAT?.trim()     || '',
+      companyAddress:       body.companyAddress?.trim() || '',
+      deliveryDoorToDoor:    Boolean(body.deliveryDoorToDoor),
+      deliveryKioskToKiosk:  Boolean(body.deliveryKioskToKiosk),
+      deliveryPudoLocker:    Boolean(body.deliveryPudoLocker),
+      deliveryPostnetAramex: Boolean(body.deliveryPostnetAramex),
+      source:               body.source || 'manual',
+      notes:                body.notes?.trim()          || '',
       totalOrders: 0,
-      totalSpent: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      totalSpent:  0,
+      createdAt: now,
+      updatedAt: now,
     }
 
     contacts.push(newContact)
@@ -95,43 +133,57 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT /api/admin/contacts - Sync contacts from orders
+// PUT /api/admin/contacts — sync from orders
 export async function PUT() {
   try {
     const contacts = await getContacts()
-    const orders = await blobRead<any[]>(ORDERS_KEY, [])
+    const orders   = await blobRead<any[]>(ORDERS_KEY, [])
 
     let added = 0
     for (const order of orders) {
       if (!order.customerEmail && !order.customerPhone) continue
 
       const exists = contacts.find(
-        c => (order.customerEmail && c.email === order.customerEmail) ||
-             (order.customerPhone && c.phone === order.customerPhone)
+        c =>
+          (order.customerEmail && c.email === order.customerEmail) ||
+          (order.customerPhone && c.phone === order.customerPhone)
       )
 
       if (!exists) {
         const nameParts = (order.customerName || '').split(' ')
+        const now = new Date().toISOString()
         contacts.push({
           id: `contact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-          firstName: nameParts[0] || '',
-          lastName: nameParts.slice(1).join(' ') || '',
-          email: order.customerEmail || '',
-          phone: order.customerPhone || '',
-          source: 'book-now',
-          notes: '',
+          firstName:            nameParts[0] || '',
+          lastName:             nameParts.slice(1).join(' ') || '',
+          email:                order.customerEmail || '',
+          phone:                order.customerPhone || '',
+          addressStreet:        '',
+          addressCity:          '',
+          addressProvince:      '',
+          addressPostalCode:    '',
+          addressCountry:       'South Africa',
+          clubName:             '',
+          clubMemberId:         '',
+          companyName:          '',
+          companyVAT:           '',
+          companyAddress:       '',
+          deliveryDoorToDoor:    false,
+          deliveryKioskToKiosk:  false,
+          deliveryPudoLocker:    false,
+          deliveryPostnetAramex: false,
+          source:   'book-now',
+          notes:    '',
           totalOrders: 0,
-          totalSpent: 0,
-          createdAt: order.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+          totalSpent:  0,
+          createdAt: order.createdAt || now,
+          updatedAt: now,
         })
         added++
       }
     }
 
-    if (added > 0) {
-      await saveContacts(contacts)
-    }
+    if (added > 0) await saveContacts(contacts)
 
     return NextResponse.json({ synced: added, total: contacts.length })
   } catch (error) {
@@ -140,7 +192,7 @@ export async function PUT() {
   }
 }
 
-// DELETE /api/admin/contacts
+// DELETE /api/admin/contacts?id=xxx  (legacy query-param route kept for compatibility)
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
