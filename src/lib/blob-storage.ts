@@ -1,102 +1,78 @@
-import { put, list, del, head } from '@vercel/blob'
+import { db } from '@/lib/db'
 
 /**
- * Cloud storage utility using Vercel Blob.
- * Replaces all local filesystem (fs) read/write operations.
- * Works in both development and production on Vercel.
+ * JSON storage using Railway PostgreSQL (json_store table).
+ * Drop-in replacement for the old Vercel Blob implementation.
  */
 
-// Read a JSON file from blob storage
 export async function blobRead<T = unknown>(key: string, fallback: T): Promise<T> {
   try {
-    const blob = await head(key)
-    if (!blob) return fallback
-
-    const response = await fetch(blob.url, { cache: 'no-store' })
-    if (!response.ok) {
-      console.error(`[blobRead] fetch failed for "${key}": ${response.status} ${response.statusText}`)
-      return fallback
-    }
-
-    const text = await response.text()
-    return JSON.parse(text) as T
+    const result = await db.query('SELECT value FROM json_store WHERE key = $1', [key])
+    if (result.rows.length === 0) return fallback
+    return result.rows[0].value as T
   } catch (err: any) {
-    // BlobNotFoundError is expected for pages that don't exist yet — don't log those
-    if (err?.name !== 'BlobNotFoundError') {
-      console.error(`[blobRead] error reading "${key}":`, err?.message || err)
-    }
+    console.error(`[blobRead] error reading "${key}":`, err?.message || err)
     return fallback
   }
 }
 
-// Write a JSON file to blob storage
 export async function blobWrite(key: string, data: unknown): Promise<void> {
-  const json = JSON.stringify(data, null, 2)
-  await put(key, json, {
-    access: 'public',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: 'application/json',
-  })
+  await db.query(
+    `INSERT INTO json_store (key, value, updated_at)
+     VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+    [key, JSON.stringify(data)]
+  )
 }
 
-// Delete a file from blob storage
 export async function blobDelete(key: string): Promise<boolean> {
   try {
-    const blob = await head(key)
-    if (!blob) return false
-    await del(blob.url)
-    return true
+    const result = await db.query('DELETE FROM json_store WHERE key = $1', [key])
+    return (result.rowCount ?? 0) > 0
   } catch {
     return false
   }
 }
 
-// List all files with a given prefix (pathnames only)
 export async function blobList(prefix: string): Promise<string[]> {
   try {
-    const { blobs } = await list({ prefix, limit: 1000 })
-    return blobs.map(b => b.pathname)
+    const result = await db.query(
+      'SELECT key FROM json_store WHERE key LIKE $1 ORDER BY key',
+      [prefix + '%']
+    )
+    return result.rows.map((r: any) => r.key)
   } catch {
     return []
   }
 }
 
-// List all files with a given prefix (pathnames + URLs for direct fetch)
 export async function blobListWithUrls(prefix: string): Promise<{ pathname: string; url: string }[]> {
   try {
-    const { blobs } = await list({ prefix, limit: 1000 })
-    return blobs.map(b => ({ pathname: b.pathname, url: b.url }))
+    const result = await db.query(
+      'SELECT key FROM json_store WHERE key LIKE $1 ORDER BY key',
+      [prefix + '%']
+    )
+    return result.rows.map((r: any) => ({ pathname: r.key, url: r.key }))
   } catch (err: any) {
     console.error(`[blobListWithUrls] error listing "${prefix}":`, err?.message || err)
     return []
   }
 }
 
-// Check if a blob exists
 export async function blobExists(key: string): Promise<boolean> {
   try {
-    await head(key)
-    return true
+    const result = await db.query('SELECT 1 FROM json_store WHERE key = $1', [key])
+    return result.rows.length > 0
   } catch {
     return false
   }
 }
 
-// Upload a binary file (for media uploads)
+// Media uploads now go through R2 — this is kept for compatibility but not used
 export async function blobUploadFile(
-  key: string,
-  data: Buffer | ArrayBuffer | Uint8Array,
-  contentType: string
+  _key: string,
+  _data: Buffer | ArrayBuffer | Uint8Array,
+  _contentType: string
 ): Promise<string> {
-  // Ensure we pass a Buffer for maximum compatibility
-  const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data)
-
-  const blob = await put(key, buffer, {
-    access: 'public',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType,
-  })
-  return blob.url
+  throw new Error('blobUploadFile is deprecated — use r2Upload from @/lib/r2-storage instead')
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
-import { blobUploadFile, blobRead, blobWrite } from '@/lib/blob-storage'
+import { db } from '@/lib/db'
+import { r2Upload } from '@/lib/r2-storage'
 
 export async function POST(request: Request) {
   try {
@@ -11,13 +11,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
-    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml', 'image/avif']
     if (file.type && !allowedTypes.includes(file.type)) {
       return NextResponse.json({ error: `File type "${file.type}" not allowed` }, { status: 400 })
     }
 
-    // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
       return NextResponse.json({ error: 'File too large (max 10MB)' }, { status: 400 })
     }
@@ -28,80 +26,24 @@ export async function POST(request: Request) {
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`
     const contentType = file.type || `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`
 
-    let publicUrl = ''
+    // Upload to Cloudflare R2
+    const publicUrl = await r2Upload(`uploads/${fileName}`, buffer, contentType)
 
-    // Primary: Upload to Supabase Storage
+    // Register in media_files table (best-effort)
     try {
-      const sb = getSupabaseAdmin()
-      const { error: uploadError } = await sb.storage
-        .from('uploads')
-        .upload(fileName, buffer, {
-          contentType,
-          upsert: true,
-        })
-
-      if (uploadError) throw uploadError
-
-      const { data: urlData } = sb.storage.from('uploads').getPublicUrl(fileName)
-      publicUrl = urlData.publicUrl
-    } catch (supaErr: any) {
-      console.error('[media/upload] Supabase Storage failed:', supaErr?.message)
-    }
-
-    // Fallback: Upload to Vercel Blob if Supabase failed
-    if (!publicUrl) {
-      try {
-        publicUrl = await blobUploadFile(`uploads/${fileName}`, buffer, contentType)
-      } catch (blobErr: any) {
-        console.error('[media/upload] Vercel Blob also failed:', blobErr?.message)
-        return NextResponse.json(
-          { error: 'Upload failed: both storage backends unavailable' },
-          { status: 500 }
-        )
-      }
-    }
-
-    // Return relative URL so it works via the /uploads/ rewrite in next.config.js
-    // This ensures portability — the rewrite proxies to Supabase Storage
-    const relativeUrl = `/uploads/${fileName}`
-
-    // Register in Supabase media_files table (best-effort)
-    try {
-      const sb = getSupabaseAdmin()
-      await sb.from('media_files').upsert({
-        id: fileName,
-        name: file.name || fileName,
-        url: relativeUrl,
-        type: contentType,
-        size: file.size,
-        folder: 'All Files',
-        uploaded_at: new Date().toISOString(),
-      }, { onConflict: 'id' })
+      await db.query(
+        `INSERT INTO media_files (id, name, url, type, size, folder, uploaded_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())
+         ON CONFLICT (id) DO UPDATE SET url = $3, name = $2`,
+        [fileName, file.name || fileName, publicUrl, contentType, file.size, 'All Files']
+      )
     } catch (dbErr: any) {
       console.error('[media/upload] media_files index failed:', dbErr?.message)
     }
 
-    // Also try blob media library index (best-effort dual-write)
-    try {
-      const MEDIA_KEY = 'data/media-library.json'
-      const library = await blobRead<{ files: any[]; folders: string[] }>(MEDIA_KEY, { files: [], folders: ['All Files'] })
-      library.files.unshift({
-        id: fileName,
-        name: file.name || fileName,
-        url: relativeUrl,
-        type: contentType,
-        size: file.size,
-        folder: 'All Files',
-        uploadedAt: new Date().toISOString(),
-      })
-      await blobWrite(MEDIA_KEY, library)
-    } catch {
-      // Blob index update is optional
-    }
-
     return NextResponse.json({
       success: true,
-      url: relativeUrl,
+      url: publicUrl,
       fileName,
     })
   } catch (error: any) {

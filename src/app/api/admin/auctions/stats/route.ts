@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
 import { isAdminRequest } from '@/lib/auction/auth'
 
 export async function GET() {
@@ -8,27 +8,18 @@ export async function GET() {
   }
 
   try {
-    const supabase = getSupabaseAdmin()
-
-    const [
-      { count: totalAuctions },
-      { count: activeAuctions },
-      { count: totalBids },
-      { data: revenueData },
-    ] = await Promise.all([
-      supabase.from('auctions').select('*', { count: 'exact', head: true }),
-      supabase.from('auctions').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-      supabase.from('bids').select('*', { count: 'exact', head: true }),
-      supabase.from('auction_payments').select('amount').eq('status', 'succeeded'),
+    const [totalRes, activeRes, bidsRes, revenueRes] = await Promise.all([
+      db.query('SELECT COUNT(*) FROM auctions'),
+      db.query("SELECT COUNT(*) FROM auctions WHERE status = 'active'"),
+      db.query('SELECT COUNT(*) FROM bids'),
+      db.query("SELECT COALESCE(SUM(amount), 0) AS total FROM auction_payments WHERE status = 'succeeded'"),
     ])
 
-    const totalRevenue = (revenueData || []).reduce((sum, p) => sum + Number(p.amount), 0)
-
     return NextResponse.json({
-      totalAuctions: totalAuctions || 0,
-      activeAuctions: activeAuctions || 0,
-      totalBids: totalBids || 0,
-      totalRevenue,
+      totalAuctions: parseInt(totalRes.rows[0].count),
+      activeAuctions: parseInt(activeRes.rows[0].count),
+      totalBids: parseInt(bidsRes.rows[0].count),
+      totalRevenue: parseFloat(revenueRes.rows[0].total),
     })
   } catch (error) {
     console.error('Error fetching stats:', error)

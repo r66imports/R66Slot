@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import type { AuctionNotification } from '@/types/auction'
+
+const POLL_INTERVAL = 15000 // 15 seconds for notifications
 
 export function useNotifications(bidderId: string | null) {
   const [notifications, setNotifications] = useState<AuctionNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchNotifications = useCallback(async () => {
     if (!bidderId) return
@@ -26,32 +28,14 @@ export function useNotifications(bidderId: string | null) {
     fetchNotifications()
   }, [fetchNotifications])
 
-  // Real-time subscription for new notifications
+  // Poll for new notifications
   useEffect(() => {
     if (!bidderId) return
-
-    const channel = supabase
-      .channel(`notifications-${bidderId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `bidder_id=eq.${bidderId}`,
-        },
-        (payload) => {
-          const newNotification = payload.new as AuctionNotification
-          setNotifications(prev => [newNotification, ...prev])
-          setUnreadCount(prev => prev + 1)
-        }
-      )
-      .subscribe()
-
+    intervalRef.current = setInterval(fetchNotifications, POLL_INTERVAL)
     return () => {
-      supabase.removeChannel(channel)
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [bidderId])
+  }, [bidderId, fetchNotifications])
 
   const markAsRead = async (notificationId: string) => {
     try {

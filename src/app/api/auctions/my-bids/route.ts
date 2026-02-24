@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
 import { getBidderFromRequest } from '@/lib/auction/auth'
 
 export async function GET() {
@@ -9,20 +9,22 @@ export async function GET() {
       return NextResponse.json({ error: 'Please log in' }, { status: 401 })
     }
 
-    const supabase = getSupabaseAdmin()
-
-    // Get all auctions the user has bid on with their highest bid
-    const { data, error } = await supabase
-      .from('bids')
-      .select('*, auction:auctions(*, category:auction_categories(*))')
-      .eq('bidder_id', bidder.id)
-      .order('created_at', { ascending: false })
-
-    if (error) throw error
+    const result = await db.query(
+      `SELECT b.*,
+        (SELECT row_to_json(a) FROM (
+          SELECT auctions.*,
+            (SELECT row_to_json(c) FROM auction_categories c WHERE c.id = auctions.category_id) AS category
+          FROM auctions WHERE auctions.id = b.auction_id
+        ) a) AS auction
+      FROM bids b
+      WHERE b.bidder_id = $1
+      ORDER BY b.created_at DESC`,
+      [bidder.id]
+    )
 
     // Group by auction, keep highest bid per auction
     const auctionMap = new Map<string, any>()
-    for (const bid of data || []) {
+    for (const bid of result.rows) {
       if (!auctionMap.has(bid.auction_id) || bid.amount > auctionMap.get(bid.auction_id).amount) {
         auctionMap.set(bid.auction_id, bid)
       }

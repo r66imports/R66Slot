@@ -1,15 +1,16 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import type { Auction, Bid } from '@/types/auction'
+
+const POLL_INTERVAL = 4000 // 4 seconds
 
 export function useAuctionRealtime(auctionId: string) {
   const [auction, setAuction] = useState<Auction | null>(null)
   const [bids, setBids] = useState<Bid[]>([])
   const [loading, setLoading] = useState(true)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Initial fetch
   const fetchAuction = useCallback(async () => {
     try {
       const res = await fetch(`/api/auctions/${auctionId}`)
@@ -28,6 +29,7 @@ export function useAuctionRealtime(auctionId: string) {
     }
   }, [auctionId])
 
+  // Initial load
   useEffect(() => {
     const load = async () => {
       setLoading(true)
@@ -37,41 +39,17 @@ export function useAuctionRealtime(auctionId: string) {
     load()
   }, [fetchAuction, fetchBids])
 
-  // Real-time subscriptions
+  // Poll for updates every 4 seconds
   useEffect(() => {
-    const auctionChannel = supabase
-      .channel(`auction-${auctionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'auctions',
-          filter: `id=eq.${auctionId}`,
-        },
-        (payload) => {
-          setAuction(prev => prev ? { ...prev, ...payload.new } as Auction : null)
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'bids',
-          filter: `auction_id=eq.${auctionId}`,
-        },
-        (payload) => {
-          const newBid = payload.new as Bid
-          setBids(prev => [newBid, ...prev])
-        }
-      )
-      .subscribe()
+    intervalRef.current = setInterval(() => {
+      fetchAuction()
+      fetchBids()
+    }, POLL_INTERVAL)
 
     return () => {
-      supabase.removeChannel(auctionChannel)
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [auctionId])
+  }, [fetchAuction, fetchBids])
 
   return { auction, bids, loading, refetchAuction: fetchAuction, refetchBids: fetchBids }
 }

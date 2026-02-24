@@ -1,6 +1,18 @@
-import { createClient } from '@supabase/supabase-js'
+/**
+ * Supabase browser client stub.
+ * Realtime is replaced with polling in useAuctionRealtime and useNotifications.
+ * Channel calls are no-ops.
+ */
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const noop = () => stubClient
+const noopChannel = {
+  on: noop,
+  subscribe: noop,
+}
+
+const stubClient = {
+  channel: (_name: string) => noopChannel,
+  removeChannel: (_ch: any) => {},
+}
+
+export const supabase = stubClient
