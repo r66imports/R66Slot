@@ -1,5 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async redirects() {
+    return [
+      // Redirect bare domain to www
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'r66slot.co.za' }],
+        destination: 'https://www.r66slot.co.za/:path*',
+        permanent: true,
+      },
+    ]
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
