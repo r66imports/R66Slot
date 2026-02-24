@@ -1,13 +1,26 @@
 import { Pool } from 'pg'
 
-const connectionString = process.env.DATABASE_URL || process.env.RAILWAY_DATABASE_URL
+// Lazy pool — only created on first query (not at build time)
+let _pool: Pool | null = null
 
-if (!connectionString) {
-  throw new Error('Missing DATABASE_URL environment variable')
+function getPool(): Pool {
+  if (!_pool) {
+    const connectionString = process.env.DATABASE_URL || process.env.RAILWAY_DATABASE_URL
+    if (!connectionString) {
+      throw new Error('Missing DATABASE_URL environment variable')
+    }
+    _pool = new Pool({
+      connectionString,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+      max: 10,
+    })
+  }
+  return _pool
 }
 
-export const db = new Pool({
-  connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 10,
+// Proxy so existing code using db.query() works unchanged
+export const db = new Proxy({} as Pool, {
+  get(_, prop) {
+    return (getPool() as any)[prop]
+  }
 })
