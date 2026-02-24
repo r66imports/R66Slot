@@ -46,27 +46,24 @@ export async function POST() {
     const currentCustomers: any[] = existing.rows.length > 0 ? existing.rows[0].value : []
     const hasAdmin = currentCustomers.some((c: any) => c.username === 'Admin')
 
-    if (hasAdmin) {
-      log.push('Admin user already exists — skipped')
-    } else {
-      const passwordHash = await bcrypt.hash('Admin123!', 12)
-      const adminCustomer = [{
-        id: 'admin-1',
-        username: 'Admin',
-        firstName: 'Admin',
-        lastName: 'User',
-        email: 'admin@r66slot.co.za',
-        password: passwordHash,
-        role: 'admin',
-        createdAt: new Date().toISOString(),
-      }]
-      await db.query(
-        `INSERT INTO json_store (key, value, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
-        ['data/customers.json', JSON.stringify(adminCustomer)]
-      )
-      log.push('Admin user seeded (username: Admin, password: Admin123!)')
-    }
+    // Always reset/create admin with known password
+    const passwordHash = await bcrypt.hash('Admin123!', 12)
+    const adminCustomer = [{
+      id: 'admin-1',
+      username: 'Admin',
+      firstName: 'Admin',
+      lastName: 'User',
+      email: 'admin@r66slot.co.za',
+      password: passwordHash,
+      role: 'admin',
+      createdAt: new Date().toISOString(),
+    }]
+    await db.query(
+      `INSERT INTO json_store (key, value, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+      ['data/customers.json', JSON.stringify(adminCustomer)]
+    )
+    log.push(hasAdmin ? 'Admin password reset to Admin123!' : 'Admin user created (username: Admin, password: Admin123!)')
 
     // ── 4. Seed starter homepage ──────────────────────────────────────────
     const hpCheck = await db.query("SELECT id FROM pages WHERE id = 'frontend-homepage'")
