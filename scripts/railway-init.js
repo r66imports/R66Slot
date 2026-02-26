@@ -20,6 +20,8 @@ if (!connectionString) {
 const db = new Pool({
   connectionString,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
 })
 
 // ---------------------------------------------------------------------------
@@ -424,4 +426,10 @@ async function main() {
   }
 }
 
-main()
+// Hard timeout — if init takes longer than 60 s, skip and let the app start
+const initTimeout = setTimeout(() => {
+  console.error('⚠️  Railway init timed out after 60 s — starting app anyway')
+  process.exit(0)
+}, 60000)
+
+main().finally(() => clearTimeout(initTimeout))

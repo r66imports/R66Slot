@@ -29,7 +29,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Also support GET for manual triggering in development
+// GET only allowed in development for manual testing
 export async function GET(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
+  }
   return POST(request)
 }

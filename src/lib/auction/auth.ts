@@ -4,7 +4,7 @@ import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { blobRead } from '@/lib/blob-storage'
 import type { BidderProfile } from '@/types/auction'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-dev-secret-replace-in-production'
 
 interface JWTPayload {
   id: string

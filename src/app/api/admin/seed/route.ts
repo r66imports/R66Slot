@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { db } from '@/lib/db'
 
@@ -6,8 +6,17 @@ import { db } from '@/lib/db'
  * POST /api/admin/seed
  * One-time database initialisation: creates tables + seeds admin + seeds homepage.
  * Idempotent — safe to call multiple times.
+ * Requires Authorization: Bearer <SEED_SECRET> header.
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const seedSecret = process.env.SEED_SECRET
+  if (!seedSecret) {
+    return NextResponse.json({ error: 'Seed endpoint disabled — set SEED_SECRET to enable' }, { status: 403 })
+  }
+  const auth = request.headers.get('authorization')
+  if (auth !== `Bearer ${seedSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const log: string[] = []
 
   try {
