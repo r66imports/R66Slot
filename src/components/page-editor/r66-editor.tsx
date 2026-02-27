@@ -651,9 +651,9 @@ ${canvasHTML}
         )}
 
         {/* ─── RIGHT PANEL: Properties / Page Settings ─── */}
-        <div className={`${rightCollapsed ? 'w-0' : ''} flex-shrink-0 overflow-hidden transition-all duration-200`}>
+        <div className={`${rightCollapsed ? 'w-0' : ''} flex-shrink-0 overflow-hidden transition-all duration-200 h-full flex flex-col`}>
           {showPageSettings ? (
-            <div className="relative">
+            <div className="relative h-full flex flex-col">
               <button
                 onClick={() => setRightCollapsed(true)}
                 title="Collapse panel"
@@ -670,7 +670,7 @@ ${canvasHTML}
               />
             </div>
           ) : selectedComponent ? (
-            <div className="relative">
+            <div className="relative h-full flex flex-col">
               <button
                 onClick={() => setRightCollapsed(true)}
                 title="Collapse panel"
