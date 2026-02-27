@@ -12,21 +12,22 @@ export default function AccountDashboard() {
     pendingOrders: 0,
     savedAddresses: 0,
   })
+  const [recentOrders, setRecentOrders] = useState<any[]>([])
 
   useEffect(() => {
-    // Fetch user data
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => setUser(data))
-      .catch(() => {
-        // Redirect to login if not authenticated
-        window.location.href = '/account/login'
-      })
+      .catch(() => { window.location.href = '/account/login' })
 
-    // Fetch stats
     fetch('/api/account/stats')
       .then((res) => res.json())
       .then((data) => setStats(data))
+      .catch(console.error)
+
+    fetch('/api/account/orders')
+      .then((res) => res.json())
+      .then((data) => setRecentOrders(Array.isArray(data) ? data.slice(0, 3) : []))
       .catch(console.error)
   }, [])
 
@@ -142,21 +143,47 @@ export default function AccountDashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Recent Orders</CardTitle>
-          <Link
-            href="/account/orders"
-            className="text-sm text-primary hover:underline"
-          >
+          <Link href="/account/orders" className="text-sm text-primary hover:underline">
             View all
           </Link>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12 text-gray-500">
-            <div className="text-5xl mb-4">📦</div>
-            <p className="mb-4">No orders yet</p>
-            <Link href="/products">
-              <Button>Start Shopping</Button>
-            </Link>
-          </div>
+          {recentOrders.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-5xl mb-4">📦</div>
+              <p className="mb-4">No orders yet</p>
+              <Link href="/products">
+                <Button>Start Shopping</Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {recentOrders.map((order) => (
+                <div key={order.id} className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="font-medium text-sm">#{order.orderNumber}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(order.date).toLocaleDateString('en-ZA', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                      })}
+                      {' · '}{order.itemCount} item{order.itemCount !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-medium text-sm">R{Number(order.total).toFixed(2)}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      order.status === 'completed' ? 'bg-green-100 text-green-700' :
+                      order.status === 'processing' ? 'bg-blue-100 text-blue-700' :
+                      order.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {order.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

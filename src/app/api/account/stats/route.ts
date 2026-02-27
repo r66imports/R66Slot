@@ -3,39 +3,39 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead } from '@/lib/blob-storage'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
-const ORDERS_KEY = 'data/orders.json'
-const ADDRESSES_KEY = 'data/addresses.json'
-
-async function getOrders() {
-  return await blobRead<any[]>(ORDERS_KEY, [])
-}
-
-async function getAddresses() {
-  return await blobRead<any[]>(ADDRESSES_KEY, [])
-}
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback-dev-secret-replace-in-production'
 
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get('customer_token')?.value
-
-    if (!token) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
+    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
 
     const decoded = jwt.verify(token, JWT_SECRET) as any
-    const orders = (await getOrders()).filter((o: any) => o.customerId === decoded.id)
-    const addresses = (await getAddresses()).filter((a: any) => a.customerId === decoded.id)
+    const customerEmail = decoded.email?.toLowerCase()
 
-    const stats = {
+    const matchesCustomer = (o: any) =>
+      o.customerId === decoded.id || o.email?.toLowerCase() === customerEmail
+
+    const [preorders, slotcarOrders, addresses] = await Promise.all([
+      blobRead<any[]>('data/preorder-list.json', []),
+      blobRead<any[]>('data/slotcar-orders.json', []),
+      blobRead<any[]>('data/addresses.json', []),
+    ])
+
+    const orders = [
+      ...preorders.filter(matchesCustomer),
+      ...slotcarOrders.filter(matchesCustomer),
+    ]
+
+    return NextResponse.json({
       totalOrders: orders.length,
-      pendingOrders: orders.filter((o: any) => o.status === 'pending' || o.status === 'processing').length,
-      savedAddresses: addresses.length,
-    }
-
-    return NextResponse.json(stats)
-  } catch (error) {
+      pendingOrders: orders.filter((o: any) =>
+        o.status === 'pending' || o.status === 'processing'
+      ).length,
+      savedAddresses: addresses.filter((a: any) => a.customerId === decoded.id).length,
+    })
+  } catch {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
   }
 }
