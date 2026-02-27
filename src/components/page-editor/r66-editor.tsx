@@ -95,6 +95,8 @@ export function R66Editor({ pageId }: R66EditorProps) {
   const [showGrid, setShowGrid] = useState(false)
   const [leftTab, setLeftTab] = useState<'components' | 'layers'>('components')
   const [draggingFreeformId, setDraggingFreeformId] = useState<string | null>(null)
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightCollapsed, setRightCollapsed] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; componentId: string } | null>(null)
   const [propertiesInitialTab, setPropertiesInitialTab] = useState<'content' | 'style' | 'settings'>('content')
@@ -407,54 +409,69 @@ ${canvasHTML}
 
       <div className="flex-1 flex overflow-hidden">
         {/* ─── LEFT SIDEBAR: Elements Library / Layers ─── */}
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
-          <div className="flex border-b border-gray-100">
-            <button
-              onClick={() => setLeftTab('components')}
-              className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
-                leftTab === 'components'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Elements
-            </button>
-            <button
-              onClick={() => setLeftTab('layers')}
-              className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
-                leftTab === 'layers'
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Layers
-            </button>
-          </div>
-          {leftTab === 'components' ? (
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {COMPONENT_LIBRARY.map((item) => (
-                <button
-                  key={item.type}
-                  onClick={() => addComponent(item.type)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
-                >
-                  <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
-                    {item.icon}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
-                    <p className="text-xs text-gray-400 font-play">{item.desc}</p>
-                  </div>
-                </button>
-              ))}
+        <div className="flex flex-shrink-0">
+          {/* Panel content */}
+          <div className={`${leftCollapsed ? 'w-0' : 'w-64'} overflow-hidden transition-all duration-200 bg-white border-r border-gray-200 flex flex-col`}>
+            <div className="flex border-b border-gray-100">
+              <button
+                onClick={() => setLeftTab('components')}
+                className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
+                  leftTab === 'components'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Elements
+              </button>
+              <button
+                onClick={() => setLeftTab('layers')}
+                className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
+                  leftTab === 'layers'
+                    ? 'text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Layers
+              </button>
             </div>
-          ) : (
-            <LayersPanel
-              components={page.components}
-              selectedComponentId={selectedComponentId}
-              onSelect={(id) => { setPropertiesInitialTab('content'); setSelectedComponentId(id); setShowPageSettings(false) }}
-            />
-          )}
+            {leftTab === 'components' ? (
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {COMPONENT_LIBRARY.map((item) => (
+                  <button
+                    key={item.type}
+                    onClick={() => addComponent(item.type)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
+                  >
+                    <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
+                      {item.icon}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
+                      <p className="text-xs text-gray-400 font-play">{item.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <LayersPanel
+                components={page.components}
+                selectedComponentId={selectedComponentId}
+                onSelect={(id) => { setPropertiesInitialTab('content'); setSelectedComponentId(id); setShowPageSettings(false) }}
+                onToggleHidden={(id) => {
+                  const comp = page.components.find(c => c.id === id)
+                  if (comp) updateComponent(id, { hidden: !comp.hidden })
+                }}
+              />
+            )}
+          </div>
+          {/* Toggle strip */}
+          <button
+            onClick={() => setLeftCollapsed(v => !v)}
+            title={leftCollapsed ? 'Show panel' : 'Hide panel'}
+            className="w-4 flex-shrink-0 bg-gray-50 border-r border-gray-200 hover:bg-blue-50 transition-colors flex items-center justify-center"
+          >
+            <span className="text-gray-400 text-[10px] select-none">{leftCollapsed ? '›' : '‹'}</span>
+          </button>
         </div>
 
         {/* ─── CANVAS: Live Preview ─── */}
@@ -601,37 +618,50 @@ ${canvasHTML}
         </div>
 
         {/* ─── RIGHT PANEL: Properties / Page Settings ─── */}
-        {showPageSettings ? (
-          <PageSettingsPanel
-            pageSettings={page.pageSettings || {}}
-            onUpdate={updatePageSettings}
-            onClose={() => setShowPageSettings(false)}
-          />
-        ) : selectedComponent ? (
-          <EditorPropertiesPanel
-            key={`${selectedComponent.id}-${propertiesInitialTab}`}
-            component={selectedComponent}
-            viewMode={viewMode}
-            onUpdate={(updates) => updateComponent(selectedComponent.id, updates)}
-            onDelete={() => deleteComponent(selectedComponent.id)}
-            onDuplicate={() => duplicateComponent(selectedComponent.id)}
-            onMoveUp={() => moveComponent(selectedComponent.id, 'up')}
-            onMoveDown={() => moveComponent(selectedComponent.id, 'down')}
-            onClose={() => { setSelectedComponentId(null); setPropertiesInitialTab('content') }}
-            initialTab={propertiesInitialTab}
-          />
-        ) : (
-          <div className="w-72 bg-white border-l border-gray-200 flex flex-col items-center justify-center text-gray-400 p-6">
-            <div className="text-4xl mb-3">👆</div>
-            <p className="text-sm font-medium font-play text-center">Click a component on the page to edit its properties</p>
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowPageSettings(true) }}
-              className="mt-4 px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs rounded-lg font-play font-medium hover:bg-indigo-100 transition-colors"
-            >
-              Edit Page Background
-            </button>
+        <div className="flex flex-shrink-0">
+          {/* Toggle strip */}
+          <button
+            onClick={() => setRightCollapsed(v => !v)}
+            title={rightCollapsed ? 'Show panel' : 'Hide panel'}
+            className="w-4 flex-shrink-0 bg-gray-50 border-l border-gray-200 hover:bg-blue-50 transition-colors flex items-center justify-center"
+          >
+            <span className="text-gray-400 text-[10px] select-none">{rightCollapsed ? '‹' : '›'}</span>
+          </button>
+          {/* Panel content */}
+          <div className={`${rightCollapsed ? 'w-0' : ''} overflow-hidden transition-all duration-200`}>
+            {showPageSettings ? (
+              <PageSettingsPanel
+                pageSettings={page.pageSettings || {}}
+                onUpdate={updatePageSettings}
+                onClose={() => setShowPageSettings(false)}
+              />
+            ) : selectedComponent ? (
+              <EditorPropertiesPanel
+                key={`${selectedComponent.id}-${propertiesInitialTab}`}
+                component={selectedComponent}
+                viewMode={viewMode}
+                onUpdate={(updates) => updateComponent(selectedComponent.id, updates)}
+                onDelete={() => deleteComponent(selectedComponent.id)}
+                onDuplicate={() => duplicateComponent(selectedComponent.id)}
+                onMoveUp={() => moveComponent(selectedComponent.id, 'up')}
+                onMoveDown={() => moveComponent(selectedComponent.id, 'down')}
+                onClose={() => { setSelectedComponentId(null); setPropertiesInitialTab('content') }}
+                initialTab={propertiesInitialTab}
+              />
+            ) : (
+              <div className="w-72 bg-white border-l border-gray-200 flex flex-col items-center justify-center text-gray-400 p-6">
+                <div className="text-4xl mb-3">👆</div>
+                <p className="text-sm font-medium font-play text-center">Click a component to edit its properties</p>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowPageSettings(true) }}
+                  className="mt-4 px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs rounded-lg font-play font-medium hover:bg-indigo-100 transition-colors"
+                >
+                  Edit Page Background
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Context Menu */}
@@ -682,6 +712,15 @@ ${canvasHTML}
               onClick={() => { moveComponent(comp.id, 'down'); setContextMenu(null) }}
             >
               <span>⬇️</span> Move Down
+            </button>
+            <div className="border-t border-gray-100 my-1" />
+            {/* Hide / Show */}
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => { updateComponent(comp.id, { hidden: !comp.hidden }); setContextMenu(null) }}
+            >
+              <span>{comp.hidden ? '👁️' : '🙈'}</span>
+              {comp.hidden ? 'Show element' : 'Hide element'}
             </button>
             <div className="border-t border-gray-100 my-1" />
             {/* Position mode toggle */}
@@ -766,7 +805,7 @@ function SortableLiveComponent({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.4 : component.hidden ? 0.25 : 1,
     position: 'relative' as const,
   }
 
@@ -789,6 +828,9 @@ function SortableLiveComponent({
           <span className="bg-blue-500 text-white text-xs px-2 py-0.5 rounded font-play font-medium capitalize">
             {component.type.replace(/-/g, ' ')}
           </span>
+          {component.hidden && (
+            <span className="bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded font-play">hidden</span>
+          )}
           <span
             className="bg-gray-600 text-white text-xs px-1.5 py-0.5 rounded cursor-grab active:cursor-grabbing"
             {...attributes}

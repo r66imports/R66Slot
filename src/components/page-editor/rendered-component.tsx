@@ -11,6 +11,9 @@ interface RenderedComponentProps {
 }
 
 export function RenderedComponent({ component, isEditing, onUpdateSettings }: RenderedComponentProps) {
+  // Hidden elements: invisible on live site, still rendered (ghosted) in editor
+  if (component.hidden && !isEditing) return null
+
   const { type, content, styles, settings, children } = component
 
   const containerStyle: React.CSSProperties = {

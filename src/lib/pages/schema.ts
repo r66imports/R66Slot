@@ -91,6 +91,8 @@ export interface PageComponent {
     [key: string]: string | boolean | number | { label: string; url: string } | undefined
   }
   children?: PageComponent[]
+  // Visibility — hidden elements are invisible on live site, ghosted in editor
+  hidden?: boolean
   // Free positioning support
   positionMode?: 'flow' | 'absolute'
 

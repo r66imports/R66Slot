@@ -334,6 +334,7 @@ export function FreeformElement({
       className={`
         freeform-element group
         ${isImageElement ? 'r66-freeform-image' : ''}
+        ${component.hidden ? 'opacity-25 outline-dashed outline-2 outline-gray-400' : ''}
         ${isSelected ? 'ring-2 ring-purple-500 ring-offset-1 selected' : 'hover:ring-2 hover:ring-purple-300'}
         ${isDragging ? 'opacity-80 shadow-xl dragging' : ''}
         ${isResizing ? 'opacity-90' : ''}
@@ -360,6 +361,12 @@ export function FreeformElement({
         <span className="bg-gray-700 text-white text-xs px-1.5 py-0.5 rounded font-play">
           {breakpoint}
         </span>
+        {/* Hidden badge */}
+        {component.hidden && (
+          <span className="bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded font-play">
+            hidden
+          </span>
+        )}
       </div>
 
       {/* Content */}
