@@ -333,7 +333,8 @@ export default function PreOrderPosterPage() {
         if (blob) {
           const file = new File([blob], `R66SLOT-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
           if (navigator.canShare?.({ files: [file] })) {
-            await navigator.share({ files: [file], text: shareText })
+            // Share image only — no text. The poster contains all details + booking URL.
+            await navigator.share({ files: [file] })
             return
           }
         }
@@ -870,6 +871,7 @@ export default function PreOrderPosterPage() {
                     <a href={bookingLink} target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-black text-white text-center font-bold font-play rounded-lg hover:bg-gray-800 transition-colors">
                       BOOK NOW →
                     </a>
+                    <p className="text-xs text-center text-blue-600 font-play font-mono">{bookingLink.replace('https://', '')}</p>
                     <p className="text-xs text-center text-gray-400 font-play">R66SLOT – Premium Slot Cars</p>
                   </div>
                 </div>
