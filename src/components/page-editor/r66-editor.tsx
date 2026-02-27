@@ -407,72 +407,88 @@ ${canvasHTML}
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* ─── LEFT SIDEBAR: Elements Library / Layers ─── */}
-        <div className="flex flex-shrink-0">
-          {/* Panel content */}
-          <div className={`${leftCollapsed ? 'w-0' : 'w-64'} overflow-hidden transition-all duration-200 bg-white border-r border-gray-200 flex flex-col`}>
-            <div className="flex border-b border-gray-100">
-              <button
-                onClick={() => setLeftTab('components')}
-                className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
-                  leftTab === 'components'
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Elements
-              </button>
-              <button
-                onClick={() => setLeftTab('layers')}
-                className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
-                  leftTab === 'layers'
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Layers
-              </button>
-            </div>
-            {leftTab === 'components' ? (
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {COMPONENT_LIBRARY.map((item) => (
-                  <button
-                    key={item.type}
-                    onClick={() => addComponent(item.type)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
-                  >
-                    <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
-                      {item.icon}
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
-                      <p className="text-xs text-gray-400 font-play">{item.desc}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <LayersPanel
-                components={page.components}
-                selectedComponentId={selectedComponentId}
-                onSelect={(id) => { setPropertiesInitialTab('content'); setSelectedComponentId(id); setShowPageSettings(false) }}
-                onToggleHidden={(id) => {
-                  const comp = page.components.find(c => c.id === id)
-                  if (comp) updateComponent(id, { hidden: !comp.hidden })
-                }}
-              />
-            )}
+        <div className={`${leftCollapsed ? 'w-0' : 'w-72'} flex-shrink-0 overflow-hidden transition-all duration-200 bg-white border-r border-gray-200 flex flex-col`}>
+          {/* Tab header with collapse button */}
+          <div className="flex items-center border-b border-gray-100">
+            <button
+              onClick={() => setLeftTab('components')}
+              className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
+                leftTab === 'components'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Elements
+            </button>
+            <button
+              onClick={() => setLeftTab('layers')}
+              className={`flex-1 py-2.5 text-xs font-semibold uppercase tracking-wider font-play transition-colors ${
+                leftTab === 'layers'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Layers
+            </button>
+            {/* Collapse button */}
+            <button
+              onClick={() => setLeftCollapsed(true)}
+              title="Collapse panel"
+              className="flex-shrink-0 px-2 py-2.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+              </svg>
+            </button>
           </div>
-          {/* Toggle strip */}
-          <button
-            onClick={() => setLeftCollapsed(v => !v)}
-            title={leftCollapsed ? 'Show panel' : 'Hide panel'}
-            className="w-4 flex-shrink-0 bg-gray-50 border-r border-gray-200 hover:bg-blue-50 transition-colors flex items-center justify-center"
-          >
-            <span className="text-gray-400 text-[10px] select-none">{leftCollapsed ? '›' : '‹'}</span>
-          </button>
+          {leftTab === 'components' ? (
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {COMPONENT_LIBRARY.map((item) => (
+                <button
+                  key={item.type}
+                  onClick={() => addComponent(item.type)}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
+                >
+                  <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
+                    {item.icon}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
+                    <p className="text-xs text-gray-400 font-play">{item.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <LayersPanel
+              components={page.components}
+              selectedComponentId={selectedComponentId}
+              onSelect={(id) => { setPropertiesInitialTab('content'); setSelectedComponentId(id); setShowPageSettings(false); setRightCollapsed(false) }}
+              onToggleHidden={(id) => {
+                const comp = page.components.find(c => c.id === id)
+                if (comp) updateComponent(id, { hidden: !comp.hidden })
+              }}
+            />
+          )}
         </div>
+
+        {/* Floating expand tab — left panel */}
+        {leftCollapsed && (
+          <button
+            onClick={() => setLeftCollapsed(false)}
+            title="Show Elements panel"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 border-l-0 rounded-r-lg shadow-md px-1.5 py-3 hover:bg-blue-50 hover:border-blue-300 transition-colors flex flex-col items-center gap-1"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+            </svg>
+            <span className="text-[9px] font-semibold text-gray-400 font-play uppercase tracking-wider" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}>
+              Elements
+            </span>
+          </button>
+        )}
 
         {/* ─── CANVAS: Live Preview ─── */}
         <div
@@ -546,12 +562,13 @@ ${canvasHTML}
                           key={component.id}
                           component={component}
                           isSelected={selectedComponentId === component.id}
-                          onSelect={() => { setPropertiesInitialTab('content'); setSelectedComponentId(component.id); setShowPageSettings(false) }}
+                          onSelect={() => { setPropertiesInitialTab('content'); setSelectedComponentId(component.id); setShowPageSettings(false); setRightCollapsed(false) }}
                           onContextMenu={(e) => {
                             e.preventDefault()
                             setPropertiesInitialTab('content')
                             setSelectedComponentId(component.id)
                             setShowPageSettings(false)
+                            setRightCollapsed(false)
                             setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
                           }}
                           onUpdateSettings={(key, value) => {
@@ -617,25 +634,52 @@ ${canvasHTML}
           </div>
         </div>
 
-        {/* ─── RIGHT PANEL: Properties / Page Settings ─── */}
-        <div className="flex flex-shrink-0">
-          {/* Toggle strip */}
+        {/* Floating expand tab — right panel */}
+        {rightCollapsed && (
           <button
-            onClick={() => setRightCollapsed(v => !v)}
-            title={rightCollapsed ? 'Show panel' : 'Hide panel'}
-            className="w-4 flex-shrink-0 bg-gray-50 border-l border-gray-200 hover:bg-blue-50 transition-colors flex items-center justify-center"
+            onClick={() => setRightCollapsed(false)}
+            title="Show Properties panel"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-50 bg-white border border-gray-300 border-r-0 rounded-l-lg shadow-md px-1.5 py-3 hover:bg-blue-50 hover:border-blue-300 transition-colors flex flex-col items-center gap-1"
           >
-            <span className="text-gray-400 text-[10px] select-none">{rightCollapsed ? '‹' : '›'}</span>
+            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+            </svg>
+            <span className="text-[9px] font-semibold text-gray-400 font-play uppercase tracking-wider" style={{ writingMode: 'vertical-rl' }}>
+              Properties
+            </span>
           </button>
-          {/* Panel content */}
-          <div className={`${rightCollapsed ? 'w-0' : ''} overflow-hidden transition-all duration-200`}>
-            {showPageSettings ? (
+        )}
+
+        {/* ─── RIGHT PANEL: Properties / Page Settings ─── */}
+        <div className={`${rightCollapsed ? 'w-0' : ''} flex-shrink-0 overflow-hidden transition-all duration-200`}>
+          {showPageSettings ? (
+            <div className="relative">
+              <button
+                onClick={() => setRightCollapsed(true)}
+                title="Collapse panel"
+                className="absolute top-2 right-2 z-10 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                </svg>
+              </button>
               <PageSettingsPanel
                 pageSettings={page.pageSettings || {}}
                 onUpdate={updatePageSettings}
                 onClose={() => setShowPageSettings(false)}
               />
-            ) : selectedComponent ? (
+            </div>
+          ) : selectedComponent ? (
+            <div className="relative">
+              <button
+                onClick={() => setRightCollapsed(true)}
+                title="Collapse panel"
+                className="absolute top-2 right-2 z-10 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                </svg>
+              </button>
               <EditorPropertiesPanel
                 key={`${selectedComponent.id}-${propertiesInitialTab}`}
                 component={selectedComponent}
@@ -648,19 +692,28 @@ ${canvasHTML}
                 onClose={() => { setSelectedComponentId(null); setPropertiesInitialTab('content') }}
                 initialTab={propertiesInitialTab}
               />
-            ) : (
-              <div className="w-72 bg-white border-l border-gray-200 flex flex-col items-center justify-center text-gray-400 p-6">
-                <div className="text-4xl mb-3">👆</div>
-                <p className="text-sm font-medium font-play text-center">Click a component to edit its properties</p>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setShowPageSettings(true) }}
-                  className="mt-4 px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs rounded-lg font-play font-medium hover:bg-indigo-100 transition-colors"
-                >
-                  Edit Page Background
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="w-72 bg-white border-l border-gray-200 flex flex-col items-center justify-center text-gray-400 p-6 relative">
+              <button
+                onClick={() => setRightCollapsed(true)}
+                title="Collapse panel"
+                className="absolute top-2 right-2 p-1.5 text-gray-300 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                </svg>
+              </button>
+              <div className="text-4xl mb-3">👆</div>
+              <p className="text-sm font-medium font-play text-center">Click a component to edit its properties</p>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowPageSettings(true) }}
+                className="mt-4 px-3 py-1.5 bg-indigo-50 text-indigo-600 text-xs rounded-lg font-play font-medium hover:bg-indigo-100 transition-colors"
+              >
+                Edit Page Background
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
