@@ -313,49 +313,77 @@ export default function PreOrderPosterPage() {
 
   const handleExportToWhatsApp = async () => {
     if (!itemDescription || !preOrderPrice) return
+
     const code = shortCode || editId || ''
-    const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-    const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\n📋 BOOK NOW: ${bookUrl}`
-
-    // On mobile, use the native share sheet (shares image + text directly to WhatsApp).
-    // On desktop, the native share API shows the OS share dialog which often fails —
-    // so always use WhatsApp URL + image download on desktop.
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    const canNativeShare = isMobile && !!(navigator.share && navigator.canShare)
-
-    if (!canNativeShare) {
-      // Desktop: open WhatsApp NOW (synchronous, gesture still active), then download image below
-      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+    if (!code) {
+      alert('Save the poster first to generate a booking link.')
+      return
     }
 
-    // Generate the poster image
+    const bookUrl = `${BOOK_NOW_URL}/${code}`
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+    // Desktop: open WhatsApp NOW with the booking link (synchronous — preserves user gesture).
+    // WhatsApp shows the poster as an OG image preview; tapping opens the booking page.
+    if (!isMobile) {
+      window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
+    }
+
     if (!posterRef.current) return
     setSendingWhatsapp(true)
+
     try {
-      const canvas = await html2canvas(posterRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true, allowTaint: true })
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92))
+      // Render the poster to a JPEG
+      const canvas = await html2canvas(posterRef.current, {
+        backgroundColor: '#ffffff', scale: 2, useCORS: true, allowTaint: true,
+      })
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
+      )
       if (!blob) return
 
-      const file = new File([blob], `R66SLOT-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
+      const posterFile = new File([blob], `R66SLOT-${sku || code}.jpg`, { type: 'image/jpeg' })
 
-      if (canNativeShare && navigator.canShare({ files: [file] })) {
-        // Mobile: native share sheet — shares image + text together (WhatsApp, etc.)
-        await navigator.share({ files: [file], title: `R66SLOT – ${itemDescription}`, text: shareText })
-      } else {
-        // Desktop: WhatsApp already opened above — now auto-download the poster image
-        // so the user can attach it to the WhatsApp message
+      // Upload the rendered poster to R2 and save it as posterImageUrl on the poster record.
+      // This makes the booking page OG preview show the actual poster image in WhatsApp.
+      if (editId) {
+        try {
+          const formData = new FormData()
+          formData.append('file', posterFile)
+          const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
+          if (uploadRes.ok) {
+            const { url: posterImageUrl } = await uploadRes.json()
+            await fetch('/api/admin/slotcar-orders', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: editId, posterImageUrl }),
+            })
+          }
+        } catch (uploadErr) {
+          console.warn('Poster upload failed (non-fatal):', uploadErr)
+        }
+      }
+
+      if (isMobile && navigator.share && navigator.canShare?.({ files: [posterFile] })) {
+        // Mobile: native share sheet — sends poster image directly to WhatsApp
+        await navigator.share({ files: [posterFile], title: `R66SLOT – ${itemDescription}`, text: bookUrl })
+      } else if (!isMobile) {
+        // Desktop: auto-download the poster image (WhatsApp already opened above)
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `R66SLOT-${sku || 'poster'}.jpg`
+        a.download = posterFile.name
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
+      } else {
+        // Mobile without native share: open WhatsApp with booking link
+        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
       }
     } catch (err) {
       if ((err as Error)?.name !== 'AbortError') {
-        console.error('WhatsApp image export failed:', err)
+        console.error('WhatsApp export failed:', err)
       }
     } finally {
       setSendingWhatsapp(false)
@@ -884,6 +912,9 @@ export default function PreOrderPosterPage() {
                     <a href={bookingLink} target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-black text-white text-center font-bold font-play rounded-lg hover:bg-gray-800 transition-colors">
                       BOOK NOW →
                     </a>
+                    {(shortCode || editId) && (
+                      <p className="text-xs text-center text-gray-500 font-play font-mono">{bookingLink.replace('https://', '')}</p>
+                    )}
                     <p className="text-xs text-center text-gray-400 font-play">R66SLOT – Premium Slot Cars</p>
                   </div>
                 </div>
