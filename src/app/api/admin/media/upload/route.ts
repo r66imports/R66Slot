@@ -63,9 +63,11 @@ export async function POST(request: Request) {
       fileName,
     })
   } catch (error: any) {
-    console.error('Error uploading file:', error)
+    const code = error?.Code || error?.code || error?.name || 'unknown'
+    const msg = error?.message || 'Failed to upload file'
+    console.error(`[R2-UPLOAD-ERROR] code=${code} msg=${msg}`)
     return NextResponse.json(
-      { error: error?.message || 'Failed to upload file' },
+      { error: `R2 error (${code}): ${msg}` },
       { status: 500 }
     )
   }
