@@ -1,6 +1,13 @@
 'use client'
 
+import { usePathname } from 'next/navigation'
+
 export function WhatsAppButton() {
+  const pathname = usePathname()
+
+  // Hide on editor and admin pages
+  if (pathname?.startsWith('/r66-editor') || pathname?.startsWith('/admin')) return null
+
   const whatsappNumber = '27615898921'
   const message = 'Hi! I have a question about your slot cars.'
 
