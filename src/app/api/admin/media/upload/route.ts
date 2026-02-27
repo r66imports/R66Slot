@@ -4,6 +4,22 @@ import { r2Upload } from '@/lib/r2-storage'
 
 export async function POST(request: Request) {
   try {
+    // Check R2 env vars are present before attempting upload
+    const missingVars = [
+      'CLOUDFLARE_R2_ACCOUNT_ID',
+      'CLOUDFLARE_R2_ACCESS_KEY_ID',
+      'CLOUDFLARE_R2_SECRET_ACCESS_KEY',
+      'CLOUDFLARE_R2_BUCKET_NAME',
+      'CLOUDFLARE_R2_PUBLIC_URL',
+    ].filter(v => !process.env[v])
+
+    if (missingVars.length > 0) {
+      return NextResponse.json(
+        { error: `Missing Railway variables: ${missingVars.join(', ')}. Add these in Railway → Variables.` },
+        { status: 500 }
+      )
+    }
+
     const formData = await request.formData()
     const file = formData.get('file') as File
 
