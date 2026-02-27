@@ -1108,6 +1108,22 @@ function ContentTab({
             <label htmlFor="btn-full-width" className="text-xs font-medium text-gray-500 font-play">Full width</label>
           </div>
 
+          {/* Min Width — lock a minimum size so buttons don't shrink on short text */}
+          {!component.settings.fullWidth && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">
+                Min Width <span className="font-normal text-gray-400">(e.g. 120px)</span>
+              </label>
+              <input
+                type="text"
+                value={(component.settings.minWidth as string) || ''}
+                onChange={(e) => updateSetting('minWidth', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+                placeholder="e.g. 140px"
+              />
+            </div>
+          )}
+
           {/* Button Icon */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Icon (optional)</label>

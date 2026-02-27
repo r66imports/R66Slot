@@ -328,6 +328,9 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       const btnIconPos = (settings.iconPosition as string) || 'right'
       const btnFullWidth = !!settings.fullWidth
       const btnNewTab = !!settings.openInNewTab
+      // Freeform buttons fill their container so the editor size is preserved on the live site
+      const isFreeformBtn = component.positionMode === 'absolute'
+      const btnMinWidth = (settings.minWidth as string) || ''
 
       const variantClasses: Record<string, string> = {
         primary: 'bg-primary text-black hover:brightness-110',
@@ -350,12 +353,13 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
 
       return (
         <div style={containerStyle}>
-          <div className={`container mx-auto flex ${btnJustifyClass}`}>
+          <div className={`${isFreeformBtn ? 'w-full h-full' : `container mx-auto flex ${btnJustifyClass}`}`}>
             <Link
               href={(settings.link as string) || '#'}
               target={btnNewTab ? '_blank' : undefined}
               rel={btnNewTab ? 'noopener noreferrer' : undefined}
-              className={`inline-flex items-center gap-2 font-bold transition-all no-underline ${variantClasses[btnVariant] || variantClasses.primary} ${sizeClasses[btnSize] || sizeClasses.medium} ${shapeClasses[btnShape] || shapeClasses.rounded} ${btnFullWidth ? 'w-full justify-center' : ''}`}
+              className={`inline-flex items-center justify-center gap-2 font-bold transition-all no-underline ${variantClasses[btnVariant] || variantClasses.primary} ${sizeClasses[btnSize] || sizeClasses.medium} ${shapeClasses[btnShape] || shapeClasses.rounded} ${btnFullWidth || isFreeformBtn ? 'w-full' : ''}`}
+              style={btnMinWidth ? { minWidth: btnMinWidth } : undefined}
             >
               {btnIcon && btnIconPos === 'left' && <span>{btnIcon}</span>}
               {content || 'Button'}
