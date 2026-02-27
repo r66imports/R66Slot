@@ -75,6 +75,50 @@ async function ensureSchema() {
   await db.query(`CREATE INDEX IF NOT EXISTS idx_pages_slug ON pages(slug)`)
   await db.query(`CREATE INDEX IF NOT EXISTS idx_pages_published ON pages(published)`)
 
+  // Dedicated products table (replaces json_store blob)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      price NUMERIC(10,2) DEFAULT 0,
+      compare_at_price NUMERIC(10,2),
+      cost_per_item NUMERIC(10,2),
+      sku TEXT DEFAULT '',
+      barcode TEXT DEFAULT '',
+      brand TEXT DEFAULT '',
+      product_type TEXT DEFAULT '',
+      car_class TEXT DEFAULT '',
+      car_type TEXT DEFAULT '',
+      part_type TEXT DEFAULT '',
+      scale TEXT DEFAULT '',
+      supplier TEXT DEFAULT '',
+      collections JSONB DEFAULT '[]',
+      tags JSONB DEFAULT '[]',
+      quantity INTEGER DEFAULT 0,
+      track_quantity BOOLEAN DEFAULT TRUE,
+      weight NUMERIC(10,3),
+      weight_unit TEXT DEFAULT 'kg',
+      box_size TEXT DEFAULT '',
+      dimensions JSONB DEFAULT '{}',
+      eta TEXT DEFAULT '',
+      status TEXT DEFAULT 'draft',
+      image_url TEXT DEFAULT '',
+      images JSONB DEFAULT '[]',
+      page_id TEXT DEFAULT '',
+      page_url TEXT DEFAULT '',
+      seo JSONB DEFAULT '{}',
+      sage_item_code TEXT,
+      sage_last_synced TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await db.query(`CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku)`)
+  await db.query(`CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand)`)
+  await db.query(`CREATE INDEX IF NOT EXISTS idx_products_status ON products(status)`)
+  await db.query(`CREATE INDEX IF NOT EXISTS idx_products_sage ON products(sage_item_code)`)
+
   await db.query(`
     CREATE TABLE IF NOT EXISTS bidder_profiles (
       id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -407,6 +451,49 @@ async function seedCategories() {
 }
 
 // ---------------------------------------------------------------------------
+// Migrate products from json_store blob → products table (one-time, idempotent)
+// ---------------------------------------------------------------------------
+async function migrateProducts() {
+  const existing = await db.query(`SELECT COUNT(*) AS count FROM products`)
+  if (parseInt(existing.rows[0].count) > 0) return // already migrated
+
+  const blob = await db.query(`SELECT value FROM json_store WHERE key = 'data/products.json'`)
+  if (!blob.rows.length || !Array.isArray(blob.rows[0].value) || blob.rows[0].value.length === 0) return
+
+  const products = blob.rows[0].value
+  console.log(`📦  Migrating ${products.length} products from json_store → products table…`)
+
+  for (const p of products) {
+    await db.query(`
+      INSERT INTO products (
+        id, title, description, price, compare_at_price, cost_per_item,
+        sku, barcode, brand, product_type, car_class, car_type, part_type,
+        scale, supplier, collections, tags, quantity, track_quantity,
+        weight, weight_unit, box_size, dimensions, eta, status,
+        image_url, images, page_id, page_url, seo, created_at, updated_at
+      ) VALUES (
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
+        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32
+      ) ON CONFLICT (id) DO NOTHING
+    `, [
+      p.id || `prod-${Date.now()}`, p.title || '', p.description || '',
+      p.price || 0, p.compareAtPrice || null, p.costPerItem || null,
+      p.sku || '', p.barcode || '', p.brand || '', p.productType || '',
+      p.carClass || '', p.carType || '', p.partType || '', p.scale || '',
+      p.supplier || '',
+      JSON.stringify(p.collections || []), JSON.stringify(p.tags || []),
+      p.quantity || 0, p.trackQuantity !== false,
+      p.weight || null, p.weightUnit || 'kg', p.boxSize || '',
+      JSON.stringify(p.dimensions || {}), p.eta || '', p.status || 'draft',
+      p.imageUrl || '', JSON.stringify(p.images || []),
+      p.pageId || '', p.pageUrl || '', JSON.stringify(p.seo || {}),
+      p.createdAt || new Date().toISOString(), p.updatedAt || new Date().toISOString(),
+    ])
+  }
+  console.log(`✅  Migrated ${products.length} products`)
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -417,6 +504,7 @@ async function main() {
     await seedAdmin()
     await seedHomepage()
     await seedCategories()
+    await migrateProducts()
     console.log('\n✅  Railway init complete\n')
   } catch (err) {
     console.error('❌  Railway init failed:', err.message)
