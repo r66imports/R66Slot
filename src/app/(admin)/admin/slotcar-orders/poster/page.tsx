@@ -315,7 +315,8 @@ export default function PreOrderPosterPage() {
     if (!itemDescription || !preOrderPrice) return
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-    window.open(`https://wa.me/?text=${encodeURIComponent(`BOOK HERE: ${bookUrl}`)}`, '_blank')
+    const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\n📋 BOOK NOW: ${bookUrl}`
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
   }
 
   const handleExportToFacebook = async () => {
