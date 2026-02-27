@@ -224,7 +224,6 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                   width: '100%',
                   height: isFreeformImage ? '100%' : (styles.height || 'auto'),
                 }}
-                crossOrigin="anonymous"
                 loading="lazy"
                 onError={(e) => {
                   const img = e.target as HTMLImageElement
