@@ -18,6 +18,8 @@ function rowToPage(row: any): Page {
 }
 
 // Convert Page object -> DB row for insert/update
+// JSONB fields must be JSON.stringified — node-postgres treats plain JS arrays
+// as PostgreSQL arrays (not JSON), which fails for JSONB columns.
 function pageToRow(page: Page) {
   return {
     id: page.id,
@@ -25,9 +27,9 @@ function pageToRow(page: Page) {
     slug: page.slug,
     published: page.published,
     is_website_page: page.isWebsitePage ?? false,
-    components: page.components,
-    page_settings: page.pageSettings ?? {},
-    seo: page.seo,
+    components: JSON.stringify(page.components ?? []),
+    page_settings: JSON.stringify(page.pageSettings ?? {}),
+    seo: JSON.stringify(page.seo ?? {}),
     created_at: page.createdAt,
     updated_at: page.updatedAt,
   }
