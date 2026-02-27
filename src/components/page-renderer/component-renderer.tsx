@@ -143,12 +143,6 @@ interface ComponentRendererProps {
 }
 
 export function ComponentRenderer({ component }: ComponentRendererProps) {
-  // Hidden components are invisible on the live site
-  if (component.hidden) return null
-
-  // The real header is provided by the layout — skip embedded header components
-  if (component.type === 'header') return null
-
   const { type, content, styles, settings, children } = component
   const animation = (settings.animation as AnimationType) || 'none'
   const animDuration = parseFloat(String(settings.animationDuration || '0.6'))
@@ -212,6 +206,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       const menuItems = menuItemsStr.split(',').map(s => s.trim())
       const menuLinks = menuLinksStr.split(',').map(s => s.trim())
       const bgColor = styles.backgroundColor || '#1F2937'
+      const iconColor = styles.textColor || '#FFFFFF'
       return (
         <header style={{
           backgroundColor: bgColor,
@@ -220,28 +215,39 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '0 24px',
-          color: styles.textColor || '#FFFFFF',
+          color: iconColor,
           width: '100%',
         }}>
-          <div style={{ fontSize: '24px', fontWeight: 700 }}>
-            <span style={{ color: '#ffffff' }}>{logoText.substring(0, 3)}</span>
-            <span style={{ color: '#DC2626' }}>{logoText.substring(3)}</span>
-          </div>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <div style={{ fontSize: '24px', fontWeight: 700 }}>
+              <span style={{ color: '#ffffff' }}>{logoText.substring(0, 3)}</span>
+              <span style={{ color: '#DC2626' }}>{logoText.substring(3)}</span>
+            </div>
+          </Link>
           <nav style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
             {menuItems.map((item, i) => (
               <Link
                 key={i}
                 href={menuLinks[i] || '#'}
-                style={{ color: styles.textColor || '#FFFFFF', fontSize: '14px', textDecoration: 'none', opacity: 0.9 }}
+                style={{ color: iconColor, fontSize: '14px', textDecoration: 'none', opacity: 0.9 }}
               >
                 {item}
               </Link>
             ))}
           </nav>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {/* Search */}
+            <Link href="/products" aria-label="Search" style={{ color: iconColor, display: 'flex', padding: '8px' }}>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            </Link>
+            {/* Account */}
+            <Link href="/account" aria-label="Account" style={{ color: iconColor, display: 'flex', padding: '8px' }}>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </Link>
+            {/* Cart */}
+            <Link href="/cart" aria-label="Cart" style={{ color: iconColor, display: 'flex', padding: '8px' }}>
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+            </Link>
           </div>
         </header>
       )
