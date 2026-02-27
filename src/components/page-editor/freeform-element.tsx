@@ -233,9 +233,11 @@ export function FreeformElement({
       newPosition.heightPercent = newHeight
     }
 
-    // Clamp to valid range
+    // Clamp to valid range — keep element fully within container
     newPosition.xPercent = Math.max(0, Math.min(100 - newPosition.widthPercent, newPosition.xPercent))
-    newPosition.yPercent = Math.max(0, newPosition.yPercent)
+    newPosition.yPercent = Math.max(0, Math.min(100 - newPosition.heightPercent, newPosition.yPercent))
+    newPosition.widthPercent = Math.min(newPosition.widthPercent, 100 - newPosition.xPercent)
+    newPosition.heightPercent = Math.min(newPosition.heightPercent, 100 - newPosition.yPercent)
 
     if (snapEnabled) {
       newPosition = snapToPercentageGrid(newPosition, gridPercent)

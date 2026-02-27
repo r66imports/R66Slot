@@ -284,7 +284,7 @@ export function applyDragDelta(
   return {
     ...current,
     xPercent: Math.max(0, Math.min(100 - current.widthPercent, current.xPercent + deltaXPercent)),
-    yPercent: Math.max(0, current.yPercent + deltaYPercent),
+    yPercent: Math.max(0, Math.min(100 - current.heightPercent, current.yPercent + deltaYPercent)),
   }
 }
 
