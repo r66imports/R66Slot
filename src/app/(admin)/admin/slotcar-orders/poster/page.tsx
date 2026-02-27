@@ -450,7 +450,8 @@ export default function PreOrderPosterPage() {
     if (sku) params.set('sku', sku)
     if (brand) params.set('brand', brand)
     if (availableQty) params.set('quantity', availableQty.toString())
-    if (imageUrl) params.set('imageUrl', imageUrl)
+    // Skip base64 data URIs — they're too large for a URL and Cloudflare rejects with 400
+    if (imageUrl && !imageUrl.startsWith('data:')) params.set('imageUrl', imageUrl)
     return `/admin/products/new?${params.toString()}`
   })()
 
