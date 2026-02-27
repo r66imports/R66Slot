@@ -311,12 +311,40 @@ export default function PreOrderPosterPage() {
     }
   }
 
-  const handleExportToWhatsApp = () => {
+  const handleExportToWhatsApp = async () => {
     if (!itemDescription || !preOrderPrice) return
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
     const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\n📋 BOOK NOW: ${bookUrl}`
+
+    // Open WhatsApp FIRST — must be synchronous before any await or popup blocker fires
     window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+
+    // Render the poster and upload it as posterImageUrl so WhatsApp shows the
+    // full poster card as the OG preview when the recipient views the message
+    if (!posterRef.current || !editId) return
+    try {
+      const canvas = await html2canvas(posterRef.current, {
+        backgroundColor: '#ffffff', scale: 2, useCORS: true, allowTaint: true,
+      })
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
+      )
+      if (!blob) return
+      const formData = new FormData()
+      formData.append('file', new File([blob], `poster-${code}.jpg`, { type: 'image/jpeg' }))
+      const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
+      if (uploadRes.ok) {
+        const { url: posterImageUrl } = await uploadRes.json()
+        await fetch('/api/admin/slotcar-orders', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editId, posterImageUrl }),
+        })
+      }
+    } catch (err) {
+      console.warn('Poster upload failed (non-fatal):', err)
+    }
   }
 
   const handleExportToFacebook = async () => {
