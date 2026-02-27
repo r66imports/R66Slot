@@ -37,6 +37,7 @@ export default function MediaLibraryPage() {
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [moveTarget, setMoveTarget] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
+  const [uploadError, setUploadError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load media library on mount
@@ -87,15 +88,18 @@ export default function MediaLibraryPage() {
     const selectedFiles = e.target.files
     if (!selectedFiles) return
     setUploading(true)
+    setUploadError('')
 
     const newFiles: MediaFile[] = []
+    const errors: string[] = []
+
     for (const file of Array.from(selectedFiles)) {
       try {
         const formData = new FormData()
         formData.append('file', file)
         const res = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
+        const data = await res.json()
         if (res.ok) {
-          const data = await res.json()
           newFiles.push({
             id: `media-${Date.now()}-${Math.random().toString(36).substring(7)}`,
             name: file.name,
@@ -105,9 +109,11 @@ export default function MediaLibraryPage() {
             folder: activeFolder === 'All Files' ? 'All Files' : activeFolder,
             uploadedAt: new Date().toISOString(),
           })
+        } else {
+          errors.push(`${file.name}: ${data.error || 'Upload failed'}`)
         }
-      } catch (err) {
-        console.error('Upload failed:', err)
+      } catch (err: any) {
+        errors.push(`${file.name}: ${err?.message || 'Network error'}`)
       }
     }
 
@@ -115,6 +121,10 @@ export default function MediaLibraryPage() {
       const updated = { ...library, files: [...newFiles, ...library.files] }
       setLibrary(updated)
       await saveLibrary(updated)
+    }
+
+    if (errors.length > 0) {
+      setUploadError(errors.join('\n'))
     }
 
     setUploading(false)
@@ -247,6 +257,14 @@ export default function MediaLibraryPage() {
           />
         </div>
       </div>
+
+      {uploadError && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm font-medium text-red-700 mb-1">Upload failed:</p>
+          <pre className="text-xs text-red-600 whitespace-pre-wrap">{uploadError}</pre>
+          <button onClick={() => setUploadError('')} className="mt-2 text-xs text-red-500 hover:underline">Dismiss</button>
+        </div>
+      )}
 
       <div className="flex gap-6">
         {/* Sidebar - Folders */}
