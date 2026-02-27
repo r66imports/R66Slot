@@ -101,8 +101,8 @@ CREATE TABLE auction_payments (
   bidder_id             UUID NOT NULL REFERENCES bidder_profiles(id),
   amount                DECIMAL(10,2) NOT NULL,
   currency              TEXT DEFAULT 'ZAR',
-  stripe_payment_intent TEXT,
-  stripe_session_id     TEXT,
+  payfast_payment_id    TEXT,  -- PayFast pf_payment_id from ITN
+  payfast_session_id    TEXT,  -- reserved for future use
   status                payment_status DEFAULT 'pending',
   paid_at               TIMESTAMPTZ,
   created_at            TIMESTAMPTZ DEFAULT NOW(),

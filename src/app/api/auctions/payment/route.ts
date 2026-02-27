@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSupabaseAdmin } from '@/lib/supabase/server'
 import { getBidderFromRequest } from '@/lib/auction/auth'
-import { createAuctionCheckoutSession } from '@/lib/stripe/auction-checkout'
+import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { buildPayFastParams, PAYFAST_URL } from '@/lib/payfast/client'
 
-// POST - Create Stripe checkout session for won auction
+// POST — generate PayFast payment form params for a won auction
 export async function POST(request: NextRequest) {
   try {
     const bidder = await getBidderFromRequest()
@@ -24,10 +24,13 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!auction) {
-      return NextResponse.json({ error: 'Auction not found or you are not the winner' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Auction not found or you are not the winner' },
+        { status: 404 }
+      )
     }
 
-    // Check if payment already exists
+    // Check if already paid
     const { data: existingPayment } = await supabase
       .from('auction_payments')
       .select('*')
@@ -39,32 +42,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Payment already completed' }, { status: 400 })
     }
 
-    const origin = new URL(request.url).origin
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.r66slot.co.za'
+    const mPaymentId = existingPayment?.id || auctionId
 
-    const session = await createAuctionCheckoutSession({
-      auctionId: auction.id,
-      auctionTitle: auction.title,
-      amount: auction.current_price,
-      bidderEmail: bidder.email,
-      successUrl: `${origin}/account/auctions/won?payment=success`,
-      cancelUrl: `${origin}/account/auctions/won?payment=cancelled`,
+    const params = buildPayFastParams({
+      returnUrl: `${siteUrl}/account/auctions/won?payment=success`,
+      cancelUrl: `${siteUrl}/account/auctions/payment/${auctionId}?payment=cancelled`,
+      notifyUrl: `${siteUrl}/api/auctions/payment/notify`,
+      nameFirst: bidder.display_name || bidder.email.split('@')[0],
+      emailAddress: bidder.email,
+      mPaymentId,
+      amount: Number(auction.current_price),
+      itemName: auction.title.slice(0, 100),
+      itemDescription: `Won auction #${auctionId.slice(-8).toUpperCase()}`,
     })
 
-    // Update payment record with Stripe session ID
+    // Mark payment as processing
     if (existingPayment) {
       await supabase
         .from('auction_payments')
-        .update({
-          stripe_session_id: session.id,
-          status: 'processing',
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status: 'processing', updated_at: new Date().toISOString() })
         .eq('id', existingPayment.id)
     }
 
-    return NextResponse.json({ url: session.url })
-  } catch (error) {
-    console.error('Error creating checkout session:', error)
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
+    return NextResponse.json({ url: PAYFAST_URL, params })
+  } catch (error: any) {
+    console.error('[payment] error:', error?.message || error)
+    return NextResponse.json({ error: 'Failed to create payment' }, { status: 500 })
   }
 }

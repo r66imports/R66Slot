@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, useRef, use } from 'react'
 import type { Auction } from '@/types/auction'
 import { formatPrice } from '@/lib/auction/helpers'
 
@@ -9,6 +9,9 @@ export default function AuctionPaymentPage({ params }: { params: Promise<{ aucti
   const [auction, setAuction] = useState<Auction | null>(null)
   const [loading, setLoading] = useState(true)
   const [paying, setPaying] = useState(false)
+  const [error, setError] = useState('')
+  const [payfastData, setPayfastData] = useState<{ url: string; params: Record<string, string> } | null>(null)
+  const formRef = useRef<HTMLFormElement>(null)
 
   useEffect(() => {
     fetch(`/api/auctions/${auctionId}`)
@@ -18,8 +21,16 @@ export default function AuctionPaymentPage({ params }: { params: Promise<{ aucti
       .finally(() => setLoading(false))
   }, [auctionId])
 
+  // Auto-submit the hidden PayFast form once data is ready
+  useEffect(() => {
+    if (payfastData && formRef.current) {
+      formRef.current.submit()
+    }
+  }, [payfastData])
+
   const handlePayment = async () => {
     setPaying(true)
+    setError('')
     try {
       const res = await fetch('/api/auctions/payment', {
         method: 'POST',
@@ -29,14 +40,21 @@ export default function AuctionPaymentPage({ params }: { params: Promise<{ aucti
 
       const data = await res.json()
 
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        alert(data.error || 'Failed to create payment session')
+      if (!res.ok) {
+        setError(data.error || 'Failed to create payment session')
+        setPaying(false)
+        return
       }
-    } catch (error) {
-      alert('Failed to start payment')
-    } finally {
+
+      if (data.url && data.params) {
+        setPayfastData({ url: data.url, params: data.params })
+        // form auto-submits via useEffect above
+      } else {
+        setError('Invalid payment response')
+        setPaying(false)
+      }
+    } catch {
+      setError('Failed to start payment')
       setPaying(false)
     }
   }
@@ -81,18 +99,38 @@ export default function AuctionPaymentPage({ params }: { params: Promise<{ aucti
           </div>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm font-play">
+            {error}
+          </div>
+        )}
+
         <button
           onClick={handlePayment}
           disabled={paying}
           className="w-full py-3 bg-primary text-secondary rounded-md font-play font-bold text-lg hover:bg-primary/90 disabled:opacity-50"
         >
-          {paying ? 'Redirecting to payment...' : `Pay ${formatPrice(auction.current_price)}`}
+          {paying ? 'Redirecting to PayFast...' : `Pay ${formatPrice(auction.current_price)}`}
         </button>
 
         <p className="text-xs text-gray-400 font-play mt-3 text-center">
-          You'll be redirected to Stripe for secure payment
+          You'll be redirected to PayFast for secure payment
         </p>
       </div>
+
+      {/* Hidden form that auto-submits to PayFast */}
+      {payfastData && (
+        <form
+          ref={formRef}
+          action={payfastData.url}
+          method="POST"
+          style={{ display: 'none' }}
+        >
+          {Object.entries(payfastData.params).map(([key, value]) => (
+            <input key={key} type="hidden" name={key} value={value} />
+          ))}
+        </form>
+      )}
     </div>
   )
 }
