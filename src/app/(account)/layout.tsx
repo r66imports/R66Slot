@@ -68,8 +68,8 @@ export default function AccountLayout({
                   Continue Shopping
                 </Link>
                 <button
-                  onClick={() => {
-                    // TODO: Implement logout
+                  onClick={async () => {
+                    await fetch('/api/auth/logout', { method: 'POST' })
                     window.location.href = '/account/login'
                   }}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50"
