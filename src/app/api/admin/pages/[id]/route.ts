@@ -38,25 +38,6 @@ function buildBrandPageTemplate(brandSlug: string, brandTitle: string): PageComp
   const ts = Date.now()
   return [
     {
-      id: `bp-header-${ts}`,
-      type: 'header',
-      content: '',
-      styles: {
-        backgroundColor: '#1F2937',
-        textColor: '#FFFFFF',
-        paddingTop: '0px',
-        paddingBottom: '0px',
-        paddingLeft: '32px',
-        paddingRight: '32px',
-        height: '64px',
-      },
-      settings: {
-        logoText: 'R66SLOT',
-        menuItems: 'Products,Brands,New Arrivals,Slotify Pre-Orders,About,Contact',
-        menuLinks: '/products,/brands,/collections/new-arrivals,/slotify-preorders,/about,/contact',
-      },
-    },
-    {
       id: `bp-hero-${ts}`,
       type: 'hero',
       content: '',
@@ -197,26 +178,6 @@ function buildCarsPageTemplate(brandSlug: string, brandTitle: string): PageCompo
   }
 
   return [
-    // Header
-    {
-      id: `cp-header-${ts}`,
-      type: 'header',
-      content: '',
-      styles: {
-        backgroundColor: '#1F2937',
-        textColor: '#FFFFFF',
-        paddingTop: '0px',
-        paddingBottom: '0px',
-        paddingLeft: '32px',
-        paddingRight: '32px',
-        height: '64px',
-      },
-      settings: {
-        logoText: 'R66SLOT',
-        menuItems: 'Products,Brands,New Arrivals,Slotify Pre-Orders,About,Contact',
-        menuLinks: '/products,/brands,/collections/new-arrivals,/slotify-preorders,/about,/contact',
-      },
-    },
     // Breadcrumb
     {
       id: `cp-breadcrumb-${ts}`,

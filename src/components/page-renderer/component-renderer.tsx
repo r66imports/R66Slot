@@ -143,6 +143,12 @@ interface ComponentRendererProps {
 }
 
 export function ComponentRenderer({ component }: ComponentRendererProps) {
+  // Hidden components are invisible on the live site
+  if (component.hidden) return null
+
+  // The real header is provided by the layout — skip embedded header components
+  if (component.type === 'header') return null
+
   const { type, content, styles, settings, children } = component
   const animation = (settings.animation as AnimationType) || 'none'
   const animDuration = parseFloat(String(settings.animationDuration || '0.6'))

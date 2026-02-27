@@ -19,8 +19,8 @@ export default async function HomePage() {
   // If we have stored homepage data, render it dynamically
   if (homepageData && homepageData.components) {
     const ps: PageSettings = homepageData.pageSettings || {}
-    const flowComponents = homepageData.components.filter((c: any) => c.positionMode !== 'absolute')
-    const absoluteComponents = homepageData.components.filter((c: any) => c.positionMode === 'absolute')
+    const flowComponents = homepageData.components.filter((c: any) => c.positionMode !== 'absolute' && !c.hidden && c.type !== 'header')
+    const absoluteComponents = homepageData.components.filter((c: any) => c.positionMode === 'absolute' && !c.hidden)
 
     // Check if we have a hero as the first component
     const hasHero = flowComponents.length > 0 && flowComponents[0].type === 'hero'

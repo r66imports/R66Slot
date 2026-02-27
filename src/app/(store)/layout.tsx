@@ -1,3 +1,4 @@
+import { DynamicHeader } from '@/components/layout/header/dynamic-header'
 import { Footer } from '@/components/layout/footer'
 
 export default function StoreLayout({
@@ -7,7 +8,7 @@ export default function StoreLayout({
 }) {
   return (
     <>
-      {/* Header is now controlled through the page editor - add a 'header' component to your page */}
+      <DynamicHeader />
       <main className="min-h-screen">{children}</main>
       <Footer />
     </>
