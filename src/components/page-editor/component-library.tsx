@@ -444,18 +444,4 @@ export const COMPONENT_LIBRARY: {
       },
     },
   },
-  {
-    type: 'freeform-spacer',
-    label: 'Spacer',
-    icon: '⬜',
-    defaultProps: {
-      content: '',
-      styles: {},
-      settings: {},
-      positionMode: 'absolute',
-      normalizedPosition: {
-        desktop: { xPercent: 40, yPercent: 40, widthPercent: 20, heightPercent: 10, zIndex: 5, rotation: 0 },
-      },
-    },
-  },
 ]

@@ -12,6 +12,7 @@ import { TemplateChooser } from './template-chooser'
 import { ResizableBox } from '@/components/editor/ResizableBox'
 import { LayersPanel } from './layers-panel'
 import { FreeformElement } from './freeform-element'
+import { SpacingGuides } from './spacing-guides'
 import type { ResponsivePositionData } from '@/lib/editor/responsive-positioning'
 import Draggable, { type DraggableData, type DraggableEvent } from 'react-draggable'
 import {
@@ -57,7 +58,6 @@ const COMPONENT_LIBRARY = [
   { type: 'media' as const, label: 'Media', icon: '🎨', desc: 'Image/video media block' },
   { type: 'header' as const, label: 'Header Menu', icon: '🧭', desc: 'Navigation header bar' },
   { type: 'booking-form' as const, label: 'Booking Form', icon: '📋', desc: 'Pre-order booking form with qty' },
-  { type: 'freeform-spacer' as const, label: 'Spacer', icon: '⬜', desc: 'Invisible spacing guide (editor only)' },
 ]
 
 const SNAP_SIZE = 20
@@ -94,6 +94,7 @@ export function R66Editor({ pageId }: R66EditorProps) {
   const [snapEnabled, setSnapEnabled] = useState(true)
   const [showGrid, setShowGrid] = useState(false)
   const [leftTab, setLeftTab] = useState<'components' | 'layers'>('components')
+  const [draggingFreeformId, setDraggingFreeformId] = useState<string | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; componentId: string } | null>(null)
   const [propertiesInitialTab, setPropertiesInitialTab] = useState<'content' | 'style' | 'settings'>('content')
@@ -575,7 +576,6 @@ ${canvasHTML}
                         setContextMenu({ x: e.clientX, y: e.clientY, componentId: component.id })
                       }}
                       onPositionChange={(normalizedPosition: ResponsivePositionData) => {
-                        // Save normalized percentage-based position
                         updateComponent(component.id, { normalizedPosition })
                       }}
                       onUpdateSettings={(key, value) => {
@@ -583,8 +583,17 @@ ${canvasHTML}
                           settings: { ...component.settings, [key]: value }
                         })
                       }}
+                      onDragStateChange={setDraggingFreeformId}
                     />
                   ))}
+
+                  {/* Spacing guides overlay — shows pixel gaps between elements while dragging */}
+                  <SpacingGuides
+                    draggingId={draggingFreeformId}
+                    components={absoluteComponents}
+                    breakpoint={viewMode}
+                    canvasRef={canvasRef}
+                  />
                 </>
               )}
             </div>

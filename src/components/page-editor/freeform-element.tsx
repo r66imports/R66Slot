@@ -36,6 +36,7 @@ interface FreeformElementProps {
   onContextMenu?: (e: React.MouseEvent) => void
   onPositionChange: (normalizedPosition: ResponsivePositionData) => void
   onUpdateSettings?: (key: string, value: any) => void
+  onDragStateChange?: (id: string | null) => void
 }
 
 const RESIZE_HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'] as const
@@ -57,6 +58,7 @@ export function FreeformElement({
   onContextMenu,
   onPositionChange,
   onUpdateSettings,
+  onDragStateChange,
 }: FreeformElementProps) {
   const elementRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
@@ -192,7 +194,8 @@ export function FreeformElement({
     setIsDragging(true)
     setStartPos({ x: e.clientX, y: e.clientY })
     setStartNormalized({ ...currentPosition })
-  }, [isSelected, isResizing, currentPosition, getContainerDimensions, detectSectionBounds])
+    onDragStateChange?.(component.id)
+  }, [isSelected, isResizing, currentPosition, getContainerDimensions, detectSectionBounds, onDragStateChange, component.id])
 
   const handleDragMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !startNormalized) return
@@ -216,7 +219,8 @@ export function FreeformElement({
   const handleDragEnd = useCallback(() => {
     setIsDragging(false)
     setStartNormalized(null)
-  }, [])
+    onDragStateChange?.(null)
+  }, [onDragStateChange])
 
   // ─── Resize Handling ───
   const handleResizeStart = useCallback((e: React.MouseEvent, handle: ResizeHandle) => {
