@@ -342,6 +342,27 @@ export function snapToPercentageGrid(
   }
 }
 
+/**
+ * Snap a position to a pixel-based grid.
+ * More intuitive than percentage snapping — e.g. snap every 10px.
+ */
+export function snapToPixelGrid(
+  position: NormalizedPosition,
+  pixelGrid: number = 10,
+  canvasWidth: number,
+  canvasHeight: number
+): NormalizedPosition {
+  const snapX = (pixelGrid / canvasWidth) * 100
+  const snapY = (pixelGrid / canvasHeight) * 100
+  return {
+    ...position,
+    xPercent: Math.round(position.xPercent / snapX) * snapX,
+    yPercent: Math.round(position.yPercent / snapY) * snapY,
+    widthPercent: Math.max(snapX, Math.round(position.widthPercent / snapX) * snapX),
+    heightPercent: Math.max(snapY, Math.round(position.heightPercent / snapY) * snapY),
+  }
+}
+
 // ─── Alignment Helpers ───
 
 /**

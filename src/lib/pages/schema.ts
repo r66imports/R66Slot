@@ -35,6 +35,7 @@ export interface PageComponent {
     | 'columns'
     | 'header'
     | 'booking-form'
+    | 'freeform-spacer'
   content: string
   styles: {
     backgroundColor?: string

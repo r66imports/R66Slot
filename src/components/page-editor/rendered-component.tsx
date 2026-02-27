@@ -585,6 +585,27 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
         </div>
       )
 
+    case 'freeform-spacer':
+      // Visible guide in editor, invisible on live site
+      if (isEditing) {
+        return (
+          <div
+            className="w-full h-full flex items-center justify-center pointer-events-none select-none"
+            style={{
+              backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(99,102,241,0.15) 6px, rgba(99,102,241,0.15) 7px)',
+              border: '1.5px dashed rgba(99,102,241,0.5)',
+              borderRadius: '2px',
+            }}
+          >
+            <span className="text-indigo-400 text-xs font-mono opacity-70 bg-white/70 px-1.5 py-0.5 rounded">
+              spacer
+            </span>
+          </div>
+        )
+      }
+      // On live site: nothing
+      return <></>
+
     case 'product-grid':
       return (
         <div style={containerStyle}>

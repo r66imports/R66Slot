@@ -14,7 +14,7 @@ import {
   normalizedToPixels,
   applyDragDelta,
   applyResizeDelta,
-  snapToPercentageGrid,
+  snapToPixelGrid,
   calculateZoomScale,
 } from '@/lib/editor/responsive-positioning'
 import {
@@ -31,7 +31,7 @@ interface FreeformElementProps {
   breakpoint: Breakpoint
   isSelected: boolean
   snapEnabled?: boolean
-  gridPercent?: number
+  snapPixels?: number
   onSelect: () => void
   onContextMenu?: (e: React.MouseEvent) => void
   onPositionChange: (normalizedPosition: ResponsivePositionData) => void
@@ -52,7 +52,7 @@ export function FreeformElement({
   breakpoint,
   isSelected,
   snapEnabled = true,
-  gridPercent = 5,
+  snapPixels = 10,
   onSelect,
   onContextMenu,
   onPositionChange,
@@ -207,11 +207,11 @@ export function FreeformElement({
     let newPosition = applyDragDelta(startNormalized, deltaX, deltaY, width, height, sectionBoundsRef.current)
 
     if (snapEnabled) {
-      newPosition = snapToPercentageGrid(newPosition, gridPercent)
+      newPosition = snapToPixelGrid(newPosition, snapPixels, containerRef.current.width, containerRef.current.height)
     }
 
     savePosition(newPosition)
-  }, [isDragging, startNormalized, startPos, snapEnabled, gridPercent, savePosition])
+  }, [isDragging, startNormalized, startPos, snapEnabled, snapPixels, savePosition])
 
   const handleDragEnd = useCallback(() => {
     setIsDragging(false)
@@ -279,11 +279,11 @@ export function FreeformElement({
     newPosition.heightPercent = Math.min(newPosition.heightPercent, yMax - newPosition.yPercent)
 
     if (snapEnabled) {
-      newPosition = snapToPercentageGrid(newPosition, gridPercent)
+      newPosition = snapToPixelGrid(newPosition, snapPixels, containerRef.current.width, containerRef.current.height)
     }
 
     savePosition(newPosition)
-  }, [isResizing, activeHandle, startNormalized, startPos, snapEnabled, gridPercent, savePosition])
+  }, [isResizing, activeHandle, startNormalized, startPos, snapEnabled, snapPixels, savePosition])
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false)
@@ -381,13 +381,19 @@ export function FreeformElement({
         </>
       )}
 
-      {/* Position Info (when selected) */}
-      {isSelected && (
-        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-0.5 rounded whitespace-nowrap font-mono">
-          {currentPosition.xPercent.toFixed(1)}%, {currentPosition.yPercent.toFixed(1)}% |{' '}
-          {currentPosition.widthPercent.toFixed(1)}% x {currentPosition.heightPercent.toFixed(1)}%
-        </div>
-      )}
+      {/* Position Info (when selected) — displayed in pixels */}
+      {isSelected && (() => {
+        const canvas = DESIGN_CANVAS[breakpoint]
+        const x = Math.round(currentPosition.xPercent / 100 * canvas.width)
+        const y = Math.round(currentPosition.yPercent / 100 * canvas.height)
+        const w = Math.round(currentPosition.widthPercent / 100 * canvas.width)
+        const h = Math.round(currentPosition.heightPercent / 100 * canvas.height)
+        return (
+          <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-0.5 rounded whitespace-nowrap font-mono">
+            {x}px, {y}px | {w}×{h}px
+          </div>
+        )
+      })()}
     </div>
   )
 }

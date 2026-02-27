@@ -57,6 +57,7 @@ const COMPONENT_LIBRARY = [
   { type: 'media' as const, label: 'Media', icon: '🎨', desc: 'Image/video media block' },
   { type: 'header' as const, label: 'Header Menu', icon: '🧭', desc: 'Navigation header bar' },
   { type: 'booking-form' as const, label: 'Booking Form', icon: '📋', desc: 'Pre-order booking form with qty' },
+  { type: 'freeform-spacer' as const, label: 'Spacer', icon: '⬜', desc: 'Invisible spacing guide (editor only)' },
 ]
 
 const SNAP_SIZE = 20
@@ -560,7 +561,7 @@ ${canvasHTML}
                       breakpoint={viewMode}
                       isSelected={selectedComponentId === component.id}
                       snapEnabled={snapEnabled}
-                      gridPercent={5}
+                      snapPixels={10}
                       onSelect={() => {
                         setPropertiesInitialTab('content')
                         setSelectedComponentId(component.id)

@@ -164,9 +164,10 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
       styles: template.defaultProps.styles || {},
       settings: template.defaultProps.settings || {},
       children: template.defaultProps.children || [],
-      // preserve positionMode/position from template if provided
+      // preserve positionMode/position/normalizedPosition from template if provided
       positionMode: (template.defaultProps as any).positionMode || 'flow',
       position: (template.defaultProps as any).position,
+      normalizedPosition: (template.defaultProps as any).normalizedPosition,
     }
 
     const newComponents = [...page.components]
