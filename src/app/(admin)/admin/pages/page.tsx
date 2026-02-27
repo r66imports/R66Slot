@@ -350,6 +350,11 @@ export default function PagesManagementPage() {
 
   const normalizedQuery = normalizeSearch(searchQuery)
 
+  // Pages not assigned to any brand section — shown in Custom Pages
+  const unassignedPages = customPages.filter(
+    (p) => !BRAND_SECTIONS.some((s) => p[s.key])
+  )
+
   const searchResults = searchQuery.trim()
     ? allSearchablePages.filter(
         (p) =>
@@ -606,6 +611,15 @@ export default function PagesManagementPage() {
                           <Button
                             variant="outline"
                             size="sm"
+                            onClick={(e) => handleTogglePageGroup(e, page.id, section.key)}
+                            disabled={togglingIds.has(page.id)}
+                            className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                          >
+                            {togglingIds.has(page.id) ? '...' : 'Remove'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => handleDelete(page.id)}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
@@ -641,7 +655,17 @@ export default function PagesManagementPage() {
           </Button>
         </div>
 
-        {customPages.length === 0 ? (
+        {unassignedPages.length === 0 && customPages.length > 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-gray-400">
+              <div className="text-4xl mb-3">📄</div>
+              <p className="text-sm">All custom pages have been assigned to a brand section.</p>
+              <p className="text-xs mt-1">
+                Use the &ldquo;Remove&rdquo; button in any brand section to move a page back here.
+              </p>
+            </CardContent>
+          </Card>
+        ) : customPages.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
               <div className="text-6xl mb-4">📄</div>
@@ -656,7 +680,7 @@ export default function PagesManagementPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {customPages.map((page) => {
+            {unassignedPages.map((page) => {
               const pageColor = getPageColor(page)
               const colors = pageColor ? COLOR_MAP[pageColor] : null
               return (
@@ -768,8 +792,8 @@ export default function PagesManagementPage() {
                 <li>• Use drag & drop to rearrange sections and components</li>
                 <li>• Double-click any custom page name to rename it</li>
                 <li>• Create custom pages for landing pages, promotions, or special content</li>
-                <li>• Use the brand section buttons (NSR Pages, Revo Pages, etc.) to assign a page to that brand section</li>
-                <li>• A page can be assigned to multiple brand sections — it stays visible in Custom Pages too</li>
+                <li>• Use the brand section buttons (NSR Pages, Revo Pages, etc.) to move a page into that brand section</li>
+                <li>• Assigned pages are hidden from Custom Pages — use &ldquo;Remove&rdquo; in the brand section to move them back</li>
                 <li>• Use the search bar to quickly find pages by URL or name</li>
               </ul>
             </div>
