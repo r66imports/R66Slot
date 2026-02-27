@@ -45,7 +45,7 @@ export function EditorPropertiesPanel({
   ]
 
   return (
-    <div className="w-80 bg-white border-l border-gray-200 flex flex-col overflow-hidden h-full">
+    <div className="w-80 bg-white border-l border-gray-200 flex flex-col min-h-0 flex-1">
       {/* Header */}
       <div className="p-3 border-b border-gray-100 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-900 capitalize font-play">
