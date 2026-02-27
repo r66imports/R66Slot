@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "Modern headless ecommerce site for slot car enthusiasts",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
