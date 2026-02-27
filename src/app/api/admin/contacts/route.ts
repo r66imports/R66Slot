@@ -30,7 +30,7 @@ export interface Contact {
   deliveryPudoLocker: boolean
   deliveryPostnetAramex: boolean
   // Meta
-  source: 'book-now' | 'manual' | 'import'
+  source: 'book-now' | 'manual' | 'import' | 'website'
   notes: string
   totalOrders: number
   totalSpent: number

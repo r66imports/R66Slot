@@ -24,7 +24,7 @@ interface Contact {
   deliveryKioskToKiosk: boolean
   deliveryPudoLocker: boolean
   deliveryPostnetAramex: boolean
-  source: 'book-now' | 'manual' | 'import'
+  source: 'book-now' | 'manual' | 'import' | 'website'
   notes: string
   totalOrders: number
   totalSpent: number
@@ -67,11 +67,13 @@ function sourceBadge(source: string) {
     'book-now': 'bg-blue-100 text-blue-700',
     manual:     'bg-green-100 text-green-700',
     import:     'bg-purple-100 text-purple-700',
+    website:    'bg-orange-100 text-orange-700',
   }
   const labels: Record<string, string> = {
     'book-now': 'Book Now',
     manual:     'Manual',
     import:     'Import',
+    website:    'Website',
   }
   return (
     <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${map[source] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -611,6 +613,7 @@ export default function ContactsPage() {
   const stats = {
     total:    contacts.length,
     bookNow:  contacts.filter(c => c.source === 'book-now').length,
+    website:  contacts.filter(c => c.source === 'website').length,
     manual:   contacts.filter(c => c.source === 'manual').length,
     revenue:  contacts.reduce((s, c) => s + (c.totalSpent || 0), 0),
   }
@@ -688,10 +691,10 @@ export default function ContactsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Contacts', value: stats.total,    color: 'bg-gray-900',   icon: '👥' },
-          { label: 'From Book Now',  value: stats.bookNow,  color: 'bg-blue-600',   icon: '📋' },
-          { label: 'Manual Entries', value: stats.manual,   color: 'bg-green-600',  icon: '✏️' },
-          { label: 'Total Revenue',  value: `R${stats.revenue.toFixed(0)}`, color: 'bg-yellow-500', icon: '💰' },
+          { label: 'Total Contacts',    value: stats.total,    color: 'bg-gray-900',   icon: '👥' },
+          { label: 'Website Signups',  value: stats.website,  color: 'bg-orange-500', icon: '🌐' },
+          { label: 'From Book Now',    value: stats.bookNow,  color: 'bg-blue-600',   icon: '📋' },
+          { label: 'Total Revenue',    value: `R${stats.revenue.toFixed(0)}`, color: 'bg-yellow-500', icon: '💰' },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
             <div className={`${s.color} text-white w-10 h-10 rounded-lg flex items-center justify-center text-lg flex-shrink-0`}>

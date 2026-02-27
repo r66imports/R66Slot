@@ -84,6 +84,38 @@ export async function POST(request: NextRequest) {
     customers.push(newCustomer)
     await saveCustomers(customers)
 
+    // Also create a contact entry so the customer appears in the admin Contacts page
+    try {
+      const CONTACTS_KEY = 'data/contacts.json'
+      const contacts = await blobRead<any[]>(CONTACTS_KEY, [])
+      const alreadyExists = contacts.find((c: any) => c.email === email)
+      if (!alreadyExists) {
+        const now = new Date().toISOString()
+        contacts.push({
+          id: `contact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+          phone: '',
+          addressStreet: '', addressCity: '', addressProvince: '',
+          addressPostalCode: '', addressCountry: 'South Africa',
+          clubName: '', clubMemberId: '',
+          companyName: '', companyVAT: '', companyAddress: '',
+          deliveryDoorToDoor: false, deliveryKioskToKiosk: false,
+          deliveryPudoLocker: false, deliveryPostnetAramex: false,
+          source: 'website',
+          notes: `Username: ${username}`,
+          totalOrders: 0,
+          totalSpent: 0,
+          createdAt: now,
+          updatedAt: now,
+        })
+        await blobWrite(CONTACTS_KEY, contacts)
+      }
+    } catch {
+      // Non-fatal: registration still succeeds even if contact sync fails
+    }
+
     // Create JWT token
     const token = jwt.sign(
       { id: newCustomer.id, email: newCustomer.email },
