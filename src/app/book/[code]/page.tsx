@@ -19,25 +19,8 @@ type PosterData = {
 
 async function getPosterByCode(code: string): Promise<PosterData | null> {
   try {
-    // List all posters and find by short code
-    const { blobListWithUrls } = await import('@/lib/blob-storage')
-    const urls = await blobListWithUrls('data/slotcar-orders/')
-    const jsonEntries = urls.filter((e) => e.pathname.endsWith('.json'))
-
-    for (const entry of jsonEntries) {
-      try {
-        const response = await fetch(entry.url, { next: { revalidate: 60 } })
-        if (response.ok) {
-          const poster = await response.json() as PosterData
-          if (poster.shortCode === code) {
-            return poster
-          }
-        }
-      } catch {
-        continue
-      }
-    }
-    return null
+    const posters = await blobRead<PosterData[]>('data/slotcar-orders.json', [])
+    return posters.find((p) => p.shortCode === code) ?? null
   } catch {
     return null
   }
