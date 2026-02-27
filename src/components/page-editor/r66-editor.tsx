@@ -129,7 +129,12 @@ export function R66Editor({ pageId }: R66EditorProps) {
         handleSave(false)
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedComponentId) {
         const active = document.activeElement
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+        if (active && (
+          active.tagName === 'INPUT' ||
+          active.tagName === 'TEXTAREA' ||
+          active.tagName === 'SELECT' ||
+          (active as HTMLElement).isContentEditable
+        )) {
           return
         }
         e.preventDefault()

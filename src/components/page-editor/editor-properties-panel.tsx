@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import type { PageComponent } from '@/lib/pages/schema'
 import { MediaLibraryPicker } from './media-library-picker'
 
@@ -227,16 +227,28 @@ function RichTextEditor({
   rows?: number
 }) {
   const editorRef = useRef<HTMLDivElement>(null)
+  // Track whether the latest value change came from user input so we don't
+  // reset innerHTML (and therefore the cursor) while the user is typing.
+  const fromUserInput = useRef(false)
+
+  useEffect(() => {
+    if (editorRef.current && !fromUserInput.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value
+    }
+    fromUserInput.current = false
+  }, [value])
 
   const execCommand = (cmd: string, val?: string) => {
     document.execCommand(cmd, false, val)
     if (editorRef.current) {
+      fromUserInput.current = true
       onChange(editorRef.current.innerHTML)
     }
   }
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
+      fromUserInput.current = true
       onChange(editorRef.current.innerHTML)
     }
   }, [onChange])
@@ -303,9 +315,9 @@ function RichTextEditor({
       <div
         ref={editorRef}
         contentEditable
+        suppressContentEditableWarning
         onInput={handleInput}
         onBlur={handleInput}
-        dangerouslySetInnerHTML={{ __html: value }}
         className="w-full px-3 py-2 border border-gray-200 rounded-b-lg text-sm font-play focus:ring-1 focus:ring-blue-400 focus:outline-none overflow-y-auto prose prose-sm max-w-none"
         style={{
           minHeight: rows ? `${rows * 24}px` : '72px',
