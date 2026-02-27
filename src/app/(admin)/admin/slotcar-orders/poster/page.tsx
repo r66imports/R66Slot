@@ -442,7 +442,7 @@ export default function PreOrderPosterPage() {
     }
   }
 
-  const handleAddToProducts = () => {
+  const addToProductsUrl = (() => {
     const params = new URLSearchParams()
     if (itemDescription) params.set('title', itemDescription)
     if (description) params.set('description', description)
@@ -451,8 +451,8 @@ export default function PreOrderPosterPage() {
     if (brand) params.set('brand', brand)
     if (availableQty) params.set('quantity', availableQty.toString())
     if (imageUrl) params.set('imageUrl', imageUrl)
-    router.push(`/admin/products/new?${params.toString()}`)
-  }
+    return `/admin/products/new?${params.toString()}`
+  })()
 
   const bookingLink = shortCode
     ? `${BOOK_NOW_URL}/${shortCode}`
@@ -514,8 +514,10 @@ export default function PreOrderPosterPage() {
                 </svg>
                 Facebook
               </Button>
-              <Button onClick={handleAddToProducts} variant="outline" className="font-play" disabled={saving}>
-                Add to Products
+              <Button variant="outline" className="font-play" asChild>
+                <a href={addToProductsUrl} target="_blank" rel="noopener noreferrer">
+                  Add to Products
+                </a>
               </Button>
               <Button onClick={handleSave} className="bg-gray-900 hover:bg-gray-800 text-white font-play" disabled={saving || !itemDescription || !preOrderPrice}>
                 {saving ? 'Saving...' : 'Save Poster'}
