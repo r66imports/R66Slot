@@ -313,27 +313,14 @@ export default function PreOrderPosterPage() {
 
   const handleExportToWhatsApp = async () => {
     if (!itemDescription || !preOrderPrice) return
+    if (!posterRef.current) return
 
     const code = shortCode || editId || ''
-    if (!code) {
-      alert('Save the poster first to generate a booking link.')
-      return
-    }
-
-    const bookUrl = `${BOOK_NOW_URL}/${code}`
+    const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
-    // Desktop: open WhatsApp NOW with the booking link (synchronous — preserves user gesture).
-    // WhatsApp shows the poster as an OG image preview; tapping opens the booking page.
-    if (!isMobile) {
-      window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
-    }
-
-    if (!posterRef.current) return
     setSendingWhatsapp(true)
-
     try {
-      // Render the poster to a JPEG
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true, allowTaint: true,
       })
@@ -342,33 +329,13 @@ export default function PreOrderPosterPage() {
       )
       if (!blob) return
 
-      const posterFile = new File([blob], `R66SLOT-${sku || code}.jpg`, { type: 'image/jpeg' })
-
-      // Upload the rendered poster to R2 and save it as posterImageUrl on the poster record.
-      // This makes the booking page OG preview show the actual poster image in WhatsApp.
-      if (editId) {
-        try {
-          const formData = new FormData()
-          formData.append('file', posterFile)
-          const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
-          if (uploadRes.ok) {
-            const { url: posterImageUrl } = await uploadRes.json()
-            await fetch('/api/admin/slotcar-orders', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: editId, posterImageUrl }),
-            })
-          }
-        } catch (uploadErr) {
-          console.warn('Poster upload failed (non-fatal):', uploadErr)
-        }
-      }
+      const posterFile = new File([blob], `R66SLOT-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
 
       if (isMobile && navigator.share && navigator.canShare?.({ files: [posterFile] })) {
-        // Mobile: native share sheet — sends poster image directly to WhatsApp
-        await navigator.share({ files: [posterFile], title: `R66SLOT – ${itemDescription}`, text: bookUrl })
-      } else if (!isMobile) {
-        // Desktop: auto-download the poster image (WhatsApp already opened above)
+        // Mobile: share poster image with "BOOK HERE" link as caption
+        await navigator.share({ files: [posterFile], text: `BOOK HERE: ${bookUrl}` })
+      } else {
+        // Desktop: download the poster image
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -377,9 +344,6 @@ export default function PreOrderPosterPage() {
         a.click()
         document.body.removeChild(a)
         URL.revokeObjectURL(url)
-      } else {
-        // Mobile without native share: open WhatsApp with booking link
-        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
       }
     } catch (err) {
       if ((err as Error)?.name !== 'AbortError') {
