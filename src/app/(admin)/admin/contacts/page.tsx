@@ -190,7 +190,7 @@ function ContactModal({
         <div className="sticky top-0 bg-white border-b z-10 flex items-center justify-between px-6 py-4 rounded-t-2xl">
           <div>
             <h2 className="text-lg font-bold text-gray-900 font-play">
-              {isEditing ? '✏️ Edit Contact' : '➕ Add New Contact'}
+              {isEditing ? '✏️ Edit Customer' : '➕ Add New Customer'}
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
               Fill in personal, address, club, business and delivery details
@@ -446,7 +446,7 @@ function ContactModal({
               disabled={saving}
               className="flex-1 bg-gray-900 text-white rounded-xl py-3 text-sm font-bold hover:bg-gray-800 disabled:opacity-50 transition-colors"
             >
-              {saving ? 'Saving…' : isEditing ? 'Save Changes' : 'Add Contact'}
+              {saving ? 'Saving…' : isEditing ? 'Save Changes' : 'Add Customer'}
             </button>
             <button
               type="button"
@@ -651,9 +651,9 @@ export default function ContactsPage() {
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Client details — personal, address, club, business &amp; delivery
+            Customer details — personal, address, club, business &amp; delivery
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -683,7 +683,7 @@ export default function ContactsPage() {
             className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
           >
             <span className="text-base font-bold">+</span>
-            Add Contact
+            Add Customer
           </button>
         </div>
       </div>
@@ -691,7 +691,7 @@ export default function ContactsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Contacts',    value: stats.total,    color: 'bg-gray-900',   icon: '👥' },
+          { label: 'Total Customers',    value: stats.total,    color: 'bg-gray-900',   icon: '👥' },
           { label: 'Website Signups',  value: stats.website,  color: 'bg-orange-500', icon: '🌐' },
           { label: 'From Book Now',    value: stats.bookNow,  color: 'bg-blue-600',   icon: '📋' },
           { label: 'Total Revenue',    value: `R${stats.revenue.toFixed(0)}`, color: 'bg-yellow-500', icon: '💰' },
@@ -732,12 +732,12 @@ export default function ContactsPage() {
           <div className="text-center py-20">
             <p className="text-4xl mb-3">👥</p>
             <p className="font-semibold text-gray-700">
-              {searchQuery ? 'No contacts found' : 'No contacts yet'}
+              {searchQuery ? 'No customers found' : 'No customers yet'}
             </p>
             <p className="text-sm text-gray-400 mt-1">
               {searchQuery
                 ? 'Try a different search term'
-                : 'Click "Add Contact" to create your first one'}
+                : 'Customers will appear here when they sign up, or click "Add Customer"'}
             </p>
           </div>
         ) : (
@@ -873,7 +873,7 @@ export default function ContactsPage() {
 
         {!loading && filtered.length > 0 && (
           <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400 bg-gray-50">
-            Showing {filtered.length} of {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
+            Showing {filtered.length} of {contacts.length} customer{contacts.length !== 1 ? 's' : ''}
           </div>
         )}
       </div>
@@ -893,14 +893,14 @@ export default function ContactsPage() {
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
-              <h3 className="text-lg font-bold text-gray-900 mb-1">Delete Contact?</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Delete Customer?</h3>
               {c && (
                 <p className="text-sm text-gray-500 mb-1">
                   <strong>{fullName(c)}</strong>
                 </p>
               )}
               <p className="text-sm text-gray-500 mb-6">
-                This cannot be undone. All contact data will be permanently removed.
+                This cannot be undone. All customer data will be permanently removed.
               </p>
               <div className="flex gap-3">
                 <button

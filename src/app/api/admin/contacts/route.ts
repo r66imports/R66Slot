@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 
-const CONTACTS_KEY = 'data/contacts.json'
-const ORDERS_KEY   = 'data/preorder-list.json'
+const CONTACTS_KEY  = 'data/contacts.json'
+const ORDERS_KEY    = 'data/preorder-list.json'
+const CUSTOMERS_KEY = 'data/customers.json'
 
 export interface Contact {
   id: string
@@ -49,8 +50,40 @@ async function saveContacts(contacts: Contact[]): Promise<void> {
 // GET /api/admin/contacts
 export async function GET() {
   try {
-    const contacts = await getContacts()
-    const orders   = await blobRead<any[]>(ORDERS_KEY, [])
+    const contacts  = await getContacts()
+    const orders    = await blobRead<any[]>(ORDERS_KEY, [])
+    const customers = await blobRead<any[]>(CUSTOMERS_KEY, [])
+
+    // Auto-merge website accounts that aren't already in the contacts list
+    let dirty = false
+    const now = new Date().toISOString()
+    for (const cust of customers) {
+      if (!cust.email) continue
+      const exists = contacts.find((c: Contact) => c.email === cust.email)
+      if (!exists) {
+        contacts.push({
+          id: `contact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          firstName:            cust.firstName?.trim()  || '',
+          lastName:             cust.lastName?.trim()   || '',
+          email:                cust.email.trim(),
+          phone:                cust.phone?.trim()      || '',
+          addressStreet: '', addressCity: '', addressProvince: '',
+          addressPostalCode: '', addressCountry: 'South Africa',
+          clubName: '', clubMemberId: '',
+          companyName: '', companyVAT: '', companyAddress: '',
+          deliveryDoorToDoor: false, deliveryKioskToKiosk: false,
+          deliveryPudoLocker: false, deliveryPostnetAramex: false,
+          source: 'website',
+          notes: cust.username ? `Username: ${cust.username}` : '',
+          totalOrders: 0,
+          totalSpent: 0,
+          createdAt: cust.createdAt || now,
+          updatedAt: now,
+        })
+        dirty = true
+      }
+    }
+    if (dirty) await saveContacts(contacts)
 
     const enriched = contacts.map(c => {
       const contactOrders = orders.filter(
