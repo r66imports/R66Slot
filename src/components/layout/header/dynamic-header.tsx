@@ -242,7 +242,7 @@ export function DynamicHeader() {
               {/* Account Link */}
               {headerConfig.showAccount && (
                 <Link
-                  href="/account"
+                  href="/account/login"
                   className="hidden md:flex p-2 hover:bg-gray-100 rounded-md transition-colors"
                   aria-label="Account"
                 >
@@ -347,7 +347,7 @@ export function DynamicHeader() {
 
                 {headerConfig.showAccount && (
                   <Link
-                    href="/account"
+                    href="/account/login"
                     className="text-sm font-medium hover:text-primary transition-colors"
                     style={{ color: headerConfig.textColor }}
                     onClick={() => setIsMenuOpen(false)}

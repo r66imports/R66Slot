@@ -16,8 +16,11 @@ export default function AccountDashboard() {
 
   useEffect(() => {
     fetch('/api/auth/me')
-      .then((res) => res.json())
-      .then((data) => setUser(data))
+      .then((res) => {
+        if (!res.ok) { window.location.href = '/account/login'; return null }
+        return res.json()
+      })
+      .then((data) => { if (data) setUser(data) })
       .catch(() => { window.location.href = '/account/login' })
 
     fetch('/api/account/stats')
