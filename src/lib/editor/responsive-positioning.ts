@@ -268,23 +268,37 @@ export function migrateLegacyPosition(
 
 // ─── Drag/Resize Handlers ───
 
+export interface SectionBounds {
+  xMin: number
+  xMax: number
+  yMin: number
+  yMax: number
+}
+
 /**
  * Convert a drag delta (in pixels) to normalized position update.
+ * If sectionBounds is provided, constrains movement within that section.
  */
 export function applyDragDelta(
   current: NormalizedPosition,
   deltaX: number,
   deltaY: number,
   containerWidth: number,
-  containerHeight: number
+  containerHeight: number,
+  sectionBounds?: SectionBounds | null
 ): NormalizedPosition {
   const deltaXPercent = (deltaX / containerWidth) * 100
   const deltaYPercent = (deltaY / containerHeight) * 100
 
+  const xMin = sectionBounds?.xMin ?? 0
+  const xMax = sectionBounds ? sectionBounds.xMax - current.widthPercent : 100 - current.widthPercent
+  const yMin = sectionBounds?.yMin ?? 0
+  const yMax = sectionBounds ? sectionBounds.yMax - current.heightPercent : 100 - current.heightPercent
+
   return {
     ...current,
-    xPercent: Math.max(0, Math.min(100 - current.widthPercent, current.xPercent + deltaXPercent)),
-    yPercent: Math.max(0, Math.min(100 - current.heightPercent, current.yPercent + deltaYPercent)),
+    xPercent: Math.max(xMin, Math.min(xMax, current.xPercent + deltaXPercent)),
+    yPercent: Math.max(yMin, Math.min(yMax, current.yPercent + deltaYPercent)),
   }
 }
 

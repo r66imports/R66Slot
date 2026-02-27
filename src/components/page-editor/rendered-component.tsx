@@ -720,7 +720,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       // Check if section has only image children (container mode)
       const hasOnlyImages = children && children.length > 0 && children.every(c => c.type === 'image')
       return (
-        <section style={{ ...containerStyle, minHeight: '200px', position: 'relative', overflow: 'hidden' }}>
+        <section data-section-container="true" style={{ ...containerStyle, minHeight: '200px', position: 'relative', overflow: 'hidden' }}>
           <div className="container mx-auto" style={hasOnlyImages ? { height: '100%' } : undefined}>
             {sectionTitle && (
               <h2 className="text-3xl font-bold mb-2 text-center">{sectionTitle}</h2>

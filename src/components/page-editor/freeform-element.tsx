@@ -8,6 +8,7 @@ import {
   type Breakpoint,
   type NormalizedPosition,
   type ResponsivePositionData,
+  type SectionBounds,
   getPositionForBreakpoint,
   pixelsToNormalized,
   normalizedToPixels,
@@ -59,6 +60,7 @@ export function FreeformElement({
 }: FreeformElementProps) {
   const elementRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+  const sectionBoundsRef = useRef<SectionBounds | null>(null)
 
   // Drag/resize state
   const [isDragging, setIsDragging] = useState(false)
@@ -149,6 +151,36 @@ export function FreeformElement({
     onPositionChange(updated)
   }, [normalizedPositions, breakpoint, onPositionChange])
 
+  // ─── Detect containing section bounds (as canvas %) ───
+  const detectSectionBounds = useCallback((): SectionBounds | null => {
+    if (!elementRef.current) return null
+    const canvas = elementRef.current.closest('.responsive-canvas, [data-canvas]') as HTMLElement | null
+    if (!canvas) return null
+
+    const canvasRect = canvas.getBoundingClientRect()
+    const zoom = parseFloat(canvas.getAttribute('data-zoom') || '1')
+    const canvasW = canvasRect.width / zoom
+    const canvasH = canvasRect.height / zoom
+
+    const elemRect = elementRef.current.getBoundingClientRect()
+    const cx = elemRect.left + elemRect.width / 2
+    const cy = elemRect.top + elemRect.height / 2
+
+    const sections = canvas.querySelectorAll('[data-section-container]')
+    for (const sec of sections) {
+      const r = sec.getBoundingClientRect()
+      if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+        return {
+          xMin: ((r.left - canvasRect.left) / zoom / canvasW) * 100,
+          xMax: ((r.right - canvasRect.left) / zoom / canvasW) * 100,
+          yMin: ((r.top - canvasRect.top) / zoom / canvasH) * 100,
+          yMax: ((r.bottom - canvasRect.top) / zoom / canvasH) * 100,
+        }
+      }
+    }
+    return null
+  }, [])
+
   // ─── Drag Handling ───
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     if (!isSelected || isResizing) return
@@ -156,10 +188,11 @@ export function FreeformElement({
     e.stopPropagation()
 
     containerRef.current = getContainerDimensions()
+    sectionBoundsRef.current = detectSectionBounds()
     setIsDragging(true)
     setStartPos({ x: e.clientX, y: e.clientY })
     setStartNormalized({ ...currentPosition })
-  }, [isSelected, isResizing, currentPosition, getContainerDimensions])
+  }, [isSelected, isResizing, currentPosition, getContainerDimensions, detectSectionBounds])
 
   const handleDragMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !startNormalized) return
@@ -171,7 +204,7 @@ export function FreeformElement({
     const deltaX = (e.clientX - startPos.x) / zoom
     const deltaY = (e.clientY - startPos.y) / zoom
 
-    let newPosition = applyDragDelta(startNormalized, deltaX, deltaY, width, height)
+    let newPosition = applyDragDelta(startNormalized, deltaX, deltaY, width, height, sectionBoundsRef.current)
 
     if (snapEnabled) {
       newPosition = snapToPercentageGrid(newPosition, gridPercent)
@@ -191,11 +224,12 @@ export function FreeformElement({
     e.stopPropagation()
 
     containerRef.current = getContainerDimensions()
+    sectionBoundsRef.current = detectSectionBounds()
     setIsResizing(true)
     setActiveHandle(handle)
     setStartPos({ x: e.clientX, y: e.clientY })
     setStartNormalized({ ...currentPosition })
-  }, [currentPosition, getContainerDimensions])
+  }, [currentPosition, getContainerDimensions, detectSectionBounds])
 
   const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizing || !activeHandle || !startNormalized) return
@@ -233,11 +267,16 @@ export function FreeformElement({
       newPosition.heightPercent = newHeight
     }
 
-    // Clamp to valid range — keep element fully within container
-    newPosition.xPercent = Math.max(0, Math.min(100 - newPosition.widthPercent, newPosition.xPercent))
-    newPosition.yPercent = Math.max(0, Math.min(100 - newPosition.heightPercent, newPosition.yPercent))
-    newPosition.widthPercent = Math.min(newPosition.widthPercent, 100 - newPosition.xPercent)
-    newPosition.heightPercent = Math.min(newPosition.heightPercent, 100 - newPosition.yPercent)
+    // Clamp to valid range — keep element fully within section (or canvas if no section)
+    const sb = sectionBoundsRef.current
+    const xMin = sb?.xMin ?? 0
+    const xMax = sb?.xMax ?? 100
+    const yMin = sb?.yMin ?? 0
+    const yMax = sb?.yMax ?? 100
+    newPosition.xPercent = Math.max(xMin, Math.min(xMax - newPosition.widthPercent, newPosition.xPercent))
+    newPosition.yPercent = Math.max(yMin, Math.min(yMax - newPosition.heightPercent, newPosition.yPercent))
+    newPosition.widthPercent = Math.min(newPosition.widthPercent, xMax - newPosition.xPercent)
+    newPosition.heightPercent = Math.min(newPosition.heightPercent, yMax - newPosition.yPercent)
 
     if (snapEnabled) {
       newPosition = snapToPercentageGrid(newPosition, gridPercent)
