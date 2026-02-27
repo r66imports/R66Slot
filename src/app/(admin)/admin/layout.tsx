@@ -94,6 +94,7 @@ export default function AdminLayout({
       { name: 'Contacts', href: '/admin/contacts', icon: '👥' },
       { name: 'Local Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
+      { name: 'Sage Accounting', href: '/admin/sage', icon: '📊' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],
     settings: [
