@@ -363,7 +363,11 @@ export async function PUT(
     }
 
     // Validate required fields (allow group toggles through)
-    if (!body.title && !body.components && body.isBrandPage === undefined && body.isCarsPage === undefined && body.isWebsitePage === undefined) {
+    const hasGroupToggle = [
+      'isBrandPage', 'isCarsPage', 'isWebsitePage',
+      'isRevoPage', 'isPioneerPage', 'isSidewaysPage', 'isBrmPage',
+    ].some((key) => body[key] !== undefined)
+    if (!body.title && !body.components && !hasGroupToggle) {
       return NextResponse.json(
         { error: 'Missing required fields (title or components)' },
         { status: 400 }
