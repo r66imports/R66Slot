@@ -50,55 +50,30 @@ const FRONTEND_PAGES = [
   },
 ]
 
-// Brand pages editable via the website editor
-const BRAND_PAGES = [
-  {
-    id: 'brand-nsr',
-    title: 'NSR',
-    slug: 'brands/nsr',
-    description: 'NSR brand page - high-performance racing models',
-    icon: '🏎️',
-    editable: true,
-  },
-  {
-    id: 'brand-revo',
-    title: 'Revo',
-    slug: 'brands/revo',
-    description: 'Revo brand page',
-    icon: '🏎️',
-    editable: true,
-  },
-  {
-    id: 'brand-pioneer',
-    title: 'Pioneer',
-    slug: 'brands/pioneer',
-    description: 'Pioneer brand page',
-    icon: '🏎️',
-    editable: true,
-  },
-  {
-    id: 'brand-sideways',
-    title: 'Sideways',
-    slug: 'brands/sideways',
-    description: 'Sideways brand page',
-    icon: '🏎️',
-    editable: true,
-  },
+type PageGroup = 'isWebsitePage' | 'isRevoPage' | 'isPioneerPage' | 'isSidewaysPage' | 'isBrmPage'
+
+const BRAND_SECTIONS: { key: PageGroup; label: string; color: string; icon: string }[] = [
+  { key: 'isWebsitePage',  label: 'NSR Pages',      color: 'green',  icon: '🏎️' },
+  { key: 'isRevoPage',     label: 'Revo Pages',     color: 'teal',   icon: '🏁' },
+  { key: 'isPioneerPage',  label: 'Pioneer Pages',  color: 'blue',   icon: '🏎️' },
+  { key: 'isSidewaysPage', label: 'Sideways Pages', color: 'violet', icon: '🏎️' },
+  { key: 'isBrmPage',      label: 'BRM Pages',      color: 'red',    icon: '🏎️' },
 ]
 
-// Cars pages grouped by brand
-const CARS_PAGES = [
-  { id: 'cars-nsr', brand: 'NSR', slug: 'cars/nsr', description: 'NSR slot cars catalog', icon: '🏎️', editable: true },
-  { id: 'cars-revo', brand: 'Revo', slug: 'cars/revo', description: 'Revo slot cars catalog', icon: '🏎️', editable: true },
-  { id: 'cars-pioneer', brand: 'Pioneer', slug: 'cars/pioneer', description: 'Pioneer slot cars catalog', icon: '🏎️', editable: true },
-  { id: 'cars-sideways', brand: 'Sideways', slug: 'cars/sideways', description: 'Sideways slot cars catalog', icon: '🏎️', editable: true },
-  { id: 'cars-slot-it', brand: 'Slot.it', slug: 'cars/slot-it', description: 'Slot.it slot cars catalog', icon: '🏎️', editable: true },
-  { id: 'cars-policar', brand: 'Policar', slug: 'cars/policar', description: 'Policar slot cars catalog', icon: '🏎️', editable: true },
-  { id: 'cars-thunderslot', brand: 'Thunderslot', slug: 'cars/thunderslot', description: 'Thunderslot slot cars catalog', icon: '🏎️', editable: true },
-  { id: 'cars-scaleauto', brand: 'Scaleauto', slug: 'cars/scaleauto', description: 'Scaleauto slot cars catalog', icon: '🏎️', editable: true },
-]
+const COLOR_MAP: Record<string, { border: string; bg: string; badge: string; btn: string }> = {
+  green:  { border: 'border-green-200',  bg: 'bg-green-50',  badge: 'bg-green-100 text-green-700',   btn: 'bg-green-600 text-white hover:bg-green-700 border-green-600'  },
+  teal:   { border: 'border-teal-200',   bg: 'bg-teal-50',   badge: 'bg-teal-100 text-teal-700',     btn: 'bg-teal-600 text-white hover:bg-teal-700 border-teal-600'    },
+  blue:   { border: 'border-blue-200',   bg: 'bg-blue-50',   badge: 'bg-blue-100 text-blue-700',     btn: 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600'    },
+  violet: { border: 'border-violet-200', bg: 'bg-violet-50', badge: 'bg-violet-100 text-violet-700', btn: 'bg-violet-600 text-white hover:bg-violet-700 border-violet-600' },
+  red:    { border: 'border-red-200',    bg: 'bg-red-50',    badge: 'bg-red-100 text-red-700',       btn: 'bg-red-600 text-white hover:bg-red-700 border-red-600'       },
+}
 
-const CAR_BRANDS = [...new Set(CARS_PAGES.map(p => p.brand))]
+function getPageColor(page: Page): string | null {
+  for (const section of BRAND_SECTIONS) {
+    if (page[section.key]) return section.color
+  }
+  return null
+}
 
 function InlineEditableTitle({
   value,
@@ -167,9 +142,6 @@ export default function PagesManagementPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
-  const [selectedCarBrand, setSelectedCarBrand] = useState<string>('all')
-  const [deletedBrandIds, setDeletedBrandIds] = useState<Set<string>>(new Set())
-  const [deletedCarsIds, setDeletedCarsIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchCustomPages()
@@ -195,7 +167,6 @@ export default function PagesManagementPage() {
     setIsSaving(true)
     setSaveMessage(null)
     try {
-      // Save each custom page to persist any inline edits
       const results = await Promise.all(
         customPages.map((page) =>
           fetch(`/api/admin/pages/${page.id}`, {
@@ -206,11 +177,7 @@ export default function PagesManagementPage() {
         )
       )
       const allOk = results.every((r) => r.ok)
-      if (allOk) {
-        setSaveMessage('All pages saved successfully!')
-      } else {
-        setSaveMessage('Some pages failed to save.')
-      }
+      setSaveMessage(allOk ? 'All pages saved successfully!' : 'Some pages failed to save.')
     } catch (error) {
       console.error('Error saving pages:', error)
       setSaveMessage('Failed to save pages.')
@@ -222,7 +189,6 @@ export default function PagesManagementPage() {
 
   const handleRename = async (id: string, newTitle: string) => {
     try {
-      // Generate a new slug from the title
       const newSlug = newTitle
         .toLowerCase()
         .replace(/[^a-z0-9\s-]/g, '')
@@ -247,12 +213,8 @@ export default function PagesManagementPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this page?')) return
-
     try {
-      const response = await fetch(`/api/admin/pages/${id}`, {
-        method: 'DELETE',
-      })
-
+      const response = await fetch(`/api/admin/pages/${id}`, { method: 'DELETE' })
       if (response.ok) {
         setCustomPages(customPages.filter((p) => p.id !== id))
       }
@@ -274,7 +236,6 @@ export default function PagesManagementPage() {
           components: [],
         }),
       })
-
       if (response.ok) {
         const newPage = await response.json()
         window.location.href = `/admin/pages/editor/${newPage.id}`
@@ -303,7 +264,6 @@ export default function PagesManagementPage() {
           },
         }),
       })
-
       if (response.ok) {
         const newPage = await response.json()
         setCustomPages((prev) => [...prev, newPage])
@@ -318,7 +278,7 @@ export default function PagesManagementPage() {
 
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
 
-  const handleTogglePageGroup = async (e: React.MouseEvent, id: string, group: 'isBrandPage' | 'isCarsPage' | 'isRevoPage') => {
+  const handleTogglePageGroup = async (e: React.MouseEvent, id: string, group: PageGroup) => {
     e.preventDefault()
     e.stopPropagation()
 
@@ -327,7 +287,6 @@ export default function PagesManagementPage() {
 
     const newValue = !page[group]
 
-    // Optimistic update
     setCustomPages((prev) =>
       prev.map((p) => (p.id === id ? { ...p, [group]: newValue } : p))
     )
@@ -358,55 +317,11 @@ export default function PagesManagementPage() {
     }
   }
 
-  const handleDeleteBrandPage = async (id: string, title: string) => {
-    if (!confirm(`Delete "${title}" from Brand Pages?`)) return
-    setDeletedBrandIds((prev) => new Set(prev).add(id))
-    try {
-      await fetch(`/api/admin/pages/frontend-${id}`, { method: 'DELETE' })
-    } catch {
-      // Ignore - the page may not have been persisted yet
-    }
-  }
-
-  const handleDeleteCarsPage = async (id: string, brand: string) => {
-    if (!confirm(`Delete "${brand} Cars" from Cars Pages?`)) return
-    setDeletedCarsIds((prev) => new Set(prev).add(id))
-    try {
-      await fetch(`/api/admin/pages/frontend-${id}`, { method: 'DELETE' })
-    } catch {
-      // Ignore
-    }
-  }
-
-  // Custom pages marked for Brand, Cars, or Revo groups
-  const brandCustomPages = customPages.filter((p) => p.isBrandPage)
-  const carsCustomPages = customPages.filter((p) => p.isCarsPage)
-  const revoCustomPages = customPages.filter((p) => p.isRevoPage)
-
-  // Website pages = custom pages marked as website pages (legacy)
-  const websitePages = customPages.filter((p) => p.isWebsitePage)
-
-  // Search across all pages (frontend + brand + custom) by URL/slug
+  // Search across all pages by URL/slug
   const allSearchablePages = [
     ...FRONTEND_PAGES.map((p) => ({
       id: p.id,
       title: p.title,
-      slug: p.slug,
-      type: 'frontend' as const,
-      icon: p.icon,
-      description: p.description,
-    })),
-    ...BRAND_PAGES.map((p) => ({
-      id: p.id,
-      title: p.title,
-      slug: p.slug,
-      type: 'frontend' as const,
-      icon: p.icon,
-      description: p.description,
-    })),
-    ...CARS_PAGES.map((p) => ({
-      id: p.id,
-      title: `${p.brand} Cars`,
       slug: p.slug,
       type: 'frontend' as const,
       icon: p.icon,
@@ -422,15 +337,12 @@ export default function PagesManagementPage() {
     })),
   ]
 
-  // Strip domain from search query to match slugs from full URLs
   const normalizeSearch = (query: string): string => {
     let q = query.trim().toLowerCase()
-    // Strip common domain patterns: https://r66slot.co.za/about -> about
     try {
       const url = new URL(q)
       q = url.pathname.replace(/^\//, '').replace(/\/$/, '')
     } catch {
-      // Not a full URL, strip leading slash
       q = q.replace(/^\/+/, '').replace(/\/$/, '')
     }
     return q
@@ -443,7 +355,6 @@ export default function PagesManagementPage() {
         (p) =>
           p.slug.toLowerCase().includes(normalizedQuery) ||
           p.title.toLowerCase().includes(normalizedQuery) ||
-          // Also match raw query against title
           p.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
       )
     : []
@@ -505,7 +416,6 @@ export default function PagesManagementPage() {
           />
         </div>
 
-        {/* Search Results */}
         {searchQuery.trim() && (
           <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-lg">
             <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 rounded-t-lg">
@@ -634,320 +544,83 @@ export default function PagesManagementPage() {
         </div>
       </div>
 
-      {/* Brand Pages */}
-      <div className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">Brand Pages</h2>
-            <p className="text-gray-600 text-sm mt-1">
-              Edit brand-specific pages on your website
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {BRAND_PAGES.filter((p) => !deletedBrandIds.has(p.id)).map((page) => (
-            <Card key={page.id} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">{page.icon}</div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
-                    <p className="text-gray-600 text-sm mb-3">{page.description}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>/{page.slug}</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      className="bg-primary hover:bg-primary-dark text-white"
-                      asChild
-                    >
-                      <Link href={`/admin/pages/editor/frontend-${page.id}`}>
-                        Edit Page
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/${page.slug}`} target="_blank">
-                        View Live
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteBrandPage(page.id, page.title)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {brandCustomPages.map((page) => (
-            <Card key={page.id} className="hover:shadow-lg transition-shadow border-purple-200 bg-purple-50">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">🏎️</div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                      <span>/{page.slug}</span>
-                      <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded">Custom</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
-                      <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/${page.slug}`} target="_blank">View Live</Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(page.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Cars Pages */}
-      <div className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">Cars Pages</h2>
-            <p className="text-gray-600 text-sm mt-1">
-              Edit car catalog pages by brand
-            </p>
-          </div>
-          <select
-            value={selectedCarBrand}
-            onChange={(e) => setSelectedCarBrand(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Brands</option>
-            {CAR_BRANDS.map((brand) => (
-              <option key={brand} value={brand}>{brand}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {CARS_PAGES
-            .filter((p) => !deletedCarsIds.has(p.id))
-            .filter((p) => selectedCarBrand === 'all' || p.brand === selectedCarBrand)
-            .map((page) => (
-            <Card key={page.id} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">{page.icon}</div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold mb-1">{page.brand} Cars</h3>
-                    <p className="text-gray-600 text-sm mb-3">{page.description}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>/{page.slug}</span>
-                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">
-                        {page.brand}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      className="bg-primary hover:bg-primary-dark text-white"
-                      asChild
-                    >
-                      <Link href={`/admin/pages/editor/frontend-${page.id}`}>
-                        Edit Page
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/${page.slug}`} target="_blank">
-                        View Live
-                      </Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDeleteCarsPage(page.id, page.brand)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-          {carsCustomPages
-            .filter((p) => selectedCarBrand === 'all' || p.title.toLowerCase().includes(selectedCarBrand.toLowerCase()))
-            .map((page) => (
-            <Card key={page.id} className="hover:shadow-lg transition-shadow border-orange-200 bg-orange-50">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">🏎️</div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                      <span>/{page.slug}</span>
-                      <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded">Custom</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
-                      <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/${page.slug}`} target="_blank">View Live</Link>
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(page.id)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Revo Pages */}
-      {revoCustomPages.length > 0 && (
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold">Revo Pages</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Custom pages assigned to the Revo section
-              </p>
+      {/* Brand Sections — NSR, Revo, Pioneer, Sideways, BRM */}
+      {BRAND_SECTIONS.map((section) => {
+        const sectionPages = customPages.filter((p) => p[section.key])
+        const colors = COLOR_MAP[section.color]
+        return (
+          <div key={section.key} className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">{section.label}</h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  Custom pages assigned to the {section.label.replace(' Pages', '')} section
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {revoCustomPages.map((page) => (
-              <Card key={page.id} className="hover:shadow-lg transition-shadow border-teal-200 bg-teal-50">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="text-4xl">🏁</div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                        <span>/{page.slug}</span>
-                        <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded">Revo</span>
-                        {page.published ? (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">Published</span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded">Draft</span>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500">{page.components.length} components</p>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
-                        <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
-                      </Button>
-                      {page.published && (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/${page.slug}`} target="_blank">View Live</Link>
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(page.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
+            {sectionPages.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-gray-400">
+                  <div className="text-4xl mb-3">{section.icon}</div>
+                  <p className="text-sm">No pages assigned to {section.label} yet.</p>
+                  <p className="text-xs mt-1">
+                    Create a custom page below and click &ldquo;{section.label}&rdquo; to assign it here.
+                  </p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Website Pages Section */}
-      {websitePages.length > 0 && (
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold">Website Pages</h2>
-              <p className="text-gray-600 text-sm mt-1">
-                Linked pages from the Main Website Pages
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {websitePages.map((page) => (
-              <Card
-                key={page.id}
-                className="hover:shadow-lg transition-shadow border-green-200 bg-green-50"
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="text-4xl">🌐</div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
-                      <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                        <span>/{page.slug}</span>
-                        <span>•</span>
-                        {page.published ? (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">
-                            Published
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded">
-                            Draft
-                          </span>
-                        )}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {sectionPages.map((page) => (
+                  <Card
+                    key={page.id}
+                    className={`hover:shadow-lg transition-shadow ${colors.border} ${colors.bg}`}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4">
+                        <div className="text-4xl">{section.icon}</div>
+                        <div className="flex-1">
+                          <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                            <span>/{page.slug}</span>
+                            <span className={`px-2 py-0.5 rounded ${colors.badge}`}>
+                              {section.label.replace(' Pages', '')}
+                            </span>
+                            {page.published ? (
+                              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">Published</span>
+                            ) : (
+                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded">Draft</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-500">{page.components.length} components</p>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
+                            <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
+                          </Button>
+                          {page.published && (
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href={`/${page.slug}`} target="_blank">View Live</Link>
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(page.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-500">
-                        {page.components.length} components
-                      </p>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        size="sm"
-                        className="bg-primary hover:bg-primary-dark text-white"
-                        asChild
-                      >
-                        <Link href={`/admin/pages/editor/${page.id}`}>
-                          Edit Page
-                        </Link>
-                      </Button>
-                      {page.published && (
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/${page.slug}`} target="_blank">
-                            View Live
-                          </Link>
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )
+      })}
 
       {/* Custom Pages - User Created */}
       <div>
@@ -983,134 +656,102 @@ export default function PagesManagementPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {customPages.map((page) => (
-              <Card
-                key={page.id}
-                className={
-                  page.isBrandPage
-                    ? 'border-purple-300 bg-purple-50'
-                    : page.isCarsPage
-                    ? 'border-orange-300 bg-orange-50'
-                    : page.isRevoPage
-                    ? 'border-teal-300 bg-teal-50'
-                    : ''
-                }
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <InlineEditableTitle
-                          value={page.title}
-                          onSave={(newTitle) => handleRename(page.id, newTitle)}
-                          className="text-xl font-semibold"
-                        />
-                        {!page.published && (
-                          <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded">
-                            Draft
+            {customPages.map((page) => {
+              const pageColor = getPageColor(page)
+              const colors = pageColor ? COLOR_MAP[pageColor] : null
+              return (
+                <Card
+                  key={page.id}
+                  className={colors ? `${colors.border} ${colors.bg}` : ''}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <InlineEditableTitle
+                            value={page.title}
+                            onSave={(newTitle) => handleRename(page.id, newTitle)}
+                            className="text-xl font-semibold"
+                          />
+                          {!page.published && (
+                            <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded">
+                              Draft
+                            </span>
+                          )}
+                          {page.published && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                              Published
+                            </span>
+                          )}
+                          {BRAND_SECTIONS.map((section) =>
+                            page[section.key] ? (
+                              <span
+                                key={section.key}
+                                className={`px-2 py-1 text-xs rounded font-medium ${COLOR_MAP[section.color].badge}`}
+                              >
+                                {section.label.replace(' Pages', '')}
+                              </span>
+                            ) : null
+                          )}
+                        </div>
+                        <p className="text-gray-600 text-sm mb-3">/{page.slug}</p>
+                        <div className="flex items-center gap-4 text-sm text-gray-500">
+                          <span>{page.components.length} components</span>
+                          <span>•</span>
+                          <span>
+                            Updated {new Date(page.updatedAt).toLocaleDateString()}
                           </span>
-                        )}
-                        {page.published && (
-                          <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
-                            Published
-                          </span>
-                        )}
-                        {page.isBrandPage && (
-                          <span className="px-2 py-1 bg-purple-200 text-purple-800 text-xs rounded font-medium">
-                            Brand Page
-                          </span>
-                        )}
-                        {page.isCarsPage && (
-                          <span className="px-2 py-1 bg-orange-200 text-orange-800 text-xs rounded font-medium">
-                            Cars Page
-                          </span>
-                        )}
-                        {page.isRevoPage && (
-                          <span className="px-2 py-1 bg-teal-200 text-teal-800 text-xs rounded font-medium">
-                            Revo Page
-                          </span>
-                        )}
+                        </div>
                       </div>
-                      <p className="text-gray-600 text-sm mb-3">/{page.slug}</p>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span>{page.components.length} components</span>
-                        <span>•</span>
-                        <span>
-                          Updated {new Date(page.updatedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 ml-4 flex-wrap justify-end">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleTogglePageGroup(e, page.id, 'isBrandPage')}
-                        disabled={togglingIds.has(page.id)}
-                        className={
-                          page.isBrandPage
-                            ? 'bg-purple-600 text-white hover:bg-purple-700 border-purple-600'
-                            : ''
-                        }
-                      >
-                        {togglingIds.has(page.id) ? '...' : 'Brand Pages'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleTogglePageGroup(e, page.id, 'isCarsPage')}
-                        disabled={togglingIds.has(page.id)}
-                        className={
-                          page.isCarsPage
-                            ? 'bg-orange-600 text-white hover:bg-orange-700 border-orange-600'
-                            : ''
-                        }
-                      >
-                        {togglingIds.has(page.id) ? '...' : 'Cars Pages'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => handleTogglePageGroup(e, page.id, 'isRevoPage')}
-                        disabled={togglingIds.has(page.id)}
-                        className={
-                          page.isRevoPage
-                            ? 'bg-teal-600 text-white hover:bg-teal-700 border-teal-600'
-                            : ''
-                        }
-                      >
-                        {togglingIds.has(page.id) ? '...' : 'Revo Pages'}
-                      </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDuplicatePage(page)}
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        Duplicate
-                      </Button>
-                      {page.published && (
+                      <div className="flex gap-2 ml-4 flex-wrap justify-end">
+                        {BRAND_SECTIONS.map((section) => (
+                          <Button
+                            key={section.key}
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => handleTogglePageGroup(e, page.id, section.key)}
+                            disabled={togglingIds.has(page.id)}
+                            className={
+                              page[section.key]
+                                ? COLOR_MAP[section.color].btn
+                                : ''
+                            }
+                          >
+                            {togglingIds.has(page.id) ? '...' : section.label}
+                          </Button>
+                        ))}
                         <Button variant="outline" size="sm" asChild>
-                          <Link href={`/${page.slug}`} target="_blank">
-                            View
-                          </Link>
+                          <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>
                         </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(page.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        Delete
-                      </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDuplicatePage(page)}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          Duplicate
+                        </Button>
+                        {page.published && (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/${page.slug}`} target="_blank">
+                              View
+                            </Link>
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(page.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
       </div>
@@ -1127,7 +768,8 @@ export default function PagesManagementPage() {
                 <li>• Use drag & drop to rearrange sections and components</li>
                 <li>• Double-click any custom page name to rename it</li>
                 <li>• Create custom pages for landing pages, promotions, or special content</li>
-                <li>• Click &ldquo;Brand Pages&rdquo;, &ldquo;Cars Pages&rdquo;, or &ldquo;Revo Pages&rdquo; to add a custom page to those sections</li>
+                <li>• Use the brand section buttons (NSR Pages, Revo Pages, etc.) to assign a page to that brand section</li>
+                <li>• A page can be assigned to multiple brand sections — it stays visible in Custom Pages too</li>
                 <li>• Use the search bar to quickly find pages by URL or name</li>
               </ul>
             </div>

@@ -191,6 +191,9 @@ export interface Page {
   isBrandPage?: boolean
   isCarsPage?: boolean
   isRevoPage?: boolean
+  isPioneerPage?: boolean
+  isSidewaysPage?: boolean
+  isBrmPage?: boolean
   components: PageComponent[]
   pageSettings?: PageSettings
   seo: {
