@@ -317,8 +317,11 @@ export default function PreOrderPosterPage() {
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
     const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\n📋 BOOK NOW: ${bookUrl}`
 
-    // Check native share support BEFORE any await (preserves user gesture context)
-    const canNativeShare = !!(navigator.share && navigator.canShare)
+    // On mobile, use the native share sheet (shares image + text directly to WhatsApp).
+    // On desktop, the native share API shows the OS share dialog which often fails —
+    // so always use WhatsApp URL + image download on desktop.
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    const canNativeShare = isMobile && !!(navigator.share && navigator.canShare)
 
     if (!canNativeShare) {
       // Desktop: open WhatsApp NOW (synchronous, gesture still active), then download image below
