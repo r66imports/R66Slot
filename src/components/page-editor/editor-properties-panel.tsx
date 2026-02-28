@@ -416,25 +416,27 @@ function LayoutModePanel({
       {/* Flow-mode layout options */}
       {!isAbsolute && (
         <div className="space-y-2">
-          {/* Display mode */}
-          <div>
-            <label className="text-[10px] text-gray-500 font-play mb-1 block">Display</label>
-            <div className="flex gap-1">
-              {(['block', 'flex', 'inline-block', 'grid'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => updateStyle('display', mode)}
-                  className={`flex-1 py-1 text-[10px] rounded font-play font-medium transition-colors ${
-                    (component.styles.display || 'block') === mode
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
+          {/* Display mode — hidden for image elements */}
+          {component.type !== 'image' && (
+            <div>
+              <label className="text-[10px] text-gray-500 font-play mb-1 block">Display</label>
+              <div className="flex gap-1">
+                {(['block', 'flex', 'inline-block', 'grid'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => updateStyle('display', mode)}
+                    className={`flex-1 py-1 text-[10px] rounded font-play font-medium transition-colors ${
+                      (component.styles.display || 'block') === mode
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    {mode}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Flex / Grid options */}
           {(component.styles.display === 'flex' || component.styles.display === 'grid') && (
@@ -857,65 +859,107 @@ function ContentTab({
             onChange={(url) => updateSetting('imageUrl', url)}
           />
 
-          {/* Freeform Image Fit - adjust image within its box */}
-          {component.positionMode === 'absolute' && (
-            <div className="bg-purple-50 rounded-lg p-3 space-y-2 border border-purple-200">
-              <h4 className="text-xs font-semibold text-purple-700 uppercase tracking-wider font-play">Image Fit (Freeform Box)</h4>
+          {/* Image Size */}
+          <div className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider font-play">Image Size</h4>
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-gray-500 font-play mb-1 block">Object Fit</label>
-                <div className="grid grid-cols-3 gap-1">
-                  {(['cover', 'contain', 'fill', 'none', 'scale-down'] as const).map((fit) => (
-                    <button
-                      key={fit}
-                      onClick={() => updateSetting('objectFit', fit)}
-                      className={`py-1.5 text-[10px] rounded font-play font-medium transition-colors ${
-                        (component.settings.objectFit || 'cover') === fit
-                          ? 'bg-purple-200 text-purple-800 ring-1 ring-purple-400'
-                          : 'bg-white text-gray-500 hover:bg-purple-100 border border-gray-200'
-                      }`}
-                    >
-                      {fit}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[10px] text-purple-500 mt-1.5 font-play">
-                  {(component.settings.objectFit || 'cover') === 'cover' && 'Fills the box, may crop edges'}
-                  {component.settings.objectFit === 'contain' && 'Fits entirely inside the box'}
-                  {component.settings.objectFit === 'fill' && 'Stretches to fill the box exactly'}
-                  {component.settings.objectFit === 'none' && 'Original size, no resizing'}
-                  {component.settings.objectFit === 'scale-down' && 'Shrinks to fit if needed, never enlarges'}
-                </p>
+                <label className="text-[10px] text-gray-500 font-play mb-1 block">Width (px)</label>
+                <input
+                  type="number"
+                  value={parseInt(component.styles.width as string) || ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    updateStyle('width', val ? `${val}px` : '')
+                  }}
+                  placeholder="auto"
+                  min={1}
+                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+                />
               </div>
               <div>
-                <label className="text-[10px] text-gray-500 font-play mb-1 block">Object Position</label>
-                <div className="grid grid-cols-3 gap-1">
-                  {[
-                    { label: '↖', value: 'top left' },
-                    { label: '↑', value: 'top center' },
-                    { label: '↗', value: 'top right' },
-                    { label: '←', value: 'center left' },
-                    { label: '●', value: 'center center' },
-                    { label: '→', value: 'center right' },
-                    { label: '↙', value: 'bottom left' },
-                    { label: '↓', value: 'bottom center' },
-                    { label: '↘', value: 'bottom right' },
-                  ].map((pos) => (
-                    <button
-                      key={pos.value}
-                      onClick={() => updateSetting('objectPosition', pos.value)}
-                      className={`py-1.5 text-[11px] rounded font-play transition-colors ${
-                        (component.settings.objectPosition || 'center center') === pos.value
-                          ? 'bg-purple-200 text-purple-800 ring-1 ring-purple-400'
-                          : 'bg-white text-gray-500 hover:bg-purple-100 border border-gray-200'
-                      }`}
-                    >
-                      {pos.label}
-                    </button>
-                  ))}
-                </div>
+                <label className="text-[10px] text-gray-500 font-play mb-1 block">Height (px)</label>
+                <input
+                  type="number"
+                  value={parseInt(component.styles.height as string) || ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    updateStyle('height', val ? `${val}px` : '')
+                  }}
+                  placeholder="auto"
+                  min={1}
+                  className="w-full px-2 py-1.5 border border-gray-200 rounded text-xs font-play"
+                />
               </div>
             </div>
-          )}
+            <p className="text-[10px] text-gray-400 font-play">Leave blank to use auto sizing</p>
+          </div>
+
+          {/* Container / Object Fit */}
+          <div className="bg-blue-50 rounded-lg p-3 space-y-2 border border-blue-200">
+            <h4 className="text-xs font-semibold text-blue-700 uppercase tracking-wider font-play">Container</h4>
+            <div>
+              <label className="text-[10px] text-gray-500 font-play mb-1 block">Fit to Box</label>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { value: 'cover', label: 'Cover' },
+                  { value: 'contain', label: 'Contain' },
+                  { value: 'fill', label: 'Fill' },
+                  { value: 'scale-down', label: 'Shrink' },
+                  { value: 'none', label: 'Original' },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => updateSetting('objectFit', opt.value)}
+                    className={`py-1.5 text-[10px] rounded font-play font-medium transition-colors ${
+                      (component.settings.objectFit || 'cover') === opt.value
+                        ? 'bg-blue-600 text-white ring-1 ring-blue-400'
+                        : 'bg-white text-gray-500 hover:bg-blue-100 border border-gray-200'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-blue-500 mt-1.5 font-play">
+                {(component.settings.objectFit || 'cover') === 'cover' && 'Fills the box — may crop edges'}
+                {component.settings.objectFit === 'contain' && 'Fits entirely inside — no cropping'}
+                {component.settings.objectFit === 'fill' && 'Stretches to fill exactly'}
+                {component.settings.objectFit === 'scale-down' && 'Shrinks to fit if needed, never enlarges'}
+                {component.settings.objectFit === 'none' && 'Displays at original size'}
+              </p>
+            </div>
+
+            {/* Object Position — useful in both modes */}
+            <div>
+              <label className="text-[10px] text-gray-500 font-play mb-1 block">Image Anchor</label>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { label: '↖', value: 'top left' },
+                  { label: '↑', value: 'top center' },
+                  { label: '↗', value: 'top right' },
+                  { label: '←', value: 'center left' },
+                  { label: '●', value: 'center center' },
+                  { label: '→', value: 'center right' },
+                  { label: '↙', value: 'bottom left' },
+                  { label: '↓', value: 'bottom center' },
+                  { label: '↘', value: 'bottom right' },
+                ].map((pos) => (
+                  <button
+                    key={pos.value}
+                    onClick={() => updateSetting('objectPosition', pos.value)}
+                    className={`py-1.5 text-[11px] rounded font-play transition-colors ${
+                      (component.settings.objectPosition || 'center center') === pos.value
+                        ? 'bg-blue-600 text-white ring-1 ring-blue-400'
+                        : 'bg-white text-gray-500 hover:bg-blue-100 border border-gray-200'
+                    }`}
+                  >
+                    {pos.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Alt Text</label>

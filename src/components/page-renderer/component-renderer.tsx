@@ -276,17 +276,21 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       const isFreeformImg = component.positionMode === 'absolute'
       const imgFit = (settings.objectFit as string) || 'cover'
       const imgPos = (settings.objectPosition as string) || 'center center'
+      const imgWidth = styles.width || '100%'
+      const imgHeight = isFreeformImg ? '100%' : (styles.height || 'auto')
 
       const imageElement = settings.imageUrl ? (
         <img
           src={settings.imageUrl as string}
           alt={(settings.alt as string) || ''}
-          className={isFreeformImg ? 'w-full h-full' : 'max-w-full h-auto'}
+          className={isFreeformImg ? 'w-full h-full' : ''}
           style={{
             objectFit: imgFit as any,
             objectPosition: imgPos,
-            width: '100%',
-            height: isFreeformImg ? '100%' : (styles.height || 'auto'),
+            width: isFreeformImg ? '100%' : imgWidth,
+            height: imgHeight,
+            maxWidth: '100%',
+            display: 'block',
           }}
         />
       ) : (
