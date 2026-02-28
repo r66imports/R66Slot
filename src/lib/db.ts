@@ -9,13 +9,25 @@ function getPool(): Pool {
     if (!connectionString) {
       throw new Error('Missing DATABASE_URL environment variable')
     }
+    // Railway internal connections (postgres.railway.internal) don't use SSL.
+    // Public connections do. Detect by hostname.
+    const isInternal = connectionString.includes('railway.internal')
+    const ssl = isInternal ? false : { rejectUnauthorized: false }
+
     _pool = new Pool({
       connectionString,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-      max: 10,
-      connectionTimeoutMillis: 10000,
+      ssl,
+      max: 5,
+      connectionTimeoutMillis: 8000,
       idleTimeoutMillis: 30000,
       statement_timeout: 30000,
+    })
+
+    // If the pool hits an unrecoverable error, reset it so the next
+    // request triggers a fresh pool (handles SIGTERM stale connections)
+    _pool.on('error', (err) => {
+      console.error('[db] Pool error, resetting:', err.message)
+      _pool = null
     })
   }
   return _pool
