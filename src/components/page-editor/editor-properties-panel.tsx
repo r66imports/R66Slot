@@ -500,51 +500,55 @@ function LayoutModePanel({
             </>
           )}
 
-          {/* Width / Height for flow mode */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Width</label>
-              <input
-                type="text"
-                value={component.styles.width || ''}
-                onChange={(e) => updateStyle('width', e.target.value)}
-                placeholder="auto"
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Max Width</label>
-              <input
-                type="text"
-                value={component.styles.maxWidth || ''}
-                onChange={(e) => updateStyle('maxWidth', e.target.value)}
-                placeholder="100%"
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Height</label>
-              <input
-                type="text"
-                value={component.styles.height || ''}
-                onChange={(e) => updateStyle('height', e.target.value)}
-                placeholder="auto"
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-500 font-play">Min Height</label>
-              <input
-                type="text"
-                value={component.styles.minHeight || ''}
-                onChange={(e) => updateStyle('minHeight', e.target.value)}
-                placeholder="auto"
-                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
-              />
-            </div>
-          </div>
+          {/* Width / Height for flow mode — hidden for image (Image Size section handles this) */}
+          {component.type !== 'image' && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-500 font-play">Width</label>
+                  <input
+                    type="text"
+                    value={component.styles.width || ''}
+                    onChange={(e) => updateStyle('width', e.target.value)}
+                    placeholder="auto"
+                    className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 font-play">Max Width</label>
+                  <input
+                    type="text"
+                    value={component.styles.maxWidth || ''}
+                    onChange={(e) => updateStyle('maxWidth', e.target.value)}
+                    placeholder="100%"
+                    className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] text-gray-500 font-play">Height</label>
+                  <input
+                    type="text"
+                    value={component.styles.height || ''}
+                    onChange={(e) => updateStyle('height', e.target.value)}
+                    placeholder="auto"
+                    className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-gray-500 font-play">Min Height</label>
+                  <input
+                    type="text"
+                    value={component.styles.minHeight || ''}
+                    onChange={(e) => updateStyle('minHeight', e.target.value)}
+                    placeholder="auto"
+                    className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -647,6 +651,9 @@ function ContentTab({
   onUpdate: (updates: Partial<PageComponent>) => void
   updateSetting: (key: string, value: any) => void
 }) {
+  const updateStyle = (key: string, value: string) => {
+    onUpdate({ styles: { ...component.styles, [key]: value } })
+  }
   return (
     <>
       {/* ─── Layout Mode (all components) ─── */}
