@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRANDS = ['NSR', 'Revo', 'Pioneer', 'Sideways', 'Slot.it', 'Carrera', 'Scalextric', 'Policar', 'BRM', 'Fly']
@@ -318,28 +319,25 @@ export default function PreOrderPosterPage() {
     setSendingWhatsapp(true)
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-    const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\n${bookUrl}`
+    const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\nBook here: ${bookUrl}`
 
     try {
-      // Step 1: Download poster image
-      if (posterRef.current) {
-        const canvas = await html2canvas(posterRef.current, {
-          backgroundColor: '#ffffff', scale: 2, useCORS: true,
-        })
-        canvas.toBlob((blob) => {
-          if (!blob) return
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `R66SLOT-${sku || 'poster'}.jpg`
-          a.click()
-          URL.revokeObjectURL(url)
-        }, 'image/jpeg', 0.92)
-      }
-      // Step 2: Open WhatsApp with text (attach the downloaded image manually)
+      if (!posterRef.current) throw new Error('No poster')
+      // Capture poster as image
+      const canvas = await html2canvas(posterRef.current, {
+        backgroundColor: '#ffffff', scale: 2, useCORS: true,
+      })
+      const imgData = canvas.toDataURL('image/jpeg', 0.92)
+      // Build A5 PDF with the poster image
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH)
+      pdf.save(`R66SLOT-${sku || 'poster'}.pdf`)
+      // Open WhatsApp with share text after PDF downloads
       setTimeout(() => {
         window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
-      }, 600)
+      }, 800)
     } catch (err) {
       console.error('WhatsApp export error:', err)
       window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
