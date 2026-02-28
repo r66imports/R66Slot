@@ -611,7 +611,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                 const colContent = (
                   <div
                     key={child.id}
-                    className={styles.textAlign === 'center' ? 'text-center' : ''}
+                    style={{ textAlign: (child.styles?.textAlign as any) || 'left' }}
                   >
                     {child.settings.icon && (
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
@@ -664,7 +664,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                 const colContent = (
                   <div
                     key={child.id}
-                    className={styles.textAlign === 'center' ? 'text-center' : ''}
+                    style={{ textAlign: (child.styles?.textAlign as any) || 'left' }}
                   >
                     {child.settings.icon && (
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">

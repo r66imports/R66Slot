@@ -1858,6 +1858,11 @@ function VisualColumnEditor({
     updateChild(index, { settings: { ...child.settings, [key]: value } })
   }
 
+  const updateChildStyle = (index: number, key: string, value: string) => {
+    const child = children[index]
+    updateChild(index, { styles: { ...child.styles, [key]: value } })
+  }
+
   const handleColumnImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -1990,6 +1995,26 @@ function VisualColumnEditor({
               placeholder="/page-slug or https://..."
               className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
             />
+          </div>
+
+          {/* Text Alignment */}
+          <div>
+            <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Text Align</label>
+            <div className="flex gap-1">
+              {(['left', 'center', 'right'] as const).map((align) => (
+                <button
+                  key={align}
+                  onClick={() => updateChildStyle(idx, 'textAlign', align)}
+                  className={`flex-1 py-1 text-[10px] rounded font-play font-medium transition-colors border ${
+                    (child.styles?.textAlign || 'left') === align
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  {align === 'left' ? '⇐ Left' : align === 'center' ? '⇔ Centre' : 'Right ⇒'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Rich text editor for content */}

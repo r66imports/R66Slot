@@ -503,8 +503,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                 const colContent = (
                   <div
                     key={child.id}
-                    className={styles.textAlign === 'center' ? 'text-center' : ''}
-                    style={{ direction: 'ltr', textAlign: 'left' }}
+                    style={{ direction: 'ltr', textAlign: (child.styles?.textAlign as any) || 'left' }}
                   >
                     {/* Column Icon */}
                     {child.settings.icon && (

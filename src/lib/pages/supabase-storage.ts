@@ -1,5 +1,26 @@
 import { getSupabaseAdmin } from '@/lib/supabase/server'
+import { db } from '@/lib/db'
 import type { Page } from './schema'
+
+// Lazy migration — adds brand flag columns if they don't exist yet
+let _brandColumnsMigrated = false
+async function ensureBrandColumns() {
+  if (_brandColumnsMigrated) return
+  try {
+    await db.query(`
+      ALTER TABLE pages
+        ADD COLUMN IF NOT EXISTS is_revo_page     BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_pioneer_page  BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_sideways_page BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_brm_page      BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_brand_page    BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS is_cars_page     BOOLEAN DEFAULT FALSE
+    `)
+  } catch (err: any) {
+    console.error('[pages] ensureBrandColumns:', err?.message)
+  }
+  _brandColumnsMigrated = true
+}
 
 // Convert DB row (snake_case) -> Page object (camelCase)
 function rowToPage(row: any): Page {
@@ -9,6 +30,12 @@ function rowToPage(row: any): Page {
     slug: row.slug,
     published: row.published,
     isWebsitePage: row.is_website_page ?? undefined,
+    isRevoPage: row.is_revo_page ?? undefined,
+    isPioneerPage: row.is_pioneer_page ?? undefined,
+    isSidewaysPage: row.is_sideways_page ?? undefined,
+    isBrmPage: row.is_brm_page ?? undefined,
+    isBrandPage: row.is_brand_page ?? undefined,
+    isCarsPage: row.is_cars_page ?? undefined,
     components: row.components ?? [],
     pageSettings: row.page_settings ?? undefined,
     seo: row.seo ?? { metaTitle: '', metaDescription: '', metaKeywords: '' },
@@ -27,6 +54,12 @@ function pageToRow(page: Page) {
     slug: page.slug,
     published: page.published,
     is_website_page: page.isWebsitePage ?? false,
+    is_revo_page: page.isRevoPage ?? false,
+    is_pioneer_page: page.isPioneerPage ?? false,
+    is_sideways_page: page.isSidewaysPage ?? false,
+    is_brm_page: page.isBrmPage ?? false,
+    is_brand_page: page.isBrandPage ?? false,
+    is_cars_page: page.isCarsPage ?? false,
     components: JSON.stringify(page.components ?? []),
     page_settings: JSON.stringify(page.pageSettings ?? {}),
     seo: JSON.stringify(page.seo ?? {}),
@@ -77,6 +110,7 @@ export async function supaGetPageBySlug(slug: string): Promise<Page | null> {
 }
 
 export async function supaUpsertPage(page: Page): Promise<void> {
+  await ensureBrandColumns()
   const sb = getSupabaseAdmin()
   const { error } = await sb
     .from('pages')
@@ -89,7 +123,7 @@ export async function supaDeletePage(id: string): Promise<boolean> {
   const sb = getSupabaseAdmin()
   const { error, count } = await sb
     .from('pages')
-    .delete({ count: 'exact' })
+    .delete()
     .eq('id', id)
 
   if (error) throw error
