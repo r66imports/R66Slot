@@ -321,30 +321,28 @@ export default function PreOrderPosterPage() {
     const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\n${bookUrl}`
 
     try {
-      // Try to share poster image + text together via Web Share API (mobile & modern desktop)
-      if (posterRef.current && navigator.share) {
+      // Step 1: Download poster image
+      if (posterRef.current) {
         const canvas = await html2canvas(posterRef.current, {
           backgroundColor: '#ffffff', scale: 2, useCORS: true,
         })
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92)
-        )
-        if (blob) {
-          const file = new File([blob], `R66SLOT-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
-          if (navigator.canShare?.({ files: [file] })) {
-            // Share poster image AND text together so WhatsApp gets both
-            await navigator.share({ files: [file], text: shareText })
-            return
-          }
-        }
+        canvas.toBlob((blob) => {
+          if (!blob) return
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `R66SLOT-${sku || 'poster'}.jpg`
+          a.click()
+          URL.revokeObjectURL(url)
+        }, 'image/jpeg', 0.92)
       }
-
-      // Fallback: open WhatsApp with text (no image sharing support)
-      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
-    } catch (err) {
-      if ((err as Error)?.name !== 'AbortError') {
+      // Step 2: Open WhatsApp with text (attach the downloaded image manually)
+      setTimeout(() => {
         window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
-      }
+      }, 600)
+    } catch (err) {
+      console.error('WhatsApp export error:', err)
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
     } finally {
       setSendingWhatsapp(false)
     }
