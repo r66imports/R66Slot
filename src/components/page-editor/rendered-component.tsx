@@ -498,6 +498,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                 // Get image fit settings
                 const imgObjectFit = (child.settings.objectFit as string) || 'cover'
                 const imgHeight = (child.settings.imageHeight as string) || ''
+                const imgWidth = (child.settings.imageWidth as string) || ''
 
                 const colContent = (
                   <div
@@ -515,13 +516,19 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                     {(child.settings.imageUrl as string) && (
                       <div
                         className="mb-3 overflow-hidden rounded-lg"
-                        style={imgHeight ? { height: imgHeight } : undefined}
+                        style={{
+                          ...(imgHeight ? { height: imgHeight } : {}),
+                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : {}),
+                        }}
                       >
                         <img
                           src={child.settings.imageUrl as string}
                           alt={(child.settings.alt as string) || ''}
-                          className={`w-full rounded-lg ${imgHeight ? 'h-full' : 'h-auto'}`}
-                          style={{ objectFit: imgObjectFit as any }}
+                          className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
+                          style={{
+                            objectFit: imgObjectFit as any,
+                            ...(imgWidth ? { width: '100%' } : {}),
+                          }}
                         />
                       </div>
                     )}

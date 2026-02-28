@@ -1953,17 +1953,29 @@ function VisualColumnEditor({
                     <option value="scale-down">Scale Down (shrink only)</option>
                   </select>
                 </div>
-                <div className="mt-1.5">
-                  <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Image Height</label>
-                  <input
-                    type="text"
-                    value={(child.settings.imageHeight as string) || ''}
-                    onChange={(e) => updateChildSetting(idx, 'imageHeight', e.target.value)}
-                    placeholder="e.g. 250px, 50vh"
-                    className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
-                  />
-                  <p className="text-[9px] text-gray-400 mt-0.5 font-play">Leave blank to auto-size. Image Fit requires a height.</p>
+                <div className="mt-1.5 flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Width</label>
+                    <input
+                      type="text"
+                      value={(child.settings.imageWidth as string) || ''}
+                      onChange={(e) => updateChildSetting(idx, 'imageWidth', e.target.value)}
+                      placeholder="e.g. 300px, 80%"
+                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Height</label>
+                    <input
+                      type="text"
+                      value={(child.settings.imageHeight as string) || ''}
+                      onChange={(e) => updateChildSetting(idx, 'imageHeight', e.target.value)}
+                      placeholder="e.g. 250px, 50vh"
+                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+                    />
+                  </div>
                 </div>
+                <p className="text-[9px] text-gray-400 mt-0.5 font-play">Set height for Image Fit to work. Leave blank to auto-size.</p>
               </>
             )}
           </div>

@@ -659,6 +659,8 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
             >
               {children?.slice(0, colCount).map((child) => {
                 const imgFitCol = (child.settings.objectFit as string) || 'cover'
+                const imgHeight = (child.settings.imageHeight as string) || (child.styles?.height as string) || ''
+                const imgWidth = (child.settings.imageWidth as string) || (child.styles?.width as string) || ''
                 const colContent = (
                   <div
                     key={child.id}
@@ -670,18 +672,21 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       </div>
                     )}
                     {(child.settings.imageUrl as string) && (
-                      <div className="mb-3 overflow-hidden rounded-lg">
+                      <div
+                        className="mb-3 overflow-hidden rounded-lg"
+                        style={{
+                          ...(imgHeight ? { height: imgHeight } : {}),
+                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : {}),
+                        }}
+                      >
                         <img
                           src={child.settings.imageUrl as string}
                           alt={(child.settings.alt as string) || ''}
-                          className="rounded-lg"
+                          className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
                           style={{
-                            width: child.styles?.width || '100%',
-                            height: child.styles?.height || 'auto',
                             objectFit: imgFitCol as any,
                             objectPosition: (child.settings.objectPosition as string) || 'center center',
-                            maxWidth: '100%',
-                            maxHeight: imgFitCol === 'contain' ? '300px' : undefined,
+                            ...(imgWidth ? { width: '100%' } : {}),
                           }}
                         />
                       </div>
