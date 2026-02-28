@@ -661,10 +661,12 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                 const imgFitCol = (child.settings.objectFit as string) || 'cover'
                 const imgHeight = (child.settings.imageHeight as string) || (child.styles?.height as string) || ''
                 const imgWidth = (child.settings.imageWidth as string) || (child.styles?.width as string) || ''
+                const colTextAlign = (child.styles?.textAlign as string) || 'left'
+                const colFlexAlign = colTextAlign === 'center' ? 'center' : colTextAlign === 'right' ? 'flex-end' : 'flex-start'
                 const colContent = (
                   <div
                     key={child.id}
-                    style={{ textAlign: (child.styles?.textAlign as any) || 'left' }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: colFlexAlign }}
                   >
                     {child.settings.icon && (
                       <div className="inline-flex items-center justify-center w-16 h-16 bg-primary text-white rounded-full mb-4 text-2xl">
@@ -676,7 +678,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                         className="mb-3 overflow-hidden rounded-lg"
                         style={{
                           ...(imgHeight ? { height: imgHeight } : {}),
-                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : {}),
+                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
                         }}
                       >
                         <img
@@ -691,7 +693,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                         />
                       </div>
                     )}
-                    <div dangerouslySetInnerHTML={{ __html: child.content }} />
+                    <div style={{ textAlign: colTextAlign as any, alignSelf: 'stretch' }} dangerouslySetInnerHTML={{ __html: child.content }} />
                   </div>
                 )
                 if (child.settings.link) {

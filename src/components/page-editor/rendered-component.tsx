@@ -499,11 +499,13 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                 const imgObjectFit = (child.settings.objectFit as string) || 'cover'
                 const imgHeight = (child.settings.imageHeight as string) || ''
                 const imgWidth = (child.settings.imageWidth as string) || ''
+                const colTextAlign = (child.styles?.textAlign as string) || 'left'
+                const colFlexAlign = colTextAlign === 'center' ? 'center' : colTextAlign === 'right' ? 'flex-end' : 'flex-start'
 
                 const colContent = (
                   <div
                     key={child.id}
-                    style={{ direction: 'ltr', textAlign: (child.styles?.textAlign as any) || 'left' }}
+                    style={{ display: 'flex', flexDirection: 'column', alignItems: colFlexAlign, direction: 'ltr' }}
                   >
                     {/* Column Icon */}
                     {child.settings.icon && (
@@ -517,7 +519,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                         className="mb-3 overflow-hidden rounded-lg"
                         style={{
                           ...(imgHeight ? { height: imgHeight } : {}),
-                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : {}),
+                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
                         }}
                       >
                         <img
@@ -531,9 +533,9 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                         />
                       </div>
                     )}
-                    {/* Column Text Content - Fix text direction */}
+                    {/* Column Text Content */}
                     <div
-                      style={{ direction: 'ltr', unicodeBidi: 'plaintext' }}
+                      style={{ direction: 'ltr', unicodeBidi: 'plaintext', textAlign: colTextAlign as any, alignSelf: 'stretch' }}
                       dangerouslySetInnerHTML={{ __html: child.content }}
                     />
                   </div>
