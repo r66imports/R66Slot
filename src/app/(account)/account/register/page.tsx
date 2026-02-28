@@ -141,10 +141,10 @@ export default function RegisterPage() {
                   required
                   autoComplete="username"
                   minLength={3}
-                  pattern="[a-zA-Z0-9_]+"
+                  pattern="[a-zA-Z0-9_ ]+"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  3+ characters, letters, numbers, and underscores only
+                  3+ characters, letters, numbers, underscores, and spaces
                 </p>
               </div>
 
