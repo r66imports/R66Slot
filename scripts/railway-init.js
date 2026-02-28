@@ -17,9 +17,10 @@ if (!connectionString) {
   process.exit(0)
 }
 
+const isInternal = connectionString.includes('railway.internal')
 const db = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: isInternal ? false : { rejectUnauthorized: false },
   connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
 })
