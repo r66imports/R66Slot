@@ -30,6 +30,7 @@ export interface Product {
   imageUrl: string
   images: string[]
   pageId: string
+  pageIds: string[]
   pageUrl: string
   seo: { metaTitle: string; metaDescription: string; metaKeywords: string }
   sageItemCode: string | null
@@ -68,6 +69,7 @@ function rowToProduct(row: any): Product {
     imageUrl: row.image_url,
     images: row.images || [],
     pageId: row.page_id,
+    pageIds: Array.isArray(row.page_ids) ? row.page_ids : (row.page_id ? [row.page_id] : []),
     pageUrl: row.page_url,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
@@ -77,9 +79,19 @@ function rowToProduct(row: any): Product {
   }
 }
 
+let _pageIdsMigrated = false
+async function ensurePageIdsColumn() {
+  if (_pageIdsMigrated) return
+  try {
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS page_ids JSONB DEFAULT '[]'::jsonb`)
+  } catch { /* ignore */ }
+  _pageIdsMigrated = true
+}
+
 // GET /api/admin/products
 export async function GET() {
   try {
+    await ensurePageIdsColumn()
     const result = await db.query(`SELECT * FROM products ORDER BY created_at DESC`)
     return NextResponse.json(result.rows.map(rowToProduct))
   } catch (error) {
@@ -101,6 +113,9 @@ export async function POST(request: Request) {
 
     const id = `prod-${Date.now()}`
     const now = new Date().toISOString()
+    await ensurePageIdsColumn()
+    const pageIds: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : [])
+    const primaryPageId = pageIds[0] || ''
 
     await db.query(`
       INSERT INTO products (
@@ -108,10 +123,10 @@ export async function POST(request: Request) {
         sku, barcode, brand, product_type, car_class, car_type, part_type,
         scale, supplier, collections, tags, quantity, track_quantity,
         weight, weight_unit, box_size, dimensions, eta, status,
-        image_url, images, page_id, page_url, seo, created_at, updated_at
+        image_url, images, page_id, page_ids, page_url, seo, created_at, updated_at
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32
+        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33
       )
     `, [
       id, body.title, body.description || '',
@@ -124,7 +139,7 @@ export async function POST(request: Request) {
       body.weight || null, body.weightUnit || 'kg', body.boxSize || '',
       JSON.stringify(body.dimensions || {}), body.eta || '', body.status || 'draft',
       body.imageUrl || body.mediaFiles?.[0] || '', JSON.stringify(body.mediaFiles || []),
-      body.pageId || '', body.pageUrl || '',
+      primaryPageId, JSON.stringify(pageIds), body.pageUrl || '',
       JSON.stringify(body.seo || {}), now, now,
     ])
 
@@ -154,10 +169,10 @@ export async function PUT(request: Request) {
           sku, barcode, brand, product_type, car_class, car_type, part_type,
           scale, supplier, collections, tags, quantity, track_quantity,
           weight, weight_unit, box_size, dimensions, eta, status,
-          image_url, images, page_id, page_url, seo, created_at, updated_at
+          image_url, images, page_id, page_ids, page_url, seo, created_at, updated_at
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-          $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32
+          $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33
         ) ON CONFLICT (id) DO NOTHING
       `, [
         id, p.title || p.name || '', p.description || '',
@@ -174,7 +189,7 @@ export async function PUT(request: Request) {
         p.boxSize || '', JSON.stringify(p.dimensions || {}),
         p.eta || '', p.status || 'active',
         p.imageUrl || '', JSON.stringify(Array.isArray(p.images) ? p.images : []),
-        p.pageId || '', p.pageUrl || '',
+        p.pageId || '', JSON.stringify(Array.isArray(p.pageIds) ? p.pageIds : (p.pageId ? [p.pageId] : [])), p.pageUrl || '',
         JSON.stringify(p.seo || {}), now, now,
       ])
       imported++

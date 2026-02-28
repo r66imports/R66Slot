@@ -32,6 +32,7 @@ function rowToProduct(row: any): Product {
     imageUrl: row.image_url,
     images: row.images || [],
     pageId: row.page_id,
+    pageIds: Array.isArray(row.page_ids) ? row.page_ids : (row.page_id ? [row.page_id] : []),
     pageUrl: row.page_url,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
@@ -71,9 +72,10 @@ export async function PUT(
         status = COALESCE($17, status),
         image_url = COALESCE($18, image_url),
         page_id = COALESCE($19, page_id),
-        page_url = COALESCE($20, page_url),
-        seo = COALESCE($21, seo),
-        updated_at = $22
+        page_ids = COALESCE($20, page_ids),
+        page_url = COALESCE($21, page_url),
+        seo = COALESCE($22, seo),
+        updated_at = $23
       WHERE id = $1
       RETURNING *
     `, [
@@ -95,7 +97,8 @@ export async function PUT(
       body.eta ?? null,
       body.status ?? null,
       body.imageUrl ?? null,
-      body.pageId ?? null,
+      (() => { const ids: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : []); return ids[0] ?? null })(),
+      (() => { const ids: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : []); return ids.length ? JSON.stringify(ids) : null })(),
       body.pageUrl ?? null,
       body.seo != null ? JSON.stringify(body.seo) : null,
       now,

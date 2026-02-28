@@ -38,7 +38,8 @@ export default function NewProductPage() {
   const [dimWidth, setDimWidth] = useState('')
   const [dimHeight, setDimHeight] = useState('')
   const [mediaFiles, setMediaFiles] = useState<{ name: string; url: string; type: string }[]>([])
-  const [pageId, setPageId] = useState('')
+  const [pageIds, setPageIds] = useState<string[]>([])
+  const [pageDropdownOpen, setPageDropdownOpen] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
@@ -237,7 +238,8 @@ export default function NewProductPage() {
         },
         mediaFiles: imageUrls,
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : '',
-        pageId,
+        pageIds,
+        pageId: pageIds[0] || '',
         seo: {
           metaTitle: seoTitle,
           metaDescription: seoDescription,
@@ -907,39 +909,57 @@ export default function NewProductPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Assign to Page
                   </label>
-                  <select
-                    value={pageId}
-                    onChange={(e) => setPageId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">No page assigned</option>
-                    {availablePages.map((p) => (
-                      <option key={p.id} value={p.id}>{p.title}</option>
-                    ))}
-                  </select>
-                  {pageId ? (
-                    <div className="mt-2 flex items-center gap-3">
-                      <a
-                        href={`/admin/pages/editor/${pageId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                      >
-                        View Page →
-                      </a>
-                      <span className="text-gray-300">|</span>
-                      <a
-                        href={`/admin/pages/frontend/${pageId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs font-medium text-green-600 hover:text-green-800 hover:underline"
-                      >
-                        Preview Live →
-                      </a>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setPageDropdownOpen(!pageDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
+                    >
+                      <span className={pageIds.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {pageIds.length === 0
+                          ? 'No page assigned'
+                          : pageIds.length === 1
+                            ? (availablePages.find(p => p.id === pageIds[0])?.title || pageIds[0])
+                            : `${pageIds.length} pages selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${pageDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {pageDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input
+                            type="checkbox"
+                            checked={pageIds.length === 0}
+                            onChange={() => setPageIds([])}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-gray-500 italic">No page assigned</span>
+                        </label>
+                        {availablePages.map((p) => (
+                          <label key={p.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={pageIds.includes(p.id)}
+                              onChange={(e) => setPageIds(e.target.checked ? [...pageIds, p.id] : pageIds.filter(id => id !== p.id))}
+                              className="rounded"
+                            />
+                            <span className="text-sm text-gray-900">{p.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {pageIds.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                      {pageIds.map(pid => (
+                        <a key={pid} href={`/admin/pages/editor/${pid}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                          {availablePages.find(p => p.id === pid)?.title || pid} →
+                        </a>
+                      ))}
                     </div>
                   ) : (
                     <p className="mt-1 text-xs text-gray-500">
-                      Select a page where this product will appear
+                      Select pages where this product will appear
                     </p>
                   )}
                 </div>
