@@ -88,6 +88,7 @@ export default function EditProductPage({
   const [pageId, setPageId] = useState('')
   const [pageUrl, setPageUrl] = useState('')
   const [carClass, setCarClass] = useState('')
+  const [revoPart, setRevoPart] = useState('')
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
@@ -172,6 +173,7 @@ export default function EditProductPage({
           setPageId(found.pageId || '')
           setPageUrl((found as any).pageUrl || '')
           setCarClass((found as any).carClass || '')
+          setRevoPart((found as any).revoPart || '')
           setSeoTitle(found.seo?.metaTitle || '')
           setSeoDescription(found.seo?.metaDescription || '')
           setSeoKeywords(found.seo?.metaKeywords || '')
@@ -306,6 +308,7 @@ export default function EditProductPage({
         brand,
         productType,
         carClass,
+        revoPart,
         carType,
         partType,
         scale,
@@ -779,6 +782,33 @@ export default function EditProductPage({
                     <p className="text-xs text-gray-500 mt-1">
                       Selected: <span className="font-semibold text-red-600">{carClass}</span>
                       <button type="button" onClick={() => setCarClass('')} className="ml-2 text-gray-400 hover:text-gray-600">✕ Clear</button>
+                    </p>
+                  )}
+                </div>
+
+                {/* Revo Parts */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Revo Parts</label>
+                  <div className="flex flex-wrap gap-2 mb-1">
+                    {['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis'].map(part => (
+                      <button
+                        key={part}
+                        type="button"
+                        onClick={() => setRevoPart(revoPart === part ? '' : part)}
+                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                          revoPart === part
+                            ? 'bg-red-600 text-white border-red-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-600'
+                        }`}
+                      >
+                        {part}
+                      </button>
+                    ))}
+                  </div>
+                  {revoPart && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Selected: <span className="font-semibold text-red-600">{revoPart}</span>
+                      <button type="button" onClick={() => setRevoPart('')} className="ml-2 text-gray-400 hover:text-gray-600">✕ Clear</button>
                     </p>
                   )}
                 </div>

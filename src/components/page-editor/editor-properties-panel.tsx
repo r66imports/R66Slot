@@ -2484,6 +2484,40 @@ function SettingsTab({
             )}
           </div>
 
+          {/* Revo Parts filter */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">
+              Revo Parts Filter
+            </label>
+            <select
+              value={(component.settings.revoPart as string) || ''}
+              onChange={(e) => updateSetting('revoPart', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="">All Parts (no filter)</option>
+              <option value="Tyres">Tyres</option>
+              <option value="Wheels">Wheels</option>
+              <option value="Axle">Axle</option>
+              <option value="Bearings">Bearings</option>
+              <option value="Gears">Gears</option>
+              <option value="Pinions">Pinions</option>
+              <option value="Screws and Nuts">Screws and Nuts</option>
+              <option value="Motors">Motors</option>
+              <option value="Guides">Guides</option>
+              <option value="Body Plates & Chassis">Body Plates &amp; Chassis</option>
+            </select>
+            {component.settings.revoPart && (
+              <p className="text-[10px] text-red-600 mt-1 font-play font-medium">
+                Showing only: {component.settings.revoPart as string}
+              </p>
+            )}
+            {!component.settings.revoPart && (
+              <p className="text-[10px] text-gray-400 mt-1 font-play">
+                Select a part type to filter Revo products
+              </p>
+            )}
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Product Count</label>
             <input

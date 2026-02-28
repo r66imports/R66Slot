@@ -33,11 +33,18 @@ function ProductGridLive({
               p.tags?.includes(settings.carClass)
           )
         }
+        if (settings.revoPart) {
+          list = list.filter(
+            (p: any) =>
+              p.revoPart === settings.revoPart ||
+              p.tags?.includes(settings.revoPart)
+          )
+        }
         setProducts(list.slice(0, (settings.productCount as number) || 8))
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.carClass, settings.productCount])
+  }, [settings.carClass, settings.revoPart, settings.productCount])
 
   const handleAddToCart = (p: any) => {
     addItem({
@@ -75,6 +82,8 @@ function ProductGridLive({
             <p className="text-sm">
               {settings.carClass
                 ? `No active products for class "${settings.carClass as string}"`
+                : settings.revoPart
+                ? `No active products for "${settings.revoPart as string}"`
                 : 'No active products found'}
             </p>
           </div>
