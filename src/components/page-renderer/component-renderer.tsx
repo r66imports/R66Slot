@@ -40,11 +40,19 @@ function ProductGridLive({
               p.tags?.includes(settings.revoPart)
           )
         }
+        const activeBrands = Array.isArray(settings.carBrands) ? (settings.carBrands as string[]) : []
+        if (activeBrands.length > 0) {
+          list = list.filter(
+            (p: any) =>
+              (Array.isArray(p.carBrands) && p.carBrands.some((b: string) => activeBrands.includes(b))) ||
+              activeBrands.some((b) => p.tags?.includes(b))
+          )
+        }
         setProducts(list.slice(0, (settings.productCount as number) || 8))
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.carClass, settings.revoPart, settings.productCount])
+  }, [settings.carClass, settings.revoPart, settings.carBrands, settings.productCount])
 
   const handleAddToCart = (p: any) => {
     addItem({

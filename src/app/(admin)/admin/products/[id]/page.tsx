@@ -90,6 +90,8 @@ export default function EditProductPage({
   const [pageUrl, setPageUrl] = useState('')
   const [carClass, setCarClass] = useState('')
   const [revoPart, setRevoPart] = useState('')
+  const [carBrands, setCarBrands] = useState<string[]>([])
+  const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
@@ -175,6 +177,7 @@ export default function EditProductPage({
           setPageUrl((found as any).pageUrl || '')
           setCarClass((found as any).carClass || '')
           setRevoPart((found as any).revoPart || '')
+          setCarBrands(Array.isArray((found as any).carBrands) ? (found as any).carBrands : [])
           setSeoTitle(found.seo?.metaTitle || '')
           setSeoDescription(found.seo?.metaDescription || '')
           setSeoKeywords(found.seo?.metaKeywords || '')
@@ -310,6 +313,7 @@ export default function EditProductPage({
         productType,
         carClass,
         revoPart,
+        carBrands,
         carType,
         partType,
         scale,
@@ -812,6 +816,63 @@ export default function EditProductPage({
                       Selected: <span className="font-semibold text-red-600">{revoPart}</span>
                       <button type="button" onClick={() => setRevoPart('')} className="ml-2 text-gray-400 hover:text-gray-600">✕ Clear</button>
                     </p>
+                  )}
+                </div>
+
+                {/* Car Brands (multi-select checkbox dropdown) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Car Brand</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCarBrandDropdownOpen(!carBrandDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
+                    >
+                      <span className={carBrands.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {carBrands.length === 0
+                          ? 'No brand assigned'
+                          : carBrands.length === 1
+                          ? carBrands[0]
+                          : `${carBrands.length} brands selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${carBrandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {carBrandDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input
+                            type="checkbox"
+                            checked={carBrands.length === 0}
+                            onChange={() => setCarBrands([])}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-gray-500 italic">None</span>
+                        </label>
+                        {['Ford Escort MK I'].map((cb) => (
+                          <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={carBrands.includes(cb)}
+                              onChange={(e) => setCarBrands(e.target.checked ? [...carBrands, cb] : carBrands.filter(b => b !== cb))}
+                              className="rounded"
+                            />
+                            <span className="text-sm text-gray-900">{cb}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {carBrands.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {carBrands.map(cb => (
+                        <span key={cb} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                          {cb}
+                          <button type="button" onClick={() => setCarBrands(carBrands.filter(b => b !== cb))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
 

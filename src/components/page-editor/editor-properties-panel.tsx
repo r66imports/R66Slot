@@ -2377,6 +2377,23 @@ function SettingsTab({
   onUpdate: (updates: Partial<PageComponent>) => void
   updateSetting: (key: string, value: any) => void
 }) {
+  const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
+
+  const CAR_BRANDS = [
+    'Ford Escort MK I',
+  ]
+
+  const selectedCarBrands: string[] = Array.isArray(component.settings.carBrands)
+    ? (component.settings.carBrands as string[])
+    : []
+
+  const toggleCarBrand = (brand: string) => {
+    const next = selectedCarBrands.includes(brand)
+      ? selectedCarBrands.filter((b) => b !== brand)
+      : [...selectedCarBrands, brand]
+    updateSetting('carBrands', next)
+  }
+
   return (
     <>
       {/* Current mode indicator */}
@@ -2565,6 +2582,73 @@ function SettingsTab({
             {!component.settings.revoPart && (
               <p className="text-[10px] text-gray-400 mt-1 font-play">
                 Select a part type to filter Revo products
+              </p>
+            )}
+          </div>
+
+          {/* Car Brand filter — multi-select checkbox dropdown */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">
+              Car Brand Filter
+            </label>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setCarBrandDropdownOpen(!carBrandDropdownOpen)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play text-left flex items-center justify-between bg-white"
+              >
+                <span className={selectedCarBrands.length === 0 ? 'text-gray-400' : 'text-gray-800'}>
+                  {selectedCarBrands.length === 0
+                    ? 'All Brands (no filter)'
+                    : selectedCarBrands.length === 1
+                    ? selectedCarBrands[0]
+                    : `${selectedCarBrands.length} brands selected`}
+                </span>
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform ${carBrandDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {carBrandDropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                    <input
+                      type="checkbox"
+                      checked={selectedCarBrands.length === 0}
+                      onChange={() => updateSetting('carBrands', [])}
+                      className="rounded"
+                    />
+                    <span className="text-xs text-gray-500 font-play italic">All Brands (no filter)</span>
+                  </label>
+                  {CAR_BRANDS.map((brand) => (
+                    <label key={brand} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedCarBrands.includes(brand)}
+                        onChange={() => toggleCarBrand(brand)}
+                        className="rounded"
+                      />
+                      <span className="text-xs text-gray-800 font-play">{brand}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedCarBrands.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {selectedCarBrands.map((b) => (
+                  <span key={b} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
+                    {b}
+                    <button onClick={() => toggleCarBrand(b)} className="hover:text-red-900">×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {selectedCarBrands.length === 0 && (
+              <p className="text-[10px] text-gray-400 mt-1 font-play">
+                Select brands to filter the product grid
               </p>
             )}
           </div>
