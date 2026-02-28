@@ -5,7 +5,7 @@ import { blobRead } from '@/lib/blob-storage'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-dev-secret-replace-in-production'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const token = cookieStore.get('customer_token')?.value
@@ -15,7 +15,9 @@ export async function GET(request: NextRequest) {
     const customerEmail = decoded.email?.toLowerCase()
 
     const matchesCustomer = (o: any) =>
-      o.customerId === decoded.id || o.email?.toLowerCase() === customerEmail
+      o.customerId === decoded.id ||
+      o.email?.toLowerCase() === customerEmail ||
+      o.customerEmail?.toLowerCase() === customerEmail
 
     const [preorders, slotcarOrders, addresses] = await Promise.all([
       blobRead<any[]>('data/preorder-list.json', []),

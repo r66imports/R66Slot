@@ -18,6 +18,7 @@ type Product = {
 }
 
 type LoggedInUser = {
+  id: string
   firstName: string
   lastName: string
   email: string
@@ -54,6 +55,7 @@ export default function BookNowClient() {
       if (res.ok) {
         const data = await res.json()
         setLoggedInUser({
+          id: data.id || '',
           firstName: data.firstName || '',
           lastName: data.lastName || '',
           email: data.email || '',
@@ -120,7 +122,7 @@ export default function BookNowClient() {
         price: selectedProduct.preOrderPrice,
         quantity: selectedQty,
         totalAmount: (parseFloat(selectedProduct.preOrderPrice) * selectedQty).toFixed(2),
-        customerId: `guest_${Date.now()}`,
+        customerId: loggedInUser?.id || `guest_${Date.now()}`,
         customerName: `${firstName.trim()} ${lastName.trim()}`,
         customerEmail: email.trim(),
         customerPhone: phone.trim(),

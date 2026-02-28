@@ -497,6 +497,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
               {children?.slice(0, colCount).map((child) => {
                 // Get image fit settings
                 const imgObjectFit = (child.settings.objectFit as string) || 'cover'
+                const imgHeight = (child.settings.imageHeight as string) || ''
 
                 const colContent = (
                   <div
@@ -512,15 +513,15 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                     )}
                     {/* Column Image with Image Fit */}
                     {(child.settings.imageUrl as string) && (
-                      <div className="mb-3 overflow-hidden rounded-lg">
+                      <div
+                        className="mb-3 overflow-hidden rounded-lg"
+                        style={imgHeight ? { height: imgHeight } : undefined}
+                      >
                         <img
                           src={child.settings.imageUrl as string}
                           alt={(child.settings.alt as string) || ''}
-                          className="w-full h-auto rounded-lg"
-                          style={{
-                            objectFit: imgObjectFit as any,
-                            maxHeight: imgObjectFit === 'contain' ? '300px' : undefined,
-                          }}
+                          className={`w-full rounded-lg ${imgHeight ? 'h-full' : 'h-auto'}`}
+                          style={{ objectFit: imgObjectFit as any }}
                         />
                       </div>
                     )}
