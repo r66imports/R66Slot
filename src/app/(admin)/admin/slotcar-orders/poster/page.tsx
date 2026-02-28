@@ -321,9 +321,8 @@ export default function PreOrderPosterPage() {
     const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\n${bookUrl}`
 
     try {
-      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-
-      if (isMobile && posterRef.current && navigator.share) {
+      // Try to share poster image + text together via Web Share API (mobile & modern desktop)
+      if (posterRef.current && navigator.share) {
         const canvas = await html2canvas(posterRef.current, {
           backgroundColor: '#ffffff', scale: 2, useCORS: true,
         })
@@ -333,14 +332,14 @@ export default function PreOrderPosterPage() {
         if (blob) {
           const file = new File([blob], `R66SLOT-${sku || 'poster'}.jpg`, { type: 'image/jpeg' })
           if (navigator.canShare?.({ files: [file] })) {
-            // Share image only — no text. The poster contains all details + booking URL.
-            await navigator.share({ files: [file] })
+            // Share poster image AND text together so WhatsApp gets both
+            await navigator.share({ files: [file], text: shareText })
             return
           }
         }
       }
 
-      // Desktop or mobile without file-share support: open WhatsApp with text
+      // Fallback: open WhatsApp with text (no image sharing support)
       window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
     } catch (err) {
       if ((err as Error)?.name !== 'AbortError') {
