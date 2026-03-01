@@ -2630,6 +2630,58 @@ function SettingsTab({
         <p className="text-[10px] text-indigo-500 font-play">Animations play on scroll in published page</p>
       </div>
 
+      {/* Columns dimensions */}
+      {(component.type === 'columns' || component.type === 'two-column' || component.type === 'three-column') && (
+        <div className="bg-gray-50 rounded-lg p-3 space-y-2 border border-gray-200">
+          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider font-play">Dimensions</h4>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-gray-500 font-play">Width</label>
+              <input
+                type="text"
+                value={component.styles.width || ''}
+                onChange={(e) => onUpdate({ styles: { ...component.styles, width: e.target.value } })}
+                placeholder="auto"
+                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 font-play">Max Width</label>
+              <input
+                type="text"
+                value={component.styles.maxWidth || ''}
+                onChange={(e) => onUpdate({ styles: { ...component.styles, maxWidth: e.target.value } })}
+                placeholder="100%"
+                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-gray-500 font-play">Height</label>
+              <input
+                type="text"
+                value={component.styles.height || ''}
+                onChange={(e) => onUpdate({ styles: { ...component.styles, height: e.target.value } })}
+                placeholder="auto"
+                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-gray-500 font-play">Min Height</label>
+              <input
+                type="text"
+                value={component.styles.minHeight || ''}
+                onChange={(e) => onUpdate({ styles: { ...component.styles, minHeight: e.target.value } })}
+                placeholder="auto"
+                className="w-full px-1.5 py-1 border border-gray-200 rounded text-[11px] font-play"
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-gray-400 font-play">Use CSS values: 500px, 80%, 50vw. Also in Content tab → Layout Mode.</p>
+        </div>
+      )}
+
       {/* Hero alignment */}
       {component.type === 'hero' && (
         <div>
@@ -3061,7 +3113,7 @@ function SettingsTab({
       )}
 
       {/* Generic info for types with no special settings */}
-      {!['hero', 'divider', 'gallery', 'section', 'content-block', 'ui-component', 'slot', 'widget', 'media', 'header'].includes(component.type) && (
+      {!['hero', 'divider', 'product-grid', 'gallery', 'section', 'content-block', 'ui-component', 'slot', 'widget', 'media', 'header', 'columns', 'two-column', 'three-column'].includes(component.type) && (
         <div className="text-xs text-gray-400 text-center py-4 font-play">
           No additional settings for this component type.
         </div>
