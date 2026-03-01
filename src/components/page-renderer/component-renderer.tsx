@@ -43,10 +43,17 @@ function ProductGridLive({
           ? (settings.revoParts as string[])
           : (settings.revoPart ? [settings.revoPart as string] : [])
         if (activeParts.includes(KEEP_EMPTY)) {
-          list = list.filter((p: any) => !p.revoPart || p.revoPart === '')
+          list = list.filter((p: any) =>
+            (!p.revoPart || p.revoPart === '') &&
+            (!Array.isArray(p.revoParts) || p.revoParts.length === 0)
+          )
         } else if (activeParts.length > 0) {
           list = list.filter((p: any) =>
-            activeParts.some((part) => p.revoPart === part || p.tags?.includes(part))
+            activeParts.some((part) =>
+              p.revoPart === part ||
+              (Array.isArray(p.revoParts) && p.revoParts.includes(part)) ||
+              p.tags?.includes(part)
+            )
           )
         }
         const activeBrands = Array.isArray(settings.carBrands) ? (settings.carBrands as string[]) : []

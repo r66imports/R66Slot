@@ -33,6 +33,7 @@ export interface Product {
   pageIds: string[]
   pageUrl: string
   carBrands: string[]
+  revoParts: string[]
   isPreOrder: boolean
   seo: { metaTitle: string; metaDescription: string; metaKeywords: string }
   sageItemCode: string | null
@@ -74,6 +75,7 @@ function rowToProduct(row: any): Product {
     pageIds: Array.isArray(row.page_ids) ? row.page_ids : (row.page_id ? [row.page_id] : []),
     pageUrl: row.page_url,
     carBrands: Array.isArray(row.car_brands) ? row.car_brands : [],
+    revoParts: Array.isArray(row.revo_parts) ? row.revo_parts : [],
     isPreOrder: row.is_pre_order || false,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
@@ -91,7 +93,8 @@ async function ensureProductColumns() {
       ALTER TABLE products
         ADD COLUMN IF NOT EXISTS page_ids JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS car_brands JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS is_pre_order BOOLEAN DEFAULT FALSE
+        ADD COLUMN IF NOT EXISTS is_pre_order BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS revo_parts JSONB DEFAULT '[]'::jsonb
     `)
   } catch { /* ignore */ }
   _productColumnsMigrated = true
@@ -126,6 +129,7 @@ export async function POST(request: Request) {
     const pageIds: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : [])
     const primaryPageId = pageIds[0] || ''
     const carBrands: string[] = Array.isArray(body.carBrands) ? body.carBrands : []
+    const revoParts: string[] = Array.isArray(body.revoParts) ? body.revoParts : []
 
     await db.query(`
       INSERT INTO products (
@@ -133,12 +137,12 @@ export async function POST(request: Request) {
         sku, barcode, brand, product_type, car_class, car_type, part_type,
         scale, supplier, collections, tags, quantity, track_quantity,
         weight, weight_unit, box_size, dimensions, eta, status,
-        image_url, images, page_id, page_ids, page_url, car_brands, is_pre_order,
+        image_url, images, page_id, page_ids, page_url, car_brands, revo_parts, is_pre_order,
         seo, created_at, updated_at
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
-        $33,$34,$35
+        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
+        $34,$35,$36
       )
     `, [
       id, body.title, body.description || '',
@@ -152,7 +156,7 @@ export async function POST(request: Request) {
       JSON.stringify(body.dimensions || {}), body.eta || '', body.status || 'draft',
       body.imageUrl || body.mediaFiles?.[0] || '', JSON.stringify(body.mediaFiles || []),
       primaryPageId, JSON.stringify(pageIds), body.pageUrl || '',
-      JSON.stringify(carBrands), body.isPreOrder || false,
+      JSON.stringify(carBrands), JSON.stringify(revoParts), body.isPreOrder || false,
       JSON.stringify(body.seo || {}), now, now,
     ])
 

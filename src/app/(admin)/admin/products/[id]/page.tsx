@@ -91,7 +91,14 @@ export default function EditProductPage({
   const [pageDropdownOpen, setPageDropdownOpen] = useState(false)
   const [pageUrl, setPageUrl] = useState('')
   const [carClass, setCarClass] = useState('')
+  const [carClassDropdownOpen, setCarClassDropdownOpen] = useState(false)
+  const [carClassOptions, setCarClassOptions] = useState(['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'])
+  const [newCarClassInput, setNewCarClassInput] = useState('')
   const [revoPart, setRevoPart] = useState('')
+  const [revoParts, setRevoParts] = useState<string[]>([])
+  const [revoPartDropdownOpen, setRevoPartDropdownOpen] = useState(false)
+  const [revoPartOptions, setRevoPartOptions] = useState(['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set'])
+  const [newRevoPartInput, setNewRevoPartInput] = useState('')
   const [carBrands, setCarBrands] = useState<string[]>([])
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
   const [isPreOrder, setIsPreOrder] = useState(false)
@@ -180,6 +187,7 @@ export default function EditProductPage({
           setPageUrl((found as any).pageUrl || '')
           setCarClass((found as any).carClass || '')
           setRevoPart((found as any).revoPart || '')
+          setRevoParts(Array.isArray((found as any).revoParts) ? (found as any).revoParts : [])
           setCarBrands(Array.isArray((found as any).carBrands) ? (found as any).carBrands : [])
           setIsPreOrder((found as any).isPreOrder || false)
           setSeoTitle(found.seo?.metaTitle || '')
@@ -317,6 +325,7 @@ export default function EditProductPage({
         productType,
         carClass,
         revoPart,
+        revoParts,
         carBrands,
         isPreOrder,
         carType,
@@ -788,57 +797,142 @@ export default function EditProductPage({
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Product organization</h3>
               <div className="space-y-4">
-                {/* Racing Class */}
+                {/* Revo Racing Class */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Racing Class</label>
-                  <div className="flex flex-wrap gap-2 mb-1">
-                    {['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'].map(cls => (
-                      <button
-                        key={cls}
-                        type="button"
-                        onClick={() => setCarClass(carClass === cls ? '' : cls)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                          carClass === cls
-                            ? 'bg-red-600 text-white border-red-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-600'
-                        }`}
-                      >
-                        {cls}
-                      </button>
-                    ))}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Revo Racing Class</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCarClassDropdownOpen(!carClassDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white"
+                    >
+                      <span className={carClass ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
+                        {carClass || '— No class —'}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${carClassDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {carClassDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="radio" checked={carClass === ''} onChange={() => { setCarClass(''); setCarClassDropdownOpen(false) }} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— No class —</span>
+                        </label>
+                        {carClassOptions.map(cls => (
+                          <label key={cls} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="radio" checked={carClass === cls} onChange={() => { setCarClass(cls); setCarClassDropdownOpen(false) }} className="rounded" />
+                            <span className="text-sm text-gray-900">{cls}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input
+                            type="text"
+                            value={newCarClassInput}
+                            onChange={e => setNewCarClassInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && newCarClassInput.trim()) {
+                                e.preventDefault()
+                                const val = newCarClassInput.trim()
+                                if (!carClassOptions.includes(val)) setCarClassOptions(prev => [...prev, val])
+                                setCarClass(val)
+                                setNewCarClassInput('')
+                                setCarClassDropdownOpen(false)
+                              }
+                            }}
+                            placeholder="+ Add class..."
+                            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = newCarClassInput.trim()
+                              if (!val) return
+                              if (!carClassOptions.includes(val)) setCarClassOptions(prev => [...prev, val])
+                              setCarClass(val)
+                              setNewCarClassInput('')
+                              setCarClassDropdownOpen(false)
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700"
+                          >Add</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {carClass && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Selected: <span className="font-semibold text-red-600">{carClass}</span>
-                      <button type="button" onClick={() => setCarClass('')} className="ml-2 text-gray-400 hover:text-gray-600">✕ Clear</button>
-                    </p>
+                    <button type="button" onClick={() => setCarClass('')} className="text-xs text-gray-400 hover:text-red-500 mt-1">✕ Clear</button>
                   )}
                 </div>
 
-                {/* Revo Parts */}
+                {/* Revo Parts (multi-select) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Revo Parts</label>
-                  <div className="flex flex-wrap gap-2 mb-1">
-                    {['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis'].map(part => (
-                      <button
-                        key={part}
-                        type="button"
-                        onClick={() => setRevoPart(revoPart === part ? '' : part)}
-                        className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                          revoPart === part
-                            ? 'bg-red-600 text-white border-red-600'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-red-400 hover:text-red-600'
-                        }`}
-                      >
-                        {part}
-                      </button>
-                    ))}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setRevoPartDropdownOpen(!revoPartDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white"
+                    >
+                      <span className={revoParts.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {revoParts.length === 0 ? '— None —' : revoParts.length === 1 ? revoParts[0] : `${revoParts.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${revoPartDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {revoPartDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={revoParts.length === 0} onChange={() => setRevoParts([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {revoPartOptions.map(part => (
+                          <label key={part} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={revoParts.includes(part)}
+                              onChange={e => setRevoParts(e.target.checked ? [...revoParts, part] : revoParts.filter(p => p !== part))}
+                              className="rounded"
+                            />
+                            <span className="text-sm text-gray-900">{part}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input
+                            type="text"
+                            value={newRevoPartInput}
+                            onChange={e => setNewRevoPartInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && newRevoPartInput.trim()) {
+                                e.preventDefault()
+                                const val = newRevoPartInput.trim()
+                                if (!revoPartOptions.includes(val)) setRevoPartOptions(prev => [...prev, val])
+                                if (!revoParts.includes(val)) setRevoParts(prev => [...prev, val])
+                                setNewRevoPartInput('')
+                              }
+                            }}
+                            placeholder="+ Add part..."
+                            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = newRevoPartInput.trim()
+                              if (!val) return
+                              if (!revoPartOptions.includes(val)) setRevoPartOptions(prev => [...prev, val])
+                              if (!revoParts.includes(val)) setRevoParts(prev => [...prev, val])
+                              setNewRevoPartInput('')
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700"
+                          >Add</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  {revoPart && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Selected: <span className="font-semibold text-red-600">{revoPart}</span>
-                      <button type="button" onClick={() => setRevoPart('')} className="ml-2 text-gray-400 hover:text-gray-600">✕ Clear</button>
-                    </p>
+                  {revoParts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {revoParts.map(p => (
+                        <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
+                          {p}<button type="button" onClick={() => setRevoParts(revoParts.filter(x => x !== p))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
 
