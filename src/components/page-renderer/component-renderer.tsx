@@ -25,12 +25,15 @@ function ProductGridLive({
     fetch('/api/admin/products')
       .then((r) => r.json())
       .then((data) => {
+        const KEEP_EMPTY = '__EMPTY__'
         let list = Array.isArray(data) ? data.filter((p: any) => p.status === 'active') : []
         // Racing class filter — supports multi-select (carClasses[]) and legacy single (carClass)
         const activeClasses: string[] = Array.isArray(settings.carClasses) && (settings.carClasses as string[]).length > 0
           ? (settings.carClasses as string[])
           : (settings.carClass ? [settings.carClass as string] : [])
-        if (activeClasses.length > 0) {
+        if (activeClasses.includes(KEEP_EMPTY)) {
+          list = list.filter((p: any) => !p.carClass || p.carClass === '')
+        } else if (activeClasses.length > 0) {
           list = list.filter((p: any) =>
             activeClasses.some((cls) => p.carClass === cls || p.tags?.includes(cls))
           )
@@ -39,13 +42,17 @@ function ProductGridLive({
         const activeParts: string[] = Array.isArray(settings.revoParts) && (settings.revoParts as string[]).length > 0
           ? (settings.revoParts as string[])
           : (settings.revoPart ? [settings.revoPart as string] : [])
-        if (activeParts.length > 0) {
+        if (activeParts.includes(KEEP_EMPTY)) {
+          list = list.filter((p: any) => !p.revoPart || p.revoPart === '')
+        } else if (activeParts.length > 0) {
           list = list.filter((p: any) =>
             activeParts.some((part) => p.revoPart === part || p.tags?.includes(part))
           )
         }
         const activeBrands = Array.isArray(settings.carBrands) ? (settings.carBrands as string[]) : []
-        if (activeBrands.length > 0) {
+        if (activeBrands.includes(KEEP_EMPTY)) {
+          list = list.filter((p: any) => !p.carBrands || (Array.isArray(p.carBrands) && p.carBrands.length === 0))
+        } else if (activeBrands.length > 0) {
           list = list.filter(
             (p: any) =>
               (Array.isArray(p.carBrands) && p.carBrands.some((b: string) => activeBrands.includes(b))) ||
@@ -414,11 +421,6 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     case 'hero': {
       const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
       const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
-      function ensureColor(value: any) {
-        // return a valid CSS color string fallback
-        if (!value) return '#000000'
-        return String(value)
-      }
       const isFreeform = settings.heroLayout === 'freeform'
 
       return (
