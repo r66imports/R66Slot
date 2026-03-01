@@ -62,11 +62,14 @@ select,
   unicode-bidi: plaintext;
 }
 
-/* Text block font-size control: browser defaults for h1-h6 have explicit em sizes
-   that override inherited font-size. Force all children to inherit so the panel
-   Font Size control works correctly regardless of what tags the rich text editor outputs. */
+/* Text block font-size control: force ALL child elements to inherit the container
+   font-size set by the panel. Uses !important to beat browser user-agent defaults
+   (h1-h6 use em-based sizes), Tailwind base resets, and any other specificity conflicts.
+   The container div carries the actual size as an inline style (e.g. font-size:1.5rem)
+   so children end up at exactly the size selected in the Font Size panel. */
+.r66-text-block,
 .r66-text-block * {
-  font-size: inherit;
+  font-size: inherit !important;
 }
 
 /* Custom Resize Handle Styles */
