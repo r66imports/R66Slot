@@ -315,7 +315,10 @@ export default function ProductsPage() {
             body: JSON.stringify({ filename: `import-${new Date().toISOString().slice(0, 10)}.csv`, csvData: importText, productCount: rows.length, source: 'product-import' }),
           })
         } catch {}
-        alert(`Imported ${data.imported} products`)
+        const parts = []
+        if (data.imported > 0) parts.push(`${data.imported} new`)
+        if (data.updated > 0) parts.push(`${data.updated} updated`)
+        alert(`Import complete: ${parts.join(', ')} product${(data.imported + data.updated) !== 1 ? 's' : ''}`)
         setShowImportModal(false)
         setImportText('')
         fetchProducts()

@@ -177,9 +177,57 @@ export async function PUT(request: Request) {
     }
 
     let imported = 0
+    let updated = 0
     for (const p of body.products) {
-      const id = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const now = new Date().toISOString()
+      const sku = (p.sku || '').trim()
+
+      // If SKU provided, check for an existing product — update instead of inserting duplicate
+      if (sku) {
+        const existing = await db.query('SELECT id FROM products WHERE sku = $1 LIMIT 1', [sku])
+        if (existing.rows.length > 0) {
+          const existingId = existing.rows[0].id
+          await db.query(`
+            UPDATE products SET
+              title       = CASE WHEN $1 <> '' THEN $1 ELSE title END,
+              description = CASE WHEN $2 <> '' THEN $2 ELSE description END,
+              price       = CASE WHEN $3::numeric > 0 THEN $3::numeric ELSE price END,
+              brand       = CASE WHEN $4 <> '' THEN $4 ELSE brand END,
+              product_type = CASE WHEN $5 <> '' THEN $5 ELSE product_type END,
+              car_class   = CASE WHEN $6 <> '' THEN $6 ELSE car_class END,
+              car_type    = CASE WHEN $7 <> '' THEN $7 ELSE car_type END,
+              part_type   = CASE WHEN $8 <> '' THEN $8 ELSE part_type END,
+              scale       = CASE WHEN $9 <> '' THEN $9 ELSE scale END,
+              supplier    = CASE WHEN $10 <> '' THEN $10 ELSE supplier END,
+              quantity    = $11::integer,
+              eta         = CASE WHEN $12 <> '' THEN $12 ELSE eta END,
+              status      = CASE WHEN $13 <> '' THEN $13 ELSE status END,
+              updated_at  = $14
+            WHERE id = $15
+          `, [
+            p.title || p.name || '',
+            p.description || '',
+            parseFloat(p.price) || 0,
+            p.brand || '',
+            p.productType || '',
+            p.carClass || '',
+            p.carType || '',
+            p.partType || '',
+            p.scale || '',
+            p.supplier || '',
+            parseInt(p.quantity) ?? 0,
+            p.eta || '',
+            p.status || '',
+            now,
+            existingId,
+          ])
+          updated++
+          continue
+        }
+      }
+
+      // No matching SKU found — insert as new product
+      const id = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       await db.query(`
         INSERT INTO products (
           id, title, description, price, compare_at_price, cost_per_item,
@@ -190,13 +238,13 @@ export async function PUT(request: Request) {
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
           $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33
-        ) ON CONFLICT (id) DO NOTHING
+        )
       `, [
         id, p.title || p.name || '', p.description || '',
         parseFloat(p.price) || 0,
         p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
         p.costPerItem ? parseFloat(p.costPerItem) : null,
-        p.sku || '', p.barcode || '', p.brand || '', p.productType || '',
+        sku, p.barcode || '', p.brand || '', p.productType || '',
         p.carClass || '', p.carType || '', p.partType || '', p.scale || '',
         p.supplier || '',
         JSON.stringify(Array.isArray(p.collections) ? p.collections : []),
@@ -212,7 +260,7 @@ export async function PUT(request: Request) {
       imported++
     }
 
-    return NextResponse.json({ imported })
+    return NextResponse.json({ imported, updated })
   } catch (error) {
     console.error('Error importing products:', error)
     return NextResponse.json({ error: 'Failed to import' }, { status: 500 })
