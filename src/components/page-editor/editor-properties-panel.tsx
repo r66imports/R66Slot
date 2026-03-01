@@ -2547,26 +2547,22 @@ function SettingsTab({
 
   const toggleCarClass = (cls: string) => {
     if (cls === KEEP_EMPTY) {
-      updateSetting('carClasses', selectedCarClasses.includes(KEEP_EMPTY) ? [] : [KEEP_EMPTY])
-      updateSetting('carClass', '')
+      onUpdate({ settings: { ...component.settings, carClasses: selectedCarClasses.includes(KEEP_EMPTY) ? [] : [KEEP_EMPTY], carClass: '' } })
       return
     }
     const base = selectedCarClasses.filter(c => c !== KEEP_EMPTY)
     const next = base.includes(cls) ? base.filter(c => c !== cls) : [...base, cls]
-    updateSetting('carClasses', next)
-    updateSetting('carClass', '')
+    onUpdate({ settings: { ...component.settings, carClasses: next, carClass: '' } })
   }
 
   const toggleRevoPart = (part: string) => {
     if (part === KEEP_EMPTY) {
-      updateSetting('revoParts', selectedRevoParts.includes(KEEP_EMPTY) ? [] : [KEEP_EMPTY])
-      updateSetting('revoPart', '')
+      onUpdate({ settings: { ...component.settings, revoParts: selectedRevoParts.includes(KEEP_EMPTY) ? [] : [KEEP_EMPTY], revoPart: '' } })
       return
     }
     const base = selectedRevoParts.filter(p => p !== KEEP_EMPTY)
     const next = base.includes(part) ? base.filter(p => p !== part) : [...base, part]
-    updateSetting('revoParts', next)
-    updateSetting('revoPart', '')
+    onUpdate({ settings: { ...component.settings, revoParts: next, revoPart: '' } })
   }
 
   return (
@@ -2758,7 +2754,7 @@ function SettingsTab({
             carClassDropdownOpen, setCarClassDropdownOpen,
             selectedCarClasses,
             toggleCarClass,
-            () => { updateSetting('carClasses', []); updateSetting('carClass', '') },
+            () => { onUpdate({ settings: { ...component.settings, carClasses: [], carClass: '' } }) },
             CAR_CLASSES,
             'Racing Class Filter',
           ])}
@@ -2824,7 +2820,7 @@ function SettingsTab({
             revoPartDropdownOpen, setRevoPartDropdownOpen,
             selectedRevoParts,
             toggleRevoPart,
-            () => { updateSetting('revoParts', []); updateSetting('revoPart', '') },
+            () => { onUpdate({ settings: { ...component.settings, revoParts: [], revoPart: '' } }) },
             REVO_PARTS,
             'Revo Parts Filter',
           ])}
