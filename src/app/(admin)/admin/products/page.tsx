@@ -295,6 +295,7 @@ export default function ProductsPage() {
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [fixingDupes, setFixingDupes] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const colPickerRef = useRef<HTMLDivElement>(null)
 
@@ -465,6 +466,22 @@ export default function ProductsPage() {
     URL.revokeObjectURL(url)
   }
 
+  const fixDuplicates = async () => {
+    if (!confirm('This will merge duplicate SKUs and delete the extras. Continue?')) return
+    setFixingDupes(true)
+    try {
+      const res = await fetch('/api/admin/products', { method: 'PATCH' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      alert(data.message)
+      fetchProducts(urlBrand)
+    } catch (err: any) {
+      alert(`Error: ${err.message}`)
+    } finally {
+      setFixingDupes(false)
+    }
+  }
+
   const handleImportCSV = async () => {
     if (!importText.trim()) return
     setImporting(true)
@@ -566,6 +583,9 @@ export default function ProductsPage() {
           <p className="text-gray-600 mt-1">{urlBrand ? `${urlBrand} product inventory` : 'All products'} — {products.length} items</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={fixDuplicates} disabled={fixingDupes}>
+            {fixingDupes ? 'Fixing…' : 'Fix Duplicates'}
+          </Button>
           <Button variant="outline" onClick={() => setShowExportModal(true)}>Export CSV</Button>
           <Button variant="outline" onClick={() => setShowImportModal(true)}>Import</Button>
           <Button size="lg" asChild>

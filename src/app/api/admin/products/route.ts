@@ -172,6 +172,121 @@ export async function POST(request: Request) {
   }
 }
 
+// PATCH /api/admin/products — deduplicate products by SKU
+export async function PATCH() {
+  try {
+    await ensureProductColumns()
+
+    // Find all SKUs that have more than one row
+    const dupeSkus = await db.query(`
+      SELECT sku FROM products
+      WHERE sku IS NOT NULL AND sku <> ''
+      GROUP BY sku HAVING COUNT(*) > 1
+    `)
+
+    if (dupeSkus.rows.length === 0) {
+      return NextResponse.json({ message: 'No duplicates found', cleaned: 0 })
+    }
+
+    let cleaned = 0
+    for (const { sku } of dupeSkus.rows) {
+      // Fetch all rows for this SKU, best first:
+      // prefer rows that have an image_url, then most recently updated
+      const rows = await db.query(`
+        SELECT * FROM products WHERE sku = $1
+        ORDER BY
+          CASE WHEN image_url IS NOT NULL AND image_url <> '' THEN 0 ELSE 1 END ASC,
+          updated_at DESC
+      `, [sku])
+
+      if (rows.rows.length < 2) continue
+
+      const keep = rows.rows[0]
+      const extras = rows.rows.slice(1)
+
+      // Merge any non-empty fields from extras into the keeper (only if keeper field is empty)
+      let mergedTitle = keep.title || ''
+      let mergedDesc = keep.description || ''
+      let mergedImageUrl = keep.image_url || ''
+      let mergedImages = Array.isArray(keep.images) ? keep.images : []
+      let mergedPrice = parseFloat(keep.price) || 0
+      let mergedBrand = keep.brand || ''
+      let mergedProductType = keep.product_type || ''
+      let mergedCarClass = keep.car_class || ''
+      let mergedCarType = keep.car_type || ''
+      let mergedPartType = keep.part_type || ''
+      let mergedScale = keep.scale || ''
+      let mergedSupplier = keep.supplier || ''
+      let mergedQuantity = keep.quantity ?? 0
+      let mergedEta = keep.eta || ''
+      let mergedStatus = keep.status || 'draft'
+
+      for (const extra of extras) {
+        if (!mergedTitle && extra.title) mergedTitle = extra.title
+        if (!mergedDesc && extra.description) mergedDesc = extra.description
+        if (!mergedImageUrl && extra.image_url) mergedImageUrl = extra.image_url
+        if (!mergedImages.length && Array.isArray(extra.images) && extra.images.length) mergedImages = extra.images
+        if (!mergedPrice && extra.price) mergedPrice = parseFloat(extra.price) || 0
+        if (!mergedBrand && extra.brand) mergedBrand = extra.brand
+        if (!mergedProductType && extra.product_type) mergedProductType = extra.product_type
+        if (!mergedCarClass && extra.car_class) mergedCarClass = extra.car_class
+        if (!mergedCarType && extra.car_type) mergedCarType = extra.car_type
+        if (!mergedPartType && extra.part_type) mergedPartType = extra.part_type
+        if (!mergedScale && extra.scale) mergedScale = extra.scale
+        if (!mergedSupplier && extra.supplier) mergedSupplier = extra.supplier
+        if (!mergedQuantity && extra.quantity) mergedQuantity = extra.quantity
+        if (!mergedEta && extra.eta) mergedEta = extra.eta
+        if (!mergedStatus && extra.status) mergedStatus = extra.status
+      }
+
+      // Update the keeper row with merged data
+      await db.query(`
+        UPDATE products SET
+          title        = $1,
+          description  = $2,
+          image_url    = $3,
+          images       = $4::jsonb,
+          price        = $5,
+          brand        = $6,
+          product_type = $7,
+          car_class    = $8,
+          car_type     = $9,
+          part_type    = $10,
+          scale        = $11,
+          supplier     = $12,
+          quantity     = $13,
+          eta          = $14,
+          status       = $15,
+          updated_at   = $16
+        WHERE id = $17
+      `, [
+        mergedTitle, mergedDesc, mergedImageUrl,
+        JSON.stringify(mergedImages),
+        mergedPrice, mergedBrand, mergedProductType,
+        mergedCarClass, mergedCarType, mergedPartType,
+        mergedScale, mergedSupplier, mergedQuantity,
+        mergedEta, mergedStatus,
+        new Date().toISOString(),
+        keep.id,
+      ])
+
+      // Delete the duplicate rows
+      const extraIds = extras.map((r: any) => r.id)
+      await db.query(`DELETE FROM products WHERE id = ANY($1::text[])`, [extraIds])
+      cleaned += extraIds.length
+    }
+
+    return NextResponse.json({
+      message: `Deduplication complete. Removed ${cleaned} duplicate row(s).`,
+      cleaned,
+      skusProcessed: dupeSkus.rows.length,
+    })
+  } catch (error: any) {
+    console.error('Dedup error:', error)
+    return NextResponse.json({ error: `Deduplication failed: ${error.message}` }, { status: 500 })
+  }
+}
+
 // PUT /api/admin/products — bulk CSV import
 export async function PUT(request: Request) {
   try {
