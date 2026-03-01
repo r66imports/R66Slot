@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { MediaLibraryPicker } from '@/components/page-editor/media-library-picker'
@@ -173,6 +173,8 @@ export default function NewProductPage() {
   const [saveError, setSaveError] = useState('')
   const [uploadingImages, setUploadingImages] = useState(false)
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false)
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const draggedIdx = useRef<number | null>(null)
 
   // Upload base64 images to server and return real URLs
   const uploadPendingImages = async (): Promise<string[]> => {
@@ -414,11 +416,33 @@ export default function NewProductPage() {
 
             {/* Media */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Media</h3>
+              <h3 className="text-sm font-medium text-gray-700 mb-1">Media</h3>
+              <p className="text-xs text-gray-400 mb-4">Drag to reorder · First image is the main image</p>
               {mediaFiles.length > 0 && (
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   {mediaFiles.map((file, index) => (
-                    <div key={index} className="relative group">
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => { draggedIdx.current = index }}
+                      onDragOver={(e) => { e.preventDefault(); setDragOverIdx(index) }}
+                      onDragLeave={() => setDragOverIdx(null)}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        setDragOverIdx(null)
+                        const from = draggedIdx.current
+                        if (from !== null && from !== index) {
+                          setMediaFiles(prev => {
+                            const next = [...prev]
+                            const [item] = next.splice(from, 1)
+                            next.splice(index, 0, item)
+                            return next
+                          })
+                        }
+                        draggedIdx.current = null
+                      }}
+                      className={`relative group cursor-grab active:cursor-grabbing rounded-lg ${dragOverIdx === index ? 'ring-2 ring-blue-400' : ''}`}
+                    >
                       {file.type.startsWith('image/') || file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                         <img src={file.url} alt={file.name} className="w-full h-32 object-contain rounded-lg border border-gray-200 bg-gray-50" />
                       ) : (
@@ -431,6 +455,25 @@ export default function NewProductPage() {
                           </div>
                         </div>
                       )}
+                      {/* MAIN badge */}
+                      {index === 0 ? (
+                        <span className="absolute bottom-1 left-1 bg-green-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded pointer-events-none">
+                          MAIN
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => setMediaFiles(prev => {
+                            const next = [...prev]
+                            const [item] = next.splice(index, 1)
+                            next.unshift(item)
+                            return next
+                          })}
+                          className="absolute bottom-1 left-1 bg-blue-600 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          Set Main
+                        </button>
+                      )}
+                      {/* Remove */}
                       <button
                         onClick={() => setMediaFiles(mediaFiles.filter((_, i) => i !== index))}
                         className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
