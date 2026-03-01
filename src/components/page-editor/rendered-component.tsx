@@ -1148,53 +1148,6 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       )
     }
 
-    case 'footer': {
-      const ftBg = styles.backgroundColor || '#1f2937'
-      const ftText = styles.textColor || '#ffffff'
-      const ftBrand = (settings.brandName as string) || 'R66SLOT'
-      const ftAccent = (settings.brandAccentColor as string) || '#ef4444'
-      const ftTagline = (settings.tagline as string) || ''
-      const ftCopyright = (settings.copyright as string) || `© ${new Date().getFullYear()} ${ftBrand}. All rights reserved.`
-      const parseLinks = (raw: string) =>
-        (raw || '').split('\n').filter(Boolean).map(line => {
-          const [label, href] = line.split('|')
-          return { label: label?.trim() || '', href: href?.trim() || '#' }
-        })
-      const columns = [
-        { title: (settings.col1Title as string) || '', links: parseLinks(settings.col1Links as string) },
-        { title: (settings.col2Title as string) || '', links: parseLinks(settings.col2Links as string) },
-        { title: (settings.col3Title as string) || '', links: parseLinks(settings.col3Links as string) },
-      ].filter(c => c.title || c.links.length > 0)
-      return (
-        <footer style={{ backgroundColor: ftBg, color: ftText, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div className="container mx-auto px-4 py-12">
-            <div className={`grid grid-cols-1 md:grid-cols-${1 + columns.length} gap-8`}>
-              <div>
-                <div className="text-2xl font-bold mb-4 font-play">
-                  <span style={{ color: ftText }}>{ftBrand.replace(/SLOT|slot/g, '')}</span>
-                  <span style={{ color: ftAccent }}>{ftBrand.match(/SLOT|slot/)?.[0] || ''}</span>
-                </div>
-                {ftTagline && <p style={{ color: ftText, opacity: 0.6 }} className="text-sm">{ftTagline}</p>}
-              </div>
-              {columns.map((col, i) => (
-                <div key={i}>
-                  <h3 className="font-semibold mb-4 font-play">{col.title}</h3>
-                  <nav className="flex flex-col gap-2 text-sm">
-                    {col.links.map((link, j) => (
-                      <span key={j} style={{ color: ftText, opacity: 0.6 }} className="text-sm">{link.label}</span>
-                    ))}
-                  </nav>
-                </div>
-              ))}
-            </div>
-            <div className="mt-12 pt-8" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-              <p className="text-sm" style={{ color: ftText, opacity: 0.6 }}>{ftCopyright}</p>
-            </div>
-          </div>
-        </footer>
-      )
-    }
-
     default:
       return (
         <div style={containerStyle}>
