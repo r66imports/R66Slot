@@ -1283,7 +1283,7 @@ function ContentTab({
               <p className="text-[10px] text-gray-400 mt-1 font-play">Select 1 to 4 columns</p>
             </div>
           )}
-          <VisualColumnEditor component={component} onUpdate={onUpdate} />
+          <VisualColumnEditor component={component} onUpdate={onUpdate} viewMode={viewMode} />
         </>
       )}
 
@@ -1490,6 +1490,124 @@ function ContentTab({
             <label htmlFor="bfBrandFilter" className="text-xs font-medium text-gray-500 font-play cursor-pointer">
               Show Brand Filter
             </label>
+          </div>
+        </>
+      )}
+
+      {/* Footer */}
+      {component.type === 'footer' && (
+        <>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Brand Name</label>
+            <input
+              type="text"
+              value={(component.settings.brandName as string) || ''}
+              onChange={(e) => updateSetting('brandName', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              placeholder="R66SLOT"
+            />
+            <p className="text-[10px] text-gray-400 mt-0.5 font-play">The word SLOT will be coloured with the accent colour.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Accent Colour</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={(component.settings.brandAccentColor as string) || '#ef4444'}
+                onChange={(e) => updateSetting('brandAccentColor', e.target.value)}
+                className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+              />
+              <input
+                type="text"
+                value={(component.settings.brandAccentColor as string) || '#ef4444'}
+                onChange={(e) => updateSetting('brandAccentColor', e.target.value)}
+                className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs font-play"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Tagline</label>
+            <input
+              type="text"
+              value={(component.settings.tagline as string) || ''}
+              onChange={(e) => updateSetting('tagline', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              placeholder="Your premium destination..."
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Copyright Text</label>
+            <input
+              type="text"
+              value={(component.settings.copyright as string) || ''}
+              onChange={(e) => updateSetting('copyright', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              placeholder={`© ${new Date().getFullYear()} R66SLOT. All rights reserved.`}
+            />
+          </div>
+          {[1, 2, 3].map((colNum) => (
+            <div key={colNum}>
+              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Column {colNum} Title</label>
+              <input
+                type="text"
+                value={(component.settings[`col${colNum}Title`] as string) || ''}
+                onChange={(e) => updateSetting(`col${colNum}Title`, e.target.value)}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-sm font-play mb-1"
+                placeholder={`Column ${colNum}`}
+              />
+              <label className="block text-[10px] text-gray-400 mb-1 font-play">Links (one per line: Label|/url)</label>
+              <textarea
+                value={(component.settings[`col${colNum}Links`] as string) || ''}
+                onChange={(e) => updateSetting(`col${colNum}Links`, e.target.value)}
+                rows={4}
+                className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play resize-none"
+                placeholder={'Shop Now|/products\nBrands|/brands'}
+              />
+            </div>
+          ))}
+          <div className="flex gap-4">
+            <label className="flex items-center gap-1.5 text-xs font-play cursor-pointer">
+              <input
+                type="checkbox"
+                checked={component.settings.showPrivacyLink !== 'false'}
+                onChange={(e) => updateSetting('showPrivacyLink', e.target.checked ? 'true' : 'false')}
+                className="rounded"
+              />
+              Privacy Link
+            </label>
+            <label className="flex items-center gap-1.5 text-xs font-play cursor-pointer">
+              <input
+                type="checkbox"
+                checked={component.settings.showTermsLink !== 'false'}
+                onChange={(e) => updateSetting('showTermsLink', e.target.checked ? 'true' : 'false')}
+                className="rounded"
+              />
+              Terms Link
+            </label>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Background Colour</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={component.styles.backgroundColor || '#1f2937'}
+                onChange={(e) => onUpdate({ styles: { ...component.styles, backgroundColor: e.target.value } })}
+                className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+              />
+              <span className="text-xs text-gray-400 font-play">{component.styles.backgroundColor || '#1f2937'}</span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Text Colour</label>
+            <div className="flex gap-2 items-center">
+              <input
+                type="color"
+                value={component.styles.textColor || '#ffffff'}
+                onChange={(e) => onUpdate({ styles: { ...component.styles, textColor: e.target.value } })}
+                className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+              />
+              <span className="text-xs text-gray-400 font-play">{component.styles.textColor || '#ffffff'}</span>
+            </div>
           </div>
         </>
       )}
@@ -1881,9 +1999,11 @@ function GalleryImageCard({
 function VisualColumnEditor({
   component,
   onUpdate,
+  viewMode = 'desktop',
 }: {
   component: PageComponent
   onUpdate: (updates: Partial<PageComponent>) => void
+  viewMode?: 'desktop' | 'tablet' | 'mobile'
 }) {
   const children = component.children || []
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({})
@@ -2009,29 +2129,41 @@ function VisualColumnEditor({
                     <option value="scale-down">Scale Down (shrink only)</option>
                   </select>
                 </div>
-                <div className="mt-1.5 flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Width</label>
-                    <input
-                      type="text"
-                      value={(child.settings.imageWidth as string) || ''}
-                      onChange={(e) => updateChildSetting(idx, 'imageWidth', e.target.value)}
-                      placeholder="e.g. 300px, 80%"
-                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
-                    />
+                <div className="mt-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] font-medium text-gray-400 font-play">Image Size</label>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-play font-bold ${
+                      viewMode === 'mobile' ? 'bg-blue-100 text-blue-600' :
+                      viewMode === 'tablet' ? 'bg-purple-100 text-purple-600' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {viewMode === 'mobile' ? 'Mobile' : viewMode === 'tablet' ? 'Tablet' : 'Desktop'}
+                    </span>
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-medium text-gray-400 mb-1 font-play">Height</label>
-                    <input
-                      type="text"
-                      value={(child.settings.imageHeight as string) || ''}
-                      onChange={(e) => updateChildSetting(idx, 'imageHeight', e.target.value)}
-                      placeholder="e.g. 250px, 50vh"
-                      className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
-                    />
+                  <div className="flex gap-2">
+                    {(['Width', 'Height'] as const).map((dim) => {
+                      const settingKey = dim === 'Width'
+                        ? (viewMode === 'mobile' ? 'imageWidthMobile' : viewMode === 'tablet' ? 'imageWidthTablet' : 'imageWidth')
+                        : (viewMode === 'mobile' ? 'imageHeightMobile' : viewMode === 'tablet' ? 'imageHeightTablet' : 'imageHeight')
+                      const storedVal = (child.settings[settingKey] as string) || ''
+                      const numVal = storedVal.replace('px', '')
+                      return (
+                        <div key={dim} className="flex-1">
+                          <label className="block text-[10px] text-gray-400 mb-1 font-play">{dim} (px)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={numVal}
+                            onChange={(e) => updateChildSetting(idx, settingKey, e.target.value ? `${e.target.value}px` : '')}
+                            placeholder="auto"
+                            className="w-full px-2 py-1 border border-gray-200 rounded text-xs font-play"
+                          />
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
-                <p className="text-[9px] text-gray-400 mt-0.5 font-play">Set height for Image Fit to work. Leave blank to auto-size.</p>
+                <p className="text-[9px] text-gray-400 mt-0.5 font-play">Switch viewport (Mobile/Tablet/Desktop) to set sizes independently.</p>
               </>
             )}
           </div>
@@ -2378,20 +2510,51 @@ function SettingsTab({
   updateSetting: (key: string, value: any) => void
 }) {
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
+  const [carClassDropdownOpen, setCarClassDropdownOpen] = useState(false)
+  const [revoPartDropdownOpen, setRevoPartDropdownOpen] = useState(false)
 
   const CAR_BRANDS = [
     'Ford Escort MK I',
   ]
 
+  const CAR_CLASSES = ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA']
+  const REVO_PARTS = ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis']
+
   const selectedCarBrands: string[] = Array.isArray(component.settings.carBrands)
     ? (component.settings.carBrands as string[])
     : []
+
+  // carClasses: new multi-value setting; falls back to legacy carClass string
+  const selectedCarClasses: string[] = Array.isArray(component.settings.carClasses)
+    ? (component.settings.carClasses as string[])
+    : (component.settings.carClass ? [component.settings.carClass as string] : [])
+
+  // revoParts: new multi-value setting; falls back to legacy revoPart string
+  const selectedRevoParts: string[] = Array.isArray(component.settings.revoParts)
+    ? (component.settings.revoParts as string[])
+    : (component.settings.revoPart ? [component.settings.revoPart as string] : [])
 
   const toggleCarBrand = (brand: string) => {
     const next = selectedCarBrands.includes(brand)
       ? selectedCarBrands.filter((b) => b !== brand)
       : [...selectedCarBrands, brand]
     updateSetting('carBrands', next)
+  }
+
+  const toggleCarClass = (cls: string) => {
+    const next = selectedCarClasses.includes(cls)
+      ? selectedCarClasses.filter((c) => c !== cls)
+      : [...selectedCarClasses, cls]
+    updateSetting('carClasses', next)
+    updateSetting('carClass', '') // clear legacy
+  }
+
+  const toggleRevoPart = (part: string) => {
+    const next = selectedRevoParts.includes(part)
+      ? selectedRevoParts.filter((p) => p !== part)
+      : [...selectedRevoParts, part]
+    updateSetting('revoParts', next)
+    updateSetting('revoPart', '') // clear legacy
   }
 
   return (
@@ -2521,68 +2684,139 @@ function SettingsTab({
       {/* Product Grid settings */}
       {component.type === 'product-grid' && (
         <>
-          {/* Racing Class filter */}
+          {/* Racing Class filter — multi-select checkbox dropdown */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">
               Racing Class Filter
             </label>
-            <select
-              value={(component.settings.carClass as string) || ''}
-              onChange={(e) => updateSetting('carClass', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-            >
-              <option value="">All Classes (no filter)</option>
-              <option value="GT">GT</option>
-              <option value="GT 1">GT 1</option>
-              <option value="GT 2">GT 2</option>
-              <option value="GT 3">GT 3</option>
-              <option value="Group 2">Group 2</option>
-              <option value="Group 5">Group 5</option>
-              <option value="GT/IUMSA">GT/IUMSA</option>
-            </select>
-            {component.settings.carClass && (
-              <p className="text-[10px] text-red-600 mt-1 font-play font-medium">
-                Showing only: {component.settings.carClass as string}
-              </p>
-            )}
-            {!component.settings.carClass && (
-              <p className="text-[10px] text-gray-400 mt-1 font-play">
-                Select a class to filter products by racing category
-              </p>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setCarClassDropdownOpen(!carClassDropdownOpen)}
+                className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${
+                  selectedCarClasses.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
+              >
+                <span className={selectedCarClasses.length === 0 ? 'text-gray-400' : 'text-gray-800'}>
+                  {selectedCarClasses.length === 0
+                    ? '— No Filter —'
+                    : selectedCarClasses.length === 1
+                    ? selectedCarClasses[0]
+                    : `${selectedCarClasses.length} classes selected`}
+                </span>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${carClassDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {carClassDropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b-2 border-gray-200 bg-gray-50">
+                    <input type="checkbox" checked={selectedCarClasses.length === 0}
+                      onChange={() => { updateSetting('carClasses', []); updateSetting('carClass', '') }}
+                      className="rounded" />
+                    <span className="text-xs text-gray-700 font-play font-semibold">— No Filter — (show all)</span>
+                  </label>
+                  {CAR_CLASSES.map((cls) => (
+                    <label key={cls} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                      <input type="checkbox" checked={selectedCarClasses.includes(cls)}
+                        onChange={() => toggleCarClass(cls)} className="rounded" />
+                      <span className="text-xs text-gray-800 font-play">{cls}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedCarClasses.length > 0 ? (
+              <div className="mt-1">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] text-red-600 font-play font-medium">
+                    Active: {selectedCarClasses.length} class{selectedCarClasses.length > 1 ? 'es' : ''}
+                  </p>
+                  <button onClick={() => { updateSetting('carClasses', []); updateSetting('carClass', '') }}
+                    className="text-[10px] text-gray-400 hover:text-red-500 font-play underline">
+                    Clear all
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {selectedCarClasses.map((cls) => (
+                    <span key={cls} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
+                      {cls}
+                      <button onClick={() => toggleCarClass(cls)} className="hover:text-red-900">×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[10px] text-gray-400 mt-1 font-play">No filter — all classes shown</p>
             )}
           </div>
 
-          {/* Revo Parts filter */}
+          {/* Revo Parts filter — multi-select checkbox dropdown */}
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">
               Revo Parts Filter
             </label>
-            <select
-              value={(component.settings.revoPart as string) || ''}
-              onChange={(e) => updateSetting('revoPart', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-            >
-              <option value="">All Parts (no filter)</option>
-              <option value="Tyres">Tyres</option>
-              <option value="Wheels">Wheels</option>
-              <option value="Axle">Axle</option>
-              <option value="Bearings">Bearings</option>
-              <option value="Gears">Gears</option>
-              <option value="Pinions">Pinions</option>
-              <option value="Screws and Nuts">Screws and Nuts</option>
-              <option value="Motors">Motors</option>
-              <option value="Guides">Guides</option>
-              <option value="Body Plates & Chassis">Body Plates &amp; Chassis</option>
-            </select>
-            {component.settings.revoPart && (
-              <p className="text-[10px] text-red-600 mt-1 font-play font-medium">
-                Showing only: {component.settings.revoPart as string}
-              </p>
-            )}
-            {!component.settings.revoPart && (
-              <p className="text-[10px] text-gray-400 mt-1 font-play">
-                Select a part type to filter Revo products
-              </p>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setRevoPartDropdownOpen(!revoPartDropdownOpen)}
+                className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${
+                  selectedRevoParts.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
+              >
+                <span className={selectedRevoParts.length === 0 ? 'text-gray-400' : 'text-gray-800'}>
+                  {selectedRevoParts.length === 0
+                    ? '— No Filter —'
+                    : selectedRevoParts.length === 1
+                    ? selectedRevoParts[0]
+                    : `${selectedRevoParts.length} parts selected`}
+                </span>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${revoPartDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {revoPartDropdownOpen && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b-2 border-gray-200 bg-gray-50">
+                    <input type="checkbox" checked={selectedRevoParts.length === 0}
+                      onChange={() => { updateSetting('revoParts', []); updateSetting('revoPart', '') }}
+                      className="rounded" />
+                    <span className="text-xs text-gray-700 font-play font-semibold">— No Filter — (show all)</span>
+                  </label>
+                  {REVO_PARTS.map((part) => (
+                    <label key={part} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                      <input type="checkbox" checked={selectedRevoParts.includes(part)}
+                        onChange={() => toggleRevoPart(part)} className="rounded" />
+                      <span className="text-xs text-gray-800 font-play">{part}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedRevoParts.length > 0 ? (
+              <div className="mt-1">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] text-red-600 font-play font-medium">
+                    Active: {selectedRevoParts.length} part{selectedRevoParts.length > 1 ? 's' : ''}
+                  </p>
+                  <button onClick={() => { updateSetting('revoParts', []); updateSetting('revoPart', '') }}
+                    className="text-[10px] text-gray-400 hover:text-red-500 font-play underline">
+                    Clear all
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {selectedRevoParts.map((part) => (
+                    <span key={part} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
+                      {part}
+                      <button onClick={() => toggleRevoPart(part)} className="hover:text-red-900">×</button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-[10px] text-gray-400 mt-1 font-play">No filter — all parts shown</p>
             )}
           </div>
 
@@ -2595,11 +2829,13 @@ function SettingsTab({
               <button
                 type="button"
                 onClick={() => setCarBrandDropdownOpen(!carBrandDropdownOpen)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play text-left flex items-center justify-between bg-white"
+                className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${
+                  selectedCarBrands.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                }`}
               >
                 <span className={selectedCarBrands.length === 0 ? 'text-gray-400' : 'text-gray-800'}>
                   {selectedCarBrands.length === 0
-                    ? 'All Brands (no filter)'
+                    ? '— No Filter —'
                     : selectedCarBrands.length === 1
                     ? selectedCarBrands[0]
                     : `${selectedCarBrands.length} brands selected`}
@@ -2613,14 +2849,14 @@ function SettingsTab({
               </button>
               {carBrandDropdownOpen && (
                 <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                  <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b-2 border-gray-200 bg-gray-50">
                     <input
                       type="checkbox"
                       checked={selectedCarBrands.length === 0}
                       onChange={() => updateSetting('carBrands', [])}
                       className="rounded"
                     />
-                    <span className="text-xs text-gray-500 font-play italic">All Brands (no filter)</span>
+                    <span className="text-xs text-gray-700 font-play font-semibold">— No Filter — (show all)</span>
                   </label>
                   {CAR_BRANDS.map((brand) => (
                     <label key={brand} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
@@ -2636,19 +2872,31 @@ function SettingsTab({
                 </div>
               )}
             </div>
-            {selectedCarBrands.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {selectedCarBrands.map((b) => (
-                  <span key={b} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
-                    {b}
-                    <button onClick={() => toggleCarBrand(b)} className="hover:text-red-900">×</button>
-                  </span>
-                ))}
+            {selectedCarBrands.length > 0 ? (
+              <div className="mt-1">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-[10px] text-red-600 font-play font-medium">
+                    Active: {selectedCarBrands.length} brand{selectedCarBrands.length > 1 ? 's' : ''}
+                  </p>
+                  <button
+                    onClick={() => updateSetting('carBrands', [])}
+                    className="text-[10px] text-gray-400 hover:text-red-500 font-play underline"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {selectedCarBrands.map((b) => (
+                    <span key={b} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
+                      {b}
+                      <button onClick={() => toggleCarBrand(b)} className="hover:text-red-900">×</button>
+                    </span>
+                  ))}
+                </div>
               </div>
-            )}
-            {selectedCarBrands.length === 0 && (
+            ) : (
               <p className="text-[10px] text-gray-400 mt-1 font-play">
-                Select brands to filter the product grid
+                No filter — all brands shown
               </p>
             )}
           </div>

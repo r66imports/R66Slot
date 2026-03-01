@@ -497,12 +497,17 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
           <div className="w-full max-w-screen-xl mx-auto px-4">
             <div className={`grid gap-3 sm:gap-6 ${colGridClass}`}>
               {children?.slice(0, colCount).map((child) => {
-                // Get image fit settings
                 const imgObjectFit = (child.settings.objectFit as string) || 'cover'
-                const imgHeight = (child.settings.imageHeight as string) || ''
                 const imgWidth = (child.settings.imageWidth as string) || ''
+                const imgHeight = (child.settings.imageHeight as string) || ''
+                const imgWidthTablet = (child.settings.imageWidthTablet as string) || imgWidth
+                const imgHeightTablet = (child.settings.imageHeightTablet as string) || imgHeight
+                const imgWidthMobile = (child.settings.imageWidthMobile as string) || imgWidth
+                const imgHeightMobile = (child.settings.imageHeightMobile as string) || imgHeight
+                const hasVpSizes = imgWidthMobile || imgHeightMobile || imgWidthTablet || imgHeightTablet
                 const colTextAlign = (child.styles?.textAlign as string) || 'left'
                 const colFlexAlign = colTextAlign === 'center' ? 'center' : colTextAlign === 'right' ? 'flex-end' : 'flex-start'
+                const imgWrapperId = `cimg-${child.id}`
 
                 const colContent = (
                   <div
@@ -517,23 +522,33 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                     )}
                     {/* Column Image with Image Fit */}
                     {(child.settings.imageUrl as string) && (
-                      <div
-                        className="mb-3 overflow-hidden rounded-lg"
-                        style={{
-                          ...(imgHeight ? { height: imgHeight } : {}),
-                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
-                        }}
-                      >
-                        <img
-                          src={child.settings.imageUrl as string}
-                          alt={(child.settings.alt as string) || ''}
-                          className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
-                          style={{
-                            objectFit: imgObjectFit as any,
-                            ...(imgWidth ? { width: '100%' } : {}),
+                      <>
+                        {hasVpSizes && (
+                          <style>{`
+                            #${imgWrapperId} { ${imgWidth ? `width:${imgWidth};` : ''} ${imgHeight ? `height:${imgHeight};` : ''} }
+                            @media (max-width: 639px) { #${imgWrapperId} { ${imgWidthMobile ? `width:${imgWidthMobile};` : ''} ${imgHeightMobile ? `height:${imgHeightMobile};` : ''} } }
+                            @media (min-width: 640px) and (max-width: 1023px) { #${imgWrapperId} { ${imgWidthTablet ? `width:${imgWidthTablet};` : ''} ${imgHeightTablet ? `height:${imgHeightTablet};` : ''} } }
+                          `}</style>
+                        )}
+                        <div
+                          id={imgWrapperId}
+                          className="mb-3 overflow-hidden rounded-lg"
+                          style={hasVpSizes ? { maxWidth: '100%' } : {
+                            ...(imgHeight ? { height: imgHeight } : {}),
+                            ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
                           }}
-                        />
-                      </div>
+                        >
+                          <img
+                            src={child.settings.imageUrl as string}
+                            alt={(child.settings.alt as string) || ''}
+                            className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
+                            style={{
+                              objectFit: imgObjectFit as any,
+                              ...(imgWidth ? { width: '100%' } : {}),
+                            }}
+                          />
+                        </div>
+                      </>
                     )}
                     {/* Column Text Content */}
                     <div
@@ -1101,6 +1116,53 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
             )}
           </div>
         </div>
+      )
+    }
+
+    case 'footer': {
+      const ftBg = styles.backgroundColor || '#1f2937'
+      const ftText = styles.textColor || '#ffffff'
+      const ftBrand = (settings.brandName as string) || 'R66SLOT'
+      const ftAccent = (settings.brandAccentColor as string) || '#ef4444'
+      const ftTagline = (settings.tagline as string) || ''
+      const ftCopyright = (settings.copyright as string) || `© ${new Date().getFullYear()} ${ftBrand}. All rights reserved.`
+      const parseLinks = (raw: string) =>
+        (raw || '').split('\n').filter(Boolean).map(line => {
+          const [label, href] = line.split('|')
+          return { label: label?.trim() || '', href: href?.trim() || '#' }
+        })
+      const columns = [
+        { title: (settings.col1Title as string) || '', links: parseLinks(settings.col1Links as string) },
+        { title: (settings.col2Title as string) || '', links: parseLinks(settings.col2Links as string) },
+        { title: (settings.col3Title as string) || '', links: parseLinks(settings.col3Links as string) },
+      ].filter(c => c.title || c.links.length > 0)
+      return (
+        <footer style={{ backgroundColor: ftBg, color: ftText, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="container mx-auto px-4 py-12">
+            <div className={`grid grid-cols-1 md:grid-cols-${1 + columns.length} gap-8`}>
+              <div>
+                <div className="text-2xl font-bold mb-4 font-play">
+                  <span style={{ color: ftText }}>{ftBrand.replace(/SLOT|slot/g, '')}</span>
+                  <span style={{ color: ftAccent }}>{ftBrand.match(/SLOT|slot/)?.[0] || ''}</span>
+                </div>
+                {ftTagline && <p style={{ color: ftText, opacity: 0.6 }} className="text-sm">{ftTagline}</p>}
+              </div>
+              {columns.map((col, i) => (
+                <div key={i}>
+                  <h3 className="font-semibold mb-4 font-play">{col.title}</h3>
+                  <nav className="flex flex-col gap-2 text-sm">
+                    {col.links.map((link, j) => (
+                      <span key={j} style={{ color: ftText, opacity: 0.6 }} className="text-sm">{link.label}</span>
+                    ))}
+                  </nav>
+                </div>
+              ))}
+            </div>
+            <div className="mt-12 pt-8" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <p className="text-sm" style={{ color: ftText, opacity: 0.6 }}>{ftCopyright}</p>
+            </div>
+          </div>
+        </footer>
       )
     }
 

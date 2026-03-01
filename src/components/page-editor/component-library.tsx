@@ -444,4 +444,30 @@ export const COMPONENT_LIBRARY: {
       },
     },
   },
+  {
+    type: 'footer',
+    label: 'Footer',
+    icon: '🔻',
+    defaultProps: {
+      content: '',
+      styles: {
+        backgroundColor: '#1f2937',
+        textColor: '#ffffff',
+      },
+      settings: {
+        brandName: 'R66SLOT',
+        brandAccentColor: '#ef4444',
+        tagline: 'Your premium destination for slot car racing.',
+        col1Title: 'Shop',
+        col1Links: 'All Products|/products\nBrands|/brands\nNew Arrivals|/collections/new-arrivals\nPre-Orders|/pre-orders',
+        col2Title: 'Information',
+        col2Links: 'About Us|/about\nContact|/contact\nShipping Info|/shipping\nReturns|/returns',
+        col3Title: 'Account',
+        col3Links: 'My Account|/account\nOrder History|/account/orders\nLogin|/account/login\nRegister|/account/register',
+        copyright: `© ${new Date().getFullYear()} R66SLOT. All rights reserved.`,
+        showPrivacyLink: 'true',
+        showTermsLink: 'true',
+      },
+    },
+  },
 ]

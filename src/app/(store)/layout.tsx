@@ -8,7 +8,9 @@ export default function StoreLayout({
   return (
     <>
       <main className="min-h-screen">{children}</main>
-      <Footer />
+      <div style={{ position: 'relative', zIndex: 2 }}>
+        <Footer />
+      </div>
     </>
   )
 }

@@ -26,18 +26,22 @@ function ProductGridLive({
       .then((r) => r.json())
       .then((data) => {
         let list = Array.isArray(data) ? data.filter((p: any) => p.status === 'active') : []
-        if (settings.carClass) {
-          list = list.filter(
-            (p: any) =>
-              p.carClass === settings.carClass ||
-              p.tags?.includes(settings.carClass)
+        // Racing class filter — supports multi-select (carClasses[]) and legacy single (carClass)
+        const activeClasses: string[] = Array.isArray(settings.carClasses) && (settings.carClasses as string[]).length > 0
+          ? (settings.carClasses as string[])
+          : (settings.carClass ? [settings.carClass as string] : [])
+        if (activeClasses.length > 0) {
+          list = list.filter((p: any) =>
+            activeClasses.some((cls) => p.carClass === cls || p.tags?.includes(cls))
           )
         }
-        if (settings.revoPart) {
-          list = list.filter(
-            (p: any) =>
-              p.revoPart === settings.revoPart ||
-              p.tags?.includes(settings.revoPart)
+        // Revo parts filter — supports multi-select (revoParts[]) and legacy single (revoPart)
+        const activeParts: string[] = Array.isArray(settings.revoParts) && (settings.revoParts as string[]).length > 0
+          ? (settings.revoParts as string[])
+          : (settings.revoPart ? [settings.revoPart as string] : [])
+        if (activeParts.length > 0) {
+          list = list.filter((p: any) =>
+            activeParts.some((part) => p.revoPart === part || p.tags?.includes(part))
           )
         }
         const activeBrands = Array.isArray(settings.carBrands) ? (settings.carBrands as string[]) : []
@@ -52,7 +56,7 @@ function ProductGridLive({
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.carClass, settings.revoPart, settings.carBrands, settings.productCount])
+  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.productCount])
 
   const handleAddToCart = (p: any) => {
     addItem({
@@ -71,14 +75,21 @@ function ProductGridLive({
     <div style={containerStyle}>
       <div className="container mx-auto">
         {/* Class badge header */}
-        {settings.carClass && (
-          <div className="mb-5 flex items-center gap-2">
-            <span className="text-sm font-semibold text-gray-600">Class:</span>
-            <span className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full tracking-wide">
-              {settings.carClass as string}
-            </span>
-          </div>
-        )}
+        {(() => {
+          const badges: string[] = Array.isArray(settings.carClasses) && (settings.carClasses as string[]).length > 0
+            ? (settings.carClasses as string[])
+            : (settings.carClass ? [settings.carClass as string] : [])
+          return badges.length > 0 ? (
+            <div className="mb-5 flex items-center flex-wrap gap-2">
+              <span className="text-sm font-semibold text-gray-600">Class:</span>
+              {badges.map((cls) => (
+                <span key={cls} className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded-full tracking-wide">
+                  {cls}
+                </span>
+              ))}
+            </div>
+          ) : null
+        })()}
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -88,10 +99,10 @@ function ProductGridLive({
           <div className="text-center py-12 text-gray-400">
             <p className="text-4xl mb-3">🏎️</p>
             <p className="text-sm">
-              {settings.carClass
-                ? `No active products for class "${settings.carClass as string}"`
-                : settings.revoPart
-                ? `No active products for "${settings.revoPart as string}"`
+              {(Array.isArray(settings.carClasses) ? (settings.carClasses as string[]) : settings.carClass ? [settings.carClass] : []).length > 0
+                ? `No active products for selected class filter`
+                : (Array.isArray(settings.revoParts) ? (settings.revoParts as string[]) : settings.revoPart ? [settings.revoPart] : []).length > 0
+                ? `No active products for selected parts filter`
                 : 'No active products found'}
             </p>
           </div>
@@ -691,10 +702,17 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
             <div className={`grid gap-3 sm:gap-6 ${colGridClass}`}>
               {children?.slice(0, colCount).map((child) => {
                 const imgFitCol = (child.settings.objectFit as string) || 'cover'
-                const imgHeight = (child.settings.imageHeight as string) || (child.styles?.height as string) || ''
+                // Per-viewport sizes (mobile < 640px, tablet 640-1024px, desktop > 1024px)
                 const imgWidth = (child.settings.imageWidth as string) || (child.styles?.width as string) || ''
+                const imgHeight = (child.settings.imageHeight as string) || (child.styles?.height as string) || ''
+                const imgWidthTablet = (child.settings.imageWidthTablet as string) || imgWidth
+                const imgHeightTablet = (child.settings.imageHeightTablet as string) || imgHeight
+                const imgWidthMobile = (child.settings.imageWidthMobile as string) || imgWidth
+                const imgHeightMobile = (child.settings.imageHeightMobile as string) || imgHeight
+                const hasVpSizes = imgWidthMobile || imgHeightMobile || imgWidthTablet || imgHeightTablet
                 const colTextAlign = (child.styles?.textAlign as string) || 'left'
                 const colFlexAlign = colTextAlign === 'center' ? 'center' : colTextAlign === 'right' ? 'flex-end' : 'flex-start'
+                const imgWrapperId = `cimg-${child.id}`
                 const colContent = (
                   <div
                     key={child.id}
@@ -707,24 +725,34 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                       </div>
                     )}
                     {(child.settings.imageUrl as string) && (
-                      <div
-                        className="mb-3 overflow-hidden rounded-lg"
-                        style={{
-                          ...(imgHeight ? { height: imgHeight } : {}),
-                          ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
-                        }}
-                      >
-                        <img
-                          src={child.settings.imageUrl as string}
-                          alt={(child.settings.alt as string) || ''}
-                          className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
-                          style={{
-                            objectFit: imgFitCol as any,
-                            objectPosition: (child.settings.objectPosition as string) || 'center center',
-                            ...(imgWidth ? { width: '100%' } : {}),
+                      <>
+                        {hasVpSizes && (
+                          <style>{`
+                            #${imgWrapperId} { ${imgWidth ? `width:${imgWidth};` : ''} ${imgHeight ? `height:${imgHeight};` : ''} }
+                            @media (max-width: 639px) { #${imgWrapperId} { ${imgWidthMobile ? `width:${imgWidthMobile};` : ''} ${imgHeightMobile ? `height:${imgHeightMobile};` : ''} } }
+                            @media (min-width: 640px) and (max-width: 1023px) { #${imgWrapperId} { ${imgWidthTablet ? `width:${imgWidthTablet};` : ''} ${imgHeightTablet ? `height:${imgHeightTablet};` : ''} } }
+                          `}</style>
+                        )}
+                        <div
+                          id={imgWrapperId}
+                          className="mb-3 overflow-hidden rounded-lg"
+                          style={hasVpSizes ? { maxWidth: '100%' } : {
+                            ...(imgHeight ? { height: imgHeight } : {}),
+                            ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
                           }}
-                        />
-                      </div>
+                        >
+                          <img
+                            src={child.settings.imageUrl as string}
+                            alt={(child.settings.alt as string) || ''}
+                            className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
+                            style={{
+                              objectFit: imgFitCol as any,
+                              objectPosition: (child.settings.objectPosition as string) || 'center center',
+                              ...(imgWidth ? { width: '100%' } : {}),
+                            }}
+                          />
+                        </div>
+                      </>
                     )}
                     <div style={{ textAlign: colTextAlign as any, alignSelf: 'stretch' }} dangerouslySetInnerHTML={{ __html: child.content }} />
                   </div>
@@ -1500,6 +1528,71 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
             />
           </div>
         </div>
+      )
+    }
+
+    case 'footer': {
+      const ftBg = styles.backgroundColor || '#1f2937'
+      const ftText = styles.textColor || '#ffffff'
+      const ftBrand = (settings.brandName as string) || 'R66SLOT'
+      const ftAccent = (settings.brandAccentColor as string) || '#ef4444'
+      const ftTagline = (settings.tagline as string) || ''
+      const ftCopyright = (settings.copyright as string) || `© ${new Date().getFullYear()} ${ftBrand}. All rights reserved.`
+      const parseLinks = (raw: string) =>
+        (raw || '').split('\n').filter(Boolean).map(line => {
+          const [label, href] = line.split('|')
+          return { label: label?.trim() || '', href: href?.trim() || '#' }
+        })
+      const columns = [
+        { title: (settings.col1Title as string) || '', links: parseLinks(settings.col1Links as string) },
+        { title: (settings.col2Title as string) || '', links: parseLinks(settings.col2Links as string) },
+        { title: (settings.col3Title as string) || '', links: parseLinks(settings.col3Links as string) },
+      ].filter(c => c.title || c.links.length > 0)
+      return (
+        <footer style={{ backgroundColor: ftBg, color: ftText, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <div className="container mx-auto px-4 py-12">
+            <div className={`grid grid-cols-1 md:grid-cols-${1 + columns.length} gap-8`}>
+              {/* Brand column */}
+              <div>
+                <div className="text-2xl font-bold mb-4 font-play">
+                  <span style={{ color: ftText }}>{ftBrand.replace(/SLOT|slot/g, '')}</span>
+                  <span style={{ color: ftAccent }}>{ftBrand.match(/SLOT|slot/)?.[0] || ''}</span>
+                </div>
+                {ftTagline && <p style={{ color: ftText, opacity: 0.6 }} className="text-sm">{ftTagline}</p>}
+              </div>
+              {/* Link columns */}
+              {columns.map((col, i) => (
+                <div key={i}>
+                  <h3 className="font-semibold mb-4 font-play">{col.title}</h3>
+                  <nav className="flex flex-col gap-2 text-sm">
+                    {col.links.map((link, j) => (
+                      <a key={j} href={link.href} style={{ color: ftText, opacity: 0.6 }}
+                        className="hover:opacity-100 transition-opacity no-underline">
+                        {link.label}
+                      </a>
+                    ))}
+                  </nav>
+                </div>
+              ))}
+            </div>
+            {/* Bottom bar */}
+            <div className="mt-12 pt-8" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                <p className="text-sm" style={{ color: ftText, opacity: 0.6 }}>{ftCopyright}</p>
+                <div className="flex gap-6">
+                  {settings.showPrivacyLink !== 'false' && (
+                    <a href="/privacy" className="text-sm hover:opacity-100 transition-opacity no-underline"
+                      style={{ color: ftText, opacity: 0.6 }}>Privacy Policy</a>
+                  )}
+                  {settings.showTermsLink !== 'false' && (
+                    <a href="/terms" className="text-sm hover:opacity-100 transition-opacity no-underline"
+                      style={{ color: ftText, opacity: 0.6 }}>Terms of Service</a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </footer>
       )
     }
 
