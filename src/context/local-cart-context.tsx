@@ -16,7 +16,7 @@ interface LocalCartContextType {
   items: LocalCartItem[]
   totalItems: number
   subtotal: number
-  addItem: (product: Omit<LocalCartItem, 'quantity'>) => void
+  addItem: (product: Omit<LocalCartItem, 'quantity'>, qty?: number) => void
   updateQuantity: (id: string, quantity: number) => void
   removeItem: (id: string) => void
   clearCart: () => void
@@ -46,15 +46,15 @@ export function LocalCartProvider({ children }: { children: React.ReactNode }) {
     }
   }, [items, hydrated])
 
-  const addItem = (product: Omit<LocalCartItem, 'quantity'>) => {
+  const addItem = (product: Omit<LocalCartItem, 'quantity'>, qty: number = 1) => {
     setItems((prev) => {
       const existing = prev.find((i) => i.id === product.id)
       if (existing) {
         return prev.map((i) =>
-          i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i
+          i.id === product.id ? { ...i, quantity: i.quantity + qty } : i
         )
       }
-      return [...prev, { ...product, quantity: 1 }]
+      return [...prev, { ...product, quantity: qty }]
     })
   }
 

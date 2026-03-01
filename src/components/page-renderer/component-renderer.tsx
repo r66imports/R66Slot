@@ -19,7 +19,12 @@ function ProductGridLive({
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [addedId, setAddedId] = useState<string | null>(null)
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
   const { addItem } = useLocalCart()
+
+  const getQty = (id: string) => quantities[id] ?? 1
+  const setQty = (id: string, val: number) =>
+    setQuantities((prev) => ({ ...prev, [id]: Math.max(1, val) }))
 
   useEffect(() => {
     fetch('/api/admin/products')
@@ -87,7 +92,8 @@ function ProductGridLive({
       price: p.price || 0,
       imageUrl: p.imageUrl || '',
       pageUrl: p.pageUrl || '',
-    })
+    }, getQty(p.id))
+    setQty(p.id, 1)
     setAddedId(p.id)
     setTimeout(() => setAddedId(null), 1500)
   }
@@ -128,7 +134,7 @@ function ProductGridLive({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
             {products.map((p) => (
               <div
                 key={p.id}
@@ -178,17 +184,40 @@ function ProductGridLive({
                       >
                         Pre Order
                       </a>
-                    ) : (
+                    ) : p.quantity === 0 ? (
                       <button
-                        onClick={() => handleAddToCart(p)}
-                        className={`block w-full text-center font-semibold py-2 px-4 rounded text-sm transition-all duration-300 ${
-                          addedId === p.id
-                            ? 'bg-green-600 text-white scale-95'
-                            : 'bg-red-600 text-white hover:bg-red-700'
-                        }`}
+                        disabled
+                        className="block w-full text-center font-semibold py-2 px-4 rounded text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
                       >
-                        {addedId === p.id ? '✓ Added!' : 'Add to Cart'}
+                        Out of Stock
                       </button>
+                    ) : (
+                      <>
+                        {/* Quantity selector */}
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                          <button
+                            type="button"
+                            onClick={() => setQty(p.id, getQty(p.id) - 1)}
+                            className="w-7 h-7 rounded border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 flex items-center justify-center text-base leading-none"
+                          >−</button>
+                          <span className="w-6 text-center text-sm font-semibold">{getQty(p.id)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setQty(p.id, getQty(p.id) + 1)}
+                            className="w-7 h-7 rounded border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 flex items-center justify-center text-base leading-none"
+                          >+</button>
+                        </div>
+                        <button
+                          onClick={() => handleAddToCart(p)}
+                          className={`block w-full text-center font-semibold py-2 px-4 rounded text-sm transition-all duration-300 ${
+                            addedId === p.id
+                              ? 'bg-green-600 text-white scale-95'
+                              : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
+                        >
+                          {addedId === p.id ? '✓ Added!' : 'Add to Cart'}
+                        </button>
+                      </>
                     )
                   )}
                 </div>
