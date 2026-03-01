@@ -1148,6 +1148,9 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       )
     }
 
+    case 'footer':
+      return null
+
     default:
       return (
         <div style={containerStyle}>

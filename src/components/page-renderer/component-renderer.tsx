@@ -1616,6 +1616,9 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       )
     }
 
+    case 'footer':
+      return null
+
     default:
       return (
         <div style={containerStyle}>
