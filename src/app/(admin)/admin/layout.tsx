@@ -251,18 +251,19 @@ export default function AdminLayout({
                               const subBrand = subBrandMatch ? decodeURIComponent(subBrandMatch[1]) : ''
                               const isSubActive = subBrand
                                 ? pathname === '/admin/products' && currentBrand.toLowerCase() === subBrand.toLowerCase()
-                                : !subBrand && pathname === subItem.href && !currentBrand || pathname.startsWith(subItem.href + '/') && !subBrand && !currentBrand
-                              return (
-                                <Link
-                                  key={subItem.name}
-                                  href={subItem.href}
-                                  className={cn(
-                                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play',
-                                    isSubActive
-                                      ? 'bg-blue-50 text-blue-700 font-medium'
-                                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                                  )}
-                                >
+                                : (pathname === subItem.href && !currentBrand) || (pathname.startsWith(subItem.href + '/') && !currentBrand)
+                              // Brand items use <a> for full page reload so products page re-mounts and re-fetches
+                              const cls = cn(
+                                'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play',
+                                isSubActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              )
+                              return subBrand ? (
+                                <a key={subItem.name} href={subItem.href} className={cls}>
+                                  <span className="text-sm">{subItem.icon}</span>
+                                  {subItem.name}
+                                </a>
+                              ) : (
+                                <Link key={subItem.name} href={subItem.href} className={cls}>
                                   <span className="text-sm">{subItem.icon}</span>
                                   {subItem.name}
                                 </Link>

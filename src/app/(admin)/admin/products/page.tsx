@@ -296,6 +296,18 @@ export default function ProductsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const colPickerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showColPicker) return
+    const handler = (e: MouseEvent) => {
+      if (colPickerRef.current && !colPickerRef.current.contains(e.target as Node)) {
+        setShowColPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showColPicker])
 
   // Task 2: categories
   const [categories, setCategories] = useState<Category[]>([])
@@ -486,7 +498,7 @@ export default function ProductsPage() {
         alert(`Import complete: ${parts.join(', ')} product${(data.imported + data.updated) !== 1 ? 's' : ''}`)
         setShowImportModal(false)
         setImportText('')
-        fetchProducts()
+        fetchProducts(urlBrand)
       }
     } catch (err) {
       console.error('Import error:', err)
@@ -516,7 +528,7 @@ export default function ProductsPage() {
     setExpandedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
-  const visibleColCount = 3 + Object.values(visibleCols).filter(Boolean).length // checkbox + product + actions + visible
+  const visibleColCount = 4 + Object.values(visibleCols).filter(Boolean).length // checkbox + expand + product + actions
 
   const filtered = products
     .filter((p) => {
@@ -620,7 +632,7 @@ export default function ProductsPage() {
         )}
 
         {/* Column picker */}
-        <div className="relative ml-auto">
+        <div className="relative ml-auto" ref={colPickerRef}>
           <button
             onClick={() => setShowColPicker((v) => !v)}
             className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1.5"
