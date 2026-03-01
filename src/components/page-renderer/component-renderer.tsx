@@ -180,7 +180,7 @@ function ProductGridLive({
                     <p className="font-bold uppercase tracking-wider truncate mb-0.5" style={{ fontSize: metaFontSize, color: metaColor }}>{p.brand}</p>
                   )}
                   {p.sku && (
-                    <p className="font-bold font-mono mb-1" style={{ fontSize: metaFontSize, color: metaColor }}>{p.sku}</p>
+                    <p className="font-bold mb-1" style={{ fontSize: metaFontSize, color: metaColor }}>{p.sku}</p>
                   )}
                   <div className="flex-1 mb-2">
                     <h3 className="font-semibold mb-1 line-clamp-2" style={{ fontSize: titleFontSize, color: titleColor }}>{p.title}</h3>
