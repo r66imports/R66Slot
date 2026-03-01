@@ -126,13 +126,16 @@ function buildPreOrderPDF(product: Product): string {
 </html>`
 }
 
-// ─── Brand Import Profiles ────────────────────────────────────────────────────
+// ─── Brand Import / Export Profiles ──────────────────────────────────────────
 type ImportProfile = {
   label: string
   hint: string
   template: string
   placeholder: string
   mapRow: (obj: Record<string, string>) => Record<string, string>
+  brandKey: string
+  exportHeaders: string[]
+  exportRow: (p: Product) => (string | number)[]
 }
 
 const IMPORT_PROFILES: Record<string, ImportProfile> = {
@@ -154,6 +157,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       eta: obj['eta'] || obj['delivery'] || '',
       status: obj['status'] || 'active',
     }),
+    brandKey: '',
+    exportHeaders: ['title', 'sku', 'brand', 'price', 'quantity', 'eta', 'description', 'type', 'car_class', 'scale', 'status', 'page_url'],
+    exportRow: (p) => [p.title, p.sku, p.brand, p.price, p.quantity, p.eta, p.description, p.productType, p.carClass || '', p.scale || '', p.status, p.pageUrl || ''],
   },
   nsr: {
     label: 'NSR',
@@ -173,6 +179,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       description: obj['description'] || obj['desc'] || '',
       status: 'active',
     }),
+    brandKey: 'NSR',
+    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
   },
   revo: {
     label: 'Revo',
@@ -191,6 +200,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       description: obj['description'] || obj['desc'] || '',
       status: 'active',
     }),
+    brandKey: 'Revo',
+    exportHeaders: ['sku', 'title', 'part_type', 'price', 'quantity', 'eta'],
+    exportRow: (p) => [p.sku, p.title, p.productType || '', p.price, p.quantity, p.eta],
   },
   brm: {
     label: 'BRM',
@@ -210,6 +222,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       description: obj['description'] || obj['desc'] || '',
       status: 'active',
     }),
+    brandKey: 'BRM',
+    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
   },
   pioneer: {
     label: 'Pioneer',
@@ -229,6 +244,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       description: obj['description'] || obj['desc'] || '',
       status: 'active',
     }),
+    brandKey: 'Pioneer',
+    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
   },
   sideways: {
     label: 'Sideways',
@@ -248,6 +266,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       description: obj['description'] || obj['desc'] || '',
       status: 'active',
     }),
+    brandKey: 'Sideways',
+    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
   },
 }
 
@@ -263,6 +284,8 @@ export default function ProductsPage() {
   const [importText, setImportText] = useState('')
   const [importing, setImporting] = useState(false)
   const [importProfile, setImportProfile] = useState('generic')
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportProfile, setExportProfile] = useState('generic')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -332,17 +355,20 @@ export default function ProductsPage() {
     finally { setBulkDeleting(false) }
   }
 
-  const exportCSV = (rows: Product[]) => {
-    const headers = ['title', 'sku', 'brand', 'price', 'quantity', 'eta', 'description', 'productType', 'carClass', 'status', 'pageUrl']
-    const csv = [headers.join(','), ...rows.map((p) => [
-      `"${(p.title || '').replace(/"/g, '""')}"`,
-      `"${p.sku || ''}"`, `"${p.brand || ''}"`, p.price, p.quantity,
-      `"${p.eta || ''}"`, `"${(p.description || '').replace(/"/g, '""')}"`,
-      `"${p.productType || ''}"`, `"${p.carClass || ''}"`, p.status, `"${p.pageUrl || ''}"`,
-    ].join(','))].join('\n')
+  const exportCSV = (rows: Product[], profileKey = 'generic') => {
+    const profile = IMPORT_PROFILES[profileKey]
+    const filtered = profile.brandKey
+      ? rows.filter((p) => p.brand.toLowerCase() === profile.brandKey.toLowerCase())
+      : rows
+    const csv = [
+      profile.exportHeaders.join(','),
+      ...filtered.map((p) =>
+        profile.exportRow(p).map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
+      ),
+    ].join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `products-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `${profileKey}-products-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
 
@@ -505,7 +531,7 @@ export default function ProductsPage() {
           <p className="text-gray-600 mt-1">Manage your product inventory ({products.length} products)</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => exportCSV(products)}>Export CSV</Button>
+          <Button variant="outline" onClick={() => setShowExportModal(true)}>Export CSV</Button>
           <Button variant="outline" onClick={() => setShowImportModal(true)}>Import</Button>
           <Button size="lg" asChild>
             <Link href="/admin/products/new">Add Product</Link>
@@ -575,7 +601,7 @@ export default function ProductsPage() {
       {selectedIds.size > 0 && (
         <div className="mb-4 flex items-center gap-3 bg-gray-900 text-white rounded-lg px-4 py-3 flex-wrap">
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
-          <button onClick={() => exportCSV(products.filter((p) => selectedIds.has(p.id)))} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-900 rounded hover:bg-gray-100">
+          <button onClick={() => exportCSV(products.filter((p) => selectedIds.has(p.id)), exportProfile)} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-900 rounded hover:bg-gray-100">
             Export CSV
           </button>
           <button onClick={handleBulkDelete} disabled={bulkDeleting} className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
@@ -803,6 +829,57 @@ export default function ProductsPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Export Modal ── */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+            <h3 className="text-lg font-semibold mb-3">Export Products (CSV)</h3>
+
+            {/* Brand profile selector */}
+            <div className="mb-3">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Select Brand / Profile</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(IMPORT_PROFILES).map(([key, profile]) => {
+                  const count = profile.brandKey
+                    ? products.filter((p) => p.brand.toLowerCase() === profile.brandKey.toLowerCase()).length
+                    : products.length
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setExportProfile(key)}
+                      className={`px-3 py-1.5 text-sm rounded-lg border font-medium transition-colors ${
+                        exportProfile === key
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                      }`}
+                    >
+                      {profile.label} ({count})
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Column preview */}
+            <p className="text-xs text-gray-500 mb-4 bg-gray-50 rounded px-3 py-2">
+              Columns: {IMPORT_PROFILES[exportProfile].exportHeaders.join(', ')}
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setShowExportModal(false)} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
+              <button
+                onClick={() => { exportCSV(products, exportProfile); setShowExportModal(false) }}
+                className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
+              >
+                Export ({IMPORT_PROFILES[exportProfile].brandKey
+                  ? products.filter((p) => p.brand.toLowerCase() === IMPORT_PROFILES[exportProfile].brandKey.toLowerCase()).length
+                  : products.length} products)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Import Modal ── */}
