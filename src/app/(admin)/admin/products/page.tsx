@@ -354,6 +354,27 @@ export default function ProductsPage() {
     } catch (err) { console.error('Delete error:', err) }
   }
 
+  const handleDuplicate = async (product: Product) => {
+    try {
+      const res = await fetch('/api/admin/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...product,
+          title: `Copy of ${product.title}`,
+          sku: product.sku ? `${product.sku}-copy` : '',
+          status: 'draft',
+          mediaFiles: product.images?.length ? product.images : (product.imageUrl ? [product.imageUrl] : []),
+          imageUrl: product.imageUrl,
+        }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setProducts(prev => [...prev, created])
+      }
+    } catch (err) { console.error('Duplicate error:', err) }
+  }
+
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -907,6 +928,13 @@ export default function ProductsPage() {
                             >
                               Edit
                             </Link>
+                            <button
+                              onClick={() => handleDuplicate(product)}
+                              className="px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded hover:bg-purple-200"
+                              title="Duplicate product"
+                            >
+                              Copy
+                            </button>
                             <button
                               onClick={() => handlePreOrder(product)}
                               className="px-2 py-1 text-xs font-bold bg-orange-500 text-white rounded hover:bg-orange-600 flex items-center gap-1"
