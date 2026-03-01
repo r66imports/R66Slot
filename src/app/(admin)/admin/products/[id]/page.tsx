@@ -932,9 +932,9 @@ export default function EditProductPage({
                   </button>
                 </div>
 
-                {/* Product Type */}
+                {/* Category */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Product type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
                   <select
                     value={productType}
                     onChange={(e) => setProductType(e.target.value)}
@@ -946,7 +946,7 @@ export default function EditProductPage({
                     ))}
                   </select>
                   <button type="button" onClick={() => setShowAddProductType(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    + Add Product Type
+                    + Add Category
                   </button>
                 </div>
 
@@ -1210,15 +1210,15 @@ export default function EditProductPage({
         </div>
       )}
 
-      {/* Add Product Type Modal */}
+      {/* Add Category Modal */}
       {showAddProductType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Product Type</h3>
+            <h3 className="text-lg font-semibold mb-4">Add New Category</h3>
             <input type="text" value={newProductType} onChange={(e) => setNewProductType(e.target.value)} placeholder="Enter product type" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4" onKeyDown={(e) => e.key === 'Enter' && handleAddProductType()} autoFocus />
             <div className="flex justify-end gap-2">
               <button onClick={() => { setShowAddProductType(false); setNewProductType('') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={handleAddProductType} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">Add Product Type</button>
+              <button onClick={handleAddProductType} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">Add Category</button>
             </div>
           </div>
         </div>

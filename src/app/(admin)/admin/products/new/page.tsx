@@ -741,10 +741,10 @@ export default function NewProductPage() {
                   </button>
                 </div>
 
-                {/* Product Type */}
+                {/* Category */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product type
+                    Category
                   </label>
                   <select
                     value={productType}
@@ -761,7 +761,7 @@ export default function NewProductPage() {
                     onClick={() => setShowAddProductType(true)}
                     className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    + Add Product Type
+                    + Add Category
                   </button>
                 </div>
 
@@ -1207,11 +1207,11 @@ export default function NewProductPage() {
         </div>
       )}
 
-      {/* Add Product Type Modal */}
+      {/* Add Category Modal */}
       {showAddProductType && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Product Type</h3>
+            <h3 className="text-lg font-semibold mb-4">Add New Category</h3>
             <input
               type="text"
               value={newProductType}
@@ -1235,7 +1235,7 @@ export default function NewProductPage() {
                 onClick={handleAddProductType}
                 className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800"
               >
-                Add Product Type
+                Add Category
               </button>
             </div>
           </div>
