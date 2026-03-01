@@ -2842,6 +2842,7 @@ function SettingsTab({
 
   const CAR_BRANDS = [
     'Ford Escort MK I',
+    'Datsun 510',
   ]
 
   const CAR_CLASSES = ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA']
