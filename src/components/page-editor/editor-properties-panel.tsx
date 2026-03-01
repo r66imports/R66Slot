@@ -687,6 +687,37 @@ function ContentTab({
               <option value="large">Large (tall image)</option>
             </select>
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Fit</label>
+            <div className="grid grid-cols-3 gap-1">
+              {([
+                { value: 'contain', label: 'Contain', desc: 'Full image visible, no crop' },
+                { value: 'cover', label: 'Cover', desc: 'Fills card, may crop edges' },
+                { value: 'scale-down', label: 'Scale Down', desc: 'Shrink only, never upscale' },
+              ] as const).map(({ value, label, desc }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => updateSetting('imageFit', value)}
+                  title={desc}
+                  className={`py-1.5 text-[10px] rounded font-play font-medium transition-colors border ${
+                    (component.settings.imageFit || 'contain') === value
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 font-play">
+              {(component.settings.imageFit as string) === 'cover'
+                ? 'Fills card fully — edges may be cropped'
+                : (component.settings.imageFit as string) === 'scale-down'
+                ? 'Shrinks to fit if too large, never stretches up'
+                : 'Full image always visible — background fills gaps'}
+            </p>
+          </div>
         </div>
       )}
 

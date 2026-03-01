@@ -140,6 +140,7 @@ function ProductGridLive({
             {products.map((p) => {
               const cardSize = (settings.cardSize as string) || 'standard'
               const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
+              const imgFit = ((settings.imageFit as string) || 'contain') as React.CSSProperties['objectFit']
               return (
               <div
                 key={p.id}
@@ -151,7 +152,8 @@ function ProductGridLive({
                     <img
                       src={p.imageUrl}
                       alt={p.title}
-                      className="w-full h-full object-contain"
+                      className="w-full h-full"
+                      style={{ objectFit: imgFit }}
                     />
                   ) : (
                     <span className="text-gray-400 text-4xl">🏎️</span>
