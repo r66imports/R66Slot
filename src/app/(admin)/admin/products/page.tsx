@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -286,6 +286,12 @@ export default function ProductsPage() {
   const [importProfile, setImportProfile] = useState('generic')
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportProfile, setExportProfile] = useState('generic')
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [showColPicker, setShowColPicker] = useState(false)
+  const [visibleCols, setVisibleCols] = useState<Record<string, boolean>>({
+    sku: true, brand: true, categories: true, price: true,
+    eta: true, qty: true, pageUrl: true, status: true,
+  })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -497,13 +503,26 @@ export default function ProductsPage() {
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
   const allRevoParts = Array.from(new Set(products.flatMap((p) => p.revoParts || []))).sort()
 
-  const filtered = products.filter((p) => {
-    const matchBrand = !brandFilter || p.brand?.toLowerCase() === brandFilter.toLowerCase()
-    const matchCat = !categoryFilter || (p.collections || []).includes(categoryFilter) || (p.categories || []).includes(categoryFilter)
-    const matchRevo = !revoFilter || (p.revoParts || []).includes(revoFilter)
-    const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
-    return matchBrand && matchCat && matchRevo && matchSearch
-  })
+  const COL_LABELS: Record<string, string> = {
+    sku: 'SKU', brand: 'Brand', categories: 'Categories', price: 'Price',
+    eta: 'ETA', qty: 'Qty', pageUrl: 'Page URL', status: 'Status',
+  }
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  const visibleColCount = 3 + Object.values(visibleCols).filter(Boolean).length // checkbox + product + actions + visible
+
+  const filtered = products
+    .filter((p) => {
+      const matchBrand = !brandFilter || p.brand?.toLowerCase() === brandFilter.toLowerCase()
+      const matchCat = !categoryFilter || (p.collections || []).includes(categoryFilter) || (p.categories || []).includes(categoryFilter)
+      const matchRevo = !revoFilter || (p.revoParts || []).includes(revoFilter)
+      const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
+      return matchBrand && matchCat && matchRevo && matchSearch
+    })
+    .sort((a, b) => (a.sku || '').localeCompare(b.sku || ''))
 
   // Helper: get page name from pageId
   const getPageTitle = (product: Product) => {
@@ -595,6 +614,35 @@ export default function ProductsPage() {
             Clear ✕
           </button>
         )}
+
+        {/* Column picker */}
+        <div className="relative ml-auto">
+          <button
+            onClick={() => setShowColPicker((v) => !v)}
+            className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            </svg>
+            Columns
+          </button>
+          {showColPicker && (
+            <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 p-3 min-w-[160px]">
+              <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Show / Hide Columns</p>
+              {Object.entries(COL_LABELS).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 py-1 cursor-pointer hover:text-gray-900 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={visibleCols[key]}
+                    onChange={() => setVisibleCols((v) => ({ ...v, [key]: !v[key] }))}
+                    className="accent-gray-900"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Bulk Actions Bar ── */}
@@ -638,17 +686,16 @@ export default function ProductsPage() {
                         className="h-4 w-4 accent-gray-900 cursor-pointer"
                       />
                     </th>
+                    <th className="w-6"></th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Product</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">SKU</th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Brand</th>
-                    {/* Task 2: Categories column */}
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Categories</th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Price</th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">ETA</th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Qty</th>
-                    {/* Task 3/4: Page URL column */}
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Page URL</th>
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    {visibleCols.sku && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">SKU</th>}
+                    {visibleCols.brand && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Brand</th>}
+                    {visibleCols.categories && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Categories</th>}
+                    {visibleCols.price && <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Price</th>}
+                    {visibleCols.eta && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">ETA</th>}
+                    {visibleCols.qty && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Qty</th>}
+                    {visibleCols.pageUrl && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Page URL</th>}
+                    {visibleCols.status && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Status</th>}
                     <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Actions</th>
                   </tr>
                 </thead>
@@ -658,11 +705,25 @@ export default function ProductsPage() {
                     const isEditingPage = editingPageId === product.id
                     const allCats = Array.from(new Set([...(product.collections || []), ...(product.categories || [])]))
                     return (
-                      <tr key={product.id} className={`border-b hover:bg-gray-50 ${selectedIds.has(product.id) ? 'bg-blue-50' : ''}`}>
+                      <React.Fragment key={product.id}>
+                      <tr className={`border-b hover:bg-gray-50 ${selectedIds.has(product.id) ? 'bg-blue-50' : ''}`}>
 
                         {/* Checkbox */}
                         <td className="py-3 px-3">
                           <input type="checkbox" checked={selectedIds.has(product.id)} onChange={() => toggleSelect(product.id)} className="h-4 w-4 accent-gray-900 cursor-pointer" />
+                        </td>
+
+                        {/* Expand toggle */}
+                        <td className="py-3 px-1">
+                          <button
+                            onClick={() => toggleExpand(product.id)}
+                            className="text-gray-400 hover:text-gray-700 transition-transform"
+                            title="View description"
+                          >
+                            <svg className={`w-3.5 h-3.5 transition-transform ${expandedIds.has(product.id) ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
                         </td>
 
                         {/* Product */}
@@ -683,58 +744,70 @@ export default function ProductsPage() {
                         </td>
 
                         {/* SKU */}
-                        <td className="py-3 px-4">
-                          <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
-                        </td>
+                        {visibleCols.sku && (
+                          <td className="py-3 px-4">
+                            <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
+                          </td>
+                        )}
 
                         {/* Brand */}
-                        <td className="py-3 px-4">
-                          <span>{product.brand || '—'}</span>
-                        </td>
+                        {visibleCols.brand && (
+                          <td className="py-3 px-4">
+                            <span>{product.brand || '—'}</span>
+                          </td>
+                        )}
 
-                        {/* ── Task 2: Categories ── */}
-                        <td className="py-3 px-4">
-                          {allCats.length > 0 ? (
-                            <div className="flex flex-wrap gap-1 max-w-[140px]">
-                              {allCats.slice(0, 3).map((c) => (
-                                <span key={c} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full">{c}</span>
-                              ))}
-                              {allCats.length > 3 && <span className="text-[10px] text-gray-400">+{allCats.length - 3}</span>}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs">—</span>
-                          )}
-                        </td>
+                        {/* Categories */}
+                        {visibleCols.categories && (
+                          <td className="py-3 px-4">
+                            {allCats.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 max-w-[140px]">
+                                {allCats.slice(0, 3).map((c) => (
+                                  <span key={c} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full">{c}</span>
+                                ))}
+                                {allCats.length > 3 && <span className="text-[10px] text-gray-400">+{allCats.length - 3}</span>}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-xs">—</span>
+                            )}
+                          </td>
+                        )}
 
                         {/* Price */}
-                        <td className="py-3 px-4 text-right">
-                          <span className="font-semibold">{product.price > 0 ? `R${product.price.toFixed(2)}` : 'POA'}</span>
-                        </td>
+                        {visibleCols.price && (
+                          <td className="py-3 px-4 text-right">
+                            <span className="font-semibold">{product.price > 0 ? `R${product.price.toFixed(2)}` : 'POA'}</span>
+                          </td>
+                        )}
 
                         {/* ETA — inline edit */}
-                        <td className="py-3 px-4 text-center">
-                          <input
-                            type="text"
-                            defaultValue={product.eta || ''}
-                            placeholder="TBC"
-                            className="w-24 text-center text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
-                            onBlur={(e) => { if (e.target.value !== (product.eta || '')) handleInlineUpdate(product.id, 'eta', e.target.value) }}
-                          />
-                        </td>
+                        {visibleCols.eta && (
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="text"
+                              defaultValue={product.eta || ''}
+                              placeholder="TBC"
+                              className="w-24 text-center text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                              onBlur={(e) => { if (e.target.value !== (product.eta || '')) handleInlineUpdate(product.id, 'eta', e.target.value) }}
+                            />
+                          </td>
+                        )}
 
                         {/* Qty — inline edit */}
-                        <td className="py-3 px-4 text-center">
-                          <input
-                            type="number"
-                            defaultValue={product.quantity}
-                            min={0}
-                            className="w-16 text-center text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
-                            onBlur={(e) => { const v = parseInt(e.target.value) || 0; if (v !== product.quantity) handleInlineUpdate(product.id, 'quantity', v) }}
-                          />
-                        </td>
+                        {visibleCols.qty && (
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="number"
+                              defaultValue={product.quantity}
+                              min={0}
+                              className="w-16 text-center text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                              onBlur={(e) => { const v = parseInt(e.target.value) || 0; if (v !== product.quantity) handleInlineUpdate(product.id, 'quantity', v) }}
+                            />
+                          </td>
+                        )}
 
-                        {/* ── Task 3/4: Page URL ── */}
-                        <td className="py-3 px-4 min-w-[180px]">
+                        {/* Page URL */}
+                        {visibleCols.pageUrl && <td className="py-3 px-4 min-w-[180px]">
                           {isEditingPage ? (
                             <div className="flex items-center gap-1">
                               <input
@@ -778,14 +851,16 @@ export default function ProductsPage() {
                               </button>
                             </div>
                           )}
-                        </td>
+                        </td>}
 
                         {/* Status */}
-                        <td className="py-3 px-4 text-center">
-                          <span className={`px-2 py-1 text-xs rounded font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {product.status}
-                          </span>
-                        </td>
+                        {visibleCols.status && (
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2 py-1 text-xs rounded font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                              {product.status}
+                            </span>
+                          </td>
+                        )}
 
                         {/* Actions */}
                         <td className="py-3 px-4">
@@ -796,7 +871,6 @@ export default function ProductsPage() {
                             >
                               Edit
                             </Link>
-                            {/* ── Task 1: Pre Order → PDF + WhatsApp ── */}
                             <button
                               onClick={() => handlePreOrder(product)}
                               className="px-2 py-1 text-xs font-bold bg-orange-500 text-white rounded hover:bg-orange-600 flex items-center gap-1"
@@ -822,6 +896,30 @@ export default function ProductsPage() {
                           </div>
                         </td>
                       </tr>
+
+                      {/* ── Expanded description row ── */}
+                      {expandedIds.has(product.id) && (
+                        <tr className="bg-gray-50 border-b">
+                          <td colSpan={visibleColCount} className="px-6 py-3">
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-gray-700 max-w-3xl">
+                              {product.description && (
+                                <div className="col-span-2">
+                                  <span className="font-semibold text-gray-500 uppercase text-[10px] tracking-wide">Description</span>
+                                  <p className="mt-0.5 text-gray-700 leading-relaxed whitespace-pre-line">{product.description}</p>
+                                </div>
+                              )}
+                              {product.productType && <div><span className="font-semibold text-gray-400">Type: </span>{product.productType}</div>}
+                              {product.scale && <div><span className="font-semibold text-gray-400">Scale: </span>{product.scale}</div>}
+                              {product.carClass && <div><span className="font-semibold text-gray-400">Class: </span>{product.carClass}</div>}
+                              {product.carType && <div><span className="font-semibold text-gray-400">Car Type: </span>{product.carType}</div>}
+                              {!product.description && !product.productType && !product.scale && !product.carClass && (
+                                <div className="col-span-2 text-gray-400 italic">No description available</div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
                     )
                   })}
                 </tbody>
