@@ -62,12 +62,11 @@ select,
   unicode-bidi: plaintext;
 }
 
-/* Text block font-size control: force ALL child elements to inherit the container
-   font-size set by the panel. Uses !important to beat browser user-agent defaults
-   (h1-h6 use em-based sizes), Tailwind base resets, and any other specificity conflicts.
-   The container div carries the actual size as an inline style (e.g. font-size:1.5rem)
-   so children end up at exactly the size selected in the Font Size panel. */
-.r66-text-block,
+/* Text block font-size control: the container div gets font-size via inline style
+   (set by the Font Size panel). All CHILDREN must inherit that value. !important
+   beats browser h1-h6 defaults (1.5em etc.) so the selected size applies uniformly.
+   NOTE: only targets *, NOT .r66-text-block itself — the container must keep its
+   own inline font-size, not inherit from its parent. */
 .r66-text-block * {
   font-size: inherit !important;
 }
