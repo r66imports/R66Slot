@@ -78,11 +78,13 @@ function ProductGridLive({
           if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum
           return (a.sku || '').localeCompare(b.sku || '')
         })
-        setProducts(list.slice(0, (settings.productCount as number) || 8))
+        const rows = (settings.productRows as number) || 3
+        const cap = rows * 3
+        setProducts(list.slice(0, cap))
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.productCount])
+  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.productCount, settings.productRows])
 
   const handleAddToCart = (p: any) => {
     addItem({
@@ -134,13 +136,15 @@ function ProductGridLive({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-            {products.map((p) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {products.map((p) => {
+              const imgH = (settings.cardSize as string) === 'compact' ? 'h-32' : (settings.cardSize as string) === 'large' ? 'h-56' : 'h-44'
+              return (
               <div
                 key={p.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
               >
-                <div className="relative aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+                <div className={`relative ${imgH} bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0`}>
                   {p.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -157,72 +161,74 @@ function ProductGridLive({
                     </span>
                   )}
                 </div>
-                <div className="p-4">
+                <div className="p-3 flex flex-col flex-1">
                   <div className="flex items-center justify-between mb-1">
                     {p.brand && (
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider truncate">
                         {p.brand}
                       </p>
                     )}
                     {p.sku && (
-                      <p className="text-[10px] text-gray-400 font-mono">
+                      <p className="text-[10px] text-gray-400 font-mono ml-1 shrink-0">
                         {p.sku}
                       </p>
                     )}
                   </div>
-                  <h3 className="font-semibold text-sm mb-2 line-clamp-2">{p.title}</h3>
+                  <h3 className="font-semibold text-sm mb-2 line-clamp-2 flex-1">{p.title}</h3>
                   {settings.showPrice && (
-                    <p className="text-red-600 font-bold mb-3 text-sm">
+                    <p className="text-red-600 font-bold mb-2 text-sm">
                       {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
                     </p>
                   )}
                   {settings.showAddToCart && (
-                    p.isPreOrder ? (
-                      <a
-                        href="/book"
-                        className="block w-full text-center font-semibold py-2 px-4 rounded text-sm bg-orange-500 text-white hover:bg-orange-600 transition-colors"
-                      >
-                        Pre Order
-                      </a>
-                    ) : p.quantity === 0 ? (
-                      <button
-                        disabled
-                        className="block w-full text-center font-semibold py-2 px-4 rounded text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
-                      >
-                        Out of Stock
-                      </button>
-                    ) : (
-                      <>
-                        {/* Quantity selector */}
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                          <button
-                            type="button"
-                            onClick={() => setQty(p.id, getQty(p.id) - 1)}
-                            className="w-7 h-7 rounded border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 flex items-center justify-center text-base leading-none"
-                          >−</button>
-                          <span className="w-6 text-center text-sm font-semibold">{getQty(p.id)}</span>
-                          <button
-                            type="button"
-                            onClick={() => setQty(p.id, getQty(p.id) + 1)}
-                            className="w-7 h-7 rounded border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 flex items-center justify-center text-base leading-none"
-                          >+</button>
-                        </div>
-                        <button
-                          onClick={() => handleAddToCart(p)}
-                          className={`block w-full text-center font-semibold py-2 px-4 rounded text-sm transition-all duration-300 ${
-                            addedId === p.id
-                              ? 'bg-green-600 text-white scale-95'
-                              : 'bg-red-600 text-white hover:bg-red-700'
-                          }`}
+                    <div className="mt-auto">
+                      {p.isPreOrder ? (
+                        <a
+                          href="/book"
+                          className="block w-full text-center font-semibold py-2 px-3 rounded text-sm bg-orange-500 text-white hover:bg-orange-600 transition-colors"
                         >
-                          {addedId === p.id ? '✓ Added!' : 'Add to Cart'}
+                          Pre Order
+                        </a>
+                      ) : p.quantity === 0 ? (
+                        <button
+                          disabled
+                          className="block w-full text-center font-semibold py-2 px-3 rounded text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
+                        >
+                          Out of Stock
                         </button>
-                      </>
-                    )
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-center gap-2 mb-2">
+                            <button
+                              type="button"
+                              onClick={() => setQty(p.id, getQty(p.id) - 1)}
+                              className="w-7 h-7 rounded border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 flex items-center justify-center text-base leading-none"
+                            >−</button>
+                            <span className="w-6 text-center text-sm font-semibold">{getQty(p.id)}</span>
+                            <button
+                              type="button"
+                              onClick={() => setQty(p.id, getQty(p.id) + 1)}
+                              className="w-7 h-7 rounded border border-gray-300 text-gray-700 font-bold hover:bg-gray-100 flex items-center justify-center text-base leading-none"
+                            >+</button>
+                          </div>
+                          <button
+                            onClick={() => handleAddToCart(p)}
+                            className={`block w-full text-center font-semibold py-2 px-3 rounded text-sm transition-all duration-300 ${
+                              addedId === p.id
+                                ? 'bg-green-600 text-white scale-95'
+                                : 'bg-red-600 text-white hover:bg-red-700'
+                            }`}
+                          >
+                            {addedId === p.id ? '✓ Added!' : 'Add to Cart'}
+                          </button>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
