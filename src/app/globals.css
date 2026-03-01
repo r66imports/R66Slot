@@ -62,6 +62,13 @@ select,
   unicode-bidi: plaintext;
 }
 
+/* Text block font-size control: browser defaults for h1-h6 have explicit em sizes
+   that override inherited font-size. Force all children to inherit so the panel
+   Font Size control works correctly regardless of what tags the rich text editor outputs. */
+.r66-text-block * {
+  font-size: inherit;
+}
+
 /* Custom Resize Handle Styles */
 .react-resizable-handle {
   background-color: #FFDD00 !important;

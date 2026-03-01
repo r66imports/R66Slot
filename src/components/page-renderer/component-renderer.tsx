@@ -381,7 +381,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       return (
         <div style={containerStyle}>
           <div
-            className="container mx-auto"
+            className="container mx-auto r66-text-block"
             style={textInlineStyle}
             dangerouslySetInnerHTML={{ __html: content }}
           />

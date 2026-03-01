@@ -236,7 +236,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       }
       return (
         <div style={containerStyle}>
-          <div className="container mx-auto" style={textInlineStyle} dangerouslySetInnerHTML={{ __html: content }} />
+          <div className="container mx-auto r66-text-block" style={textInlineStyle} dangerouslySetInnerHTML={{ __html: content }} />
         </div>
       )
     }
