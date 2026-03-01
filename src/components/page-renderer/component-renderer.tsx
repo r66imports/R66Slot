@@ -422,6 +422,19 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
               <a href={settings.link as string} target="_blank" rel="noopener noreferrer">
                 {imageElement}
               </a>
+            ) : settings.imageUrl ? (
+              <ImageWithZoom
+                src={settings.imageUrl as string}
+                alt={(settings.alt as string) || ''}
+                imgStyle={{
+                  objectFit: imgFit as any,
+                  objectPosition: imgPos,
+                  width: imgWidth,
+                  height: imgHeight,
+                  maxWidth: '100%',
+                  display: 'block',
+                }}
+              />
             ) : (
               imageElement
             )}
@@ -804,23 +817,26 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                             @media (min-width: 640px) and (max-width: 1023px) { #${imgWrapperId} { ${imgWidthTablet ? `width:${imgWidthTablet};` : ''} ${imgHeightTablet ? `height:${imgHeightTablet};` : ''} } }
                           `}</style>
                         )}
-                        <ImageWithZoom
-                          src={child.settings.imageUrl as string}
-                          alt={(child.settings.alt as string) || ''}
-                          wrapperId={imgWrapperId}
-                          wrapperClassName="mb-3 overflow-hidden rounded-lg"
-                          wrapperStyle={hasVpSizes ? { maxWidth: '100%' } : {
+                        <div
+                          id={imgWrapperId}
+                          className="mb-3 overflow-hidden rounded-lg"
+                          style={hasVpSizes ? { maxWidth: '100%' } : {
                             ...(imgHeight ? { height: imgHeight } : {}),
                             ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
                           }}
-                          className="w-full h-full"
-                          imgClassName={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
-                          imgStyle={{
-                            objectFit: imgFitCol as any,
-                            objectPosition: (child.settings.objectPosition as string) || 'center center',
-                            ...(imgWidth ? { width: '100%' } : {}),
-                          }}
-                        />
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={child.settings.imageUrl as string}
+                            alt={(child.settings.alt as string) || ''}
+                            className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
+                            style={{
+                              objectFit: imgFitCol as any,
+                              objectPosition: (child.settings.objectPosition as string) || 'center center',
+                              ...(imgWidth ? { width: '100%' } : {}),
+                            }}
+                          />
+                        </div>
                       </>
                     )}
                     <div style={{ textAlign: colTextAlign as any, alignSelf: 'stretch' }} dangerouslySetInnerHTML={{ __html: child.content }} />
