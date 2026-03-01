@@ -738,6 +738,46 @@ function ContentTab({
                 : 'Full image always visible — background fills gaps'}
             </p>
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Gap Between Cards</label>
+            <div className="flex gap-1">
+              {(['none', 'xs', 'sm', 'md', 'lg', 'xl'] as const).map((g) => (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() => updateSetting('cardGap', g)}
+                  className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
+                    ((component.settings.cardGap as string) || 'md') === g
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 font-play">Space between each product card</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Card Padding</label>
+            <div className="flex gap-1">
+              {(['none', 'sm', 'md', 'lg', 'xl'] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => updateSetting('cardPadding', p)}
+                  className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
+                    ((component.settings.cardPadding as string) || 'md') === p
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 font-play">Space inside each card (around text &amp; price)</p>
+          </div>
         </div>
       )}
 

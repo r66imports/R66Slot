@@ -138,11 +138,12 @@ function ProductGridLive({
             </p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${(settings.gridColumns as number) || 3}, minmax(0, 1fr))`, gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${(settings.gridColumns as number) || 3}, minmax(0, 1fr))`, gap: { none: '0', xs: '0.5rem', sm: '0.75rem', md: '1rem', lg: '1.5rem', xl: '2rem' }[(settings.cardGap as string) || 'md'] || '1rem' }}>
             {products.map((p) => {
               const cardSize = (settings.cardSize as string) || 'standard'
               const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
               const imgFit = ((settings.imageFit as string) || 'contain') as React.CSSProperties['objectFit']
+              const cardPad = { none: '0', sm: '8px', md: '12px', lg: '16px', xl: '24px' }[(settings.cardPadding as string) || 'md'] || '12px'
               const productUrl = `/product/${p.id}`
               return (
               <div
@@ -170,7 +171,7 @@ function ProductGridLive({
                     )}
                   </div>
                 </a>
-                <div className="p-3 flex flex-col flex-1">
+                <div className="flex flex-col flex-1" style={{ padding: cardPad }}>
                   {p.brand && (
                     <p className="text-[10px] text-black font-bold uppercase tracking-wider truncate mb-0.5">{p.brand}</p>
                   )}
