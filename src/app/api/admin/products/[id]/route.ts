@@ -45,6 +45,23 @@ function rowToProduct(row: any): Product {
   }
 }
 
+// GET /api/admin/products/[id]
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const result = await db.query(`SELECT * FROM products WHERE id = $1`, [id])
+    if (result.rows.length === 0) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+    return NextResponse.json(rowToProduct(result.rows[0]))
+  } catch (err) {
+    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+  }
+}
+
 // PUT /api/admin/products/[id]
 export async function PUT(
   request: Request,
