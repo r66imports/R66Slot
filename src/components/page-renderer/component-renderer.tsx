@@ -173,11 +173,6 @@ function ProductGridLive({
                     ) : (
                       <span className="text-gray-400 text-4xl">🏎️</span>
                     )}
-                    {p.carClass && (
-                      <span className="absolute top-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                        {p.carClass}
-                      </span>
-                    )}
                   </div>
                 </a>
                 <div className="flex flex-col flex-1" style={{ padding: cardPad }}>
@@ -187,7 +182,12 @@ function ProductGridLive({
                   {p.sku && (
                     <p className="font-bold font-mono mb-1" style={{ fontSize: metaFontSize, color: metaColor }}>{p.sku}</p>
                   )}
-                  <h3 className="font-semibold mb-2 line-clamp-2 flex-1" style={{ fontSize: titleFontSize, color: titleColor }}>{p.title}</h3>
+                  <div className="flex-1 mb-2">
+                    <h3 className="font-semibold mb-1 line-clamp-2" style={{ fontSize: titleFontSize, color: titleColor }}>{p.title}</h3>
+                    {p.carClass && (
+                      <span className="inline-block bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">{p.carClass}</span>
+                    )}
+                  </div>
                   {settings.showPrice && (
                     <p className="font-bold mb-2" style={{ fontSize: priceFontSize, color: priceColor }}>
                       {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
