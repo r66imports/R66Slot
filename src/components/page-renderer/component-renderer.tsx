@@ -59,6 +59,13 @@ function ProductGridLive({
               activeBrands.some((b) => p.tags?.includes(b))
           )
         }
+        // Sort by SKU — numeric where possible, else alphabetical
+        list.sort((a: any, b: any) => {
+          const aNum = parseFloat(a.sku)
+          const bNum = parseFloat(b.sku)
+          if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum
+          return (a.sku || '').localeCompare(b.sku || '')
+        })
         setProducts(list.slice(0, (settings.productCount as number) || 8))
       })
       .catch(() => setProducts([]))
@@ -138,11 +145,18 @@ function ProductGridLive({
                   )}
                 </div>
                 <div className="p-4">
-                  {p.brand && (
-                    <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">
-                      {p.brand}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between mb-1">
+                    {p.brand && (
+                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">
+                        {p.brand}
+                      </p>
+                    )}
+                    {p.sku && (
+                      <p className="text-[10px] text-gray-400 font-mono">
+                        {p.sku}
+                      </p>
+                    )}
+                  </div>
                   <h3 className="font-semibold text-sm mb-2 line-clamp-2">{p.title}</h3>
                   {settings.showPrice && (
                     <p className="text-red-600 font-bold mb-3 text-sm">
