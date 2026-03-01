@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { useLocalCart } from '@/context/local-cart-context'
 import type { PageComponent } from '@/lib/pages/schema'
 import { AnimatedWrapper, type AnimationType } from './animated-wrapper'
+import { ImageWithZoom } from '@/components/ui/image-zoom'
 
 // ─── Live Product Grid — fetches real products filtered by class ──────────────
 function ProductGridLive({
@@ -793,25 +794,23 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                             @media (min-width: 640px) and (max-width: 1023px) { #${imgWrapperId} { ${imgWidthTablet ? `width:${imgWidthTablet};` : ''} ${imgHeightTablet ? `height:${imgHeightTablet};` : ''} } }
                           `}</style>
                         )}
-                        <div
-                          id={imgWrapperId}
-                          className="mb-3 overflow-hidden rounded-lg"
-                          style={hasVpSizes ? { maxWidth: '100%' } : {
+                        <ImageWithZoom
+                          src={child.settings.imageUrl as string}
+                          alt={(child.settings.alt as string) || ''}
+                          wrapperId={imgWrapperId}
+                          wrapperClassName="mb-3 overflow-hidden rounded-lg"
+                          wrapperStyle={hasVpSizes ? { maxWidth: '100%' } : {
                             ...(imgHeight ? { height: imgHeight } : {}),
                             ...(imgWidth ? { width: imgWidth, maxWidth: '100%' } : { alignSelf: 'stretch' }),
                           }}
-                        >
-                          <img
-                            src={child.settings.imageUrl as string}
-                            alt={(child.settings.alt as string) || ''}
-                            className={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
-                            style={{
-                              objectFit: imgFitCol as any,
-                              objectPosition: (child.settings.objectPosition as string) || 'center center',
-                              ...(imgWidth ? { width: '100%' } : {}),
-                            }}
-                          />
-                        </div>
+                          className="w-full h-full"
+                          imgClassName={`rounded-lg ${imgWidth ? '' : 'w-full'} ${imgHeight ? 'h-full' : 'h-auto'}`}
+                          imgStyle={{
+                            objectFit: imgFitCol as any,
+                            objectPosition: (child.settings.objectPosition as string) || 'center center',
+                            ...(imgWidth ? { width: '100%' } : {}),
+                          }}
+                        />
                       </>
                     )}
                     <div style={{ textAlign: colTextAlign as any, alignSelf: 'stretch' }} dangerouslySetInnerHTML={{ __html: child.content }} />
