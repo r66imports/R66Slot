@@ -89,7 +89,7 @@ export interface PageComponent {
     originalPrice?: string
     autoplay?: boolean
     cta?: { label: string; url: string }
-    [key: string]: string | boolean | number | { label: string; url: string } | undefined
+    [key: string]: string | boolean | number | string[] | { label: string; url: string } | undefined
   }
   children?: PageComponent[]
   // Visibility — hidden elements are invisible on live site, ghosted in editor
