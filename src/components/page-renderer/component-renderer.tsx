@@ -79,12 +79,13 @@ function ProductGridLive({
           return (a.sku || '').localeCompare(b.sku || '')
         })
         const rows = (settings.productRows as number) || 3
-        const cap = rows * 3
+        const gridCols = (settings.gridColumns as number) || 3
+        const cap = rows * gridCols
         setProducts(list.slice(0, cap))
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.productCount, settings.productRows])
+  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.productCount, settings.productRows, settings.gridColumns])
 
   const handleAddToCart = (p: any) => {
     addItem({
@@ -136,47 +137,45 @@ function ProductGridLive({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${(settings.gridColumns as number) || 3}, minmax(0, 1fr))`, gap: '1rem' }}>
             {products.map((p) => {
               const cardSize = (settings.cardSize as string) || 'standard'
               const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
               const imgFit = ((settings.imageFit as string) || 'contain') as React.CSSProperties['objectFit']
+              const productUrl = p.pageUrl || '/products'
               return (
               <div
                 key={p.id}
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
               >
-                <div className="relative bg-white flex items-center justify-center overflow-hidden flex-shrink-0" style={{ height: imgHpx }}>
-                  {p.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={p.imageUrl}
-                      alt={p.title}
-                      className="w-full h-full"
-                      style={{ objectFit: imgFit }}
-                    />
-                  ) : (
-                    <span className="text-gray-400 text-4xl">🏎️</span>
-                  )}
-                  {p.carClass && (
-                    <span className="absolute top-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                      {p.carClass}
-                    </span>
-                  )}
-                </div>
-                <div className="p-3 flex flex-col flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    {p.brand && (
-                      <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider truncate">
-                        {p.brand}
-                      </p>
+                {/* Image — click to open product page */}
+                <a href={productUrl} target="_blank" rel="noopener noreferrer" className="block flex-shrink-0 cursor-pointer">
+                  <div className="relative bg-white flex items-center justify-center overflow-hidden" style={{ height: imgHpx }}>
+                    {p.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.imageUrl}
+                        alt={p.title}
+                        className="w-full h-full"
+                        style={{ objectFit: imgFit }}
+                      />
+                    ) : (
+                      <span className="text-gray-400 text-4xl">🏎️</span>
                     )}
-                    {p.sku && (
-                      <p className="text-[10px] text-gray-400 font-mono ml-1 shrink-0">
-                        {p.sku}
-                      </p>
+                    {p.carClass && (
+                      <span className="absolute top-2 right-2 bg-black/80 text-white text-[10px] font-bold px-2 py-0.5 rounded">
+                        {p.carClass}
+                      </span>
                     )}
                   </div>
+                </a>
+                <div className="p-3 flex flex-col flex-1">
+                  {p.brand && (
+                    <p className="text-[10px] text-black font-bold uppercase tracking-wider truncate mb-0.5">{p.brand}</p>
+                  )}
+                  {p.sku && (
+                    <p className="text-[10px] text-black font-bold font-mono mb-1">{p.sku}</p>
+                  )}
                   <h3 className="font-semibold text-sm mb-2 line-clamp-2 flex-1">{p.title}</h3>
                   {settings.showPrice && (
                     <p className="text-red-600 font-bold mb-2 text-sm">

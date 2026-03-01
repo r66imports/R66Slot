@@ -615,24 +615,27 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       )
 
     case 'product-grid': {
+      const pgCols = (settings.gridColumns as number) || 3
       const pgRows = (settings.productRows as number) || 3
-      const pgCount = pgRows * 3
+      const pgCount = pgRows * pgCols
       const cardSize = (settings.cardSize as string) || 'standard'
       const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${pgCols}, minmax(0, 1fr))`, gap: '1rem' }}>
               {Array.from({ length: pgCount }).map((_, i) => (
-                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-100 flex flex-col">
+                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 flex flex-col">
                   <div className="bg-gray-50 flex items-center justify-center" style={{ height: imgHpx }}>
-                    <span className="text-gray-300 text-5xl">🏎️</span>
+                    <span className="text-gray-300 text-4xl">🏎️</span>
                   </div>
                   <div className="p-3">
+                    <p className="text-[10px] text-black font-bold uppercase tracking-wider mb-0.5">REVO</p>
+                    <p className="text-[10px] text-black font-bold font-mono mb-1">RS{100 + i}</p>
                     <h3 className="font-semibold text-sm mb-1 text-gray-800">Product {i + 1}</h3>
                     {settings.showPrice && <p className="text-red-600 font-bold text-sm mb-2">R999.99</p>}
                     {settings.showAddToCart && (
-                      <span className="block text-center bg-red-600 text-white text-sm font-semibold py-2 px-4 rounded-lg">
+                      <span className="block text-center bg-red-600 text-white text-sm font-semibold py-2 px-3 rounded-lg">
                         Add to Cart
                       </span>
                     )}

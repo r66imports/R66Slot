@@ -664,6 +664,26 @@ function ContentTab({
         <div className="bg-gray-50 rounded-lg p-3 space-y-3 border border-gray-200">
           <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider font-play">Grid Layout</h4>
           <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Products per Row</label>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => updateSetting('gridColumns', n)}
+                  className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
+                    ((component.settings.gridColumns as number) || 3) === n
+                      ? 'bg-blue-100 text-blue-700 border-blue-300'
+                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 font-play">More columns = smaller cards</p>
+          </div>
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Rows to Show</label>
             <input
               type="number"
@@ -673,7 +693,7 @@ function ContentTab({
               max={10}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
             />
-            <p className="text-[10px] text-gray-400 mt-1 font-play">3 products per row (desktop). Rows × 3 = total shown.</p>
+            <p className="text-[10px] text-gray-400 mt-1 font-play">Rows × columns = total products shown.</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Card Size</label>
