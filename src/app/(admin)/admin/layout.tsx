@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
 import { AuthGuard } from '@/components/admin/auth-guard'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
 
 // Submenu item type
@@ -24,6 +24,13 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const [currentBrand, setCurrentBrand] = useState('')
+
+  // Read brand param from URL on client (avoids useSearchParams Suspense requirement)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setCurrentBrand(params.get('brand') || '')
+  }, [pathname])
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showCostingModal, setShowCostingModal] = useState(false)
   const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
@@ -49,7 +56,12 @@ export default function AdminLayout({
         href: '/admin/products',
         icon: '📦',
         submenu: [
-          { name: 'Products', href: '/admin/products', icon: '🛍️' },
+          { name: 'All Products', href: '/admin/products', icon: '🛍️' },
+          { name: 'NSR', href: '/admin/products?brand=NSR', icon: '🏎️' },
+          { name: 'Revo', href: '/admin/products?brand=Revo', icon: '🔧' },
+          { name: 'BRM', href: '/admin/products?brand=BRM', icon: '🏁' },
+          { name: 'Pioneer', href: '/admin/products?brand=Pioneer', icon: '🚗' },
+          { name: 'Sideways', href: '/admin/products?brand=Sideways', icon: '🔄' },
           { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
         ]
       },
@@ -235,7 +247,11 @@ export default function AdminLayout({
                         {isExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
                             {item.submenu!.map((subItem) => {
-                              const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
+                              const subBrandMatch = subItem.href.match(/\?brand=(.+)/)
+                              const subBrand = subBrandMatch ? decodeURIComponent(subBrandMatch[1]) : ''
+                              const isSubActive = subBrand
+                                ? pathname === '/admin/products' && currentBrand.toLowerCase() === subBrand.toLowerCase()
+                                : !subBrand && pathname === subItem.href && !currentBrand || pathname.startsWith(subItem.href + '/') && !subBrand && !currentBrand
                               return (
                                 <Link
                                   key={subItem.name}

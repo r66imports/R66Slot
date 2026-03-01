@@ -274,6 +274,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
+  const [urlBrand, setUrlBrand] = useState('')
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [brandFilter, setBrandFilter] = useState('')
@@ -305,22 +306,25 @@ export default function ProductsPage() {
   const [editingPageUrl, setEditingPageUrl] = useState('')
 
   useEffect(() => {
-    fetchProducts()
-    // Task 2: load categories
+    const brand = new URLSearchParams(window.location.search).get('brand') || ''
+    setUrlBrand(brand)
+    setBrandFilter(brand)
+    fetchProducts(brand)
     fetch('/api/admin/categories')
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setCategories(data) })
       .catch(() => {})
-    // Task 3/4: load pages
     fetch('/api/admin/pages')
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setPages(data.map((p: any) => ({ id: p.id, title: p.title }))) })
       .catch(() => {})
   }, [])
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (brand = '') => {
+    setIsLoading(true)
     try {
-      const response = await fetch('/api/admin/products')
+      const url = brand ? `/api/admin/products?brand=${encodeURIComponent(brand)}` : '/api/admin/products'
+      const response = await fetch(url)
       if (response.ok) setProducts(await response.json())
     } catch (err) {
       console.error('Error fetching products:', err)
@@ -546,8 +550,8 @@ export default function ProductsPage() {
       {/* ── Page Header ── */}
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-gray-600 mt-1">Manage your product inventory ({products.length} products)</p>
+          <h1 className="text-3xl font-bold">{urlBrand ? `${urlBrand} Products` : 'Products'}</h1>
+          <p className="text-gray-600 mt-1">{urlBrand ? `${urlBrand} product inventory` : 'All products'} — {products.length} items</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowExportModal(true)}>Export CSV</Button>
