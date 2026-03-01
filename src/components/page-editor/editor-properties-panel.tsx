@@ -85,7 +85,7 @@ export function EditorPropertiesPanel({
           <ContentTab component={component} viewMode={viewMode} onUpdate={onUpdate} updateSetting={updateSetting} />
         )}
         {activeTab === 'style' && (
-          <StyleTab component={component} updateStyle={updateStyle} />
+          <StyleTab component={component} updateStyle={updateStyle} updateSetting={updateSetting} />
         )}
         {activeTab === 'settings' && (
           <SettingsTab component={component} onUpdate={onUpdate} updateSetting={updateSetting} />
@@ -2401,9 +2401,11 @@ function OpacitySlider({ value, onChange }: { value: string; onChange: (v: strin
 function StyleTab({
   component,
   updateStyle,
+  updateSetting,
 }: {
   component: PageComponent
   updateStyle: (key: string, value: string) => void
+  updateSetting: (key: string, value: any) => void
 }) {
   return (
     <>
@@ -2617,6 +2619,95 @@ function StyleTab({
           />
         </div>
       </div>
+
+      {/* ─── Product Card Styles (product-grid only) ─── */}
+      {component.type === 'product-grid' && (
+        <div className="pt-2 border-t border-gray-100">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 font-play">Product Card Styles</h4>
+          <div className="space-y-3">
+
+            {/* Card Background */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 font-play">Card Background</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={(component.settings.cardBgColor as string) || '#ffffff'}
+                  onChange={(e) => updateSetting('cardBgColor', e.target.value)}
+                  className="w-8 h-8 rounded cursor-pointer border border-gray-200"
+                />
+                <input
+                  type="text"
+                  value={(component.settings.cardBgColor as string) || ''}
+                  onChange={(e) => updateSetting('cardBgColor', e.target.value)}
+                  placeholder="#ffffff"
+                  className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs font-play"
+                />
+              </div>
+            </div>
+
+            {/* Text Colors */}
+            <div className="space-y-2">
+              <p className="text-[10px] text-gray-400 font-play uppercase tracking-wider font-semibold">Text Colors</p>
+              {([
+                { key: 'cardMetaColor', label: 'Brand & SKU', def: '#000000' },
+                { key: 'cardTitleColor', label: 'Product Title', def: '#000000' },
+                { key: 'cardPriceColor', label: 'Price', def: '#dc2626' },
+              ] as const).map(({ key, label, def }) => (
+                <div key={key}>
+                  <label className="block text-[10px] text-gray-500 mb-1 font-play">{label}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={(component.settings[key] as string) || def}
+                      onChange={(e) => updateSetting(key, e.target.value)}
+                      className="w-7 h-7 rounded cursor-pointer border border-gray-200"
+                    />
+                    <input
+                      type="text"
+                      value={(component.settings[key] as string) || ''}
+                      onChange={(e) => updateSetting(key, e.target.value)}
+                      placeholder={def}
+                      className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs font-play"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Text Sizes */}
+            <div className="space-y-2">
+              <p className="text-[10px] text-gray-400 font-play uppercase tracking-wider font-semibold">Text Sizes</p>
+              {([
+                { key: 'cardMetaSize', label: 'Brand & SKU', def: 'xs' },
+                { key: 'cardTitleSize', label: 'Product Title', def: 'md' },
+                { key: 'cardPriceSize', label: 'Price', def: 'md' },
+              ] as const).map(({ key, label, def }) => (
+                <div key={key}>
+                  <label className="block text-[10px] text-gray-500 mb-1 font-play">{label}</label>
+                  <div className="flex gap-1">
+                    {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => updateSetting(key, s)}
+                        className={`flex-1 py-1 text-[10px] rounded font-play font-bold transition-colors border ${
+                          ((component.settings[key] as string) || def) === s
+                            ? 'bg-blue-100 text-blue-700 border-blue-300'
+                            : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>
+        </div>
+      )}
     </>
   )
 }

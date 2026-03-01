@@ -144,11 +144,20 @@ function ProductGridLive({
               const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
               const imgFit = ((settings.imageFit as string) || 'contain') as React.CSSProperties['objectFit']
               const cardPad = { none: '0', sm: '8px', md: '12px', lg: '16px', xl: '24px' }[(settings.cardPadding as string) || 'md'] || '12px'
+              const szMap: Record<string, string> = { xs: '10px', sm: '12px', md: '14px', lg: '16px', xl: '20px' }
+              const cardBgColor = (settings.cardBgColor as string) || '#ffffff'
+              const metaColor = (settings.cardMetaColor as string) || '#000000'
+              const titleColor = (settings.cardTitleColor as string) || '#000000'
+              const priceColor = (settings.cardPriceColor as string) || '#dc2626'
+              const metaFontSize = szMap[(settings.cardMetaSize as string) || 'xs'] || '10px'
+              const titleFontSize = szMap[(settings.cardTitleSize as string) || 'md'] || '14px'
+              const priceFontSize = szMap[(settings.cardPriceSize as string) || 'md'] || '14px'
               const productUrl = `/product/${p.id}`
               return (
               <div
                 key={p.id}
-                className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
+                className="rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
+                style={{ backgroundColor: cardBgColor }}
               >
                 {/* Image — click to open product page */}
                 <a href={productUrl} target="_blank" rel="noopener noreferrer" className="block flex-shrink-0 cursor-pointer">
@@ -173,14 +182,14 @@ function ProductGridLive({
                 </a>
                 <div className="flex flex-col flex-1" style={{ padding: cardPad }}>
                   {p.brand && (
-                    <p className="text-[10px] text-black font-bold uppercase tracking-wider truncate mb-0.5">{p.brand}</p>
+                    <p className="font-bold uppercase tracking-wider truncate mb-0.5" style={{ fontSize: metaFontSize, color: metaColor }}>{p.brand}</p>
                   )}
                   {p.sku && (
-                    <p className="text-[10px] text-black font-bold font-mono mb-1">{p.sku}</p>
+                    <p className="font-bold font-mono mb-1" style={{ fontSize: metaFontSize, color: metaColor }}>{p.sku}</p>
                   )}
-                  <h3 className="font-semibold text-sm mb-2 line-clamp-2 flex-1">{p.title}</h3>
+                  <h3 className="font-semibold mb-2 line-clamp-2 flex-1" style={{ fontSize: titleFontSize, color: titleColor }}>{p.title}</h3>
                   {settings.showPrice && (
-                    <p className="text-red-600 font-bold mb-2 text-sm">
+                    <p className="font-bold mb-2" style={{ fontSize: priceFontSize, color: priceColor }}>
                       {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
                     </p>
                   )}
