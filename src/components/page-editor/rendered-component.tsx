@@ -614,19 +614,23 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
         </div>
       )
 
-    case 'product-grid':
+    case 'product-grid': {
+      const pgRows = (settings.productRows as number) || 3
+      const pgCount = pgRows * 3
+      const cardSize = (settings.cardSize as string) || 'standard'
+      const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {Array.from({ length: (settings.productCount as number) || 8 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-100">
-                  <div className="aspect-square bg-gray-50 flex items-center justify-center">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {Array.from({ length: pgCount }).map((_, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow border border-gray-100 flex flex-col">
+                  <div className="bg-gray-50 flex items-center justify-center" style={{ height: imgHpx }}>
                     <span className="text-gray-300 text-5xl">🏎️</span>
                   </div>
-                  <div className="p-4">
+                  <div className="p-3">
                     <h3 className="font-semibold text-sm mb-1 text-gray-800">Product {i + 1}</h3>
-                    {settings.showPrice && <p className="text-red-600 font-bold text-lg mb-2">R999.99</p>}
+                    {settings.showPrice && <p className="text-red-600 font-bold text-sm mb-2">R999.99</p>}
                     {settings.showAddToCart && (
                       <span className="block text-center bg-red-600 text-white text-sm font-semibold py-2 px-4 rounded-lg">
                         Add to Cart
@@ -639,6 +643,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
           </div>
         </div>
       )
+    }
 
     case 'featured-product':
       return (

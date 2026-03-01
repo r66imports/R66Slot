@@ -138,19 +138,20 @@ function ProductGridLive({
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {products.map((p) => {
-              const imgH = (settings.cardSize as string) === 'compact' ? 'h-32' : (settings.cardSize as string) === 'large' ? 'h-56' : 'h-44'
+              const cardSize = (settings.cardSize as string) || 'standard'
+              const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
               return (
               <div
                 key={p.id}
                 className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
               >
-                <div className={`relative ${imgH} bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0`}>
+                <div className="relative bg-white flex items-center justify-center overflow-hidden flex-shrink-0" style={{ height: imgHpx }}>
                   {p.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={p.imageUrl}
                       alt={p.title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                   ) : (
                     <span className="text-gray-400 text-4xl">🏎️</span>
