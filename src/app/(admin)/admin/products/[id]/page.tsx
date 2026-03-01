@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MediaLibraryPicker } from '@/components/page-editor/media-library-picker'
 
+const BASE_CAR_BRANDS = ['Datsun 510', 'Ford Escort MK I', 'Ford Escort MK II', 'BMW M3 E30', 'Porsche 911', 'Ferrari 308', 'Lancia Delta', 'Audi Quattro']
+
 interface Product {
   id: string
   title: string
@@ -103,6 +105,8 @@ export default function EditProductPage({
   const [newRevoPartInput, setNewRevoPartInput] = useState('')
   const [carBrands, setCarBrands] = useState<string[]>([])
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
+  const [customCarBrands, setCustomCarBrands] = useState<string[]>([])
+  const [newCarBrandInput, setNewCarBrandInput] = useState('')
   const [isPreOrder, setIsPreOrder] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
@@ -200,7 +204,9 @@ export default function EditProductPage({
           setCarClass((found as any).carClass || '')
           setRevoPart((found as any).revoPart || '')
           setRevoParts(Array.isArray((found as any).revoParts) ? (found as any).revoParts : [])
-          setCarBrands(Array.isArray((found as any).carBrands) ? (found as any).carBrands : [])
+          const loadedBrands: string[] = Array.isArray((found as any).carBrands) ? (found as any).carBrands : []
+          setCarBrands(loadedBrands)
+          setCustomCarBrands(loadedBrands.filter(b => !BASE_CAR_BRANDS.includes(b)))
           setIsPreOrder((found as any).isPreOrder || false)
           setSeoTitle(found.seo?.metaTitle || '')
           setSeoDescription(found.seo?.metaDescription || '')
@@ -1026,7 +1032,7 @@ export default function EditProductPage({
                           />
                           <span className="text-sm text-gray-500 italic">None</span>
                         </label>
-                        {['Ford Escort MK I'].map((cb) => (
+                        {[...BASE_CAR_BRANDS, ...customCarBrands].map((cb) => (
                           <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
                             <input
                               type="checkbox"
@@ -1037,6 +1043,38 @@ export default function EditProductPage({
                             <span className="text-sm text-gray-900">{cb}</span>
                           </label>
                         ))}
+                        <div className="flex items-center gap-1 px-3 py-2 border-t border-gray-100">
+                          <input
+                            type="text"
+                            value={newCarBrandInput}
+                            onChange={(e) => setNewCarBrandInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                const val = newCarBrandInput.trim()
+                                if (val && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(val)) {
+                                  setCustomCarBrands(prev => [...prev, val])
+                                  setCarBrands(prev => [...prev, val])
+                                }
+                                setNewCarBrandInput('')
+                              }
+                            }}
+                            placeholder="Add brand..."
+                            className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = newCarBrandInput.trim()
+                              if (val && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(val)) {
+                                setCustomCarBrands(prev => [...prev, val])
+                                setCarBrands(prev => [...prev, val])
+                              }
+                              setNewCarBrandInput('')
+                            }}
+                            className="text-xs px-2 py-1 bg-gray-900 text-white rounded hover:bg-gray-700"
+                          >+Add</button>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -51,6 +51,9 @@ export default function NewProductPage() {
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [carBrands, setCarBrands] = useState<string[]>([])
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
+  const [newCarBrandInput, setNewCarBrandInput] = useState('')
+  const [customCarBrands, setCustomCarBrands] = useState<string[]>([])
+  const BASE_CAR_BRANDS = ['Datsun 510', 'Ford Escort MK I', 'Ford Escort MK II', 'BMW M3 E30', 'Porsche 911', 'Ferrari 308', 'Lancia Delta', 'Audi Quattro']
   const [isPreOrder, setIsPreOrder] = useState(false)
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
@@ -998,17 +1001,52 @@ export default function NewProductPage() {
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${carBrandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {carBrandDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                           <input type="checkbox" checked={carBrands.length === 0} onChange={() => setCarBrands([])} className="rounded" />
                           <span className="text-sm text-gray-500 italic">No brand assigned</span>
                         </label>
-                        {['Ford Escort MK I', 'Ford Escort MK II', 'BMW M3 E30', 'Porsche 911', 'Ferrari 308', 'Lancia Delta', 'Audi Quattro'].map((cb) => (
+                        {[...BASE_CAR_BRANDS, ...customCarBrands].map((cb) => (
                           <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
                             <input type="checkbox" checked={carBrands.includes(cb)} onChange={(e) => setCarBrands(e.target.checked ? [...carBrands, cb] : carBrands.filter(b => b !== cb))} className="rounded" />
                             <span className="text-sm text-gray-900">{cb}</span>
                           </label>
                         ))}
+                        {/* Add custom brand */}
+                        <div className="flex gap-1 px-2 py-2 border-t border-gray-100">
+                          <input
+                            type="text"
+                            value={newCarBrandInput}
+                            onChange={(e) => setNewCarBrandInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                const t = newCarBrandInput.trim()
+                                if (t && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(t)) {
+                                  setCustomCarBrands(prev => [...prev, t])
+                                  setCarBrands(prev => [...prev, t])
+                                  setNewCarBrandInput('')
+                                }
+                              }
+                            }}
+                            placeholder="New car brand…"
+                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const t = newCarBrandInput.trim()
+                              if (t && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(t)) {
+                                setCustomCarBrands(prev => [...prev, t])
+                                setCarBrands(prev => [...prev, t])
+                                setNewCarBrandInput('')
+                              }
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700"
+                          >
+                            + Add
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
