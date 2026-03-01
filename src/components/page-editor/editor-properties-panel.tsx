@@ -783,12 +783,126 @@ function ContentTab({
 
       {/* Rich text content for text type */}
       {component.type === 'text' && (
-        <RichTextEditor
-          label="Text Content"
-          value={component.content}
-          onChange={(html) => onUpdate({ content: html })}
-          rows={5}
-        />
+        <>
+          <RichTextEditor
+            label="Text Content"
+            value={component.content}
+            onChange={(html) => onUpdate({ content: html })}
+            rows={5}
+          />
+
+          {/* ── Text Styles ── */}
+          <div className="pt-2 border-t border-gray-100 space-y-3">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-play">Text Style</h4>
+
+            {/* Font Size */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 font-play">Font Size</label>
+              <div className="flex flex-wrap gap-1">
+                {(['xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl'] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => updateSetting('textSize', s)}
+                    className={`px-2 py-1 text-xs rounded font-play ${
+                      (component.settings.textSize || 'base') === s
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Weight + Italic */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 font-play">Style</label>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => updateSetting('textWeight', component.settings.textWeight === 'bold' ? 'normal' : 'bold')}
+                  className={`flex-1 py-1.5 text-xs rounded font-bold font-play ${
+                    component.settings.textWeight === 'bold'
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  B
+                </button>
+                <button
+                  onClick={() => updateSetting('textItalic', component.settings.textItalic ? false : true)}
+                  className={`flex-1 py-1.5 text-xs rounded italic font-play ${
+                    component.settings.textItalic
+                      ? 'bg-gray-900 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  I
+                </button>
+              </div>
+            </div>
+
+            {/* Text Color */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 font-play">Text Color</label>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="color"
+                  value={(component.settings.textColor as string) || '#000000'}
+                  onChange={(e) => updateSetting('textColor', e.target.value)}
+                  className="w-8 h-8 rounded cursor-pointer border border-gray-200"
+                />
+                <input
+                  type="text"
+                  value={(component.settings.textColor as string) || ''}
+                  onChange={(e) => updateSetting('textColor', e.target.value)}
+                  placeholder="#000000"
+                  className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs font-play"
+                />
+              </div>
+              {/* Preset colors */}
+              <div className="flex flex-wrap gap-1.5">
+                {['#000000','#ffffff','#374151','#6b7280','#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899'].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => updateSetting('textColor', c)}
+                    title={c}
+                    className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                      (component.settings.textColor as string) === c ? 'border-blue-500 scale-110' : 'border-gray-200'
+                    }`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Text Align */}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1 font-play">Text Align</label>
+              <div className="flex gap-1">
+                {([
+                  { value: 'left',    icon: '≡', label: 'Left' },
+                  { value: 'center',  icon: '≡', label: 'Center' },
+                  { value: 'right',   icon: '≡', label: 'Right' },
+                  { value: 'justify', icon: '≡', label: 'Justify' },
+                ] as const).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => updateSetting('textAlign', value)}
+                    title={label}
+                    className={`flex-1 py-1.5 text-xs rounded font-play ${
+                      (component.settings.textAlign || 'left') === value
+                        ? 'bg-gray-900 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Simple text for button */}
