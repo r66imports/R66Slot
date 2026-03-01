@@ -659,6 +659,37 @@ function ContentTab({
       {/* ─── Layout Mode (all components) ─── */}
       <LayoutModePanel component={component} viewMode={viewMode} onUpdate={onUpdate} />
 
+      {/* Product Grid Layout controls */}
+      {component.type === 'product-grid' && (
+        <div className="bg-gray-50 rounded-lg p-3 space-y-3 border border-gray-200">
+          <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider font-play">Grid Layout</h4>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Rows to Show</label>
+            <input
+              type="number"
+              value={(component.settings.productRows as number) || 3}
+              onChange={(e) => updateSetting('productRows', parseInt(e.target.value) || 3)}
+              min={1}
+              max={10}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            />
+            <p className="text-[10px] text-gray-400 mt-1 font-play">3 products per row (desktop). Rows × 3 = total shown.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Card Size</label>
+            <select
+              value={(component.settings.cardSize as string) || 'standard'}
+              onChange={(e) => updateSetting('cardSize', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+            >
+              <option value="compact">Compact (small image)</option>
+              <option value="standard">Standard</option>
+              <option value="large">Large (tall image)</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Rich text content for text type */}
       {component.type === 'text' && (
         <RichTextEditor
@@ -2943,30 +2974,6 @@ function SettingsTab({
             'Car Brand Filter',
           ])}
 
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Rows to Show</label>
-            <input
-              type="number"
-              value={(component.settings.productRows as number) || 3}
-              onChange={(e) => updateSetting('productRows', parseInt(e.target.value) || 3)}
-              min={1}
-              max={10}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-            />
-            <p className="text-[10px] text-gray-400 mt-1 font-play">3 products per row (desktop). Rows × 3 = total shown.</p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Card Size</label>
-            <select
-              value={(component.settings.cardSize as string) || 'standard'}
-              onChange={(e) => updateSetting('cardSize', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-            >
-              <option value="compact">Compact (small image)</option>
-              <option value="standard">Standard</option>
-              <option value="large">Large (tall image)</option>
-            </select>
-          </div>
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
