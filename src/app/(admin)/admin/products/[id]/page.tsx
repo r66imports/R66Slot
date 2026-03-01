@@ -107,34 +107,44 @@ export default function EditProductPage({
   const [seoDescription, setSeoDescription] = useState('')
   const [seoKeywords, setSeoKeywords] = useState('')
 
-  // Lists for custom options
+  // Lists for custom options (loaded from API)
   const [brands, setBrands] = useState(['NSR', 'Revo', 'Pioneer', 'Sideways'])
-  const [suppliers, setSuppliers] = useState(['NSR'])
   const [scales, setScales] = useState(['1/32', '1/24'])
   const [productTypes, setProductTypes] = useState(['Slot Cars', 'Parts'])
-  const [partTypes, setPartTypes] = useState([
-    'Guides', 'Braid', 'Lead Wire', 'Magnets', 'Weights', 'Screws',
-    'Suspension Parts', 'Tires', 'Wheels', 'Wheels with Tires',
-    'Wheel Inserts', 'Inline Gears', 'Sidewinder Gears',
-    'Anglewinder Gears', 'Motors'
-  ])
 
   // Modal states
   const [showAddBrand, setShowAddBrand] = useState(false)
-  const [showAddSupplier, setShowAddSupplier] = useState(false)
   const [showAddScale, setShowAddScale] = useState(false)
   const [showAddProductType, setShowAddProductType] = useState(false)
-  const [showAddPartType, setShowAddPartType] = useState(false)
 
   // New item inputs
   const [newBrand, setNewBrand] = useState('')
-  const [newSupplier, setNewSupplier] = useState('')
   const [newScale, setNewScale] = useState('')
   const [newProductType, setNewProductType] = useState('')
-  const [newPartType, setNewPartType] = useState('')
 
-  // Load available pages
+  // Save options to persistent store
+  const saveOptions = async (key: string, list: string[]) => {
+    try {
+      await fetch('/api/admin/product-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: list }),
+      })
+    } catch { /* non-critical */ }
+  }
+
+  // Load persistent dropdown options + pages
   useEffect(() => {
+    fetch('/api/admin/product-options')
+      .then(r => r.json())
+      .then(opts => {
+        if (opts.brands?.length) setBrands(opts.brands)
+        if (opts.scales?.length) setScales(opts.scales)
+        if (opts.categories?.length) setProductTypes(opts.categories)
+        if (opts.carClasses?.length) setCarClassOptions(opts.carClasses)
+        if (opts.revoParts?.length) setRevoPartOptions(opts.revoParts)
+      })
+      .catch(() => {})
     fetch('/api/admin/pages')
       .then(res => res.json())
       .then(pages => {
@@ -205,12 +215,9 @@ export default function EditProductPage({
           }
           setMediaFiles(images)
 
-          // Add brand/supplier/scale to lists if not already there
+          // Add brand/scale to lists if not already there
           if (found.brand && !brands.some(b => b.toLowerCase() === found.brand.toLowerCase())) {
             setBrands(prev => [...prev, found.brand])
-          }
-          if (found.supplier && !suppliers.some(s => s.toLowerCase() === found.supplier.toLowerCase())) {
-            setSuppliers(prev => [...prev, found.supplier])
           }
           if (found.scale && !scales.includes(found.scale)) {
             setScales(prev => [...prev, found.scale])
@@ -224,45 +231,38 @@ export default function EditProductPage({
     }
   }
 
-  // Add new item functions
+  // Add new item functions — update local state and persist to DB
   const handleAddBrand = () => {
-    if (newBrand.trim() && !brands.includes(newBrand.trim())) {
-      setBrands([...brands, newBrand.trim()])
-      setBrand(newBrand.trim().toLowerCase())
+    const val = newBrand.trim()
+    if (val && !brands.includes(val)) {
+      const next = [...brands, val]
+      setBrands(next)
+      saveOptions('brands', next)
+      setBrand(val.toLowerCase())
       setNewBrand('')
       setShowAddBrand(false)
     }
   }
-  const handleAddSupplier = () => {
-    if (newSupplier.trim() && !suppliers.includes(newSupplier.trim())) {
-      setSuppliers([...suppliers, newSupplier.trim()])
-      setSupplier(newSupplier.trim().toLowerCase())
-      setNewSupplier('')
-      setShowAddSupplier(false)
-    }
-  }
   const handleAddScale = () => {
-    if (newScale.trim() && !scales.includes(newScale.trim())) {
-      setScales([...scales, newScale.trim()])
-      setScale(newScale.trim())
+    const val = newScale.trim()
+    if (val && !scales.includes(val)) {
+      const next = [...scales, val]
+      setScales(next)
+      saveOptions('scales', next)
+      setScale(val)
       setNewScale('')
       setShowAddScale(false)
     }
   }
   const handleAddProductType = () => {
-    if (newProductType.trim() && !productTypes.includes(newProductType.trim())) {
-      setProductTypes([...productTypes, newProductType.trim()])
-      setProductType(newProductType.trim().toLowerCase().replace(/ /g, '-'))
+    const val = newProductType.trim()
+    if (val && !productTypes.includes(val)) {
+      const next = [...productTypes, val]
+      setProductTypes(next)
+      saveOptions('categories', next)
+      setProductType(val.toLowerCase().replace(/ /g, '-'))
       setNewProductType('')
       setShowAddProductType(false)
-    }
-  }
-  const handleAddPartType = () => {
-    if (newPartType.trim() && !partTypes.includes(newPartType.trim())) {
-      setPartTypes([...partTypes, newPartType.trim()])
-      setPartType(newPartType.trim())
-      setNewPartType('')
-      setShowAddPartType(false)
     }
   }
 
@@ -832,7 +832,11 @@ export default function EditProductPage({
                               if (e.key === 'Enter' && newCarClassInput.trim()) {
                                 e.preventDefault()
                                 const val = newCarClassInput.trim()
-                                if (!carClassOptions.includes(val)) setCarClassOptions(prev => [...prev, val])
+                                if (!carClassOptions.includes(val)) {
+                                  const next = [...carClassOptions, val]
+                                  setCarClassOptions(next)
+                                  saveOptions('carClasses', next)
+                                }
                                 setCarClass(val)
                                 setNewCarClassInput('')
                                 setCarClassDropdownOpen(false)
@@ -846,7 +850,11 @@ export default function EditProductPage({
                             onClick={() => {
                               const val = newCarClassInput.trim()
                               if (!val) return
-                              if (!carClassOptions.includes(val)) setCarClassOptions(prev => [...prev, val])
+                              if (!carClassOptions.includes(val)) {
+                                const next = [...carClassOptions, val]
+                                setCarClassOptions(next)
+                                saveOptions('carClasses', next)
+                              }
                               setCarClass(val)
                               setNewCarClassInput('')
                               setCarClassDropdownOpen(false)
@@ -902,7 +910,11 @@ export default function EditProductPage({
                               if (e.key === 'Enter' && newRevoPartInput.trim()) {
                                 e.preventDefault()
                                 const val = newRevoPartInput.trim()
-                                if (!revoPartOptions.includes(val)) setRevoPartOptions(prev => [...prev, val])
+                                if (!revoPartOptions.includes(val)) {
+                                  const next = [...revoPartOptions, val]
+                                  setRevoPartOptions(next)
+                                  saveOptions('revoParts', next)
+                                }
                                 if (!revoParts.includes(val)) setRevoParts(prev => [...prev, val])
                                 setNewRevoPartInput('')
                               }
@@ -915,7 +927,11 @@ export default function EditProductPage({
                             onClick={() => {
                               const val = newRevoPartInput.trim()
                               if (!val) return
-                              if (!revoPartOptions.includes(val)) setRevoPartOptions(prev => [...prev, val])
+                              if (!revoPartOptions.includes(val)) {
+                                const next = [...revoPartOptions, val]
+                                setRevoPartOptions(next)
+                                saveOptions('revoParts', next)
+                              }
                               if (!revoParts.includes(val)) setRevoParts(prev => [...prev, val])
                               setNewRevoPartInput('')
                             }}
@@ -1060,24 +1076,6 @@ export default function EditProductPage({
                   </select>
                 </div>
 
-                {/* Part Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Part Type</label>
-                  <select
-                    value={partType}
-                    onChange={(e) => setPartType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select part type...</option>
-                    {partTypes.map((pt) => (
-                      <option key={pt} value={pt.toLowerCase().replace(/ /g, '-')}>{pt}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setShowAddPartType(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    + Add Part Type
-                  </button>
-                </div>
-
                 {/* Scale */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Scale</label>
@@ -1093,24 +1091,6 @@ export default function EditProductPage({
                   </select>
                   <button type="button" onClick={() => setShowAddScale(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
                     + Add Scale
-                  </button>
-                </div>
-
-                {/* Supplier */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Supplier</label>
-                  <select
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select supplier...</option>
-                    {suppliers.map((s) => (
-                      <option key={s} value={s.toLowerCase()}>{s}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setShowAddSupplier(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    + Add Supplier
                   </button>
                 </div>
 
@@ -1276,19 +1256,6 @@ export default function EditProductPage({
         </div>
       )}
 
-      {/* Add Supplier Modal */}
-      {showAddSupplier && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Supplier</h3>
-            <input type="text" value={newSupplier} onChange={(e) => setNewSupplier(e.target.value)} placeholder="Enter supplier name" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4" onKeyDown={(e) => e.key === 'Enter' && handleAddSupplier()} autoFocus />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => { setShowAddSupplier(false); setNewSupplier('') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={handleAddSupplier} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">Add Supplier</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Add Scale Modal */}
       {showAddScale && (
@@ -1318,19 +1285,6 @@ export default function EditProductPage({
         </div>
       )}
 
-      {/* Add Part Type Modal */}
-      {showAddPartType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Part Type</h3>
-            <input type="text" value={newPartType} onChange={(e) => setNewPartType(e.target.value)} placeholder="Enter part type" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4" onKeyDown={(e) => e.key === 'Enter' && handleAddPartType()} autoFocus />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => { setShowAddPartType(false); setNewPartType('') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={handleAddPartType} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">Add Part Type</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

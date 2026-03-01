@@ -20,6 +20,7 @@ interface Product {
   carClass?: string
   carType?: string
   scale?: string
+  revoParts?: string[]
   collections: string[]
   categories?: string[]
   quantity: number
@@ -131,6 +132,7 @@ export default function ProductsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [brandFilter, setBrandFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')  // Task 2
+  const [revoFilter, setRevoFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
   const [importText, setImportText] = useState('')
@@ -335,12 +337,14 @@ export default function ProductsPage() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
+  const allRevoParts = Array.from(new Set(products.flatMap((p) => p.revoParts || []))).sort()
 
   const filtered = products.filter((p) => {
     const matchBrand = !brandFilter || p.brand?.toLowerCase() === brandFilter.toLowerCase()
     const matchCat = !categoryFilter || (p.collections || []).includes(categoryFilter) || (p.categories || []).includes(categoryFilter)
+    const matchRevo = !revoFilter || (p.revoParts || []).includes(revoFilter)
     const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
-    return matchBrand && matchCat && matchSearch
+    return matchBrand && matchCat && matchRevo && matchSearch
   })
 
   // Helper: get page name from pageId
@@ -411,9 +415,23 @@ export default function ProductsPage() {
           ))}
         </select>
 
-        {(searchQuery || brandFilter || categoryFilter) && (
+        {/* Revo Parts filter */}
+        {allRevoParts.length > 0 && (
+          <select
+            value={revoFilter}
+            onChange={(e) => setRevoFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900"
+          >
+            <option value="">All Revo Parts</option>
+            {allRevoParts.map((part) => (
+              <option key={part} value={part}>{part}</option>
+            ))}
+          </select>
+        )}
+
+        {(searchQuery || brandFilter || categoryFilter || revoFilter) && (
           <button
-            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilter('') }}
+            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilter(''); setRevoFilter('') }}
             className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-lg"
           >
             Clear ✕
