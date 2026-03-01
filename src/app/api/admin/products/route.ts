@@ -32,6 +32,8 @@ export interface Product {
   pageId: string
   pageIds: string[]
   pageUrl: string
+  carBrands: string[]
+  isPreOrder: boolean
   seo: { metaTitle: string; metaDescription: string; metaKeywords: string }
   sageItemCode: string | null
   sageLastSynced: string | null
@@ -71,6 +73,8 @@ function rowToProduct(row: any): Product {
     pageId: row.page_id,
     pageIds: Array.isArray(row.page_ids) ? row.page_ids : (row.page_id ? [row.page_id] : []),
     pageUrl: row.page_url,
+    carBrands: Array.isArray(row.car_brands) ? row.car_brands : [],
+    isPreOrder: row.is_pre_order || false,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
     sageLastSynced: row.sage_last_synced,
@@ -79,19 +83,24 @@ function rowToProduct(row: any): Product {
   }
 }
 
-let _pageIdsMigrated = false
-async function ensurePageIdsColumn() {
-  if (_pageIdsMigrated) return
+let _productColumnsMigrated = false
+async function ensureProductColumns() {
+  if (_productColumnsMigrated) return
   try {
-    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS page_ids JSONB DEFAULT '[]'::jsonb`)
+    await db.query(`
+      ALTER TABLE products
+        ADD COLUMN IF NOT EXISTS page_ids JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS car_brands JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS is_pre_order BOOLEAN DEFAULT FALSE
+    `)
   } catch { /* ignore */ }
-  _pageIdsMigrated = true
+  _productColumnsMigrated = true
 }
 
 // GET /api/admin/products
 export async function GET() {
   try {
-    await ensurePageIdsColumn()
+    await ensureProductColumns()
     const result = await db.query(`SELECT * FROM products ORDER BY created_at DESC`)
     return NextResponse.json(result.rows.map(rowToProduct))
   } catch (error) {
@@ -113,9 +122,10 @@ export async function POST(request: Request) {
 
     const id = `prod-${Date.now()}`
     const now = new Date().toISOString()
-    await ensurePageIdsColumn()
+    await ensureProductColumns()
     const pageIds: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : [])
     const primaryPageId = pageIds[0] || ''
+    const carBrands: string[] = Array.isArray(body.carBrands) ? body.carBrands : []
 
     await db.query(`
       INSERT INTO products (
@@ -123,10 +133,12 @@ export async function POST(request: Request) {
         sku, barcode, brand, product_type, car_class, car_type, part_type,
         scale, supplier, collections, tags, quantity, track_quantity,
         weight, weight_unit, box_size, dimensions, eta, status,
-        image_url, images, page_id, page_ids, page_url, seo, created_at, updated_at
+        image_url, images, page_id, page_ids, page_url, car_brands, is_pre_order,
+        seo, created_at, updated_at
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33
+        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
+        $33,$34,$35
       )
     `, [
       id, body.title, body.description || '',
@@ -140,6 +152,7 @@ export async function POST(request: Request) {
       JSON.stringify(body.dimensions || {}), body.eta || '', body.status || 'draft',
       body.imageUrl || body.mediaFiles?.[0] || '', JSON.stringify(body.mediaFiles || []),
       primaryPageId, JSON.stringify(pageIds), body.pageUrl || '',
+      JSON.stringify(carBrands), body.isPreOrder || false,
       JSON.stringify(body.seo || {}), now, now,
     ])
 

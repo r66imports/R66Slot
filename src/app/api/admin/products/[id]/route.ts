@@ -34,6 +34,8 @@ function rowToProduct(row: any): Product {
     pageId: row.page_id,
     pageIds: Array.isArray(row.page_ids) ? row.page_ids : (row.page_id ? [row.page_id] : []),
     pageUrl: row.page_url,
+    carBrands: Array.isArray(row.car_brands) ? row.car_brands : [],
+    isPreOrder: row.is_pre_order || false,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
     sageLastSynced: row.sage_last_synced,
@@ -74,8 +76,10 @@ export async function PUT(
         page_id = COALESCE($19, page_id),
         page_ids = COALESCE($20, page_ids),
         page_url = COALESCE($21, page_url),
-        seo = COALESCE($22, seo),
-        updated_at = $23
+        car_brands = COALESCE($22, car_brands),
+        is_pre_order = COALESCE($23, is_pre_order),
+        seo = COALESCE($24, seo),
+        updated_at = $25
       WHERE id = $1
       RETURNING *
     `, [
@@ -100,6 +104,8 @@ export async function PUT(
       (() => { const ids: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : []); return ids[0] ?? null })(),
       (() => { const ids: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : []); return ids.length ? JSON.stringify(ids) : null })(),
       body.pageUrl ?? null,
+      Array.isArray(body.carBrands) ? JSON.stringify(body.carBrands) : null,
+      body.isPreOrder != null ? body.isPreOrder : null,
       body.seo != null ? JSON.stringify(body.seo) : null,
       now,
     ])

@@ -41,6 +41,9 @@ export default function NewProductPage() {
   const [pageIds, setPageIds] = useState<string[]>([])
   const [pageDropdownOpen, setPageDropdownOpen] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
+  const [carBrands, setCarBrands] = useState<string[]>([])
+  const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
+  const [isPreOrder, setIsPreOrder] = useState(false)
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
   const [seoKeywords, setSeoKeywords] = useState('')
@@ -240,6 +243,8 @@ export default function NewProductPage() {
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : '',
         pageIds,
         pageId: pageIds[0] || '',
+        carBrands,
+        isPreOrder,
         seo: {
           metaTitle: seoTitle,
           metaDescription: seoDescription,
@@ -777,6 +782,62 @@ export default function NewProductPage() {
                     <option value="Group 5">Group 5</option>
                     <option value="GT/IUMSA">GT/IUMSA</option>
                   </select>
+                </div>
+
+                {/* Car Brands (multi-select checkbox dropdown) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Car Brand</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCarBrandDropdownOpen(!carBrandDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white"
+                    >
+                      <span className={carBrands.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {carBrands.length === 0 ? 'No brand assigned' : carBrands.length === 1 ? carBrands[0] : `${carBrands.length} brands selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${carBrandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {carBrandDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={carBrands.length === 0} onChange={() => setCarBrands([])} className="rounded" />
+                          <span className="text-sm text-gray-500 italic">No brand assigned</span>
+                        </label>
+                        {['Ford Escort MK I', 'Ford Escort MK II', 'BMW M3 E30', 'Porsche 911', 'Ferrari 308', 'Lancia Delta', 'Audi Quattro'].map((cb) => (
+                          <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" checked={carBrands.includes(cb)} onChange={(e) => setCarBrands(e.target.checked ? [...carBrands, cb] : carBrands.filter(b => b !== cb))} className="rounded" />
+                            <span className="text-sm text-gray-900">{cb}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {carBrands.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {carBrands.map(cb => (
+                        <span key={cb} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                          {cb}
+                          <button type="button" onClick={() => setCarBrands(carBrands.filter(b => b !== cb))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pre Order Toggle */}
+                <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Pre Order</p>
+                    <p className="text-xs text-gray-500">Changes &quot;Add to Cart&quot; to &quot;Pre Order&quot; and shows product on /book</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPreOrder(!isPreOrder)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${isPreOrder ? 'bg-orange-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isPreOrder ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
                 </div>
 
                 {/* Categories — multi-select */}

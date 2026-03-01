@@ -92,6 +92,7 @@ export default function EditProductPage({
   const [revoPart, setRevoPart] = useState('')
   const [carBrands, setCarBrands] = useState<string[]>([])
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
+  const [isPreOrder, setIsPreOrder] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
@@ -178,6 +179,7 @@ export default function EditProductPage({
           setCarClass((found as any).carClass || '')
           setRevoPart((found as any).revoPart || '')
           setCarBrands(Array.isArray((found as any).carBrands) ? (found as any).carBrands : [])
+          setIsPreOrder((found as any).isPreOrder || false)
           setSeoTitle(found.seo?.metaTitle || '')
           setSeoDescription(found.seo?.metaDescription || '')
           setSeoKeywords(found.seo?.metaKeywords || '')
@@ -314,6 +316,7 @@ export default function EditProductPage({
         carClass,
         revoPart,
         carBrands,
+        isPreOrder,
         carType,
         partType,
         scale,
@@ -874,6 +877,21 @@ export default function EditProductPage({
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Pre Order Toggle */}
+                <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Pre Order</p>
+                    <p className="text-xs text-gray-500">Changes &quot;Add to Cart&quot; to &quot;Pre Order&quot; and shows product on /book</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsPreOrder(!isPreOrder)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${isPreOrder ? 'bg-orange-500' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isPreOrder ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
                 </div>
 
                 {/* Brand */}

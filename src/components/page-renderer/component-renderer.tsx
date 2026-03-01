@@ -132,16 +132,25 @@ function ProductGridLive({
                     </p>
                   )}
                   {settings.showAddToCart && (
-                    <button
-                      onClick={() => handleAddToCart(p)}
-                      className={`block w-full text-center font-semibold py-2 px-4 rounded text-sm transition-all duration-300 ${
-                        addedId === p.id
-                          ? 'bg-green-600 text-white scale-95'
-                          : 'bg-red-600 text-white hover:bg-red-700'
-                      }`}
-                    >
-                      {addedId === p.id ? '✓ Added!' : 'Add to Cart'}
-                    </button>
+                    p.isPreOrder ? (
+                      <a
+                        href="/book"
+                        className="block w-full text-center font-semibold py-2 px-4 rounded text-sm bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+                      >
+                        Pre Order
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => handleAddToCart(p)}
+                        className={`block w-full text-center font-semibold py-2 px-4 rounded text-sm transition-all duration-300 ${
+                          addedId === p.id
+                            ? 'bg-green-600 text-white scale-95'
+                            : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
+                      >
+                        {addedId === p.id ? '✓ Added!' : 'Add to Cart'}
+                      </button>
+                    )
                   )}
                 </div>
               </div>
