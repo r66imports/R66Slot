@@ -504,7 +504,7 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
                 const imgHeightTablet = (child.settings.imageHeightTablet as string) || imgHeight
                 const imgWidthMobile = (child.settings.imageWidthMobile as string) || imgWidth
                 const imgHeightMobile = (child.settings.imageHeightMobile as string) || imgHeight
-                const hasVpSizes = imgWidthMobile || imgHeightMobile || imgWidthTablet || imgHeightTablet
+                const hasVpSizes = (child.settings.imageWidthMobile as string) || (child.settings.imageHeightMobile as string) || (child.settings.imageWidthTablet as string) || (child.settings.imageHeightTablet as string)
                 const colTextAlign = (child.styles?.textAlign as string) || 'left'
                 const colFlexAlign = colTextAlign === 'center' ? 'center' : colTextAlign === 'right' ? 'flex-end' : 'flex-start'
                 const imgWrapperId = `cimg-${child.id}`
