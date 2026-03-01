@@ -680,13 +680,15 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
 
     case 'columns': {
       const colCount = (settings.columns as number) || 2
+      const colGridClass =
+        colCount <= 2 ? 'grid-cols-2' :
+        colCount === 3 ? 'grid-cols-2 md:grid-cols-3' :
+        colCount === 4 ? 'grid-cols-2 md:grid-cols-4' :
+        'grid-cols-2 md:grid-cols-3'
       return (
         <section style={containerStyle}>
-          <div className="container mx-auto">
-            <div
-              className="grid gap-8"
-              style={{ gridTemplateColumns: `repeat(${colCount}, 1fr)` }}
-            >
+          <div className="w-full max-w-screen-xl mx-auto px-4">
+            <div className={`grid gap-3 sm:gap-6 ${colGridClass}`}>
               {children?.slice(0, colCount).map((child) => {
                 const imgFitCol = (child.settings.objectFit as string) || 'cover'
                 const imgHeight = (child.settings.imageHeight as string) || (child.styles?.height as string) || ''
@@ -696,6 +698,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
                 const colContent = (
                   <div
                     key={child.id}
+                    className="min-w-0 overflow-hidden"
                     style={{ display: 'flex', flexDirection: 'column', alignItems: colFlexAlign }}
                   >
                     {child.settings.icon && (
