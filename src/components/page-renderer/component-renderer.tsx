@@ -142,7 +142,7 @@ function ProductGridLive({
               const cardSize = (settings.cardSize as string) || 'standard'
               const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
               const imgFit = ((settings.imageFit as string) || 'contain') as React.CSSProperties['objectFit']
-              const productUrl = p.pageUrl || '/products'
+              const productUrl = `/product/${p.id}`
               return (
               <div
                 key={p.id}
