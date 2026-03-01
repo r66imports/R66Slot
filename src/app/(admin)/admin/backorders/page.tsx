@@ -729,6 +729,7 @@ export default function BackordersPage() {
   const [showModal, setShowModal] = useState(false)
   const [editItem, setEditItem] = useState<Backorder | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -831,6 +832,47 @@ export default function BackordersPage() {
     const res = await fetch(`/api/admin/backorders/${id}`, { method: 'DELETE' })
     if (res.ok) setBackorders((prev) => prev.filter((b) => b.id !== id))
     setDeleteConfirm(null)
+  }
+
+  // ── Duplicate ────────────────────────────────────────────────────────────────
+  const handleDuplicate = async (bo: Backorder) => {
+    setDuplicatingId(bo.id)
+    try {
+      const res = await fetch('/api/admin/backorders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: bo.clientId || '',
+          clientName: bo.clientName,
+          clientEmail: bo.clientEmail,
+          clientPhone: bo.clientPhone,
+          clubName: bo.clubName || '',
+          clubMemberId: bo.clubMemberId || '',
+          companyName: bo.companyName || '',
+          companyVAT: bo.companyVAT || '',
+          companyAddress: bo.companyAddress || '',
+          sku: bo.sku,
+          description: bo.description,
+          brand: bo.brand,
+          supplierLink: bo.supplierLink,
+          qty: bo.qty,
+          price: bo.price,
+          notes: bo.notes || '',
+          // Reset all phases — duplicate starts fresh
+          phaseQuote: false,
+          phaseSalesOrder: false,
+          phaseInvoice: false,
+          phaseDepositPaid: false,
+          status: 'active',
+        }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setBackorders((prev) => [created, ...prev])
+      }
+    } finally {
+      setDuplicatingId(null)
+    }
   }
 
   // ── Filtered List ───────────────────────────────────────────────────────────
@@ -1090,6 +1132,18 @@ export default function BackordersPage() {
                             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           >
                             ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDuplicate(bo)}
+                            title="Duplicate Order"
+                            disabled={duplicatingId === bo.id}
+                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            {duplicatingId === bo.id ? (
+                              <span className="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              '📋'
+                            )}
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(bo.id)}
