@@ -93,19 +93,20 @@ export function ImageWithZoom({
       <div
         id={wrapperId}
         className={`relative group ${wrapperClassName || ''}`}
-        style={wrapperStyle}
+        style={{ ...wrapperStyle, cursor: 'zoom-in' }}
+        onClick={(e) => { e.stopPropagation(); setOpen(true) }}
       >
         <div className={className} style={style}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={src} alt={alt} className={imgClassName} style={imgStyle} />
         </div>
 
-        {/* Spyglass button — top-right corner */}
+        {/* Spyglass button — top-right corner, always slightly visible */}
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); setOpen(true) }}
           title="Enlarge image"
-          className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:bg-white hover:scale-110"
+          className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center opacity-40 group-hover:opacity-100 transition-all duration-150 hover:bg-white hover:scale-110"
           style={{ zIndex: 10 }}
         >
           <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
