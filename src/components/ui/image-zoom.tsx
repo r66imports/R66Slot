@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ImageWithZoomProps {
   src: string
@@ -26,6 +27,9 @@ export function ImageWithZoom({
   wrapperId,
 }: ImageWithZoomProps) {
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     if (!open) return
@@ -46,6 +50,43 @@ export function ImageWithZoom({
     return () => { document.body.style.overflow = '' }
   }, [open])
 
+  const modal = mounted && open ? createPortal(
+    <div
+      className="fixed inset-0 flex items-center justify-center p-6"
+      style={{ backgroundColor: 'rgba(0,0,0,0.88)', zIndex: 99999 }}
+      onClick={() => setOpen(false)}
+    >
+      {/* Close button */}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(false) }}
+        className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-colors"
+        style={{ zIndex: 100000 }}
+        title="Close (Esc)"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+
+      {/* Zoomed image */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt={alt}
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-xl shadow-2xl object-contain select-none"
+        style={{ maxHeight: '88vh', maxWidth: '88vw' }}
+      />
+
+      {/* Hint */}
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs select-none">
+        Click outside or press Esc to close
+      </p>
+    </div>,
+    document.body
+  ) : null
+
   return (
     <>
       {/* Image wrapper — preserves all original sizing */}
@@ -62,9 +103,10 @@ export function ImageWithZoom({
         {/* Spyglass button — top-right corner */}
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={(e) => { e.stopPropagation(); setOpen(true) }}
           title="Enlarge image"
-          className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:bg-white hover:scale-110 z-10"
+          className="absolute top-2 right-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-150 hover:bg-white hover:scale-110"
+          style={{ zIndex: 10 }}
         >
           <svg className="w-4 h-4 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <circle cx="11" cy="11" r="7" />
@@ -75,41 +117,8 @@ export function ImageWithZoom({
         </button>
       </div>
 
-      {/* Lightbox modal */}
-      {open && (
-        <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-6"
-          style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
-          onClick={() => setOpen(false)}
-        >
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white transition-colors z-10"
-            title="Close (Esc)"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-
-          {/* Zoomed image */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={src}
-            alt={alt}
-            onClick={(e) => e.stopPropagation()}
-            className="rounded-xl shadow-2xl object-contain select-none"
-            style={{ maxHeight: '88vh', maxWidth: '88vw' }}
-          />
-
-          {/* Hint */}
-          <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 text-xs select-none">
-            Click outside or press Esc to close
-          </p>
-        </div>
-      )}
+      {/* Lightbox modal — rendered at document.body via portal to escape overflow/z-index issues */}
+      {modal}
     </>
   )
 }
