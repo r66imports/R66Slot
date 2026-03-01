@@ -126,6 +126,131 @@ function buildPreOrderPDF(product: Product): string {
 </html>`
 }
 
+// ─── Brand Import Profiles ────────────────────────────────────────────────────
+type ImportProfile = {
+  label: string
+  hint: string
+  template: string
+  placeholder: string
+  mapRow: (obj: Record<string, string>) => Record<string, string>
+}
+
+const IMPORT_PROFILES: Record<string, ImportProfile> = {
+  generic: {
+    label: 'Generic',
+    hint: 'Columns: title, sku, brand, price, quantity, eta, description, type, car_class, scale',
+    template: 'title,sku,brand,price,quantity,eta,description,type,car_class,scale',
+    placeholder: 'NSR Audi R8,NSR-0001,NSR,450,5,Feb 2025,,Slot Car,GT 3,1/32',
+    mapRow: (obj) => ({
+      title: obj['title'] || obj['name'] || obj['product'] || '',
+      description: obj['description'] || obj['desc'] || '',
+      price: obj['price'] || '0',
+      sku: obj['sku'] || obj['code'] || '',
+      brand: obj['brand'] || '',
+      productType: obj['type'] || obj['producttype'] || '',
+      carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
+      scale: obj['scale'] || '',
+      quantity: obj['quantity'] || obj['qty'] || '0',
+      eta: obj['eta'] || obj['delivery'] || '',
+      status: obj['status'] || 'active',
+    }),
+  },
+  nsr: {
+    label: 'NSR',
+    hint: 'Columns: sku, title, car_class, scale, price, quantity, eta — brand & type auto-filled',
+    template: 'sku,title,car_class,scale,price,quantity,eta',
+    placeholder: 'NSR-0001,NSR Audi R8 GT3,GT 3,1/32,450,5,Feb 2025',
+    mapRow: (obj) => ({
+      sku: obj['sku'] || obj['code'] || obj['item code'] || '',
+      title: obj['title'] || obj['name'] || obj['description'] || obj['desc'] || '',
+      brand: 'NSR',
+      productType: 'Slot Car',
+      carClass: obj['car_class'] || obj['carclass'] || obj['class'] || obj['category'] || '',
+      scale: obj['scale'] || '1/32',
+      price: obj['price'] || obj['retail'] || obj['retail price'] || '0',
+      quantity: obj['quantity'] || obj['qty'] || obj['stock'] || '0',
+      eta: obj['eta'] || obj['delivery'] || obj['lead time'] || '',
+      description: obj['description'] || obj['desc'] || '',
+      status: 'active',
+    }),
+  },
+  revo: {
+    label: 'Revo',
+    hint: 'Columns: sku, title, part_type, price, quantity, eta — brand & type auto-filled',
+    template: 'sku,title,part_type,price,quantity,eta',
+    placeholder: 'RV-001,Revo Slick Tyres,Tyres,120,10,Mar 2025',
+    mapRow: (obj) => ({
+      sku: obj['sku'] || obj['code'] || obj['item'] || obj['item code'] || '',
+      title: obj['title'] || obj['name'] || obj['description'] || obj['desc'] || '',
+      brand: 'Revo',
+      productType: 'Parts',
+      partType: obj['part_type'] || obj['parttype'] || obj['type'] || obj['category'] || '',
+      price: obj['price'] || obj['retail'] || obj['retail price'] || '0',
+      quantity: obj['quantity'] || obj['qty'] || obj['stock'] || '0',
+      eta: obj['eta'] || obj['delivery'] || obj['lead time'] || '',
+      description: obj['description'] || obj['desc'] || '',
+      status: 'active',
+    }),
+  },
+  brm: {
+    label: 'BRM',
+    hint: 'Columns: sku, title, car_class, scale, price, quantity, eta — brand & type auto-filled',
+    template: 'sku,title,car_class,scale,price,quantity,eta',
+    placeholder: 'BRM-001,BRM Alfa Romeo GTA,GT,1/24,650,3,Apr 2025',
+    mapRow: (obj) => ({
+      sku: obj['sku'] || obj['code'] || obj['item code'] || '',
+      title: obj['title'] || obj['name'] || obj['description'] || obj['desc'] || '',
+      brand: 'BRM',
+      productType: 'Slot Car',
+      carClass: obj['car_class'] || obj['carclass'] || obj['class'] || obj['category'] || '',
+      scale: obj['scale'] || '1/24',
+      price: obj['price'] || obj['retail'] || '0',
+      quantity: obj['quantity'] || obj['qty'] || obj['stock'] || '0',
+      eta: obj['eta'] || obj['delivery'] || '',
+      description: obj['description'] || obj['desc'] || '',
+      status: 'active',
+    }),
+  },
+  pioneer: {
+    label: 'Pioneer',
+    hint: 'Columns: sku, title, car_class, scale, price, quantity, eta — brand & type auto-filled',
+    template: 'sku,title,car_class,scale,price,quantity,eta',
+    placeholder: 'P-001,Pioneer Camaro Z28,Group 5,1/32,550,4,Mar 2025',
+    mapRow: (obj) => ({
+      sku: obj['sku'] || obj['code'] || obj['item code'] || '',
+      title: obj['title'] || obj['name'] || obj['description'] || obj['desc'] || '',
+      brand: 'Pioneer',
+      productType: 'Slot Car',
+      carClass: obj['car_class'] || obj['carclass'] || obj['class'] || obj['category'] || '',
+      scale: obj['scale'] || '1/32',
+      price: obj['price'] || obj['retail'] || '0',
+      quantity: obj['quantity'] || obj['qty'] || obj['stock'] || '0',
+      eta: obj['eta'] || obj['delivery'] || '',
+      description: obj['description'] || obj['desc'] || '',
+      status: 'active',
+    }),
+  },
+  sideways: {
+    label: 'Sideways',
+    hint: 'Columns: sku, title, car_class, scale, price, quantity, eta — brand & type auto-filled',
+    template: 'sku,title,car_class,scale,price,quantity,eta',
+    placeholder: 'SW-001,Sideways Porsche 935,GT,1/32,480,6,May 2025',
+    mapRow: (obj) => ({
+      sku: obj['sku'] || obj['code'] || obj['item code'] || '',
+      title: obj['title'] || obj['name'] || obj['description'] || obj['desc'] || '',
+      brand: 'Sideways',
+      productType: 'Slot Car',
+      carClass: obj['car_class'] || obj['carclass'] || obj['class'] || obj['category'] || '',
+      scale: obj['scale'] || '1/32',
+      price: obj['price'] || obj['retail'] || '0',
+      quantity: obj['quantity'] || obj['qty'] || obj['stock'] || '0',
+      eta: obj['eta'] || obj['delivery'] || '',
+      description: obj['description'] || obj['desc'] || '',
+      status: 'active',
+    }),
+  },
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -137,6 +262,7 @@ export default function ProductsPage() {
   const [showImportModal, setShowImportModal] = useState(false)
   const [importText, setImportText] = useState('')
   const [importing, setImporting] = useState(false)
+  const [importProfile, setImportProfile] = useState('generic')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -279,27 +405,30 @@ export default function ProductsPage() {
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
+  const downloadTemplate = () => {
+    const profile = IMPORT_PROFILES[importProfile]
+    const csv = profile.template + '\n' + profile.placeholder
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${importProfile}-import-template.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleImportCSV = async () => {
     if (!importText.trim()) return
     setImporting(true)
+    const profile = IMPORT_PROFILES[importProfile]
     try {
       const lines = importText.trim().split('\n')
       const headers = lines[0].split(',').map((h) => h.trim().toLowerCase())
-      const rows = lines.slice(1).map((line) => {
+      const rows = lines.slice(1).filter((l) => l.trim()).map((line) => {
         const values = line.split(',').map((v) => v.trim())
         const obj: Record<string, string> = {}
         headers.forEach((h, i) => { obj[h] = values[i] || '' })
-        return {
-          title: obj['title'] || obj['name'] || obj['product'] || '',
-          description: obj['description'] || '',
-          price: obj['price'] || '0',
-          sku: obj['sku'] || '',
-          brand: obj['brand'] || '',
-          productType: obj['type'] || obj['producttype'] || '',
-          quantity: obj['quantity'] || obj['qty'] || '0',
-          eta: obj['eta'] || obj['delivery'] || '',
-          status: 'active',
-        }
+        return profile.mapRow(obj)
       })
       const res = await fetch('/api/admin/products', {
         method: 'PUT',
@@ -679,24 +808,61 @@ export default function ProductsPage() {
       {/* ── Import Modal ── */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
-            <h3 className="text-lg font-semibold mb-4">Import Products (CSV)</h3>
-            <p className="text-sm text-gray-600 mb-3">Upload a CSV file or paste data. Columns: title, sku, brand, price, quantity, eta, description, type</p>
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl">
+            <h3 className="text-lg font-semibold mb-3">Import Products (CSV)</h3>
+
+            {/* Brand profile selector */}
+            <div className="mb-3">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Select Brand / Profile</p>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(IMPORT_PROFILES).map(([key, profile]) => (
+                  <button
+                    key={key}
+                    onClick={() => { setImportProfile(key); setImportText('') }}
+                    className={`px-3 py-1.5 text-sm rounded-lg border font-medium transition-colors ${
+                      importProfile === key
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                    }`}
+                  >
+                    {profile.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Hint for selected profile */}
+            <p className="text-xs text-gray-500 mb-3 bg-gray-50 rounded px-3 py-2">
+              {IMPORT_PROFILES[importProfile].hint}
+            </p>
+
+            {/* File upload */}
             <div className="mb-3">
               <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="text-sm" />
             </div>
+
+            {/* CSV textarea */}
             <textarea
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
               rows={8}
-              placeholder={'title,sku,brand,price,quantity,eta\nNSR Audi R8,NSR-0001,NSR,450,5,Feb 2025'}
+              placeholder={`${IMPORT_PROFILES[importProfile].template}\n${IMPORT_PROFILES[importProfile].placeholder}`}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-gray-900"
             />
-            <div className="flex justify-end gap-3 mt-4">
-              <button onClick={() => { setShowImportModal(false); setImportText('') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={handleImportCSV} disabled={importing || !importText.trim()} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50">
-                {importing ? 'Importing…' : 'Import'}
+
+            <div className="flex items-center justify-between mt-4">
+              <button
+                onClick={downloadTemplate}
+                className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Download Template
               </button>
+              <div className="flex gap-3">
+                <button onClick={() => { setShowImportModal(false); setImportText(''); setImportProfile('generic') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
+                <button onClick={handleImportCSV} disabled={importing || !importText.trim()} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50">
+                  {importing ? 'Importing…' : `Import (${IMPORT_PROFILES[importProfile].label})`}
+                </button>
+              </div>
             </div>
           </div>
         </div>
