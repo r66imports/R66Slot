@@ -388,22 +388,32 @@ export default function EditProductPage({
   }
 
   const handleExportToWhatsApp = () => {
-    let message = `*Product Update*\n\n`
-    message += `*Product:* ${title || 'Not specified'}\n`
-    message += `*Price:* R${price || '0.00'}\n`
-    if (compareAtPrice) message += `*Compare at:* R${compareAtPrice}\n`
-    if (brand) message += `*Brand:* ${brand}\n`
-    if (productType) message += `*Type:* ${productType}\n`
-    if (partType) message += `*Part Type:* ${partType}\n`
-    if (scale) message += `*Scale:* ${scale}\n`
-    if (supplier) message += `*Supplier:* ${supplier}\n`
-    if (sku) message += `*SKU:* ${sku}\n`
-    if (quantity) message += `*Quantity:* ${quantity}\n`
-    if (description) message += `\n*Description:*\n${description}\n`
+    const header = isPreOrder
+      ? `🎯 *PRE-ORDER – ${title || 'Product'}*`
+      : `🛒 *${title || 'Product'}*`
 
-    const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_DEFAULT_NUMBER || '27615898921'
-    const encodedMessage = encodeURIComponent(message)
-    window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank')
+    const parts: string[] = [header, '']
+    if (brand) parts.push(`*Brand:* ${brand}`)
+    if (carBrands.length > 0) parts.push(`*Car Brand:* ${carBrands.join(', ')}`)
+    if (carClass) parts.push(`*Class:* ${carClass}`)
+    if (carType) parts.push(`*Car Type:* ${carType}`)
+    if (scale) parts.push(`*Scale:* ${scale}`)
+    if (productType) parts.push(`*Type:* ${productType}`)
+    if (partType) parts.push(`*Part Type:* ${partType}`)
+    if (sku) parts.push(`*SKU:* ${sku}`)
+    if (price) parts.push(`*Price:* R${parseFloat(price).toFixed(2)}`)
+    if (compareAtPrice) parts.push(`*Was:* R${parseFloat(compareAtPrice).toFixed(2)}`)
+    if (eta) parts.push(`*ETA:* ${eta}`)
+    if (quantity && quantity !== '0') parts.push(`*Stock:* ${quantity} units`)
+    if (description) { parts.push(''); parts.push(description) }
+    if (isPreOrder) {
+      parts.push('', `📋 *Book Now:* https://r66slot.co.za/book`)
+    } else if (pageUrl) {
+      parts.push('', `🔗 ${pageUrl}`)
+    }
+
+    const message = parts.join('\n')
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   if (loading) {
