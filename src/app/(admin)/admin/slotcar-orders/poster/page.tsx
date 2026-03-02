@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import html2canvas from 'html2canvas'
-import jsPDF from 'jspdf'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRANDS = ['NSR', 'Revo', 'Pioneer', 'Sideways', 'Slot.it', 'Carrera', 'Scalextric', 'Policar', 'BRM', 'Fly']
@@ -319,25 +318,46 @@ export default function PreOrderPosterPage() {
     setSendingWhatsapp(true)
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-    const shareText = `${orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'} - ${itemDescription}\nBrand: ${brand}${carClass ? `\nClass: ${carClass}` : ''}\nPrice: R${preOrderPrice}\nETA: ${estimatedDeliveryDate || 'TBC'}\n\nBook here: ${bookUrl}`
+    const shareText = [
+      `${orderType === 'pre-order' ? '🎯 *PRE-ORDER*' : '✨ *NEW ORDER*'} – ${itemDescription}`,
+      '',
+      brand ? `*Brand:* ${brand}` : '',
+      carClass ? `*Class:* ${carClass}` : '',
+      scale ? `*Scale:* ${scale}` : '',
+      sku ? `*SKU:* ${sku}` : '',
+      `*Price:* R${preOrderPrice}`,
+      estimatedDeliveryDate ? `*ETA:* ${estimatedDeliveryDate}` : '*ETA:* TBC',
+      '',
+      `📋 *Book Now:* ${bookUrl}`,
+    ].filter(Boolean).join('\n')
 
     try {
       if (!posterRef.current) throw new Error('No poster')
-      // Capture poster as image
+      // Capture poster as high-res image
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true,
       })
-      const imgData = canvas.toDataURL('image/jpeg', 0.92)
-      // Build A5 PDF with the poster image
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a5' })
-      const pageW = pdf.internal.pageSize.getWidth()
-      const pageH = pdf.internal.pageSize.getHeight()
-      pdf.addImage(imgData, 'JPEG', 0, 0, pageW, pageH)
-      pdf.save(`R66SLOT-${sku || 'poster'}.pdf`)
-      // Open WhatsApp with share text after PDF downloads
-      setTimeout(() => {
-        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
-      }, 800)
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed to create image')), 'image/jpeg', 0.92)
+      )
+      const filename = `R66SLOT-${sku || 'poster'}.jpg`
+      const file = new File([blob], filename, { type: 'image/jpeg' })
+
+      // On mobile: use native share sheet — can attach image directly to WhatsApp
+      if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text: shareText })
+      } else {
+        // Desktop fallback: download the JPEG, then open WhatsApp with text
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+        setTimeout(() => {
+          window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+        }, 800)
+      }
     } catch (err) {
       console.error('WhatsApp export error:', err)
       window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
