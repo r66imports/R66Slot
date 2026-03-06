@@ -102,6 +102,12 @@ function ProductGridLive({
     setTimeout(() => setAddedId(null), 1500)
   }
 
+  const deskCols = (settings.gridColumns as number) || 3
+  const mobCols = (settings.gridColumnsMobile as number) || Math.min(2, deskCols)
+  const gridGapMap: Record<string, string> = { none: '0', xs: '0.5rem', sm: '0.75rem', md: '1rem', lg: '1.5rem', xl: '2rem' }
+  const gridGap = gridGapMap[(settings.cardGap as string) || 'md'] ?? '1rem'
+  const pgCls = `pg-${deskCols}d${mobCols}m`
+
   return (
     <div style={containerStyle}>
       <div className="container mx-auto">
@@ -138,7 +144,9 @@ function ProductGridLive({
             </p>
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${(settings.gridColumns as number) || 3}, minmax(0, 1fr))`, gap: { none: '0', xs: '0.5rem', sm: '0.75rem', md: '1rem', lg: '1.5rem', xl: '2rem' }[(settings.cardGap as string) || 'md'] || '1rem' }}>
+          <>
+          <style>{`.${pgCls}{display:grid;grid-template-columns:repeat(${deskCols},minmax(0,1fr));gap:${gridGap}}@media(max-width:639px){.${pgCls}{grid-template-columns:repeat(${mobCols},minmax(0,1fr))}}`}</style>
+          <div className={pgCls}>
             {products.map((p) => {
               const cardSize = (settings.cardSize as string) || 'standard'
               const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
@@ -243,6 +251,7 @@ function ProductGridLive({
               )
             })}
           </div>
+          </>
         )}
       </div>
     </div>

@@ -684,6 +684,26 @@ function ContentTab({
             <p className="text-[10px] text-gray-400 mt-1 font-play">More columns = smaller cards</p>
           </div>
           <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Mobile Columns <span className="text-gray-400 font-normal">(screens &lt;640px)</span></label>
+            <div className="flex gap-1">
+              {[1, 2, 3, 4].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => updateSetting('gridColumnsMobile', n)}
+                  className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
+                    ((component.settings.gridColumnsMobile as number) || 2) === n
+                      ? 'bg-green-100 text-green-700 border-green-300'
+                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1 font-play">Saved separately from desktop — default 2</p>
+          </div>
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Rows to Show</label>
             <input
               type="number"
