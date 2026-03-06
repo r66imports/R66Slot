@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 
 type PosterData = {
@@ -33,6 +33,24 @@ export default function BookingPageClient({ code, initialPoster }: BookingPageCl
   const [selectedQty, setSelectedQty] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
+  const [loggedInCustomerId, setLoggedInCustomerId] = useState<string | null>(null)
+  const [loggedInName, setLoggedInName] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/account/profile')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && !data.error) {
+          setFirstName(data.firstName || '')
+          setLastName(data.lastName || '')
+          setEmail(data.email || '')
+          setPhone(data.phone || '')
+          setLoggedInCustomerId(data.id || null)
+          setLoggedInName(`${data.firstName || ''} ${data.lastName || ''}`.trim())
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handlePlaceOrder = async () => {
     if (!poster) return
@@ -52,7 +70,7 @@ export default function BookingPageClient({ code, initialPoster }: BookingPageCl
         price: poster.preOrderPrice,
         quantity: selectedQty,
         totalAmount: (parseFloat(poster.preOrderPrice) * selectedQty).toFixed(2),
-        customerId: `guest_${Date.now()}`,
+        customerId: loggedInCustomerId || `guest_${Date.now()}`,
         customerName: `${firstName.trim()} ${lastName.trim()}`,
         customerEmail: email.trim(),
         customerPhone: phone.trim(),
@@ -221,7 +239,14 @@ export default function BookingPageClient({ code, initialPoster }: BookingPageCl
 
               {/* Booking Form */}
               <div className="border-t pt-4 space-y-3">
-                <h3 className="font-bold font-play">Your Details</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold font-play">Your Details</h3>
+                  {loggedInName && (
+                    <span className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-full px-3 py-1 font-play">
+                      ✓ Signed in as {loggedInName}
+                    </span>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

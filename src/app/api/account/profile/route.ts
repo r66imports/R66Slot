@@ -14,6 +14,30 @@ async function saveCustomers(customers: any[]) {
   await blobWrite(CUSTOMERS_KEY, customers)
 }
 
+export async function GET() {
+  try {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('customer_token')?.value
+
+    if (!token) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const decoded = jwt.verify(token, JWT_SECRET) as any
+    const customers = await getCustomers()
+    const customer = customers.find((c: any) => c.id === decoded.id)
+
+    if (!customer) {
+      return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
+    }
+
+    const { password, ...customerData } = customer
+    return NextResponse.json(customerData)
+  } catch {
+    return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+  }
+}
+
 export async function PUT(request: NextRequest) {
   try {
     const cookieStore = await cookies()
