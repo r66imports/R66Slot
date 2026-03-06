@@ -336,7 +336,9 @@ export default function PreOrderPosterPage() {
       let prefetchedDataUrl: string | null = null
       if (imageUrl && !imageUrl.startsWith('data:')) {
         try {
-          const resp = await fetch(imageUrl)
+          // Use server-side proxy so the browser fetch isn't blocked by R2 CORS
+          const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(imageUrl)}`
+          const resp = await fetch(proxyUrl)
           const blob = await resp.blob()
           prefetchedDataUrl = await new Promise<string>((res) => {
             const reader = new FileReader()
