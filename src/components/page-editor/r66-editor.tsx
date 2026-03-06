@@ -567,6 +567,7 @@ ${canvasHTML}
                         <SortableLiveComponent
                           key={component.id}
                           component={component}
+                          viewMode={viewMode}
                           isSelected={selectedComponentId === component.id}
                           onSelect={() => { setPropertiesInitialTab('content'); setSelectedComponentId(component.id); setShowPageSettings(false); setRightCollapsed(false) }}
                           onContextMenu={(e) => {
@@ -845,12 +846,14 @@ function SortableLiveComponent({
   onSelect,
   onContextMenu,
   onUpdateSettings,
+  viewMode,
 }: {
   component: PageComponent
   isSelected: boolean
   onSelect: () => void
   onContextMenu?: (e: React.MouseEvent) => void
   onUpdateSettings?: (key: string, value: any) => void
+  viewMode?: 'desktop' | 'tablet' | 'mobile'
 }) {
   const {
     attributes,
@@ -900,7 +903,7 @@ function SortableLiveComponent({
         </div>
 
         {/* Actual rendered component */}
-        <RenderedComponent component={component} isEditing={true} onUpdateSettings={onUpdateSettings} />
+        <RenderedComponent component={component} isEditing={true} viewMode={viewMode} onUpdateSettings={onUpdateSettings} />
       </div>
     </div>
   )

@@ -7,10 +7,11 @@ import type { PageComponent } from '@/lib/pages/schema'
 interface RenderedComponentProps {
   component: PageComponent
   isEditing?: boolean
+  viewMode?: 'desktop' | 'tablet' | 'mobile'
   onUpdateSettings?: (key: string, value: any) => void
 }
 
-export function RenderedComponent({ component, isEditing, onUpdateSettings }: RenderedComponentProps) {
+export function RenderedComponent({ component, isEditing, viewMode = 'desktop', onUpdateSettings }: RenderedComponentProps) {
   // Hidden elements: invisible on live site, still rendered (ghosted) in editor
   if (component.hidden && !isEditing) return null
 
@@ -648,7 +649,11 @@ export function RenderedComponent({ component, isEditing, onUpdateSettings }: Re
       )
 
     case 'product-grid': {
-      const pgCols = (settings.gridColumns as number) || 3
+      const pgCols = viewMode === 'mobile'
+        ? ((settings.gridColumnsMobile as number) || 2)
+        : viewMode === 'tablet'
+        ? ((settings.gridColumnsTablet as number) || (settings.gridColumns as number) || 3)
+        : ((settings.gridColumns as number) || 3)
       const pgRows = (settings.productRows as number) || 3
       const pgCount = pgRows * pgCols
       const cardSize = (settings.cardSize as string) || 'standard'
