@@ -1009,10 +1009,6 @@ export default function PreOrderPosterPage() {
                         <p className="text-2xl font-bold text-red-500 font-play">R{preOrderPrice || '0.00'}</p>
                       </div>
                     </div>
-                    <a href={bookingLink} target="_blank" rel="noopener noreferrer" className="block w-full py-3 bg-black text-white text-center font-bold font-play rounded-lg hover:bg-gray-800 transition-colors">
-                      BOOK NOW →
-                    </a>
-                    <p className="text-xs text-center text-blue-600 font-play font-mono">{bookingLink.replace('https://', '')}</p>
                     <p className="text-xs text-center text-gray-400 font-play">R66SLOT – Premium Slot Cars</p>
                   </div>
                 </div>
