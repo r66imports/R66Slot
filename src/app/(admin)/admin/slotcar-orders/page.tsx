@@ -116,8 +116,11 @@ export default function SlotCarOrdersPage() {
         const filename = `R66SLOT-${poster.sku || 'poster'}.jpg`
         const file = new File([imageBlob], filename, { type: 'image/jpeg' })
 
-        // Mobile: Web Share API — attaches image directly to WhatsApp
-        if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        // Mobile only: Web Share API — attaches image directly to WhatsApp
+        // Skip on desktop (Web Share API exists but fails to find WhatsApp)
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+          !!(navigator as any).userAgentData?.mobile
+        if (isMobile && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], text: bookUrl })
           return
         }
