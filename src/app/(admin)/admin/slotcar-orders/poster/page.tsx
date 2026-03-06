@@ -326,6 +326,7 @@ export default function PreOrderPosterPage() {
     setWhatsappStatus(null)
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
+    const prevViewMode = viewMode
 
     try {
       if (!posterRef.current) throw new Error('No poster')
@@ -334,6 +335,8 @@ export default function PreOrderPosterPage() {
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true,
       })
+      // Restore the view mode the user had before export
+      setViewMode(prevViewMode)
       const jpegBlob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed to create image')), 'image/jpeg', 0.92)
       )
