@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import html2canvas from 'html2canvas'
 import { flushSync } from 'react-dom'
+import { MediaLibraryPicker } from '@/components/page-editor/media-library-picker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRANDS = ['NSR', 'Revo', 'Pioneer', 'Sideways', 'Slot.it', 'Carrera', 'Scalextric', 'Policar', 'BRM', 'Fly']
@@ -177,6 +178,7 @@ export default function PreOrderPosterPage() {
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
   const [whatsappStatus, setWhatsappStatus] = useState<{ type: 'mobile' | 'clipboard' | 'download'; bookUrl: string } | null>(null)
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('mobile')
   const [mobileImageHeight, setMobileImageHeight] = useState(320)
@@ -654,22 +656,43 @@ export default function PreOrderPosterPage() {
 
             {/* 1. Product Image */}
             <SectionCard title="Product Image" open={open.image} onToggle={() => toggle('image')}>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                {imageUrl ? (
-                  <div className="relative">
-                    <img src={imageUrl} alt="Product" className="max-h-64 mx-auto rounded-lg" />
-                    <button onClick={() => { setImageUrl(''); setImageFile(null) }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600">×</button>
+              {imageUrl ? (
+                <div className="relative">
+                  <img src={imageUrl} alt="Product" className="max-h-64 mx-auto rounded-lg" />
+                  <button onClick={() => { setImageUrl(''); setImageFile(null) }} className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 text-lg leading-none">×</button>
+                  <div className="mt-3 flex gap-2 justify-center">
+                    <label className="cursor-pointer px-3 py-1.5 text-xs font-bold border border-gray-300 rounded-lg bg-white hover:bg-gray-50 font-play">
+                      ↑ Replace from Device
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    </label>
+                    <button
+                      onClick={() => setMediaPickerOpen(true)}
+                      className="px-3 py-1.5 text-xs font-bold border border-gray-300 rounded-lg bg-white hover:bg-gray-50 font-play"
+                    >
+                      🖼️ Browse Library
+                    </button>
                   </div>
-                ) : (
-                  <label className="cursor-pointer block">
-                    <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-sm text-gray-600 font-play">Click to upload product image</p>
-                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                  </label>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                  <svg className="mx-auto h-12 w-12 text-gray-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-sm text-gray-500 font-play mb-3">No image selected</p>
+                  <div className="flex gap-2 justify-center">
+                    <label className="cursor-pointer px-4 py-2 text-sm font-bold bg-gray-900 text-white rounded-lg hover:bg-gray-800 font-play">
+                      ↑ Upload from Device
+                      <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                    </label>
+                    <button
+                      onClick={() => setMediaPickerOpen(true)}
+                      className="px-4 py-2 text-sm font-bold border-2 border-gray-900 text-gray-900 rounded-lg hover:bg-gray-50 font-play"
+                    >
+                      🖼️ Media Library
+                    </button>
+                  </div>
+                </div>
+              )}
             </SectionCard>
 
             {/* 2. Order Type */}
@@ -1052,6 +1075,16 @@ export default function PreOrderPosterPage() {
           </div>{/* end right column */}
         </div>
       </div>
+
+      <MediaLibraryPicker
+        open={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        onSelect={(url) => {
+          setImageUrl(url)
+          setImageFile(null)
+          setMediaPickerOpen(false)
+        }}
+      />
     </div>
   )
 }
