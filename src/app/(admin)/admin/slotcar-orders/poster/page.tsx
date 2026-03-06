@@ -198,6 +198,7 @@ export default function PreOrderPosterPage() {
   // ── Core poster fields ──
   const [imageUrl, setImageUrl] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
+  const [posterImageUrl, setPosterImageUrl] = useState('') // R2 URL of the generated branded poster JPEG
   const [shortCode, setShortCode] = useState('')
   const [orderType, setOrderType] = useState<'new-order' | 'pre-order'>('pre-order')
   const [sku, setSku] = useState('')
@@ -259,6 +260,7 @@ export default function PreOrderPosterPage() {
       setPreOrderPrice(p.preOrderPrice || '')
       setAvailableQty(p.availableQty || 10)
       setImageUrl(p.imageUrl || '')
+      setPosterImageUrl(p.posterImageUrl || '')
       setShortCode(p.shortCode || '')
       setMobileImageHeight(p.mobileImageHeight || 320)
       setDesktopImageHeight(p.desktopImageHeight || 280)
@@ -377,6 +379,29 @@ export default function PreOrderPosterPage() {
       )
       const filename = `R66SLOT-${sku || 'poster'}.jpg`
       const file = new File([jpegBlob], filename, { type: 'image/jpeg' })
+
+      // Upload the generated poster JPEG to R2 and save as posterImageUrl (fire-and-forget)
+      // This lets the list page quick-share button reuse the same branded poster image
+      if (editId && !posterImageUrl) {
+        ;(async () => {
+          try {
+            const uploadForm = new FormData()
+            uploadForm.append('file', new File([jpegBlob], filename, { type: 'image/jpeg' }))
+            const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: uploadForm })
+            if (uploadRes.ok) {
+              const { url } = await uploadRes.json()
+              setPosterImageUrl(url)
+              await fetch('/api/admin/slotcar-orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: editId, posterImageUrl: url }),
+              })
+            }
+          } catch (e) {
+            console.warn('Failed to save poster image URL:', e)
+          }
+        })()
+      }
 
       // 1. Mobile: Web Share API — attaches image directly to WhatsApp
       if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {

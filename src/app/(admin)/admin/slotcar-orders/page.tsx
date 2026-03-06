@@ -18,6 +18,7 @@ type PreOrderPoster = {
   preOrderPrice: string
   availableQty: number
   imageUrl: string
+  posterImageUrl?: string
   shortCode?: string
   createdAt: string
   published: boolean
@@ -100,14 +101,19 @@ export default function SlotCarOrdersPage() {
 
     const code = poster.shortCode || poster.id
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-    const waText = `🎯 ${poster.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${poster.itemDescription}\nBrand: ${poster.brand}\nPrice: R${poster.preOrderPrice}\nBook Here: ${bookUrl}`
+    // Desktop fallback text includes ETA and booking link
+    const waText = `🎯 ${poster.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${poster.itemDescription}\nBrand: ${poster.brand}\nPrice: R${poster.preOrderPrice}\nEst. Delivery: ${poster.estimatedDeliveryDate}\nBook Here: ${bookUrl}`
 
     try {
+      // Use the branded poster JPEG if it was saved on a previous WhatsApp export,
+      // otherwise fall back to the raw product photo
+      const imageSource = poster.posterImageUrl || poster.imageUrl
+
       // Fetch saved poster image via proxy to avoid R2 CORS restrictions
       let imageBlob: Blob | null = null
-      if (poster.imageUrl) {
+      if (imageSource) {
         try {
-          const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(poster.imageUrl)}`
+          const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(imageSource)}`
           const resp = await fetch(proxyUrl)
           imageBlob = await resp.blob()
         } catch (e) {
@@ -119,15 +125,13 @@ export default function SlotCarOrdersPage() {
         const filename = `R66SLOT-${poster.sku || 'poster'}.jpg`
         const file = new File([imageBlob], filename, { type: 'image/jpeg' })
 
-        // Mobile: Web Share API — attaches image + text directly to WhatsApp
-        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-          !!(navigator as any).userAgentData?.mobile
-        if (isMobile && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text: waText })
+        // Mobile & desktop: Web Share API with files — sends image + booking link to WhatsApp
+        if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text: bookUrl })
           return
         }
 
-        // Desktop: download the poster JPEG + open WhatsApp with pre-filled text
+        // Desktop fallback: download the poster JPEG + open WhatsApp with pre-filled text
         const objUrl = URL.createObjectURL(imageBlob)
         const a = document.createElement('a')
         a.href = objUrl
@@ -137,14 +141,14 @@ export default function SlotCarOrdersPage() {
         document.body.removeChild(a)
         setTimeout(() => URL.revokeObjectURL(objUrl), 30000)
 
-        // Open WhatsApp Web/App with the booking text pre-filled
+        // Open WhatsApp with pre-filled text (booking link + ETA + details)
         window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
 
         // Show the instruction banner on this card
         setWhatsappDone(poster.id)
         setTimeout(() => setWhatsappDone(null), 12000)
       } else {
-        // No image — just open WhatsApp with booking link
+        // No image — just open WhatsApp with full text
         window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
       }
     } catch (err: any) {
