@@ -103,10 +103,11 @@ function ProductGridLive({
   }
 
   const deskCols = (settings.gridColumns as number) || 3
+  const tabCols = (settings.gridColumnsTablet as number) || deskCols
   const mobCols = (settings.gridColumnsMobile as number) || Math.min(2, deskCols)
   const gridGapMap: Record<string, string> = { none: '0', xs: '0.5rem', sm: '0.75rem', md: '1rem', lg: '1.5rem', xl: '2rem' }
   const gridGap = gridGapMap[(settings.cardGap as string) || 'md'] ?? '1rem'
-  const pgCls = `pg-${deskCols}d${mobCols}m`
+  const pgCls = `pg-${deskCols}d${tabCols}t${mobCols}m`
 
   return (
     <div style={containerStyle}>
@@ -145,7 +146,7 @@ function ProductGridLive({
           </div>
         ) : (
           <>
-          <style>{`.${pgCls}{display:grid;grid-template-columns:repeat(${deskCols},minmax(0,1fr));gap:${gridGap}}@media(max-width:639px){.${pgCls}{grid-template-columns:repeat(${mobCols},minmax(0,1fr))}}`}</style>
+          <style>{`.${pgCls}{display:grid;grid-template-columns:repeat(${deskCols},minmax(0,1fr));gap:${gridGap}}@media(max-width:1023px){.${pgCls}{grid-template-columns:repeat(${tabCols},minmax(0,1fr))}}@media(max-width:639px){.${pgCls}{grid-template-columns:repeat(${mobCols},minmax(0,1fr))}}`}</style>
           <div className={pgCls}>
             {products.map((p) => {
               const cardSize = (settings.cardSize as string) || 'standard'

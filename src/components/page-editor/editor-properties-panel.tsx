@@ -663,45 +663,95 @@ function ContentTab({
       {component.type === 'product-grid' && (
         <div className="bg-gray-50 rounded-lg p-3 space-y-3 border border-gray-200">
           <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wider font-play">Grid Layout</h4>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Products per Row</label>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => updateSetting('gridColumns', n)}
-                  className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
-                    ((component.settings.gridColumns as number) || 3) === n
-                      ? 'bg-blue-100 text-blue-700 border-blue-300'
-                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
+          {/* Products per Row — independent per view */}
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-gray-500 font-play">Products per Row</label>
+
+            {/* Desktop */}
+            <div className={`rounded-lg p-2 border ${viewMode === 'desktop' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-[10px] font-bold font-play uppercase tracking-wide ${viewMode === 'desktop' ? 'text-blue-600' : 'text-gray-400'}`}>
+                  🖥️ Desktop
+                </span>
+                <span className="text-[10px] font-play text-gray-400">{(component.settings.gridColumns as number) || 3} col</span>
+              </div>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => updateSetting('gridColumns', n)}
+                    className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
+                      ((component.settings.gridColumns as number) || 3) === n
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-white text-gray-500 hover:bg-blue-50 border-gray-200'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[10px] text-gray-400 mt-1 font-play">More columns = smaller cards</p>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Mobile Columns <span className="text-gray-400 font-normal">(screens &lt;640px)</span></label>
-            <div className="flex gap-1">
-              {[1, 2, 3, 4].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => updateSetting('gridColumnsMobile', n)}
-                  className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
-                    ((component.settings.gridColumnsMobile as number) || 2) === n
-                      ? 'bg-green-100 text-green-700 border-green-300'
-                      : 'bg-white text-gray-500 hover:bg-gray-50 border-gray-200'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
+
+            {/* Tablet */}
+            <div className={`rounded-lg p-2 border ${viewMode === 'tablet' ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-white'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-[10px] font-bold font-play uppercase tracking-wide ${viewMode === 'tablet' ? 'text-purple-600' : 'text-gray-400'}`}>
+                  📱 Tablet
+                </span>
+                <span className="text-[10px] font-play text-gray-400">
+                  {(component.settings.gridColumnsTablet as number)
+                    ? `${component.settings.gridColumnsTablet} col`
+                    : `${(component.settings.gridColumns as number) || 3} col (same as desktop)`}
+                </span>
+              </div>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => updateSetting('gridColumnsTablet', n)}
+                    className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
+                      ((component.settings.gridColumnsTablet as number) || 0) === n
+                        ? 'bg-purple-500 text-white border-purple-500'
+                        : 'bg-white text-gray-500 hover:bg-purple-50 border-gray-200'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              {!(component.settings.gridColumnsTablet) && (
+                <p className="text-[10px] text-purple-400 mt-1 font-play">Not set — inherits desktop value</p>
+              )}
             </div>
-            <p className="text-[10px] text-gray-400 mt-1 font-play">Saved separately from desktop — default 2</p>
+
+            {/* Mobile */}
+            <div className={`rounded-lg p-2 border ${viewMode === 'mobile' ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className={`text-[10px] font-bold font-play uppercase tracking-wide ${viewMode === 'mobile' ? 'text-green-600' : 'text-gray-400'}`}>
+                  📲 Mobile
+                </span>
+                <span className="text-[10px] font-play text-gray-400">{(component.settings.gridColumnsMobile as number) || 2} col</span>
+              </div>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => updateSetting('gridColumnsMobile', n)}
+                    className={`flex-1 py-1.5 text-xs rounded font-play font-bold transition-colors border ${
+                      ((component.settings.gridColumnsMobile as number) || 2) === n
+                        ? 'bg-green-500 text-white border-green-500'
+                        : 'bg-white text-gray-500 hover:bg-green-50 border-gray-200'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-400 font-play">Each view is saved independently — switching views does not change other settings.</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Rows to Show</label>
