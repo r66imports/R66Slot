@@ -38,6 +38,9 @@ export interface Product {
   seo: { metaTitle: string; metaDescription: string; metaKeywords: string }
   sageItemCode: string | null
   sageLastSynced: string | null
+  unit: string
+  salesAccount: string
+  purchaseAccount: string
   createdAt: string
   updatedAt: string
 }
@@ -80,6 +83,9 @@ function rowToProduct(row: any): Product {
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
     sageLastSynced: row.sage_last_synced,
+    unit: row.unit || 'Each',
+    salesAccount: row.sales_account || '',
+    purchaseAccount: row.purchase_account || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -94,7 +100,10 @@ async function ensureProductColumns() {
         ADD COLUMN IF NOT EXISTS page_ids JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS car_brands JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS is_pre_order BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS revo_parts JSONB DEFAULT '[]'::jsonb
+        ADD COLUMN IF NOT EXISTS revo_parts JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'Each',
+        ADD COLUMN IF NOT EXISTS sales_account TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS purchase_account TEXT DEFAULT ''
     `)
   } catch { /* ignore */ }
   _productColumnsMigrated = true
@@ -318,10 +327,13 @@ export async function PUT(request: Request) {
               part_type   = CASE WHEN $8 <> '' THEN $8 ELSE part_type END,
               scale       = CASE WHEN $9 <> '' THEN $9 ELSE scale END,
               supplier    = CASE WHEN $10 <> '' THEN $10 ELSE supplier END,
-              quantity    = $11::integer,
-              eta         = CASE WHEN $12 <> '' THEN $12 ELSE eta END,
-              status      = CASE WHEN $13 <> '' THEN $13 ELSE status END,
-              updated_at  = $14
+              quantity        = $11::integer,
+              eta             = CASE WHEN $12 <> '' THEN $12 ELSE eta END,
+              status          = CASE WHEN $13 <> '' THEN $13 ELSE status END,
+              unit            = CASE WHEN $16 <> '' THEN $16 ELSE unit END,
+              sales_account   = CASE WHEN $17 <> '' THEN $17 ELSE sales_account END,
+              purchase_account = CASE WHEN $18 <> '' THEN $18 ELSE purchase_account END,
+              updated_at      = $14
             WHERE id = $15
           `, [
             p.title || p.name || '',
@@ -339,6 +351,9 @@ export async function PUT(request: Request) {
             p.status || '',
             now,
             existingId,
+            p.unit || '',
+            p.salesAccount || '',
+            p.purchaseAccount || '',
           ])
           updated++
           continue
@@ -353,10 +368,13 @@ export async function PUT(request: Request) {
           sku, barcode, brand, product_type, car_class, car_type, part_type,
           scale, supplier, collections, tags, quantity, track_quantity,
           weight, weight_unit, box_size, dimensions, eta, status,
-          image_url, images, page_id, page_ids, page_url, seo, created_at, updated_at
+          image_url, images, page_id, page_ids, page_url, seo,
+          unit, sales_account, purchase_account,
+          created_at, updated_at
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-          $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33
+          $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,
+          $32,$33,$34,$35,$36
         )
       `, [
         id, p.title || p.name || '', p.description || '',
@@ -374,7 +392,9 @@ export async function PUT(request: Request) {
         p.eta || '', p.status || 'active',
         p.imageUrl || '', JSON.stringify(Array.isArray(p.images) ? p.images : []),
         p.pageId || '', JSON.stringify(Array.isArray(p.pageIds) ? p.pageIds : (p.pageId ? [p.pageId] : [])), p.pageUrl || '',
-        JSON.stringify(p.seo || {}), now, now,
+        JSON.stringify(p.seo || {}),
+        p.unit || 'Each', p.salesAccount || '', p.purchaseAccount || '',
+        now, now,
       ])
       imported++
     }

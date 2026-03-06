@@ -29,6 +29,9 @@ interface Product {
   imageUrl: string
   pageId?: string
   pageUrl?: string
+  unit?: string
+  salesAccount?: string
+  purchaseAccount?: string
   createdAt: string
   updatedAt: string
 }
@@ -158,8 +161,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: obj['status'] || 'active',
     }),
     brandKey: '',
-    exportHeaders: ['title', 'sku', 'brand', 'price', 'quantity', 'eta', 'description', 'type', 'car_class', 'scale', 'status', 'page_url'],
-    exportRow: (p) => [p.title, p.sku, p.brand, p.price, p.quantity, p.eta, p.description, p.productType, p.carClass || '', p.scale || '', p.status, p.pageUrl || ''],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP - Exclusive', 'Cost - Exclusive', 'Pre-Order Retail Exclusive', 'Sales Account', 'Purchase Account', 'Qty'],
+    exportRow: (p) => [p.sku, p.title, p.productType || p.carClass || '', p.unit || 'Each', p.price, p.costPerItem ?? '', p.compareAtPrice ?? '', p.salesAccount || '', p.purchaseAccount || '', p.quantity],
   },
   nsr: {
     label: 'NSR',
@@ -180,8 +183,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'NSR',
-    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
-    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP - Exclusive', 'Cost - Exclusive', 'Pre-Order Retail Exclusive', 'Sales Account', 'Purchase Account', 'Qty'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || p.productType || '', p.unit || 'Each', p.price, p.costPerItem ?? '', p.compareAtPrice ?? '', p.salesAccount || '', p.purchaseAccount || '', p.quantity],
   },
   revo: {
     label: 'Revo',
@@ -201,8 +204,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Revo',
-    exportHeaders: ['sku', 'title', 'part_type', 'price', 'quantity', 'eta'],
-    exportRow: (p) => [p.sku, p.title, p.productType || '', p.price, p.quantity, p.eta],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP - Exclusive', 'Cost - Exclusive', 'Pre-Order Retail Exclusive', 'Sales Account', 'Purchase Account', 'Qty'],
+    exportRow: (p) => [p.sku, p.title, p.productType || '', p.unit || 'Each', p.price, p.costPerItem ?? '', p.compareAtPrice ?? '', p.salesAccount || '', p.purchaseAccount || '', p.quantity],
   },
   brm: {
     label: 'BRM',
@@ -223,8 +226,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'BRM',
-    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
-    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP - Exclusive', 'Cost - Exclusive', 'Pre-Order Retail Exclusive', 'Sales Account', 'Purchase Account', 'Qty'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || p.productType || '', p.unit || 'Each', p.price, p.costPerItem ?? '', p.compareAtPrice ?? '', p.salesAccount || '', p.purchaseAccount || '', p.quantity],
   },
   pioneer: {
     label: 'Pioneer',
@@ -245,8 +248,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Pioneer',
-    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
-    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP - Exclusive', 'Cost - Exclusive', 'Pre-Order Retail Exclusive', 'Sales Account', 'Purchase Account', 'Qty'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || p.productType || '', p.unit || 'Each', p.price, p.costPerItem ?? '', p.compareAtPrice ?? '', p.salesAccount || '', p.purchaseAccount || '', p.quantity],
   },
   sideways: {
     label: 'Sideways',
@@ -267,8 +270,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Sideways',
-    exportHeaders: ['sku', 'title', 'car_class', 'scale', 'price', 'quantity', 'eta'],
-    exportRow: (p) => [p.sku, p.title, p.carClass || '', p.scale || '', p.price, p.quantity, p.eta],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP - Exclusive', 'Cost - Exclusive', 'Pre-Order Retail Exclusive', 'Sales Account', 'Purchase Account', 'Qty'],
+    exportRow: (p) => [p.sku, p.title, p.carClass || p.productType || '', p.unit || 'Each', p.price, p.costPerItem ?? '', p.compareAtPrice ?? '', p.salesAccount || '', p.purchaseAccount || '', p.quantity],
   },
 }
 
