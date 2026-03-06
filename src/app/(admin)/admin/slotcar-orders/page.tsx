@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
+const BOOK_NOW_URL = 'https://r66slot.co.za/book'
+
 type PreOrderPoster = {
   id: string
   orderType: 'new-order' | 'pre-order'
@@ -16,6 +18,7 @@ type PreOrderPoster = {
   preOrderPrice: string
   availableQty: number
   imageUrl: string
+  shortCode?: string
   createdAt: string
   published: boolean
 }
@@ -40,6 +43,7 @@ export default function SlotCarOrdersPage() {
   const [posters, setPosters] = useState<PreOrderPoster[]>([])
   const [orders, setOrders] = useState<PreOrderItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [sharingPosterId, setSharingPosterId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPosters()
@@ -85,6 +89,80 @@ export default function SlotCarOrdersPage() {
       }
     } catch (error) {
       console.error('Error deleting poster:', error)
+    }
+  }
+
+  const handleWhatsApp = async (poster: PreOrderPoster) => {
+    if (sharingPosterId) return
+    setSharingPosterId(poster.id)
+
+    const code = poster.shortCode || poster.id
+    const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
+
+    try {
+      // Fetch saved poster image via proxy to avoid R2 CORS restrictions
+      let imageBlob: Blob | null = null
+      if (poster.imageUrl) {
+        try {
+          const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(poster.imageUrl)}`
+          const resp = await fetch(proxyUrl)
+          imageBlob = await resp.blob()
+        } catch (e) {
+          console.warn('Could not fetch poster image:', e)
+        }
+      }
+
+      if (imageBlob) {
+        const filename = `R66SLOT-${poster.sku || 'poster'}.jpg`
+        const file = new File([imageBlob], filename, { type: 'image/jpeg' })
+
+        // Mobile: Web Share API — attaches image directly to WhatsApp
+        if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text: bookUrl })
+          return
+        }
+
+        // Desktop: convert JPEG to PNG and copy to clipboard, then open WhatsApp Web
+        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+          const pngBlob = await new Promise<Blob>((resolve, reject) => {
+            const img = new Image()
+            const objectUrl = URL.createObjectURL(imageBlob!)
+            img.onload = () => {
+              const canvas = document.createElement('canvas')
+              canvas.width = img.naturalWidth
+              canvas.height = img.naturalHeight
+              canvas.getContext('2d')?.drawImage(img, 0, 0)
+              URL.revokeObjectURL(objectUrl)
+              canvas.toBlob((b) => b ? resolve(b) : reject(new Error('PNG conversion failed')), 'image/png')
+            }
+            img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Image load failed')) }
+            img.src = objectUrl
+          })
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })])
+          window.open('https://web.whatsapp.com', '_blank')
+          return
+        }
+
+        // Last resort: download the JPEG
+        const objUrl = URL.createObjectURL(imageBlob)
+        const a = document.createElement('a')
+        a.href = objUrl
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(objUrl), 30000)
+      } else {
+        // No image — just open wa.me with booking link
+        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
+      }
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('WhatsApp share error:', err)
+        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
+      }
+    } finally {
+      setSharingPosterId(null)
     }
   }
 
@@ -163,21 +241,25 @@ export default function SlotCarOrdersPage() {
                 <p className="text-sm text-gray-500">Delivery: {poster.estimatedDeliveryDate}</p>
                 <p className="text-sm text-gray-500">Available: {poster.availableQty} units</p>
 
-                <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm" asChild className="flex-1 font-play">
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  <Button variant="outline" size="sm" asChild className="font-play">
                     <Link href={`/admin/slotcar-orders/poster?edit=${poster.id}`}>
                       Edit
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild className="font-play">
+                    <Link href={`/preorder/${poster.id}`} target="_blank">
+                      View
                     </Link>
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
-                    asChild
-                    className="flex-1 font-play"
+                    onClick={() => handleWhatsApp(poster)}
+                    disabled={sharingPosterId === poster.id}
+                    className="text-green-600 hover:text-green-700 border-green-200 font-play"
                   >
-                    <Link href={`/preorder/${poster.id}`} target="_blank">
-                      View
-                    </Link>
+                    {sharingPosterId === poster.id ? 'Sending…' : 'WhatsApp'}
                   </Button>
                   <Button
                     variant="outline"
