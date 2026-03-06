@@ -176,6 +176,7 @@ export default function PreOrderPosterPage() {
   const [sendingWhatsapp, setSendingWhatsapp] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
+  const [whatsappStatus, setWhatsappStatus] = useState<{ type: 'mobile' | 'clipboard' | 'download'; bookUrl: string } | null>(null)
 
   // ── Task 1: section visibility ──
   const [open, setOpen] = useState<Record<string, boolean>>({
@@ -316,51 +317,52 @@ export default function PreOrderPosterPage() {
   const handleExportToWhatsApp = async () => {
     if (!itemDescription || !preOrderPrice || sendingWhatsapp) return
     setSendingWhatsapp(true)
+    setWhatsappStatus(null)
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-    const shareText = [
-      `${orderType === 'pre-order' ? '🎯 *PRE-ORDER*' : '✨ *NEW ORDER*'} – ${itemDescription}`,
-      '',
-      brand ? `*Brand:* ${brand}` : '',
-      carClass ? `*Class:* ${carClass}` : '',
-      scale ? `*Scale:* ${scale}` : '',
-      sku ? `*SKU:* ${sku}` : '',
-      `*Price:* R${preOrderPrice}`,
-      estimatedDeliveryDate ? `*ETA:* ${estimatedDeliveryDate}` : '*ETA:* TBC',
-      '',
-      `📋 *Book Now:* ${bookUrl}`,
-    ].filter(Boolean).join('\n')
 
     try {
       if (!posterRef.current) throw new Error('No poster')
-      // Capture poster as high-res image
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true,
       })
-      const blob = await new Promise<Blob>((resolve, reject) =>
+      const jpegBlob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed to create image')), 'image/jpeg', 0.92)
       )
       const filename = `R66SLOT-${sku || 'poster'}.jpg`
-      const file = new File([blob], filename, { type: 'image/jpeg' })
+      const file = new File([jpegBlob], filename, { type: 'image/jpeg' })
 
-      // On mobile: use native share sheet — can attach image directly to WhatsApp
+      // 1. Mobile: Web Share API — attaches image directly to WhatsApp
       if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], text: shareText })
+        await navigator.share({ files: [file], text: bookUrl })
+        setWhatsappStatus({ type: 'mobile', bookUrl })
+
+      // 2. Desktop Chrome/Edge/Safari: copy image to clipboard, open WhatsApp Web
+      } else if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+        const pngBlob = await new Promise<Blob>((resolve, reject) =>
+          canvas.toBlob((b) => b ? resolve(b) : reject(new Error('PNG failed')), 'image/png')
+        )
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })])
+        window.open('https://web.whatsapp.com', '_blank')
+        setWhatsappStatus({ type: 'clipboard', bookUrl })
+
+      // 3. Last resort: download the JPEG
       } else {
-        // Desktop fallback: download the JPEG, then open WhatsApp with text
-        const url = URL.createObjectURL(blob)
+        const objUrl = URL.createObjectURL(jpegBlob)
         const a = document.createElement('a')
-        a.href = url
+        a.href = objUrl
         a.download = filename
+        document.body.appendChild(a)
         a.click()
-        URL.revokeObjectURL(url)
-        setTimeout(() => {
-          window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
-        }, 800)
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(objUrl), 30000)
+        setWhatsappStatus({ type: 'download', bookUrl })
       }
-    } catch (err) {
-      console.error('WhatsApp export error:', err)
-      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank')
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('WhatsApp export error:', err)
+        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
+      }
     } finally {
       setSendingWhatsapp(false)
     }
@@ -559,6 +561,39 @@ export default function PreOrderPosterPage() {
             <code className="bg-white border border-blue-200 px-3 py-1 rounded text-blue-800 font-mono text-xs">{bookingLink}</code>
             <a href={bookingLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 underline font-play text-xs">Open →</a>
             <button onClick={handleCopyLink} className="text-blue-600 hover:text-blue-800 font-play text-xs font-medium">{linkCopied ? '✅ Copied!' : '📋 Copy'}</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── WhatsApp Status Banner ── */}
+      {whatsappStatus && (
+        <div className="bg-green-50 border-b border-green-200 py-3 px-4">
+          <div className="max-w-7xl mx-auto flex items-start gap-3 text-sm flex-wrap">
+            <span className="text-xl mt-0.5">📱</span>
+            <div className="flex-1 font-play">
+              {whatsappStatus.type === 'clipboard' && (
+                <>
+                  <p className="font-bold text-green-800">Poster image copied to clipboard! WhatsApp Web is opening…</p>
+                  <p className="text-green-700 mt-1">
+                    In WhatsApp Web, open a chat and <strong>paste with Ctrl+V</strong> to attach the poster image.
+                    Then add this booking link: <strong className="select-all">{whatsappStatus.bookUrl}</strong>
+                  </p>
+                </>
+              )}
+              {whatsappStatus.type === 'download' && (
+                <>
+                  <p className="font-bold text-green-800">Poster downloaded as {`R66SLOT-${sku || 'poster'}.jpg`}</p>
+                  <p className="text-green-700 mt-1">
+                    In WhatsApp Web, open a chat, click the 📎 attach button and select the downloaded file.
+                    Then add this booking link: <strong className="select-all">{whatsappStatus.bookUrl}</strong>
+                  </p>
+                </>
+              )}
+              {whatsappStatus.type === 'mobile' && (
+                <p className="font-bold text-green-800">Poster shared via WhatsApp!</p>
+              )}
+            </div>
+            <button onClick={() => setWhatsappStatus(null)} className="text-green-600 hover:text-green-800 font-bold text-lg leading-none">×</button>
           </div>
         </div>
       )}
