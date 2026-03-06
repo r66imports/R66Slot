@@ -330,12 +330,43 @@ export default function PreOrderPosterPage() {
 
     try {
       if (!posterRef.current) throw new Error('No poster')
+
+      // Pre-fetch product image as a data URL so html2canvas can render it
+      // (cross-origin images from R2 are blocked by CORS even with useCORS:true)
+      let prefetchedDataUrl: string | null = null
+      if (imageUrl && !imageUrl.startsWith('data:')) {
+        try {
+          const resp = await fetch(imageUrl)
+          const blob = await resp.blob()
+          prefetchedDataUrl = await new Promise<string>((res) => {
+            const reader = new FileReader()
+            reader.onloadend = () => res(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+        } catch (e) {
+          console.warn('Could not pre-fetch poster image:', e)
+        }
+      }
+
       // Always capture in mobile view for WhatsApp (portrait fits phone screens)
       flushSync(() => setViewMode('mobile'))
+
+      // Temporarily swap img src to the local data URL so html2canvas sees it
+      const imgEl = posterRef.current.querySelector<HTMLImageElement>('img[alt="Product"]')
+      const origSrc = imgEl?.getAttribute('src') ?? null
+      if (imgEl && prefetchedDataUrl) {
+        imgEl.src = prefetchedDataUrl
+        if (!imgEl.complete) {
+          await new Promise<void>((res) => { imgEl.onload = () => res(); imgEl.onerror = () => res() })
+        }
+      }
+
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true,
       })
-      // Restore the view mode the user had before export
+
+      // Restore img src and view mode
+      if (imgEl && origSrc !== null) imgEl.src = origSrc
       setViewMode(prevViewMode)
       const jpegBlob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed to create image')), 'image/jpeg', 0.92)
