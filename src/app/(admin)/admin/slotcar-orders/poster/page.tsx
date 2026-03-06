@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import html2canvas from 'html2canvas'
+import { flushSync } from 'react-dom'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const BRANDS = ['NSR', 'Revo', 'Pioneer', 'Sideways', 'Slot.it', 'Carrera', 'Scalextric', 'Policar', 'BRM', 'Fly']
@@ -177,6 +178,9 @@ export default function PreOrderPosterPage() {
   const [linkCopied, setLinkCopied] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
   const [whatsappStatus, setWhatsappStatus] = useState<{ type: 'mobile' | 'clipboard' | 'download'; bookUrl: string } | null>(null)
+  const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('mobile')
+  const [mobileImageHeight, setMobileImageHeight] = useState(320)
+  const [desktopImageHeight, setDesktopImageHeight] = useState(280)
 
   // ── Task 1: section visibility ──
   const [open, setOpen] = useState<Record<string, boolean>>({
@@ -254,6 +258,8 @@ export default function PreOrderPosterPage() {
       setAvailableQty(p.availableQty || 10)
       setImageUrl(p.imageUrl || '')
       setShortCode(p.shortCode || '')
+      setMobileImageHeight(p.mobileImageHeight || 320)
+      setDesktopImageHeight(p.desktopImageHeight || 280)
       // extended fields
       setCarClass(p.carClass || '')
       setProductType(p.productType || '')
@@ -323,6 +329,8 @@ export default function PreOrderPosterPage() {
 
     try {
       if (!posterRef.current) throw new Error('No poster')
+      // Always capture in mobile view for WhatsApp (portrait fits phone screens)
+      flushSync(() => setViewMode('mobile'))
       const canvas = await html2canvas(posterRef.current, {
         backgroundColor: '#ffffff', scale: 2, useCORS: true,
       })
@@ -410,6 +418,7 @@ export default function PreOrderPosterPage() {
         orderType, sku, itemDescription, estimatedDeliveryDate,
         brand, description, preOrderPrice, availableQty,
         imageUrl: finalImageUrl,
+        mobileImageHeight, desktopImageHeight,
         // Task 2
         selectedCategories,
         // Task 3
@@ -859,20 +868,35 @@ export default function PreOrderPosterPage() {
             {/* Poster Preview */}
             <Card>
               <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="text-base font-semibold font-play">Poster Preview</h3>
                   <button onClick={handleExportPDF} disabled={!itemDescription} className="px-3 py-1.5 text-xs font-bold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 font-play">
                     📄 Print / PDF
                   </button>
                 </div>
 
-                <div ref={posterRef} className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden" style={{ maxWidth: '400px', margin: '0 auto' }}>
+                {/* Mobile / Desktop toggle */}
+                <div className="flex items-center gap-2 mb-3">
+                  <button
+                    onClick={() => setViewMode('mobile')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors font-play ${viewMode === 'mobile' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >📱 Mobile</button>
+                  <button
+                    onClick={() => setViewMode('desktop')}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors font-play ${viewMode === 'desktop' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >🖥️ Desktop</button>
+                  <span className="text-xs text-gray-400 font-play ml-1">
+                    {viewMode === 'mobile' ? '375px wide' : '500px wide'}
+                  </span>
+                </div>
+
+                <div ref={posterRef} className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden transition-all" style={{ width: viewMode === 'mobile' ? '375px' : '500px', margin: '0 auto' }}>
                   <div className={`py-2 px-4 text-center font-bold text-white font-play ${orderType === 'pre-order' ? 'bg-orange-500' : 'bg-green-500'}`}>
                     {orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'}
                   </div>
-                  <div className="bg-gray-100 flex items-center justify-center" style={{ maxHeight: '280px', overflow: 'hidden' }}>
+                  <div className="bg-gray-100 flex items-center justify-center" style={{ height: `${viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}px`, overflow: 'hidden' }}>
                     {imageUrl ? (
-                      <img src={imageUrl} alt="Product" className="max-w-full max-h-[280px] object-contain" />
+                      <img src={imageUrl} alt="Product" className="max-w-full object-contain" style={{ maxHeight: `${viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}px` }} />
                     ) : (
                       <div className="text-gray-400 text-center p-8">
                         <svg className="mx-auto h-14 w-14 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -925,6 +949,30 @@ export default function PreOrderPosterPage() {
                     <p className="text-xs text-center text-gray-400 font-play">R66SLOT – Premium Slot Cars</p>
                   </div>
                 </div>
+
+                {/* Image height slider — outside posterRef so it's not captured */}
+                <div className="mt-4 px-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-gray-500 font-play">
+                      {viewMode === 'mobile' ? '📱 Mobile' : '🖥️ Desktop'} image height: <strong>{viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}px</strong>
+                    </span>
+                    <span className="text-xs text-gray-400 font-play">150 – 500px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="150"
+                    max="500"
+                    step="10"
+                    value={viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value)
+                      if (viewMode === 'mobile') setMobileImageHeight(val)
+                      else setDesktopImageHeight(val)
+                    }}
+                    className="w-full accent-gray-900"
+                  />
+                </div>
+
               </CardContent>
             </Card>
 
