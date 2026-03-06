@@ -44,6 +44,7 @@ export default function SlotCarOrdersPage() {
   const [orders, setOrders] = useState<PreOrderItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [sharingPosterId, setSharingPosterId] = useState<string | null>(null)
+  const [whatsappDone, setWhatsappDone] = useState<string | null>(null) // poster id that was last shared
 
   useEffect(() => {
     fetchPosters()
@@ -95,9 +96,11 @@ export default function SlotCarOrdersPage() {
   const handleWhatsApp = async (poster: PreOrderPoster) => {
     if (sharingPosterId) return
     setSharingPosterId(poster.id)
+    setWhatsappDone(null)
 
     const code = poster.shortCode || poster.id
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
+    const waText = `🎯 ${poster.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${poster.itemDescription}\nBrand: ${poster.brand}\nPrice: R${poster.preOrderPrice}\nBook Here: ${bookUrl}`
 
     try {
       // Fetch saved poster image via proxy to avoid R2 CORS restrictions
@@ -116,37 +119,15 @@ export default function SlotCarOrdersPage() {
         const filename = `R66SLOT-${poster.sku || 'poster'}.jpg`
         const file = new File([imageBlob], filename, { type: 'image/jpeg' })
 
-        // Mobile only: Web Share API — attaches image directly to WhatsApp
-        // Skip on desktop (Web Share API exists but fails to find WhatsApp)
+        // Mobile: Web Share API — attaches image + text directly to WhatsApp
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
           !!(navigator as any).userAgentData?.mobile
         if (isMobile && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text: bookUrl })
+          await navigator.share({ files: [file], text: waText })
           return
         }
 
-        // Desktop: convert JPEG to PNG and copy to clipboard, then open WhatsApp Web
-        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-          const pngBlob = await new Promise<Blob>((resolve, reject) => {
-            const img = new Image()
-            const objectUrl = URL.createObjectURL(imageBlob!)
-            img.onload = () => {
-              const canvas = document.createElement('canvas')
-              canvas.width = img.naturalWidth
-              canvas.height = img.naturalHeight
-              canvas.getContext('2d')?.drawImage(img, 0, 0)
-              URL.revokeObjectURL(objectUrl)
-              canvas.toBlob((b) => b ? resolve(b) : reject(new Error('PNG conversion failed')), 'image/png')
-            }
-            img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Image load failed')) }
-            img.src = objectUrl
-          })
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })])
-          window.open('https://web.whatsapp.com', '_blank')
-          return
-        }
-
-        // Last resort: download the JPEG
+        // Desktop: download the poster JPEG + open WhatsApp with pre-filled text
         const objUrl = URL.createObjectURL(imageBlob)
         const a = document.createElement('a')
         a.href = objUrl
@@ -155,14 +136,21 @@ export default function SlotCarOrdersPage() {
         a.click()
         document.body.removeChild(a)
         setTimeout(() => URL.revokeObjectURL(objUrl), 30000)
+
+        // Open WhatsApp Web/App with the booking text pre-filled
+        window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
+
+        // Show the instruction banner on this card
+        setWhatsappDone(poster.id)
+        setTimeout(() => setWhatsappDone(null), 12000)
       } else {
-        // No image — just open wa.me with booking link
-        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
+        // No image — just open WhatsApp with booking link
+        window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
       }
     } catch (err: any) {
       if (err?.name !== 'AbortError') {
         console.error('WhatsApp share error:', err)
-        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
+        window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
       }
     } finally {
       setSharingPosterId(null)
@@ -273,6 +261,14 @@ export default function SlotCarOrdersPage() {
                     Delete
                   </Button>
                 </div>
+
+                {/* Desktop instruction banner — shown after WhatsApp button clicked */}
+                {whatsappDone === poster.id && (
+                  <div className="mt-3 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs font-play text-green-800">
+                    <p className="font-bold">✅ Poster downloaded + WhatsApp opening!</p>
+                    <p className="mt-0.5">In WhatsApp, click the 📎 attach button → select the downloaded poster file to send.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
