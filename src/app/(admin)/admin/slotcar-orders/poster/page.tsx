@@ -968,10 +968,18 @@ export default function PreOrderPosterPage() {
                         {selectedCategories.length > 4 && <span className="text-xs text-gray-400 font-play">+{selectedCategories.length - 4}</span>}
                       </div>
                     )}
-                    <div className="flex justify-between items-center pt-2 border-t">
+                    <div className="flex justify-between items-center pt-2 border-t gap-2">
                       <div>
                         <p className="text-xs text-gray-500 font-play">Est. Delivery</p>
-                        <p className="font-semibold font-play text-sm">{estimatedDeliveryDate || '---'}</p>
+                        <p className="font-semibold font-play text-sm">
+                          {estimatedDeliveryDate
+                            ? new Date(estimatedDeliveryDate + 'T00:00:00').toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
+                            : '---'}
+                        </p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-gray-500 font-play">Qty Available</p>
+                        <p className="font-semibold font-play text-sm">{availableQty}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-gray-500 font-play">Price</p>
