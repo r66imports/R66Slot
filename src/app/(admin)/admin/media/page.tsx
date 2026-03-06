@@ -38,6 +38,8 @@ export default function MediaLibraryPage() {
   const [moveTarget, setMoveTarget] = useState<string | null>(null)
   const [isDirty, setIsDirty] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [draggedFileId, setDraggedFileId] = useState<string | null>(null)
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Load media library on mount
@@ -148,6 +150,7 @@ export default function MediaLibraryPage() {
   }
 
   const handleBulkMove = async (folder: string) => {
+    const movedFiles = library.files.filter((f) => selectedFiles.has(f.id))
     const updated = {
       ...library,
       files: library.files.map((f) => selectedFiles.has(f.id) ? { ...f, folder } : f),
@@ -155,7 +158,27 @@ export default function MediaLibraryPage() {
     setLibrary(updated)
     setSelectedFiles(new Set())
     setMoveTarget(null)
-    await saveLibrary(updated)
+    await Promise.all(movedFiles.map((f) =>
+      fetch('/api/admin/media', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: f.url, folder }),
+      }).catch(() => {})
+    ))
+  }
+
+  const moveFile = async (fileId: string, targetFolder: string) => {
+    const file = library.files.find((f) => f.id === fileId)
+    if (!file || file.folder === targetFolder) return
+    setLibrary((prev) => ({
+      ...prev,
+      files: prev.files.map((f) => f.id === fileId ? { ...f, folder: targetFolder } : f),
+    }))
+    await fetch('/api/admin/media', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: file.url, folder: targetFolder }),
+    }).catch((err) => console.error('Move failed:', err))
   }
 
   const handleCopyUrl = (url: string) => {
@@ -168,27 +191,44 @@ export default function MediaLibraryPage() {
     })
   }
 
+  const saveFolderList = (folders: string[]) => {
+    fetch('/api/admin/media', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ folders }),
+    }).catch((err) => console.error('Save folders failed:', err))
+  }
+
   const handleCreateFolder = () => {
     const name = newFolderName.trim()
     if (!name || library.folders.includes(name)) return
-    const updated = { ...library, folders: [...library.folders, name] }
-    setLibrary(updated)
+    const customFolders = [...library.folders.filter((f) => f !== 'All Files'), name].sort()
+    const allFolders = ['All Files', ...customFolders]
+    setLibrary((prev) => ({ ...prev, folders: allFolders }))
     setNewFolderName('')
     setShowNewFolder(false)
-    saveLibrary(updated)
+    saveFolderList(allFolders)
   }
 
   const handleDeleteFolder = (folder: string) => {
     if (folder === 'All Files') return
     if (!confirm(`Delete folder "${folder}"? Files will be moved to "All Files".`)) return
-    const updated = {
-      ...library,
-      folders: library.folders.filter((f) => f !== folder),
-      files: library.files.map((f) => f.folder === folder ? { ...f, folder: 'All Files' } : f),
-    }
-    setLibrary(updated)
+    const newFolders = library.folders.filter((f) => f !== folder)
+    const affectedFiles = library.files.filter((f) => f.folder === folder)
+    setLibrary((prev) => ({
+      ...prev,
+      folders: newFolders,
+      files: prev.files.map((f) => f.folder === folder ? { ...f, folder: 'All Files' } : f),
+    }))
     if (activeFolder === folder) setActiveFolder('All Files')
-    saveLibrary(updated)
+    saveFolderList(newFolders)
+    affectedFiles.forEach((f) =>
+      fetch('/api/admin/media', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: f.url, folder: 'All Files' }),
+      }).catch(() => {})
+    )
   }
 
   const toggleFileSelect = (id: string) => {
@@ -305,15 +345,26 @@ export default function MediaLibraryPage() {
                 const count = folder === 'All Files'
                   ? library.files.length
                   : library.files.filter((f) => f.folder === folder).length
+                const isDropTarget = dragOverFolder === folder && folder !== 'All Files' && draggedFileId !== null
                 return (
                   <div
                     key={folder}
                     className={`flex items-center justify-between group rounded-md px-2 py-1.5 cursor-pointer text-sm transition-colors ${
                       activeFolder === folder
                         ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'text-gray-600 hover:bg-gray-50'
+                        : isDropTarget
+                          ? 'bg-green-100 text-green-800 ring-2 ring-green-400'
+                          : 'text-gray-600 hover:bg-gray-50'
                     }`}
                     onClick={() => setActiveFolder(folder)}
+                    onDragOver={(e) => { e.preventDefault(); setDragOverFolder(folder) }}
+                    onDragLeave={() => setDragOverFolder(null)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      if (draggedFileId && folder !== 'All Files') moveFile(draggedFileId, folder)
+                      setDragOverFolder(null)
+                      setDraggedFileId(null)
+                    }}
                   >
                     <span className="flex items-center gap-2 truncate">
                       <span>{folder === 'All Files' ? '📁' : '📂'}</span>
@@ -450,10 +501,15 @@ export default function MediaLibraryPage() {
               {filteredFiles.map((file) => (
                 <Card
                   key={file.id}
-                  className={`overflow-hidden group cursor-pointer transition-all ${
+                  draggable
+                  onDragStart={(e) => { e.stopPropagation(); setDraggedFileId(file.id) }}
+                  onDragEnd={() => setDraggedFileId(null)}
+                  className={`overflow-hidden group cursor-grab active:cursor-grabbing transition-all ${
                     selectedFiles.has(file.id)
                       ? 'ring-2 ring-blue-500 shadow-md'
-                      : 'hover:shadow-lg'
+                      : draggedFileId === file.id
+                        ? 'opacity-50 ring-2 ring-dashed ring-gray-400'
+                        : 'hover:shadow-lg'
                   }`}
                   onClick={() => toggleFileSelect(file.id)}
                 >
@@ -518,9 +574,12 @@ export default function MediaLibraryPage() {
               {filteredFiles.map((file) => (
                 <div
                   key={file.id}
+                  draggable
+                  onDragStart={(e) => { e.stopPropagation(); setDraggedFileId(file.id) }}
+                  onDragEnd={() => setDraggedFileId(null)}
                   onClick={() => toggleFileSelect(file.id)}
-                  className={`grid grid-cols-[auto,1fr,100px,100px,120px,80px] gap-3 px-4 py-2.5 items-center border-b border-gray-100 cursor-pointer transition-colors ${
-                    selectedFiles.has(file.id) ? 'bg-blue-50' : 'hover:bg-gray-50'
+                  className={`grid grid-cols-[auto,1fr,100px,100px,120px,80px] gap-3 px-4 py-2.5 items-center border-b border-gray-100 cursor-grab active:cursor-grabbing transition-colors ${
+                    selectedFiles.has(file.id) ? 'bg-blue-50' : draggedFileId === file.id ? 'opacity-50' : 'hover:bg-gray-50'
                   }`}
                 >
                   <div className="w-5 h-5">

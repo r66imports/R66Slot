@@ -84,6 +84,11 @@ export function MediaLibraryPicker({ open, onClose, onSelect }: MediaLibraryPick
 
   if (!open) return null
 
+  // Folders sorted alphabetically, "All Files" always first
+  const sortedFolders = library
+    ? ['All Files', ...(library.folders.filter((f) => f !== 'All Files').sort())]
+    : ['All Files']
+
   const imageFiles = (library?.files || []).filter((f) => {
     const isImage = f.type?.startsWith('image/') || f.url?.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)
     if (!isImage) return false
@@ -118,13 +123,13 @@ export function MediaLibraryPicker({ open, onClose, onSelect }: MediaLibraryPick
             placeholder="Search images..."
             className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-play focus:ring-2 focus:ring-blue-400 focus:border-transparent"
           />
-          {library && library.folders.length > 1 && (
+          {sortedFolders.length > 1 && (
             <select
               value={selectedFolder}
               onChange={(e) => setSelectedFolder(e.target.value)}
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
             >
-              {library.folders.map((f) => (
+              {sortedFolders.map((f) => (
                 <option key={f} value={f}>{f}</option>
               ))}
             </select>
