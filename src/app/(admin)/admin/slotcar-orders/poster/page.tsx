@@ -180,7 +180,7 @@ export default function PreOrderPosterPage() {
   const [exportingPDF, setExportingPDF] = useState(false)
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
   const [whatsappStatus, setWhatsappStatus] = useState<{ type: 'mobile' | 'clipboard' | 'download'; bookUrl: string } | null>(null)
-  const [facebookStatus, setFacebookStatus] = useState<{ captionCopied: boolean } | null>(null)
+  const [facebookStatus, setFacebookStatus] = useState<{ captionCopied: boolean; posted?: boolean; error?: string } | null>(null)
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('mobile')
   const [mobileImageHeight, setMobileImageHeight] = useState(320)
   const [desktopImageHeight, setDesktopImageHeight] = useState(280)
@@ -442,18 +442,41 @@ export default function PreOrderPosterPage() {
   }
 
   const handleExportToFacebook = async () => {
-    if (!posterRef.current || !itemDescription || !preOrderPrice) return
+    if (!itemDescription || !preOrderPrice) return
     setFacebookStatus(null)
-    try {
-      const code = shortCode || editId || ''
-      const bookingLink = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-      const caption = `🎯 ${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}\nBrand: ${brand}\nPrice: R${preOrderPrice}\nEst. Delivery: ${estimatedDeliveryDate}\nBook Here: ${bookingLink}`
 
+    const code = shortCode || editId || ''
+    const bookingLink = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
+    const caption = `🎯 ${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}\nBrand: ${brand}\nPrice: R${preOrderPrice}\nEst. Delivery: ${estimatedDeliveryDate}\nBook Here: ${bookingLink}`
+
+    // 1. Try posting directly to R66Slot Facebook Page via Graph API
+    if (shortCode) {
+      try {
+        const res = await fetch('/api/admin/facebook-post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shortCode, caption }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          setFacebookStatus({ captionCopied: false, posted: true })
+          return
+        }
+        if (res.status !== 503) {
+          // Real API error — show it and fall through to download fallback
+          setFacebookStatus({ captionCopied: false, posted: false, error: data.error })
+        }
+        // 503 = token not configured → fall through silently
+      } catch { /* network error — fall through */ }
+    }
+
+    // 2. Fallback: html2canvas download + copy caption + open Facebook share dialog
+    if (!posterRef.current) return
+    try {
       const canvas = await html2canvas(posterRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true })
       canvas.toBlob(async (blob) => {
         if (!blob) return
 
-        // Download the poster JPEG
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
@@ -463,19 +486,19 @@ export default function PreOrderPosterPage() {
         document.body.removeChild(a)
         setTimeout(() => URL.revokeObjectURL(url), 30000)
 
-        // Copy the ad caption to clipboard so it's ready to paste on Facebook
         let captionCopied = false
         try {
           await navigator.clipboard.writeText(caption)
           captionCopied = true
-        } catch (e) {
-          console.warn('Could not copy caption to clipboard:', e)
-        }
+        } catch { /* ignore */ }
 
-        // Open Facebook to create a new post/ad
-        window.open('https://www.facebook.com/', '_blank')
+        // Open Facebook share dialog — booking page OG tags show the poster image
+        const shareTarget = shortCode
+          ? `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${BOOK_NOW_URL}/${shortCode}`)}`
+          : 'https://www.facebook.com/profile.php?id=61582238030752'
+        window.open(shareTarget, '_blank', 'width=620,height=450')
 
-        setFacebookStatus({ captionCopied })
+        setFacebookStatus((prev) => prev?.posted !== undefined ? prev : { captionCopied })
       }, 'image/jpeg', 0.95)
     } catch (err) {
       console.error('Facebook export error:', err)
@@ -696,21 +719,29 @@ export default function PreOrderPosterPage() {
 
       {/* ── Facebook Status Banner ── */}
       {facebookStatus && (
-        <div className="bg-blue-50 border-b border-blue-200 py-3 px-4">
+        <div className={`border-b py-3 px-4 ${facebookStatus.posted ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
           <div className="max-w-7xl mx-auto flex items-start gap-3 text-sm flex-wrap">
-            <span className="text-xl mt-0.5">📘</span>
+            <span className="text-xl mt-0.5">{facebookStatus.posted ? '✅' : '📘'}</span>
             <div className="flex-1 font-play">
-              <p className="font-bold text-blue-800">
-                Poster downloaded{facebookStatus.captionCopied ? ' + ad caption copied to clipboard!' : '!'}
-              </p>
-              <p className="text-blue-700 mt-1">
-                On Facebook, create a new post or ad → attach the downloaded poster image
-                {facebookStatus.captionCopied
-                  ? <> → <strong>paste the caption with Ctrl+V</strong>.</>
-                  : <> → type your caption and add the booking link.</>}
-              </p>
+              {facebookStatus.posted ? (
+                <p className="font-bold text-green-800">Posted to R66Slot Facebook Page!</p>
+              ) : (
+                <>
+                  <p className={`font-bold ${facebookStatus.error ? 'text-red-800' : 'text-blue-800'}`}>
+                    {facebookStatus.error
+                      ? `⚠️ ${facebookStatus.error} — poster downloaded, upload manually.`
+                      : `Poster downloaded${facebookStatus.captionCopied ? ' + ad caption copied to clipboard!' : '!'}`}
+                  </p>
+                  <p className="text-blue-700 mt-1">
+                    On Facebook, create a new post → attach the poster
+                    {facebookStatus.captionCopied
+                      ? <> → <strong>paste the caption with Ctrl+V</strong>.</>
+                      : <> → add the booking link in the caption.</>}
+                  </p>
+                </>
+              )}
             </div>
-            <button onClick={() => setFacebookStatus(null)} className="text-blue-600 hover:text-blue-800 font-bold text-lg leading-none">×</button>
+            <button onClick={() => setFacebookStatus(null)} className="text-gray-500 hover:text-gray-800 font-bold text-lg leading-none">×</button>
           </div>
         </div>
       )}
@@ -1079,6 +1110,12 @@ export default function PreOrderPosterPage() {
                         <p className="text-2xl font-bold text-red-500 font-play">R{preOrderPrice || '0.00'}</p>
                       </div>
                     </div>
+                    {shortCode && (
+                      <div className="pt-2 border-t text-center">
+                        <p className="text-sm font-bold text-blue-600 font-play">📋 Book Here</p>
+                        <p className="text-xs text-blue-500 font-play">r66slot.co.za/book/{shortCode}</p>
+                      </div>
+                    )}
                     <p className="text-xs text-center text-gray-400 font-play">R66SLOT – Premium Slot Cars</p>
                   </div>
                 </div>

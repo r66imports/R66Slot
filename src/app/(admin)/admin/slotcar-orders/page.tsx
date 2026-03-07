@@ -46,7 +46,7 @@ export default function SlotCarOrdersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [sharingPosterId, setSharingPosterId] = useState<string | null>(null)
   const [whatsappDone, setWhatsappDone] = useState<string | null>(null)
-  const [facebookDoneId, setFacebookDoneId] = useState<string | null>(null)
+  const [facebookResult, setFacebookResult] = useState<{ posterId: string; posted: boolean; error?: string } | null>(null)
 
   useEffect(() => {
     fetchPosters()
@@ -179,15 +179,36 @@ export default function SlotCarOrdersPage() {
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
     const caption = `🎯 ${poster.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${poster.itemDescription}\nBrand: ${poster.brand}\nPrice: R${poster.preOrderPrice}\nEst. Delivery: ${poster.estimatedDeliveryDate}\nBook Here: ${bookUrl}`
 
-    // Fetch the server-generated poster image
+    // 1. Try posting directly to R66Slot Facebook Page via Graph API
+    if (poster.shortCode) {
+      try {
+        const res = await fetch('/api/admin/facebook-post', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ shortCode: poster.shortCode, caption }),
+        })
+        const data = await res.json()
+        if (data.success) {
+          setFacebookResult({ posterId: poster.id, posted: true })
+          setTimeout(() => setFacebookResult(null), 15000)
+          return
+        }
+        if (res.status !== 503) {
+          // API returned a real error — show it and fall through to download
+          setFacebookResult({ posterId: poster.id, posted: false, error: data.error })
+          setTimeout(() => setFacebookResult(null), 15000)
+        }
+        // 503 = token not configured → fall through silently to download
+      } catch { /* network error — fall through */ }
+    }
+
+    // 2. Fallback: download poster JPEG + copy caption + open Facebook share dialog
     let imageBlob: Blob | null = null
     if (poster.shortCode) {
       try {
         const resp = await fetch(`/api/poster-image/${poster.shortCode}`)
         if (resp.ok) imageBlob = await resp.blob()
-      } catch (e) {
-        console.warn('Could not generate poster image:', e)
-      }
+      } catch { /* ignore */ }
     }
     if (!imageBlob) {
       const imageSource = poster.posterImageUrl || poster.imageUrl
@@ -195,13 +216,10 @@ export default function SlotCarOrdersPage() {
         try {
           const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(imageSource)}`)
           if (resp.ok) imageBlob = await resp.blob()
-        } catch (e) {
-          console.warn('Proxy failed:', e)
-        }
+        } catch { /* ignore */ }
       }
     }
 
-    // Download the poster image
     if (imageBlob) {
       const ext = imageBlob.type === 'image/png' ? 'png' : 'jpg'
       const filename = `R66SLOT-${poster.sku || 'poster'}.${ext}`
@@ -215,18 +233,18 @@ export default function SlotCarOrdersPage() {
       setTimeout(() => URL.revokeObjectURL(objUrl), 30000)
     }
 
-    // Copy ad caption to clipboard
-    try {
-      await navigator.clipboard.writeText(caption)
-    } catch (e) {
-      console.warn('Could not copy caption:', e)
-    }
+    try { await navigator.clipboard.writeText(caption) } catch { /* ignore */ }
 
-    // Open Facebook
-    window.open('https://www.facebook.com/', '_blank')
+    // Open Facebook share dialog — booking page OG tags show the poster image
+    const shareTarget = poster.shortCode
+      ? `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`${BOOK_NOW_URL}/${poster.shortCode}`)}`
+      : 'https://www.facebook.com/profile.php?id=61582238030752'
+    window.open(shareTarget, '_blank', 'width=620,height=450')
 
-    setFacebookDoneId(poster.id)
-    setTimeout(() => setFacebookDoneId(null), 15000)
+    setFacebookResult((prev) =>
+      prev?.posterId === poster.id ? prev : { posterId: poster.id, posted: false }
+    )
+    setTimeout(() => setFacebookResult(null), 15000)
   }
 
   if (isLoading) {
@@ -350,11 +368,19 @@ export default function SlotCarOrdersPage() {
                   </div>
                 )}
 
-                {/* Facebook instruction banner */}
-                {facebookDoneId === poster.id && (
-                  <div className="mt-3 rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-play text-blue-800">
-                    <p className="font-bold">✅ Poster downloaded + ad caption copied!</p>
-                    <p className="mt-0.5">On Facebook, create a new post/ad → attach the poster → paste caption with Ctrl+V.</p>
+                {/* Facebook result banner */}
+                {facebookResult?.posterId === poster.id && (
+                  <div className={`mt-3 rounded-md px-3 py-2 text-xs font-play border ${facebookResult.posted ? 'bg-green-50 border-green-200 text-green-800' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+                    {facebookResult.posted ? (
+                      <p className="font-bold">✅ Posted to R66Slot Facebook Page!</p>
+                    ) : (
+                      <>
+                        <p className="font-bold">
+                          {facebookResult.error ? `⚠️ ${facebookResult.error} — poster downloaded, upload manually.` : '✅ Poster downloaded + ad caption copied!'}
+                        </p>
+                        <p className="mt-0.5">On Facebook, create a new post → attach the poster → paste caption with Ctrl+V.</p>
+                      </>
+                    )}
                   </div>
                 )}
               </CardContent>
