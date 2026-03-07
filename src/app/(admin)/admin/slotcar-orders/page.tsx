@@ -105,25 +105,35 @@ export default function SlotCarOrdersPage() {
     const waText = `🎯 ${poster.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${poster.itemDescription}\nBrand: ${poster.brand}\nPrice: R${poster.preOrderPrice}\nEst. Delivery: ${poster.estimatedDeliveryDate}\nBook Here: ${bookUrl}`
 
     try {
-      // Use the branded poster JPEG if it was saved on a previous WhatsApp export,
-      // otherwise fall back to the raw product photo
-      const imageSource = poster.posterImageUrl || poster.imageUrl
-
-      // Fetch saved poster image via proxy to avoid R2 CORS restrictions
+      // Fetch the server-generated poster image (branded, no BOOK NOW, works for any shortCode)
       let imageBlob: Blob | null = null
-      if (imageSource) {
+
+      if (poster.shortCode) {
         try {
-          const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(imageSource)}`
-          const resp = await fetch(proxyUrl)
-          imageBlob = await resp.blob()
+          const resp = await fetch(`/api/poster-image/${poster.shortCode}`)
+          if (resp.ok) imageBlob = await resp.blob()
         } catch (e) {
-          console.warn('Could not fetch poster image:', e)
+          console.warn('Could not generate poster image:', e)
+        }
+      }
+
+      // Fallback: try proxy with saved poster/product image
+      if (!imageBlob) {
+        const imageSource = poster.posterImageUrl || poster.imageUrl
+        if (imageSource) {
+          try {
+            const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(imageSource)}`)
+            if (resp.ok) imageBlob = await resp.blob()
+          } catch (e) {
+            console.warn('Could not fetch poster image via proxy:', e)
+          }
         }
       }
 
       if (imageBlob) {
-        const filename = `R66SLOT-${poster.sku || 'poster'}.jpg`
-        const file = new File([imageBlob], filename, { type: 'image/jpeg' })
+        const ext = imageBlob.type === 'image/png' ? 'png' : 'jpg'
+        const filename = `R66SLOT-${poster.sku || 'poster'}.${ext}`
+        const file = new File([imageBlob], filename, { type: imageBlob.type || 'image/png' })
 
         // Mobile only: Web Share API — attaches image + booking link directly to WhatsApp
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
