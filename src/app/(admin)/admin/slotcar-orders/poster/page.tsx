@@ -330,6 +330,7 @@ export default function PreOrderPosterPage() {
     setWhatsappStatus(null)
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
+    const waText = `🎯 ${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}\nBrand: ${brand}\nPrice: R${preOrderPrice}\nEst. Delivery: ${estimatedDeliveryDate}\nBook Here: ${bookUrl}`
     const prevViewMode = viewMode
 
     try {
@@ -403,18 +404,18 @@ export default function PreOrderPosterPage() {
         })()
       }
 
-      // 1. Mobile: Web Share API — attaches image directly to WhatsApp
+      // 1. Mobile: Web Share API — attaches image + full message text directly to WhatsApp
       if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], text: bookUrl })
+        await navigator.share({ files: [file], text: waText })
         setWhatsappStatus({ type: 'mobile', bookUrl })
 
-      // 2. Desktop Chrome/Edge/Safari: copy image to clipboard, open WhatsApp Web
+      // 2. Desktop Chrome/Edge/Safari: copy image to clipboard, open WhatsApp with pre-filled text
       } else if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
         const pngBlob = await new Promise<Blob>((resolve, reject) =>
           canvas.toBlob((b) => b ? resolve(b) : reject(new Error('PNG failed')), 'image/png')
         )
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })])
-        window.open('https://web.whatsapp.com', '_blank')
+        window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
         setWhatsappStatus({ type: 'clipboard', bookUrl })
 
       // 3. Last resort: download the JPEG
@@ -432,7 +433,7 @@ export default function PreOrderPosterPage() {
     } catch (err: any) {
       if (err?.name !== 'AbortError') {
         console.error('WhatsApp export error:', err)
-        window.open(`https://wa.me/?text=${encodeURIComponent(bookUrl)}`, '_blank')
+        window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
       }
     } finally {
       setSendingWhatsapp(false)

@@ -129,7 +129,7 @@ export default function SlotCarOrdersPage() {
         const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
           !!(navigator as any).userAgentData?.mobile
         if (isMobile && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], text: bookUrl })
+          await navigator.share({ files: [file], text: waText })
           return
         }
 
