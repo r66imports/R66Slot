@@ -125,13 +125,15 @@ export default function SlotCarOrdersPage() {
         const filename = `R66SLOT-${poster.sku || 'poster'}.jpg`
         const file = new File([imageBlob], filename, { type: 'image/jpeg' })
 
-        // Mobile & desktop: Web Share API with files — sends image + booking link to WhatsApp
-        if (typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+        // Mobile only: Web Share API — attaches image + booking link directly to WhatsApp
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+          !!(navigator as any).userAgentData?.mobile
+        if (isMobile && typeof navigator.share === 'function' && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], text: bookUrl })
           return
         }
 
-        // Desktop fallback: download the poster JPEG + open WhatsApp with pre-filled text
+        // Desktop: download the poster JPEG + open WhatsApp with pre-filled text
         const objUrl = URL.createObjectURL(imageBlob)
         const a = document.createElement('a')
         a.href = objUrl
