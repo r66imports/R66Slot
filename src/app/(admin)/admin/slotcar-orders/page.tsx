@@ -45,7 +45,8 @@ export default function SlotCarOrdersPage() {
   const [orders, setOrders] = useState<PreOrderItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [sharingPosterId, setSharingPosterId] = useState<string | null>(null)
-  const [whatsappDone, setWhatsappDone] = useState<string | null>(null) // poster id that was last shared
+  const [whatsappDone, setWhatsappDone] = useState<string | null>(null)
+  const [facebookDoneId, setFacebookDoneId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPosters()
@@ -173,6 +174,61 @@ export default function SlotCarOrdersPage() {
     }
   }
 
+  const handleFacebook = async (poster: PreOrderPoster) => {
+    const code = poster.shortCode || poster.id
+    const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
+    const caption = `🎯 ${poster.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${poster.itemDescription}\nBrand: ${poster.brand}\nPrice: R${poster.preOrderPrice}\nEst. Delivery: ${poster.estimatedDeliveryDate}\nBook Here: ${bookUrl}`
+
+    // Fetch the server-generated poster image
+    let imageBlob: Blob | null = null
+    if (poster.shortCode) {
+      try {
+        const resp = await fetch(`/api/poster-image/${poster.shortCode}`)
+        if (resp.ok) imageBlob = await resp.blob()
+      } catch (e) {
+        console.warn('Could not generate poster image:', e)
+      }
+    }
+    if (!imageBlob) {
+      const imageSource = poster.posterImageUrl || poster.imageUrl
+      if (imageSource) {
+        try {
+          const resp = await fetch(`/api/image-proxy?url=${encodeURIComponent(imageSource)}`)
+          if (resp.ok) imageBlob = await resp.blob()
+        } catch (e) {
+          console.warn('Proxy failed:', e)
+        }
+      }
+    }
+
+    // Download the poster image
+    if (imageBlob) {
+      const ext = imageBlob.type === 'image/png' ? 'png' : 'jpg'
+      const filename = `R66SLOT-${poster.sku || 'poster'}.${ext}`
+      const objUrl = URL.createObjectURL(imageBlob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(objUrl), 30000)
+    }
+
+    // Copy ad caption to clipboard
+    try {
+      await navigator.clipboard.writeText(caption)
+    } catch (e) {
+      console.warn('Could not copy caption:', e)
+    }
+
+    // Open Facebook
+    window.open('https://www.facebook.com/', '_blank')
+
+    setFacebookDoneId(poster.id)
+    setTimeout(() => setFacebookDoneId(null), 15000)
+  }
+
   if (isLoading) {
     return (
       <div className="font-play flex items-center justify-center min-h-[400px]">
@@ -271,18 +327,34 @@ export default function SlotCarOrdersPage() {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => handleFacebook(poster)}
+                    className="text-blue-600 hover:text-blue-700 border-blue-200 font-play"
+                  >
+                    Facebook
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleDelete(poster.id)}
-                    className="text-red-600 hover:text-red-700 font-play"
+                    className="col-span-2 text-red-600 hover:text-red-700 font-play"
                   >
                     Delete
                   </Button>
                 </div>
 
-                {/* Desktop instruction banner — shown after WhatsApp button clicked */}
+                {/* WhatsApp instruction banner */}
                 {whatsappDone === poster.id && (
                   <div className="mt-3 rounded-md bg-green-50 border border-green-200 px-3 py-2 text-xs font-play text-green-800">
                     <p className="font-bold">✅ Poster downloaded + WhatsApp opening!</p>
                     <p className="mt-0.5">In WhatsApp, click the 📎 attach button → select the downloaded poster file to send.</p>
+                  </div>
+                )}
+
+                {/* Facebook instruction banner */}
+                {facebookDoneId === poster.id && (
+                  <div className="mt-3 rounded-md bg-blue-50 border border-blue-200 px-3 py-2 text-xs font-play text-blue-800">
+                    <p className="font-bold">✅ Poster downloaded + ad caption copied!</p>
+                    <p className="mt-0.5">On Facebook, create a new post/ad → attach the poster → paste caption with Ctrl+V.</p>
                   </div>
                 )}
               </CardContent>

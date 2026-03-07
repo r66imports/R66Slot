@@ -180,6 +180,7 @@ export default function PreOrderPosterPage() {
   const [exportingPDF, setExportingPDF] = useState(false)
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
   const [whatsappStatus, setWhatsappStatus] = useState<{ type: 'mobile' | 'clipboard' | 'download'; bookUrl: string } | null>(null)
+  const [facebookStatus, setFacebookStatus] = useState<{ captionCopied: boolean } | null>(null)
   const [viewMode, setViewMode] = useState<'mobile' | 'desktop'>('mobile')
   const [mobileImageHeight, setMobileImageHeight] = useState(320)
   const [desktopImageHeight, setDesktopImageHeight] = useState(280)
@@ -441,22 +442,44 @@ export default function PreOrderPosterPage() {
   }
 
   const handleExportToFacebook = async () => {
-    if (!posterRef.current) return
+    if (!posterRef.current || !itemDescription || !preOrderPrice) return
+    setFacebookStatus(null)
     try {
-      const canvas = await html2canvas(posterRef.current, { backgroundColor: '#ffffff', scale: 2 })
-      canvas.toBlob((blob) => {
+      const code = shortCode || editId || ''
+      const bookingLink = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
+      const caption = `🎯 ${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}\nBrand: ${brand}\nPrice: R${preOrderPrice}\nEst. Delivery: ${estimatedDeliveryDate}\nBook Here: ${bookingLink}`
+
+      const canvas = await html2canvas(posterRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true })
+      canvas.toBlob(async (blob) => {
         if (!blob) return
+
+        // Download the poster JPEG
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `preorder-${sku || 'poster'}.jpg`
+        a.download = `R66SLOT-${sku || 'poster'}.jpg`
+        document.body.appendChild(a)
         a.click()
-        URL.revokeObjectURL(url)
-        const code = shortCode || editId || ''
-        const bookingLink = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(bookingLink)}&quote=${encodeURIComponent(`🎯 ${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}\nBrand: ${brand}\nPrice: R${preOrderPrice}\nBook Here: ${bookingLink}`)}`, '_blank')
+        document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(url), 30000)
+
+        // Copy the ad caption to clipboard so it's ready to paste on Facebook
+        let captionCopied = false
+        try {
+          await navigator.clipboard.writeText(caption)
+          captionCopied = true
+        } catch (e) {
+          console.warn('Could not copy caption to clipboard:', e)
+        }
+
+        // Open Facebook to create a new post/ad
+        window.open('https://www.facebook.com/', '_blank')
+
+        setFacebookStatus({ captionCopied })
       }, 'image/jpeg', 0.95)
-    } catch (err) { console.error('Facebook export error:', err) }
+    } catch (err) {
+      console.error('Facebook export error:', err)
+    }
   }
 
   const handleSave = async () => {
@@ -667,6 +690,27 @@ export default function PreOrderPosterPage() {
               )}
             </div>
             <button onClick={() => setWhatsappStatus(null)} className="text-green-600 hover:text-green-800 font-bold text-lg leading-none">×</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Facebook Status Banner ── */}
+      {facebookStatus && (
+        <div className="bg-blue-50 border-b border-blue-200 py-3 px-4">
+          <div className="max-w-7xl mx-auto flex items-start gap-3 text-sm flex-wrap">
+            <span className="text-xl mt-0.5">📘</span>
+            <div className="flex-1 font-play">
+              <p className="font-bold text-blue-800">
+                Poster downloaded{facebookStatus.captionCopied ? ' + ad caption copied to clipboard!' : '!'}
+              </p>
+              <p className="text-blue-700 mt-1">
+                On Facebook, create a new post or ad → attach the downloaded poster image
+                {facebookStatus.captionCopied
+                  ? <> → <strong>paste the caption with Ctrl+V</strong>.</>
+                  : <> → type your caption and add the booking link.</>}
+              </p>
+            </div>
+            <button onClick={() => setFacebookStatus(null)} className="text-blue-600 hover:text-blue-800 font-bold text-lg leading-none">×</button>
           </div>
         </div>
       )}
