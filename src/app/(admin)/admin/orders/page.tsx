@@ -222,18 +222,11 @@ function DocumentBody({
 
   return (
     <div className="bg-white text-gray-900 text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
-      {/* Header */}
+      {/* Header: Logo left, Doc title/number/date right */}
       <div className="flex items-start justify-between mb-4">
         <div>
           {template.logoUrl && (
-            <img src={template.logoUrl} alt="Logo" className="h-16 w-auto object-contain mb-2" />
-          )}
-          {activeImages.length > 0 && (
-            <div className="flex gap-1.5 mt-1">
-              {activeImages.map((url, i) => (
-                <img key={i} src={url} alt="" className="h-10 w-10 object-cover rounded border border-gray-100" />
-              ))}
-            </div>
+            <img src={template.logoUrl} alt="Logo" className="h-16 w-auto object-contain" />
           )}
         </div>
         <div className="text-right">
@@ -246,6 +239,17 @@ function DocumentBody({
           </div>
         </div>
       </div>
+
+      {/* Image block — full width, 16:9 containers, above addresses */}
+      {activeImages.length > 0 && (
+        <div className="flex gap-2 mb-4">
+          {activeImages.map((url, i) => (
+            <div key={i} className="flex-1 overflow-hidden rounded border border-gray-100 bg-gray-50" style={{ aspectRatio: '16/9' }}>
+              <img src={url} alt="" className="w-full h-full object-contain" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Company + Client row */}
       <div className="flex gap-8 mb-5 pt-4 border-t border-gray-200">
