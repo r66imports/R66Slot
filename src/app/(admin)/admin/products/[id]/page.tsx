@@ -120,7 +120,6 @@ export default function EditProductPage({
 
   // Dropdown open states for Product Organization
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
-  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
   const [carTypeDropdownOpen, setCarTypeDropdownOpen] = useState(false)
   const [scaleDropdownOpen, setScaleDropdownOpen] = useState(false)
 
@@ -137,7 +136,7 @@ export default function EditProductPage({
 
   // Dropdown refs for click-outside
   const brandRef = useRef<HTMLDivElement>(null)
-  const categoryRef = useRef<HTMLDivElement>(null)
+
   const carTypeRef = useRef<HTMLDivElement>(null)
   const scaleRef = useRef<HTMLDivElement>(null)
   const carBrandRef = useRef<HTMLDivElement>(null)
@@ -277,7 +276,6 @@ export default function EditProductPage({
     }
     if (v) setProductType(v.toLowerCase().replace(/ /g, '-'))
     setNewCategoryInput('')
-    setCategoryDropdownOpen(false)
   }
   const handleAddCarType = (val: string) => {
     const v = val.trim()
@@ -374,21 +372,21 @@ export default function EditProductPage({
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
       seoTitle, seoDescription, seoKeywords])
 
-  // Click-outside — close all custom dropdowns
+  // Click-outside — close all custom dropdowns (registered once; no state deps needed)
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (brandDropdownOpen && brandRef.current && !brandRef.current.contains(e.target as Node)) setBrandDropdownOpen(false)
-      if (categoryDropdownOpen && categoryRef.current && !categoryRef.current.contains(e.target as Node)) setCategoryDropdownOpen(false)
-      if (carTypeDropdownOpen && carTypeRef.current && !carTypeRef.current.contains(e.target as Node)) setCarTypeDropdownOpen(false)
-      if (scaleDropdownOpen && scaleRef.current && !scaleRef.current.contains(e.target as Node)) setScaleDropdownOpen(false)
-      if (carBrandDropdownOpen && carBrandRef.current && !carBrandRef.current.contains(e.target as Node)) setCarBrandDropdownOpen(false)
-      if (pageDropdownOpen && pageRef.current && !pageRef.current.contains(e.target as Node)) setPageDropdownOpen(false)
-      if (itemCategoryDropdownOpen && itemCategoryRef.current && !itemCategoryRef.current.contains(e.target as Node)) setItemCategoryDropdownOpen(false)
+      const t = e.target as Node
+      if (brandRef.current && !brandRef.current.contains(t)) setBrandDropdownOpen(false)
+
+      if (carTypeRef.current && !carTypeRef.current.contains(t)) setCarTypeDropdownOpen(false)
+      if (scaleRef.current && !scaleRef.current.contains(t)) setScaleDropdownOpen(false)
+      if (carBrandRef.current && !carBrandRef.current.contains(t)) setCarBrandDropdownOpen(false)
+      if (pageRef.current && !pageRef.current.contains(t)) setPageDropdownOpen(false)
+      if (itemCategoryRef.current && !itemCategoryRef.current.contains(t)) setItemCategoryDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [brandDropdownOpen, categoryDropdownOpen, carTypeDropdownOpen, scaleDropdownOpen,
-      carBrandDropdownOpen, pageDropdownOpen, itemCategoryDropdownOpen])
+  }, [])
 
   // Upload base64 images to server and return real URLs
   const uploadPendingImages = async (): Promise<string[]> => {
