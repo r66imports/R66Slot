@@ -34,6 +34,11 @@ export interface Backorder {
   phaseInvoiceDate?: string
   phaseDepositPaid: boolean
   phaseDepositPaidDate?: string
+  // Order tracking
+  orderStatus?: 'booked' | 'confirmed' | 'shipping' | 'tracking'
+  quoteNumber?: string
+  salesOrderNumber?: string
+  invoiceNumber?: string
   // Meta
   notes?: string
   status: 'active' | 'complete' | 'cancelled'

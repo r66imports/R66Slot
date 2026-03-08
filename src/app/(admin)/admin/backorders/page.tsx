@@ -45,6 +45,10 @@ interface Backorder {
   phaseInvoiceDate?: string
   phaseDepositPaid: boolean
   phaseDepositPaidDate?: string
+  orderStatus?: 'booked' | 'confirmed' | 'shipping' | 'tracking'
+  quoteNumber?: string
+  salesOrderNumber?: string
+  invoiceNumber?: string
   notes?: string
   status: 'active' | 'complete' | 'cancelled'
   createdAt: string
@@ -704,6 +708,28 @@ function PhaseProgress({ bo }: { bo: Backorder }) {
   )
 }
 
+function PhaseNumberInput({
+  boId, field, value, placeholder, onSave,
+}: {
+  boId: string
+  field: string
+  value?: string
+  placeholder: string
+  onSave: (id: string, field: string, val: string) => void
+}) {
+  const [v, setV] = useState(value || '')
+  useEffect(() => { setV(value || '') }, [value])
+  return (
+    <input
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => { if (v !== (value || '')) onSave(boId, field, v) }}
+      placeholder={placeholder}
+      className="w-[68px] mt-1 border border-gray-200 rounded px-1.5 py-0.5 text-[9px] text-center focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white font-mono"
+    />
+  )
+}
+
 function StatusBadge({ status }: { status: Backorder['status'] }) {
   const map: Record<string, string> = {
     active: 'bg-blue-100 text-blue-700',
@@ -730,6 +756,8 @@ export default function BackordersPage() {
   const [editItem, setEditItem] = useState<Backorder | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+  const [openActionsId, setOpenActionsId] = useState<string | null>(null)
+  const [completedConfirm, setCompletedConfirm] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -746,6 +774,16 @@ export default function BackordersPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // Close actions dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-actions-menu]')) setOpenActionsId(null)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
   // ── Toggle Phase ────────────────────────────────────────────────────────────
   const togglePhase = async (id: string, field: string, current: boolean) => {
@@ -872,6 +910,56 @@ export default function BackordersPage() {
       }
     } finally {
       setDuplicatingId(null)
+    }
+  }
+
+  // ── Mark Completed ──────────────────────────────────────────────────────────
+  const handleMarkCompleted = async (id: string) => {
+    setPatchingId(id)
+    try {
+      const res = await fetch(`/api/admin/backorders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'complete' }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setBackorders((prev) => prev.map((b) => (b.id === id ? updated : b)))
+      }
+    } finally {
+      setPatchingId(null)
+      setCompletedConfirm(null)
+    }
+  }
+
+  // ── Order Status ─────────────────────────────────────────────────────────────
+  const handleOrderStatusChange = async (id: string, orderStatus: string) => {
+    setPatchingId(id)
+    try {
+      const res = await fetch(`/api/admin/backorders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderStatus }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setBackorders((prev) => prev.map((b) => (b.id === id ? updated : b)))
+      }
+    } finally {
+      setPatchingId(null)
+    }
+  }
+
+  // ── Phase Number Save ────────────────────────────────────────────────────────
+  const handlePhaseNumber = async (id: string, field: string, value: string) => {
+    const res = await fetch(`/api/admin/backorders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setBackorders((prev) => prev.map((b) => (b.id === id ? updated : b)))
     }
   }
 
@@ -1014,8 +1102,8 @@ export default function BackordersPage() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Price</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[300px]">Phases</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[320px]">Order #</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Order Status</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
@@ -1026,7 +1114,12 @@ export default function BackordersPage() {
                     <tr key={bo.id} className="hover:bg-gray-50 transition-colors">
                       {/* Client */}
                       <td className="px-4 py-4 max-w-[200px]">
-                        <p className="font-semibold text-gray-900 truncate">{bo.clientName}</p>
+                        <button
+                          onClick={() => { setEditItem(bo); setShowModal(true) }}
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate block text-left w-full transition-colors"
+                        >
+                          {bo.clientName}
+                        </button>
                         {bo.clientEmail && (
                           <p className="text-xs text-gray-400 truncate">{bo.clientEmail}</p>
                         )}
@@ -1074,85 +1167,147 @@ export default function BackordersPage() {
                           : <span className="text-gray-400 text-xs">POA</span>}
                       </td>
 
-                      {/* Phases */}
+                      {/* Order # (Phases + Number Inputs) */}
                       <td className="px-4 py-4">
-                        <div className="flex items-end justify-center gap-2 mb-2">
-                          <PhaseCheckbox
-                            label="Quote"
-                            checked={bo.phaseQuote}
-                            date={bo.phaseQuoteDate}
-                            onChange={() => togglePhase(bo.id, 'phaseQuote', bo.phaseQuote)}
-                            loading={isPatching}
-                          />
-                          <div className="flex-1 flex items-center mb-3.5">
-                            <div className={`flex-1 h-px ${bo.phaseSalesOrder ? 'bg-green-400' : 'bg-gray-200'}`} />
+                        <div className="flex items-start justify-center gap-1 mb-2">
+                          <div className="flex flex-col items-center">
+                            <PhaseCheckbox
+                              label="Quoted"
+                              checked={bo.phaseQuote}
+                              date={bo.phaseQuoteDate}
+                              onChange={() => togglePhase(bo.id, 'phaseQuote', bo.phaseQuote)}
+                              loading={isPatching}
+                            />
+                            {bo.phaseQuote && (
+                              <PhaseNumberInput
+                                boId={bo.id}
+                                field="quoteNumber"
+                                value={bo.quoteNumber}
+                                placeholder="Quote #"
+                                onSave={handlePhaseNumber}
+                              />
+                            )}
                           </div>
-                          <PhaseCheckbox
-                            label="Sales Order"
-                            checked={bo.phaseSalesOrder}
-                            date={bo.phaseSalesOrderDate}
-                            onChange={() => togglePhase(bo.id, 'phaseSalesOrder', bo.phaseSalesOrder)}
-                            loading={isPatching}
-                          />
-                          <div className="flex-1 flex items-center mb-3.5">
-                            <div className={`flex-1 h-px ${bo.phaseInvoice ? 'bg-green-400' : 'bg-gray-200'}`} />
+                          <div className={`flex-1 h-px mt-[13px] ${bo.phaseSalesOrder ? 'bg-green-400' : 'bg-gray-200'}`} />
+                          <div className="flex flex-col items-center">
+                            <PhaseCheckbox
+                              label="Sales Order"
+                              checked={bo.phaseSalesOrder}
+                              date={bo.phaseSalesOrderDate}
+                              onChange={() => togglePhase(bo.id, 'phaseSalesOrder', bo.phaseSalesOrder)}
+                              loading={isPatching}
+                            />
+                            {bo.phaseSalesOrder && (
+                              <PhaseNumberInput
+                                boId={bo.id}
+                                field="salesOrderNumber"
+                                value={bo.salesOrderNumber}
+                                placeholder="SO #"
+                                onSave={handlePhaseNumber}
+                              />
+                            )}
                           </div>
-                          <PhaseCheckbox
-                            label="Invoice"
-                            checked={bo.phaseInvoice}
-                            date={bo.phaseInvoiceDate}
-                            onChange={() => togglePhase(bo.id, 'phaseInvoice', bo.phaseInvoice)}
-                            loading={isPatching}
-                          />
-                          <div className="flex-1 flex items-center mb-3.5">
-                            <div className={`flex-1 h-px ${bo.phaseDepositPaid ? 'bg-green-400' : 'bg-gray-200'}`} />
+                          <div className={`flex-1 h-px mt-[13px] ${bo.phaseInvoice ? 'bg-green-400' : 'bg-gray-200'}`} />
+                          <div className="flex flex-col items-center">
+                            <PhaseCheckbox
+                              label="Invoice"
+                              checked={bo.phaseInvoice}
+                              date={bo.phaseInvoiceDate}
+                              onChange={() => togglePhase(bo.id, 'phaseInvoice', bo.phaseInvoice)}
+                              loading={isPatching}
+                            />
+                            {bo.phaseInvoice && (
+                              <PhaseNumberInput
+                                boId={bo.id}
+                                field="invoiceNumber"
+                                value={bo.invoiceNumber}
+                                placeholder="Inv #"
+                                onSave={handlePhaseNumber}
+                              />
+                            )}
                           </div>
-                          <PhaseCheckbox
-                            label="Deposit Paid"
-                            checked={bo.phaseDepositPaid}
-                            date={bo.phaseDepositPaidDate}
-                            onChange={() => togglePhase(bo.id, 'phaseDepositPaid', bo.phaseDepositPaid)}
-                            loading={isPatching}
-                          />
+                          <div className={`flex-1 h-px mt-[13px] ${bo.phaseDepositPaid ? 'bg-green-400' : 'bg-gray-200'}`} />
+                          <div className="flex flex-col items-center">
+                            <PhaseCheckbox
+                              label="Deposit Paid"
+                              checked={bo.phaseDepositPaid}
+                              date={bo.phaseDepositPaidDate}
+                              onChange={() => togglePhase(bo.id, 'phaseDepositPaid', bo.phaseDepositPaid)}
+                              loading={isPatching}
+                            />
+                          </div>
                         </div>
                         <PhaseProgress bo={bo} />
                       </td>
 
-                      {/* Status */}
+                      {/* Order Status */}
                       <td className="px-4 py-4 text-center">
-                        <StatusBadge status={bo.status} />
+                        <select
+                          value={bo.orderStatus || ''}
+                          onChange={(e) => handleOrderStatusChange(bo.id, e.target.value)}
+                          disabled={isPatching}
+                          className={`text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-medium cursor-pointer disabled:opacity-50 ${
+                            bo.orderStatus === 'booked' ? 'border-blue-300 bg-blue-50 text-blue-700' :
+                            bo.orderStatus === 'confirmed' ? 'border-green-300 bg-green-50 text-green-700' :
+                            bo.orderStatus === 'shipping' ? 'border-orange-300 bg-orange-50 text-orange-700' :
+                            bo.orderStatus === 'tracking' ? 'border-purple-300 bg-purple-50 text-purple-700' :
+                            'border-gray-200 bg-white text-gray-400'
+                          }`}
+                        >
+                          <option value="">Set status…</option>
+                          <option value="booked">Booked</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="shipping">Shipping</option>
+                          <option value="tracking">Tracking Info</option>
+                        </select>
                       </td>
 
-                      {/* Actions */}
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => { setEditItem(bo); setShowModal(true) }}
-                            title="Edit"
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            onClick={() => handleDuplicate(bo)}
-                            title="Duplicate Order"
-                            disabled={duplicatingId === bo.id}
-                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                          >
-                            {duplicatingId === bo.id ? (
-                              <span className="inline-block w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              '📋'
-                            )}
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(bo.id)}
-                            title="Delete"
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            🗑️
-                          </button>
-                        </div>
+                      {/* Actions Dropdown */}
+                      <td className="px-4 py-4 relative">
+                        <button
+                          data-actions-menu
+                          onClick={() => setOpenActionsId(openActionsId === bo.id ? null : bo.id)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                          Actions
+                          <svg className={`w-3 h-3 transition-transform ${openActionsId === bo.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        {openActionsId === bo.id && (
+                          <div data-actions-menu className="absolute right-2 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-xl w-40 py-1">
+                            <button
+                              data-actions-menu
+                              onClick={() => { setOpenActionsId(null); setEditItem(bo); setShowModal(true) }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              data-actions-menu
+                              onClick={() => { setOpenActionsId(null); handleDuplicate(bo) }}
+                              disabled={duplicatingId === bo.id}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-40"
+                            >
+                              📋 Duplicate
+                            </button>
+                            <div className="border-t border-gray-100 my-1" />
+                            <button
+                              data-actions-menu
+                              onClick={() => { setOpenActionsId(null); setCompletedConfirm(bo.id) }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-green-700 hover:bg-green-50 flex items-center gap-2 font-medium"
+                            >
+                              ✅ Completed
+                            </button>
+                            <button
+                              data-actions-menu
+                              onClick={() => { setOpenActionsId(null); setDeleteConfirm(bo.id) }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                            >
+                              🗑️ Delete
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
@@ -1202,6 +1357,33 @@ export default function BackordersPage() {
               </button>
               <button
                 onClick={() => setDeleteConfirm(null)}
+                className="flex-1 border border-gray-300 text-gray-700 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Completed Confirm */}
+      {completedConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <div className="text-4xl mb-3 text-center">✅</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1 text-center">Are you sure?</h3>
+            <p className="text-sm text-gray-500 mb-6 text-center">
+              This will mark the backorder as <strong>Completed</strong>. You sure about this?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleMarkCompleted(completedConfirm)}
+                className="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold hover:bg-green-700 transition-colors"
+              >
+                Yes, mark complete
+              </button>
+              <button
+                onClick={() => setCompletedConfirm(null)}
                 className="flex-1 border border-gray-300 text-gray-700 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors"
               >
                 Cancel

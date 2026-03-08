@@ -38,6 +38,7 @@ export async function PATCH(
       'phaseSalesOrder', 'phaseSalesOrderDate',
       'phaseInvoice', 'phaseInvoiceDate',
       'phaseDepositPaid', 'phaseDepositPaidDate',
+      'orderStatus', 'quoteNumber', 'salesOrderNumber', 'invoiceNumber',
       'notes', 'status',
     ]
 
