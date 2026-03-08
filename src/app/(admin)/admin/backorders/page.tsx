@@ -4,6 +4,17 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface Supplier {
+  id: string
+  name: string
+  code: string
+  email: string
+  phone: string
+  country: string
+  website: string
+  notes: string
+}
+
 interface Client {
   id: string
   firstName: string
@@ -49,6 +60,9 @@ interface Backorder {
   quoteNumber?: string
   salesOrderNumber?: string
   invoiceNumber?: string
+  itemFound?: 'yes' | 'no'
+  supplierId?: string
+  supplierName?: string
   notes?: string
   status: 'active' | 'complete' | 'cancelled'
   createdAt: string
@@ -75,6 +89,13 @@ const EMPTY_PRODUCT_FIELDS = {
   qty: 1,
   price: 0,
   notes: '',
+  supplierId: '',
+  supplierName: '',
+}
+
+const formatDate = (iso: string) => {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()
 }
 
 type FormData = typeof EMPTY_CLIENT_FIELDS & typeof EMPTY_PRODUCT_FIELDS
@@ -265,6 +286,68 @@ function ClientSearchDropdown({
   )
 }
 
+// ─── Supplier Dropdown ────────────────────────────────────────────────────────
+
+function SupplierDropdown({
+  suppliers,
+  value,
+  onSelect,
+}: {
+  suppliers: Supplier[]
+  value: string
+  onSelect: (s: Supplier | null) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const selected = suppliers.find((s) => s.id === value)
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      >
+        <span className={selected ? 'text-gray-900 font-medium' : 'text-gray-400'}>
+          {selected ? selected.name : 'Select supplier…'}
+        </span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto">
+          <li
+            onMouseDown={() => { onSelect(null); setOpen(false) }}
+            className="px-4 py-2.5 text-sm text-gray-400 cursor-pointer hover:bg-gray-50 italic"
+          >
+            — No supplier —
+          </li>
+          {suppliers.map((s) => (
+            <li
+              key={s.id}
+              onMouseDown={() => { onSelect(s); setOpen(false) }}
+              className="px-4 py-2.5 text-sm cursor-pointer hover:bg-blue-50 flex items-center justify-between"
+            >
+              <span className="font-medium text-gray-900">{s.name}</span>
+              <span className="text-xs text-gray-400">{s.country}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
@@ -284,11 +367,13 @@ function SectionHeader({ icon, title, subtitle }: { icon: string; title: string;
 function BackorderModal({
   initial,
   clients,
+  suppliers,
   onSave,
   onClose,
 }: {
   initial?: Partial<FormData> & { id?: string }
   clients: Client[]
+  suppliers: Supplier[]
   onSave: (data: FormData & { id?: string }) => Promise<void>
   onClose: () => void
 }) {
@@ -552,6 +637,14 @@ function BackorderModal({
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Supplier</label>
+                <SupplierDropdown
+                  suppliers={suppliers}
+                  value={form.supplierId}
+                  onSelect={(s) => setForm((p) => ({ ...p, supplierId: s?.id || '', supplierName: s?.name || '' }))}
+                />
+              </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
                   Description <span className="text-red-500">*</span>
@@ -758,16 +851,21 @@ export default function BackordersPage() {
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [openActionsId, setOpenActionsId] = useState<string | null>(null)
   const [completedConfirm, setCompletedConfirm] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [supplierPopup, setSupplierPopup] = useState<Supplier | null>(null)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, clRes] = await Promise.all([
+      const [boRes, clRes, supRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/clients'),
+        fetch('/api/admin/supplier-contacts'),
       ])
       if (boRes.ok) setBackorders(await boRes.json())
       if (clRes.ok) setClients(await clRes.json())
+      if (supRes.ok) setSuppliers(await supRes.json())
     } finally {
       setLoading(false)
     }
@@ -950,6 +1048,72 @@ export default function BackordersPage() {
     }
   }
 
+  // ── Item Found ──────────────────────────────────────────────────────────────
+  const handleItemFound = async (id: string, itemFound: string) => {
+    const res = await fetch(`/api/admin/backorders/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ itemFound }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setBackorders((prev) => prev.map((b) => (b.id === id ? updated : b)))
+    }
+  }
+
+  // ── Bulk Selection ──────────────────────────────────────────────────────────
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+
+  const toggleSelectAll = (rows: Backorder[]) => {
+    if (selectedIds.length === rows.length && rows.length > 0) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(rows.map((b) => b.id))
+    }
+  }
+
+  const handleBulkOrderStatus = async (orderStatus: string) => {
+    if (!orderStatus || selectedIds.length === 0) return
+    await Promise.all(
+      selectedIds.map((id) =>
+        fetch(`/api/admin/backorders/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderStatus }),
+        })
+      )
+    )
+    await load()
+    setSelectedIds([])
+  }
+
+  const handleBulkItemFound = async (itemFound: string) => {
+    if (!itemFound || selectedIds.length === 0) return
+    await Promise.all(
+      selectedIds.map((id) =>
+        fetch(`/api/admin/backorders/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemFound }),
+        })
+      )
+    )
+    await load()
+    setSelectedIds([])
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return
+    await Promise.all(
+      selectedIds.map((id) =>
+        fetch(`/api/admin/backorders/${id}`, { method: 'DELETE' })
+      )
+    )
+    setBackorders((prev) => prev.filter((b) => !selectedIds.includes(b.id)))
+    setSelectedIds([])
+  }
+
   // ── Phase Number Save ────────────────────────────────────────────────────────
   const handlePhaseNumber = async (id: string, field: string, value: string) => {
     const res = await fetch(`/api/admin/backorders/${id}`, {
@@ -1005,6 +1169,8 @@ export default function BackordersPage() {
         qty: editItem.qty,
         price: editItem.price,
         notes: editItem.notes || '',
+        supplierId: editItem.supplierId || '',
+        supplierName: editItem.supplierName || '',
       }
     : undefined
 
@@ -1072,6 +1238,46 @@ export default function BackordersPage() {
         </div>
       </div>
 
+      {/* Bulk Action Toolbar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-blue-600 text-white rounded-xl px-4 py-3 flex flex-wrap items-center gap-3 shadow-lg">
+          <span className="text-sm font-bold">{selectedIds.length} selected</span>
+          <div className="w-px h-5 bg-blue-400" />
+          <select
+            defaultValue=""
+            onChange={(e) => { handleBulkOrderStatus(e.target.value); e.target.value = '' }}
+            className="text-xs bg-blue-700 border border-blue-500 text-white rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer"
+          >
+            <option value="" disabled>Set Status…</option>
+            <option value="booked">Booked</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="shipping">Shipping</option>
+            <option value="tracking">Tracking Info</option>
+          </select>
+          <select
+            defaultValue=""
+            onChange={(e) => { handleBulkItemFound(e.target.value); e.target.value = '' }}
+            className="text-xs bg-blue-700 border border-blue-500 text-white rounded-lg px-2 py-1.5 focus:outline-none cursor-pointer"
+          >
+            <option value="" disabled>Item Found…</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+          <button
+            onClick={handleBulkDelete}
+            className="text-xs bg-red-500 hover:bg-red-600 text-white rounded-lg px-3 py-1.5 font-semibold transition-colors"
+          >
+            🗑️ Delete Selected
+          </button>
+          <button
+            onClick={() => setSelectedIds([])}
+            className="ml-auto text-xs text-blue-200 hover:text-white transition-colors"
+          >
+            Clear selection ×
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
@@ -1097,13 +1303,23 @@ export default function BackordersPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-3 py-3 w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.length === filtered.length && filtered.length > 0}
+                      onChange={() => toggleSelectAll(filtered)}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
+                  <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Date</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU / Product</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Brand</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Supplier</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Price</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[320px]">Order #</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Order Status</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Found</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                 </tr>
               </thead>
@@ -1111,7 +1327,24 @@ export default function BackordersPage() {
                 {filtered.map((bo) => {
                   const isPatching = patchingId === bo.id
                   return (
-                    <tr key={bo.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={bo.id} className={`hover:bg-gray-50 transition-colors ${selectedIds.includes(bo.id) ? 'bg-blue-50' : ''}`}>
+                      {/* Checkbox */}
+                      <td className="px-3 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(bo.id)}
+                          onChange={() => toggleSelect(bo.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+
+                      {/* Date */}
+                      <td className="px-3 py-4 whitespace-nowrap">
+                        <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
+                          {formatDate(bo.createdAt)}
+                        </span>
+                      </td>
+
                       {/* Client */}
                       <td className="px-4 py-4 max-w-[200px]">
                         <button
@@ -1152,9 +1385,21 @@ export default function BackordersPage() {
                         )}
                       </td>
 
-                      {/* Brand */}
+                      {/* Supplier */}
                       <td className="px-4 py-4">
-                        <span className="text-gray-700 font-medium">{bo.brand || '—'}</span>
+                        {bo.supplierName ? (
+                          <button
+                            onClick={() => {
+                              const s = suppliers.find((x) => x.id === bo.supplierId || x.name === bo.supplierName)
+                              if (s) setSupplierPopup(s)
+                            }}
+                            className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors text-left"
+                          >
+                            {bo.supplierName}
+                          </button>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
                       </td>
 
                       {/* QTY */}
@@ -1262,6 +1507,24 @@ export default function BackordersPage() {
                         </select>
                       </td>
 
+                      {/* Item Found */}
+                      <td className="px-4 py-4 text-center">
+                        <select
+                          value={bo.itemFound || ''}
+                          onChange={(e) => handleItemFound(bo.id, e.target.value)}
+                          disabled={isPatching}
+                          className={`text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 font-medium cursor-pointer disabled:opacity-50 ${
+                            bo.itemFound === 'yes' ? 'border-green-300 bg-green-50 text-green-700' :
+                            bo.itemFound === 'no' ? 'border-red-300 bg-red-50 text-red-600' :
+                            'border-gray-200 bg-white text-gray-400'
+                          }`}
+                        >
+                          <option value="">—</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </td>
+
                       {/* Actions Dropdown */}
                       <td className="px-4 py-4 relative">
                         <button
@@ -1335,6 +1598,7 @@ export default function BackordersPage() {
         <BackorderModal
           initial={editFormData}
           clients={clients}
+          suppliers={suppliers}
           onSave={editItem ? handleEdit : handleCreate}
           onClose={() => { setShowModal(false); setEditItem(null) }}
         />
@@ -1362,6 +1626,64 @@ export default function BackordersPage() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supplier Info Popup */}
+      {supplierPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">{supplierPopup.name}</h3>
+                {supplierPopup.code && <span className="text-xs text-gray-400 font-mono">{supplierPopup.code}</span>}
+              </div>
+              <button
+                onClick={() => setSupplierPopup(null)}
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors text-xl"
+              >
+                ×
+              </button>
+            </div>
+            <div className="space-y-2.5 text-sm">
+              {supplierPopup.country && (
+                <div className="flex items-center gap-3 text-gray-700">
+                  <span className="text-base">🌍</span>
+                  <span>{supplierPopup.country}</span>
+                </div>
+              )}
+              {supplierPopup.email && (
+                <div className="flex items-center gap-3 text-gray-700">
+                  <span className="text-base">📧</span>
+                  <a href={`mailto:${supplierPopup.email}`} className="text-blue-600 hover:underline">{supplierPopup.email}</a>
+                </div>
+              )}
+              {supplierPopup.phone && (
+                <div className="flex items-center gap-3 text-gray-700">
+                  <span className="text-base">📞</span>
+                  <span>{supplierPopup.phone}</span>
+                </div>
+              )}
+              {supplierPopup.website && (
+                <div className="flex items-center gap-3 text-gray-700">
+                  <span className="text-base">🌐</span>
+                  <a href={supplierPopup.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate">{supplierPopup.website}</a>
+                </div>
+              )}
+              {supplierPopup.notes && (
+                <div className="flex items-start gap-3 text-gray-600 bg-gray-50 rounded-lg p-3 mt-3">
+                  <span className="text-base">📝</span>
+                  <span className="text-xs">{supplierPopup.notes}</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={() => setSupplierPopup(null)}
+              className="mt-5 w-full border border-gray-300 text-gray-700 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

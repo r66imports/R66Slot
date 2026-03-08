@@ -39,6 +39,11 @@ export interface Backorder {
   quoteNumber?: string
   salesOrderNumber?: string
   invoiceNumber?: string
+  // Item status
+  itemFound?: 'yes' | 'no'
+  // Supplier
+  supplierId?: string
+  supplierName?: string
   // Meta
   notes?: string
   status: 'active' | 'complete' | 'cancelled'
