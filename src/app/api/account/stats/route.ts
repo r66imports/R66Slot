@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead } from '@/lib/blob-storage'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback-dev-secret-replace-in-production'
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 
 export async function GET(_request: NextRequest) {
   try {
@@ -19,16 +19,12 @@ export async function GET(_request: NextRequest) {
       o.email?.toLowerCase() === customerEmail ||
       o.customerEmail?.toLowerCase() === customerEmail
 
-    const [preorders, slotcarOrders, addresses] = await Promise.all([
+    const [preorders, addresses] = await Promise.all([
       blobRead<any[]>('data/preorder-list.json', []),
-      blobRead<any[]>('data/slotcar-orders.json', []),
       blobRead<any[]>('data/addresses.json', []),
     ])
 
-    const orders = [
-      ...preorders.filter(matchesCustomer),
-      ...slotcarOrders.filter(matchesCustomer),
-    ]
+    const orders = preorders.filter(matchesCustomer)
 
     return NextResponse.json({
       totalOrders: orders.length,

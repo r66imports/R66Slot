@@ -24,13 +24,13 @@ export default function AccountDashboard() {
       .catch(() => { window.location.href = '/account/login' })
 
     fetch('/api/account/stats')
-      .then((res) => res.json())
-      .then((data) => setStats(data))
+      .then((res) => { if (res.ok) return res.json(); return null })
+      .then((data) => { if (data) setStats(data) })
       .catch(console.error)
 
     fetch('/api/account/orders')
-      .then((res) => res.json())
-      .then((data) => setRecentOrders(Array.isArray(data) ? data.slice(0, 3) : []))
+      .then((res) => { if (res.ok) return res.json(); return null })
+      .then((data) => { if (data) setRecentOrders(Array.isArray(data) ? data.slice(0, 3) : []) })
       .catch(console.error)
   }, [])
 

@@ -5,10 +5,11 @@ const OPTIONS_KEY = 'data/product-options.json'
 
 const DEFAULTS = {
   brands: ['NSR', 'Revo', 'Pioneer', 'Sideways'],
-  categories: ['Slot Cars', 'Parts'],
+  categories: [] as string[],
   scales: ['1/32', '1/24'],
   carClasses: ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'],
   revoParts: ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set'],
+  carTypes: ['Livery', 'White Kit', 'White Body Kit', 'White Body'],
 }
 
 export async function GET() {
@@ -17,10 +18,11 @@ export async function GET() {
     // Merge saved values with defaults so new hardcoded defaults always appear
     return NextResponse.json({
       brands: Array.from(new Set([...DEFAULTS.brands, ...(saved.brands || [])])),
-      categories: Array.from(new Set([...DEFAULTS.categories, ...(saved.categories || [])])),
+      categories: Array.from(new Set([...(saved.categories || [])])),
       scales: Array.from(new Set([...DEFAULTS.scales, ...(saved.scales || [])])),
       carClasses: Array.from(new Set([...DEFAULTS.carClasses, ...(saved.carClasses || [])])),
       revoParts: Array.from(new Set([...DEFAULTS.revoParts, ...(saved.revoParts || [])])),
+      carTypes: Array.from(new Set([...DEFAULTS.carTypes, ...((saved as any).carTypes || [])])),
     })
   } catch {
     return NextResponse.json(DEFAULTS)

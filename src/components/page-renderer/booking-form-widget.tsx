@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 
 type PreOrderItem = {
   id: string
@@ -49,9 +48,22 @@ export default function BookingFormWidget({
   const [selectedQty, setSelectedQty] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [orderPlaced, setOrderPlaced] = useState(false)
+  const [loggedInCustomerId, setLoggedInCustomerId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchItems()
+    fetch('/api/account/profile')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && !data.error) {
+          setFirstName(data.firstName || '')
+          setLastName(data.lastName || '')
+          setEmail(data.email || '')
+          setPhone(data.phone || '')
+          setLoggedInCustomerId(data.id || null)
+        }
+      })
+      .catch(() => {})
   }, [])
 
   async function fetchItems() {
@@ -89,7 +101,7 @@ export default function BookingFormWidget({
         price: selectedItem.preOrderPrice,
         quantity: selectedQty,
         totalAmount: (parseFloat(selectedItem.preOrderPrice) * selectedQty).toFixed(2),
-        customerId: `guest_${Date.now()}`,
+        customerId: loggedInCustomerId || `guest_${Date.now()}`,
         customerName: `${firstName.trim()} ${lastName.trim()}`,
         customerEmail: email.trim(),
         customerPhone: phone.trim(),

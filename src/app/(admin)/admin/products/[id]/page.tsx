@@ -79,6 +79,7 @@ export default function EditProductPage({
   const [brand, setBrand] = useState('')
   const [productType, setProductType] = useState('')
   const [carType, setCarType] = useState('')
+  const [carTypes, setCarTypes] = useState<string[]>([])
   const [partType, setPartType] = useState('')
   const [scale, setScale] = useState('')
   const [supplier, setSupplier] = useState('')
@@ -119,17 +120,35 @@ export default function EditProductPage({
   // Lists for custom options (loaded from API)
   const [brands, setBrands] = useState(['NSR', 'Revo', 'Pioneer', 'Sideways'])
   const [scales, setScales] = useState(['1/32', '1/24'])
-  const [productTypes, setProductTypes] = useState(['Slot Cars', 'Parts'])
+  const [productTypes, setProductTypes] = useState<string[]>([])
+  const [carTypeOptions, setCarTypeOptions] = useState(['Livery', 'White Kit', 'White Body Kit', 'White Body'])
 
-  // Modal states
-  const [showAddBrand, setShowAddBrand] = useState(false)
-  const [showAddScale, setShowAddScale] = useState(false)
-  const [showAddProductType, setShowAddProductType] = useState(false)
+  // Dropdown open states for Product Organization
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
+  const [carTypeDropdownOpen, setCarTypeDropdownOpen] = useState(false)
+  const [scaleDropdownOpen, setScaleDropdownOpen] = useState(false)
 
-  // New item inputs
-  const [newBrand, setNewBrand] = useState('')
-  const [newScale, setNewScale] = useState('')
-  const [newProductType, setNewProductType] = useState('')
+  // Inline add inputs
+  const [newBrandInput, setNewBrandInput] = useState('')
+  const [newCategoryInput, setNewCategoryInput] = useState('')
+  const [newCarTypeInput, setNewCarTypeInput] = useState('')
+  const [newScaleInput, setNewScaleInput] = useState('')
+
+  // Autosave
+  const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const isLoaded = useRef(false)
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Dropdown refs for click-outside
+  const brandRef = useRef<HTMLDivElement>(null)
+  const categoryRef = useRef<HTMLDivElement>(null)
+  const carTypeRef = useRef<HTMLDivElement>(null)
+  const scaleRef = useRef<HTMLDivElement>(null)
+  const carClassRef = useRef<HTMLDivElement>(null)
+  const revoPartRef = useRef<HTMLDivElement>(null)
+  const carBrandRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -152,6 +171,7 @@ export default function EditProductPage({
         if (opts.categories?.length) setProductTypes(opts.categories)
         if (opts.carClasses?.length) setCarClassOptions(opts.carClasses)
         if (opts.revoParts?.length) setRevoPartOptions(opts.revoParts)
+        if (opts.carTypes?.length) setCarTypeOptions(opts.carTypes)
       })
       .catch(() => {})
     fetch('/api/admin/pages')
@@ -191,6 +211,7 @@ export default function EditProductPage({
           setBrand(found.brand || '')
           setProductType(found.productType || '')
           setCarType(found.carType || '')
+          setCarTypes(Array.isArray((found as any).carTypes) ? (found as any).carTypes : (found.carType ? [found.carType] : []))
           setPartType(found.partType || '')
           setScale(found.scale || '')
           setSupplier(found.supplier || '')
@@ -240,42 +261,54 @@ export default function EditProductPage({
       console.error('Error loading product:', err)
     } finally {
       setLoading(false)
+      isLoaded.current = true
     }
   }
 
   // Add new item functions — update local state and persist to DB
-  const handleAddBrand = () => {
-    const val = newBrand.trim()
-    if (val && !brands.includes(val)) {
-      const next = [...brands, val]
+  const handleAddBrand = (val: string) => {
+    const v = val.trim()
+    if (v && !brands.includes(v)) {
+      const next = [...brands, v]
       setBrands(next)
       saveOptions('brands', next)
-      setBrand(val.toLowerCase())
-      setNewBrand('')
-      setShowAddBrand(false)
     }
+    if (v) setBrand(v.toLowerCase())
+    setNewBrandInput('')
+    setBrandDropdownOpen(false)
   }
-  const handleAddScale = () => {
-    const val = newScale.trim()
-    if (val && !scales.includes(val)) {
-      const next = [...scales, val]
+  const handleAddScale = (val: string) => {
+    const v = val.trim()
+    if (v && !scales.includes(v)) {
+      const next = [...scales, v]
       setScales(next)
       saveOptions('scales', next)
-      setScale(val)
-      setNewScale('')
-      setShowAddScale(false)
     }
+    if (v) setScale(v)
+    setNewScaleInput('')
+    setScaleDropdownOpen(false)
   }
-  const handleAddProductType = () => {
-    const val = newProductType.trim()
-    if (val && !productTypes.includes(val)) {
-      const next = [...productTypes, val]
+  const handleAddProductType = (val: string) => {
+    const v = val.trim()
+    if (v && !productTypes.includes(v)) {
+      const next = [...productTypes, v]
       setProductTypes(next)
       saveOptions('categories', next)
-      setProductType(val.toLowerCase().replace(/ /g, '-'))
-      setNewProductType('')
-      setShowAddProductType(false)
     }
+    if (v) setProductType(v.toLowerCase().replace(/ /g, '-'))
+    setNewCategoryInput('')
+    setCategoryDropdownOpen(false)
+  }
+  const handleAddCarType = (val: string) => {
+    const v = val.trim()
+    if (!v) return
+    if (!carTypeOptions.includes(v)) {
+      const next = [...carTypeOptions, v]
+      setCarTypeOptions(next)
+      saveOptions('carTypes', next)
+    }
+    if (!carTypes.includes(v)) setCarTypes(prev => [...prev, v])
+    setNewCarTypeInput('')
   }
 
   // ── Unit autosave handlers ─────────────────────────────────────────────────
@@ -308,6 +341,75 @@ export default function EditProductPage({
       })
     } catch { /* non-critical */ }
   }
+
+  // Autosave — saves current fields without uploading pending images or redirecting
+  const doAutosave = async () => {
+    if (!title.trim()) return
+    setAutosaveStatus('saving')
+    const cleanFloat = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
+    const cleanInt = (v: string) => { const n = parseInt(v); return isNaN(n) ? 0 : n }
+    try {
+      await fetch(`/api/admin/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: title.trim(), description,
+          price: cleanFloat(price),
+          compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
+          costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
+          sku, barcode, trackQuantity, quantity: cleanInt(quantity),
+          weight: weight ? cleanFloat(weight) : null, weightUnit,
+          brand, productType, carClass, revoPart, revoParts, carBrands, isPreOrder, units,
+          carType: carTypes[0] || carType, carTypes, partType, scale, supplier, collections,
+          tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
+          status, boxSize,
+          dimensions: {
+            length: dimLength ? cleanFloat(dimLength) : null,
+            width: dimWidth ? cleanFloat(dimWidth) : null,
+            height: dimHeight ? cleanFloat(dimHeight) : null,
+          },
+          eta,
+          images: mediaFiles.filter(f => !f.url.startsWith('data:')).map(f => f.url),
+          imageUrl: mediaFiles.find(f => !f.url.startsWith('data:'))?.url || '',
+          pageIds, pageId: pageIds[0] || '', pageUrl,
+          seo: { metaTitle: seoTitle, metaDescription: seoDescription, metaKeywords: seoKeywords },
+        }),
+      })
+      setAutosaveStatus('saved')
+      setTimeout(() => setAutosaveStatus('idle'), 2000)
+    } catch {
+      setAutosaveStatus('idle')
+    }
+  }
+
+  // Autosave effect — debounced 1500ms after any field change (skips during initial load)
+  useEffect(() => {
+    if (!isLoaded.current) return
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    autosaveTimer.current = setTimeout(doAutosave, 1500)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
+      quantity, weight, weightUnit, brand, productType, carClass, revoPart, revoParts,
+      carBrands, isPreOrder, units, carTypes, partType, scale, supplier, collections,
+      tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
+      seoTitle, seoDescription, seoKeywords])
+
+  // Click-outside — close all custom dropdowns
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (brandDropdownOpen && brandRef.current && !brandRef.current.contains(e.target as Node)) setBrandDropdownOpen(false)
+      if (categoryDropdownOpen && categoryRef.current && !categoryRef.current.contains(e.target as Node)) setCategoryDropdownOpen(false)
+      if (carTypeDropdownOpen && carTypeRef.current && !carTypeRef.current.contains(e.target as Node)) setCarTypeDropdownOpen(false)
+      if (scaleDropdownOpen && scaleRef.current && !scaleRef.current.contains(e.target as Node)) setScaleDropdownOpen(false)
+      if (carClassDropdownOpen && carClassRef.current && !carClassRef.current.contains(e.target as Node)) setCarClassDropdownOpen(false)
+      if (revoPartDropdownOpen && revoPartRef.current && !revoPartRef.current.contains(e.target as Node)) setRevoPartDropdownOpen(false)
+      if (carBrandDropdownOpen && carBrandRef.current && !carBrandRef.current.contains(e.target as Node)) setCarBrandDropdownOpen(false)
+      if (pageDropdownOpen && pageRef.current && !pageRef.current.contains(e.target as Node)) setPageDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [brandDropdownOpen, categoryDropdownOpen, carTypeDropdownOpen, scaleDropdownOpen,
+      carClassDropdownOpen, revoPartDropdownOpen, carBrandDropdownOpen, pageDropdownOpen])
 
   // Upload base64 images to server and return real URLs
   const uploadPendingImages = async (): Promise<string[]> => {
@@ -372,7 +474,8 @@ export default function EditProductPage({
         carBrands,
         isPreOrder,
         units,
-        carType,
+        carType: carTypes[0] || carType,
+        carTypes,
         partType,
         scale,
         supplier,
@@ -432,7 +535,7 @@ export default function EditProductPage({
     if (brand) parts.push(`*Brand:* ${brand}`)
     if (carBrands.length > 0) parts.push(`*Car Brand:* ${carBrands.join(', ')}`)
     if (carClass) parts.push(`*Class:* ${carClass}`)
-    if (carType) parts.push(`*Car Type:* ${carType}`)
+    if (carTypes.length) parts.push(`*Car Type:* ${carTypes.join(', ')}`)
     if (scale) parts.push(`*Scale:* ${scale}`)
     if (productType) parts.push(`*Type:* ${productType}`)
     if (partType) parts.push(`*Part Type:* ${partType}`)
@@ -505,12 +608,14 @@ export default function EditProductPage({
               >
                 Discard
               </button>
+              {autosaveStatus === 'saving' && <span className="text-xs text-gray-400">Saving...</span>}
+              {autosaveStatus === 'saved' && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
               <button
                 onClick={handleSave}
                 className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
                 disabled={saving}
               >
-                {uploadingImages ? 'Uploading images...' : saving ? 'Saving...' : 'Save Changes'}
+                {uploadingImages ? 'Uploading images...' : saving ? 'Saving...' : 'Save & Exit'}
               </button>
             </div>
           </div>
@@ -895,7 +1000,7 @@ export default function EditProductPage({
                 {/* Revo Racing Class */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Revo Racing Class</label>
-                  <div className="relative">
+                  <div className="relative" ref={carClassRef}>
                     <button
                       type="button"
                       onClick={() => setCarClassDropdownOpen(!carClassDropdownOpen)}
@@ -968,7 +1073,7 @@ export default function EditProductPage({
                 {/* Revo Parts (multi-select) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Revo Parts</label>
-                  <div className="relative">
+                  <div className="relative" ref={revoPartRef}>
                     <button
                       type="button"
                       onClick={() => setRevoPartDropdownOpen(!revoPartDropdownOpen)}
@@ -1050,7 +1155,7 @@ export default function EditProductPage({
                 {/* Car Brands (multi-select checkbox dropdown) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Car Brand</label>
-                  <div className="relative">
+                  <div className="relative" ref={carBrandRef}>
                     <button
                       type="button"
                       onClick={() => setCarBrandDropdownOpen(!carBrandDropdownOpen)}
@@ -1153,72 +1258,135 @@ export default function EditProductPage({
 
                 {/* Brand */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Brand</label>
-                  <select
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select brand...</option>
-                    {brands.map((b) => (
-                      <option key={b} value={b.toLowerCase()}>{b}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setShowAddBrand(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    + Add Brand
-                  </button>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Unit (Brand)</label>
+                  <div className="relative" ref={brandRef}>
+                    <button type="button" onClick={() => setBrandDropdownOpen(!brandDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={brand ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
+                        {brand ? (brands.find(b => b.toLowerCase() === brand) || brand) : 'Select brand...'}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${brandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {brandDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="radio" checked={brand === ''} onChange={() => { setBrand(''); setBrandDropdownOpen(false) }} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {brands.map(b => (
+                          <label key={b} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="radio" checked={brand === b.toLowerCase()} onChange={() => { setBrand(b.toLowerCase()); setBrandDropdownOpen(false) }} className="rounded" />
+                            <span className="text-sm text-gray-900">{b}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newBrandInput} onChange={e => setNewBrandInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newBrandInput.trim()) { e.preventDefault(); handleAddBrand(newBrandInput) } }} placeholder="+ Add brand..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { if (newBrandInput.trim()) handleAddBrand(newBrandInput) }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {/* Category */}
+                {/* Item Category */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                  <select
-                    value={productType}
-                    onChange={(e) => setProductType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select type...</option>
-                    {productTypes.map((pt) => (
-                      <option key={pt} value={pt.toLowerCase().replace(/ /g, '-')}>{pt}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setShowAddProductType(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    + Add Category
-                  </button>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Item Category</label>
+                  <div className="relative" ref={categoryRef}>
+                    <button type="button" onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={productType ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
+                        {productType ? (productTypes.find(pt => pt.toLowerCase().replace(/ /g, '-') === productType) || productType) : 'Select category...'}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${categoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {categoryDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="radio" checked={productType === ''} onChange={() => { setProductType(''); setCategoryDropdownOpen(false) }} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {productTypes.map(pt => (
+                          <label key={pt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="radio" checked={productType === pt.toLowerCase().replace(/ /g, '-')} onChange={() => { setProductType(pt.toLowerCase().replace(/ /g, '-')); setCategoryDropdownOpen(false) }} className="rounded" />
+                            <span className="text-sm text-gray-900">{pt}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newCategoryInput} onChange={e => setNewCategoryInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newCategoryInput.trim()) { e.preventDefault(); handleAddProductType(newCategoryInput) } }} placeholder="+ Add category..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { if (newCategoryInput.trim()) handleAddProductType(newCategoryInput) }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Car Type */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Car Type</label>
-                  <select
-                    value={carType}
-                    onChange={(e) => setCarType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select car type...</option>
-                    <option value="livery">Livery</option>
-                    <option value="white-kit">White Kit</option>
-                    <option value="white-body-kit">White Body Kit</option>
-                    <option value="white-body">White Body</option>
-                  </select>
+                  <div className="relative" ref={carTypeRef}>
+                    <button type="button" onClick={() => setCarTypeDropdownOpen(!carTypeDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={carTypes.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {carTypes.length === 0 ? '— None —' : carTypes.length === 1 ? carTypes[0] : `${carTypes.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${carTypeDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {carTypeDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={carTypes.length === 0} onChange={() => setCarTypes([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {carTypeOptions.map(ct => (
+                          <label key={ct} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" checked={carTypes.includes(ct)} onChange={e => setCarTypes(e.target.checked ? [...carTypes, ct] : carTypes.filter(t => t !== ct))} className="rounded" />
+                            <span className="text-sm text-gray-900">{ct}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newCarTypeInput} onChange={e => setNewCarTypeInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newCarTypeInput.trim()) { e.preventDefault(); handleAddCarType(newCarTypeInput) } }} placeholder="+ Add car type..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { if (newCarTypeInput.trim()) handleAddCarType(newCarTypeInput) }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {carTypes.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {carTypes.map(ct => (
+                        <span key={ct} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
+                          {ct}<button type="button" onClick={() => setCarTypes(carTypes.filter(t => t !== ct))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Scale */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Scale</label>
-                  <select
-                    value={scale}
-                    onChange={(e) => setScale(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select scale...</option>
-                    {scales.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setShowAddScale(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                    + Add Scale
-                  </button>
+                  <div className="relative" ref={scaleRef}>
+                    <button type="button" onClick={() => setScaleDropdownOpen(!scaleDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={scale ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
+                        {scale || 'Select scale...'}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${scaleDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {scaleDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="radio" checked={scale === ''} onChange={() => { setScale(''); setScaleDropdownOpen(false) }} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {scales.map(s => (
+                          <label key={s} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="radio" checked={scale === s} onChange={() => { setScale(s); setScaleDropdownOpen(false) }} className="rounded" />
+                            <span className="text-sm text-gray-900">{s}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newScaleInput} onChange={e => setNewScaleInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newScaleInput.trim()) { e.preventDefault(); handleAddScale(newScaleInput) } }} placeholder="+ Add scale..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { if (newScaleInput.trim()) handleAddScale(newScaleInput) }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Units */}
@@ -1274,7 +1442,7 @@ export default function EditProductPage({
                 {/* Page Assignment */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Assign to Page</label>
-                  <div className="relative">
+                  <div className="relative" ref={pageRef}>
                     <button
                       type="button"
                       onClick={() => setPageDropdownOpen(!pageDropdownOpen)}
@@ -1407,48 +1575,6 @@ export default function EditProductPage({
         </div>
       </div>
 
-      {/* Add Brand Modal */}
-      {showAddBrand && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Brand</h3>
-            <input type="text" value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="Enter brand name" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4" onKeyDown={(e) => e.key === 'Enter' && handleAddBrand()} autoFocus />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => { setShowAddBrand(false); setNewBrand('') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={handleAddBrand} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">Add Brand</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-
-      {/* Add Scale Modal */}
-      {showAddScale && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Scale</h3>
-            <input type="text" value={newScale} onChange={(e) => setNewScale(e.target.value)} placeholder="Enter scale (e.g., 1/43)" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4" onKeyDown={(e) => e.key === 'Enter' && handleAddScale()} autoFocus />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => { setShowAddScale(false); setNewScale('') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={handleAddScale} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">Add Scale</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Category Modal */}
-      {showAddProductType && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-96">
-            <h3 className="text-lg font-semibold mb-4">Add New Category</h3>
-            <input type="text" value={newProductType} onChange={(e) => setNewProductType(e.target.value)} placeholder="Enter product type" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent mb-4" onKeyDown={(e) => e.key === 'Enter' && handleAddProductType()} autoFocus />
-            <div className="flex justify-end gap-2">
-              <button onClick={() => { setShowAddProductType(false); setNewProductType('') }} className="px-4 py-2 text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={handleAddProductType} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">Add Category</button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )
