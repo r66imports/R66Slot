@@ -370,12 +370,14 @@ function BackorderModal({
   suppliers,
   onSave,
   onClose,
+  onSupplierCreated,
 }: {
   initial?: Partial<FormData> & { id?: string }
   clients: Client[]
   suppliers: Supplier[]
   onSave: (data: FormData & { id?: string }) => Promise<void>
   onClose: () => void
+  onSupplierCreated: (s: Supplier) => void
 }) {
   const [form, setForm] = useState<FormData>({
     ...EMPTY_CLIENT_FIELDS,
@@ -388,6 +390,30 @@ function BackorderModal({
   const [selectedClientName, setSelectedClientName] = useState(
     initial?.clientName ? `${initial.clientName}` : ''
   )
+  const [showAddSupplier, setShowAddSupplier] = useState(false)
+  const [newSupplier, setNewSupplier] = useState({ name: '', code: '', country: '', email: '', phone: '', website: '', notes: '' })
+  const [savingSupplier, setSavingSupplier] = useState(false)
+
+  const handleCreateSupplier = async () => {
+    if (!newSupplier.name.trim()) return
+    setSavingSupplier(true)
+    try {
+      const res = await fetch('/api/admin/supplier-contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSupplier),
+      })
+      if (res.ok) {
+        const created: Supplier = await res.json()
+        onSupplierCreated(created)
+        setForm((p) => ({ ...p, supplierId: created.id, supplierName: created.name }))
+        setShowAddSupplier(false)
+        setNewSupplier({ name: '', code: '', country: '', email: '', phone: '', website: '', notes: '' })
+      }
+    } finally {
+      setSavingSupplier(false)
+    }
+  }
 
   const set = <K extends keyof FormData>(field: K, value: FormData[K]) =>
     setForm((p) => ({ ...p, [field]: value }))
@@ -638,12 +664,86 @@ function BackorderModal({
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Supplier</label>
-                <SupplierDropdown
-                  suppliers={suppliers}
-                  value={form.supplierId}
-                  onSelect={(s) => setForm((p) => ({ ...p, supplierId: s?.id || '', supplierName: s?.name || '' }))}
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-gray-600">Supplier</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSupplier((v) => !v)}
+                    className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddSupplier ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}
+                  >
+                    <span className="text-sm leading-none">+</span> Add
+                  </button>
+                </div>
+                {!showAddSupplier && (
+                  <SupplierDropdown
+                    suppliers={suppliers}
+                    value={form.supplierId}
+                    onSelect={(s) => setForm((p) => ({ ...p, supplierId: s?.id || '', supplierName: s?.name || '' }))}
+                  />
+                )}
+                {showAddSupplier && (
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <input
+                          value={newSupplier.name}
+                          onChange={(e) => setNewSupplier((p) => ({ ...p, name: e.target.value }))}
+                          placeholder="Supplier name *"
+                          className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <input
+                        value={newSupplier.code}
+                        onChange={(e) => setNewSupplier((p) => ({ ...p, code: e.target.value }))}
+                        placeholder="Code (e.g. NSR)"
+                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <input
+                        value={newSupplier.country}
+                        onChange={(e) => setNewSupplier((p) => ({ ...p, country: e.target.value }))}
+                        placeholder="Country"
+                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <input
+                        value={newSupplier.email}
+                        onChange={(e) => setNewSupplier((p) => ({ ...p, email: e.target.value }))}
+                        placeholder="Email"
+                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <input
+                        value={newSupplier.phone}
+                        onChange={(e) => setNewSupplier((p) => ({ ...p, phone: e.target.value }))}
+                        placeholder="Phone"
+                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <div className="col-span-2">
+                        <input
+                          value={newSupplier.website}
+                          onChange={(e) => setNewSupplier((p) => ({ ...p, website: e.target.value }))}
+                          placeholder="Website URL"
+                          className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCreateSupplier}
+                        disabled={savingSupplier || !newSupplier.name.trim()}
+                        className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {savingSupplier ? 'Saving…' : 'Save Supplier'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddSupplier(false)}
+                        className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">
@@ -1317,7 +1417,7 @@ export default function BackordersPage() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Supplier</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
                   <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Price</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[320px]">Order #</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[320px]">Order Status</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                   <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Found</th>
                   <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
@@ -1601,6 +1701,7 @@ export default function BackordersPage() {
           suppliers={suppliers}
           onSave={editItem ? handleEdit : handleCreate}
           onClose={() => { setShowModal(false); setEditItem(null) }}
+          onSupplierCreated={(s) => setSuppliers((prev) => [...prev, s])}
         />
       )}
 
