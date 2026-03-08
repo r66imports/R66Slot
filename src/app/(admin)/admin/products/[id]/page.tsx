@@ -353,7 +353,8 @@ export default function EditProductPage({
           costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
           sku, barcode, trackQuantity, quantity: cleanInt(quantity),
           weight: weight ? cleanFloat(weight) : null, weightUnit,
-          brand, productType, carBrands, isPreOrder, units,
+          brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
+          carBrands, isPreOrder, units, salesAccount, purchaseAccount,
           carType: carTypes[0] || carType, carTypes, partType, scale, supplier, collections,
           tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
           status, boxSize,
@@ -383,10 +384,10 @@ export default function EditProductPage({
     autosaveTimer.current = setTimeout(doAutosave, 1500)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
-      quantity, weight, weightUnit, brand, productType,
+      quantity, weight, weightUnit, brand, productType, categoryBrands, itemCategories,
       carBrands, isPreOrder, units, carTypes, partType, scale, supplier, collections,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
-      seoTitle, seoDescription, seoKeywords])
+      seoTitle, seoDescription, seoKeywords, salesAccount, purchaseAccount])
 
   // Click-outside — close all custom dropdowns (registered once; no state deps needed)
   useEffect(() => {
