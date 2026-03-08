@@ -39,6 +39,7 @@ export interface Product {
   sageItemCode: string | null
   sageLastSynced: string | null
   unit: string
+  units: string[]
   salesAccount: string
   purchaseAccount: string
   createdAt: string
@@ -84,6 +85,7 @@ function rowToProduct(row: any): Product {
     sageItemCode: row.sage_item_code,
     sageLastSynced: row.sage_last_synced,
     unit: row.unit || 'Each',
+    units: Array.isArray(row.units) ? row.units : [],
     salesAccount: row.sales_account || '',
     purchaseAccount: row.purchase_account || '',
     createdAt: row.created_at,
@@ -102,6 +104,7 @@ async function ensureProductColumns() {
         ADD COLUMN IF NOT EXISTS is_pre_order BOOLEAN DEFAULT FALSE,
         ADD COLUMN IF NOT EXISTS revo_parts JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'Each',
+        ADD COLUMN IF NOT EXISTS units JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS sales_account TEXT DEFAULT '',
         ADD COLUMN IF NOT EXISTS purchase_account TEXT DEFAULT ''
     `)

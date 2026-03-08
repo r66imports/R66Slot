@@ -40,6 +40,7 @@ function rowToProduct(row: any): Product {
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
     sageLastSynced: row.sage_last_synced,
+    units: Array.isArray(row.units) ? row.units : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -109,7 +110,8 @@ export async function PUT(
         revo_parts = COALESCE($32, revo_parts),
         is_pre_order = COALESCE($33, is_pre_order),
         seo = COALESCE($34, seo),
-        updated_at = $35
+        units = COALESCE($35, units),
+        updated_at = $36
       WHERE id = $1
       RETURNING *
     `, [
@@ -147,6 +149,7 @@ export async function PUT(
       Array.isArray(body.revoParts) ? JSON.stringify(body.revoParts) : null,
       body.isPreOrder != null ? body.isPreOrder : null,
       body.seo != null ? JSON.stringify(body.seo) : null,
+      Array.isArray(body.units) ? JSON.stringify(body.units) : null,
       now,
     ])
 
