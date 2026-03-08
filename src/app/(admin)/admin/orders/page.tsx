@@ -362,27 +362,11 @@ function ViewDocumentModal({
   template: OrderTemplate
   onClose: () => void
 }) {
-  const printRef = useRef<HTMLDivElement>(null)
+  const docTypeLabel = data.docType === 'salesorder' ? 'Sales Order' : data.docType.charAt(0).toUpperCase() + data.docType.slice(1)
 
-  const handlePrint = () => {
-    const content = printRef.current?.innerHTML
-    if (!content) return
-    const win = window.open('', '_blank', 'width=900,height=700')
-    if (!win) return
-    win.document.write(`<!DOCTYPE html><html><head>
-      <title>${data.docNumber}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 40px; color: #111; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #1f2937; color: white; padding: 8px 12px; text-align: left; }
-        td { padding: 7px 12px; border-bottom: 1px solid #f3f4f6; }
-        @media print { body { margin: 20px; } }
-      </style>
-    </head><body>${content}</body></html>`)
-    win.document.close()
-    win.focus()
-    setTimeout(() => { win.print(); win.close() }, 300)
-  }
+  const handlePrint = () => doPrint(data, template)
+  const handleEmail = () => doEmail(data, template)
+  const handlePrintAndEmail = () => { doPrint(data, template); setTimeout(() => doEmail(data, template), 600) }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -390,22 +374,23 @@ function ViewDocumentModal({
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div>
             <h2 className="text-lg font-bold">{data.docNumber}</h2>
-            <p className="text-xs text-gray-400 mt-0.5 capitalize">{data.docType === 'salesorder' ? 'Sales Order' : data.docType} • {data.clientName}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{docTypeLabel} • {data.clientName}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handlePrint}
-              className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium flex items-center gap-1.5"
-            >
-              🖨️ Print / Save PDF
+            <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
+              🖨️ Print
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            <button onClick={handlePrintAndEmail} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50 font-medium">
+              🖨️✉️ Print &amp; Email
+            </button>
+            <button onClick={handleEmail} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
+              ✉️ Email
+            </button>
+            <button onClick={onClose} className="ml-1 text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
           </div>
         </div>
         <div className="overflow-y-auto flex-1 p-6">
-          <div ref={printRef}>
-            <DocumentBody data={data} template={template} />
-          </div>
+          <DocumentBody data={data} template={template} />
         </div>
       </div>
     </div>
@@ -786,6 +771,144 @@ function CreateDocumentModal({
   )
 }
 
+// ─── Document Print / Email Utilities ─────────────────────────────────────────
+
+function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
+  const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
+  const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const vat = subtotal * 0.15
+  const total = subtotal + vat
+  const activeImages = (template.imageBlock ?? []).filter(Boolean)
+
+  const imagesHTML = activeImages.length > 0
+    ? `<div style="display:flex;gap:8px;margin-bottom:16px">${activeImages.map(url =>
+        `<div style="flex:1;aspect-ratio:16/9;overflow:hidden;border-radius:4px;border:1px solid #f3f4f6;background:#f9fafb"><img src="${url}" style="width:100%;height:100%;object-fit:contain"/></div>`
+      ).join('')}</div>`
+    : ''
+
+  const rowsHTML = data.lineItems.map((li, i) =>
+    `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#9ca3af">${i + 1}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6">${li.description || '—'}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${li.qty}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${fmtPrice(li.unitPrice)}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600">${fmtPrice(li.qty * li.unitPrice)}</td>
+    </tr>`
+  ).join('')
+
+  const bankHTML = template.bankName
+    ? `<div style="margin-bottom:16px;padding:12px;background:#eff6ff;border-radius:8px;border:1px solid #dbeafe">
+        <div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px">Banking Details</div>
+        <table style="width:100%"><tr>
+          <td style="font-size:12px">Bank: <strong>${template.bankName}</strong></td>
+          <td style="font-size:12px">Account: <strong>${template.bankAccount}</strong></td>
+        </tr><tr>
+          <td style="font-size:12px">Branch: <strong>${template.bankBranch}</strong></td>
+          <td style="font-size:12px">Type: <strong>${template.bankType}</strong></td>
+        </tr></table>
+      </div>`
+    : ''
+
+  return `<!DOCTYPE html><html><head><title>${data.docNumber}</title>
+  <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:40px;color:#111;font-size:14px}@media print{body{margin:20px}}</style>
+  </head><body>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+    <div>${template.logoUrl ? `<img src="${template.logoUrl}" style="height:64px;width:auto;object-fit:contain"/>` : ''}</div>
+    <div style="text-align:right">
+      <div style="font-size:24px;font-weight:700;letter-spacing:0.1em;color:#1f2937">${docTitle}</div>
+      <div style="font-size:16px;font-weight:600;margin-top:4px">${data.docNumber}</div>
+      <div style="font-size:12px;color:#6b7280;margin-top:2px">${fmtDateLong(data.date)}</div>
+    </div>
+  </div>
+  ${imagesHTML}
+  <div style="display:flex;gap:32px;margin-bottom:20px;padding-top:16px;border-top:1px solid #e5e7eb">
+    <div style="flex:1">
+      <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">From</div>
+      <div style="font-weight:600">${template.companyName || 'R66 Slot'}</div>
+      ${template.companyAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${template.companyAddress}</div>` : ''}
+      ${template.companyVAT ? `<div style="font-size:12px;color:#6b7280">VAT: ${template.companyVAT}</div>` : ''}
+      ${template.companyPhone ? `<div style="font-size:12px;color:#6b7280">Tel: ${template.companyPhone}</div>` : ''}
+      ${template.companyEmail ? `<div style="font-size:12px;color:#6b7280">${template.companyEmail}</div>` : ''}
+    </div>
+    <div style="flex:1">
+      <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Bill To</div>
+      <div style="font-weight:600">${data.clientName}</div>
+      ${data.clientEmail ? `<div style="font-size:12px;color:#4b5563">${data.clientEmail}</div>` : ''}
+      ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
+      ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
+    </div>
+  </div>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+    <thead><tr style="background:#1f2937;color:white">
+      <th style="padding:8px 12px;text-align:left;font-size:13px">#</th>
+      <th style="padding:8px 12px;text-align:left;font-size:13px">Description</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px">Qty</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px">Unit Price</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px">Total</th>
+    </tr></thead>
+    <tbody>${rowsHTML}</tbody>
+  </table>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+    <div style="width:260px">
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal (excl. VAT)</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">VAT (15%)</span><span style="font-weight:500">${fmtPrice(vat)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
+    </div>
+  </div>
+  ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
+  ${bankHTML}
+  ${data.terms ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Terms &amp; Conditions</div><div style="font-size:12px;color:#6b7280;white-space:pre-line">${data.terms}</div></div>` : ''}
+  ${template.footerText ? `<div style="padding-top:16px;border-top:1px solid #e5e7eb;text-align:center;font-size:12px;color:#9ca3af">${template.footerText}</div>` : ''}
+  </body></html>`
+}
+
+function doPrint(data: DocViewData, template: OrderTemplate) {
+  const win = window.open('', '_blank', 'width=920,height=750')
+  if (!win) return
+  win.document.write(generateDocHTML(data, template))
+  win.document.close()
+  win.focus()
+  setTimeout(() => { win.print(); win.close() }, 400)
+}
+
+function doEmail(data: DocViewData, template: OrderTemplate) {
+  const docLabel = data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
+  const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const vat = subtotal * 0.15
+  const subject = `${docLabel} ${data.docNumber} – ${template.companyName || 'R66 Slot'}`
+  const lines = data.lineItems.map((li, i) =>
+    `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}  =  ${fmtPrice(li.qty * li.unitPrice)}`
+  ).join('\n')
+  const banking = template.bankName
+    ? `\nBANKING DETAILS\nBank: ${template.bankName}  |  Account: ${template.bankAccount}\nBranch: ${template.bankBranch}  |  Type: ${template.bankType}\n`
+    : ''
+  const body = [
+    `Dear ${data.clientName},`,
+    '',
+    `Please see your ${docLabel} details below.`,
+    '',
+    `${docLabel.toUpperCase()}: ${data.docNumber}`,
+    `Date: ${fmtDateLong(data.date)}`,
+    '',
+    `ITEMS`,
+    '─'.repeat(52),
+    lines,
+    '─'.repeat(52),
+    `Subtotal (excl. VAT):  ${fmtPrice(subtotal)}`,
+    `VAT (15%):             ${fmtPrice(vat)}`,
+    `TOTAL (incl. VAT):     ${fmtPrice(subtotal + vat)}`,
+    banking,
+    data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
+    '',
+    `Kind regards,`,
+    template.companyName || 'R66 Slot',
+    template.companyPhone ? `Tel: ${template.companyPhone}` : '',
+    template.companyEmail || '',
+  ].filter((l) => l !== undefined).join('\n')
+
+  window.location.href = `mailto:${data.clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
 // ─── Push to Sage Button ───────────────────────────────────────────────────────
 
 function PushToSageBtn() {
@@ -851,11 +974,10 @@ export default function OrdersPage() {
     invoices: backorders.filter(TAB_CFG.invoices.boPhase).length + documents.filter((d) => d.type === 'invoice').length,
   }
 
-  // Open view modal for a backorder-derived document
-  const viewBackorder = (b: Backorder) => {
+  // Build DocViewData from a backorder row (current tab context)
+  const boToViewData = useCallback((b: Backorder): DocViewData => {
     const c = TAB_CFG[tab]
-    const terms = template[c.termsKey] as string
-    setViewData({
+    return {
       docType: c.docType,
       docNumber: c.boDocNum(b),
       date: c.boDate(b) ?? b.createdAt,
@@ -865,27 +987,21 @@ export default function OrdersPage() {
       clientAddress: '',
       lineItems: [{ id: b.id, description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`, qty: b.qty, unitPrice: b.price }],
       notes: b.notes ?? '',
-      terms,
+      terms: template[c.termsKey] as string,
       status: b.status,
-    })
-  }
+    }
+  }, [tab, template])
 
-  // Open view modal for a standalone document
-  const viewDocument = (doc: OrderDocument) => {
-    setViewData({
-      docType: doc.type,
-      docNumber: doc.docNumber,
-      date: doc.date,
-      clientName: doc.clientName,
-      clientEmail: doc.clientEmail,
-      clientPhone: doc.clientPhone,
-      clientAddress: doc.clientAddress,
-      lineItems: doc.lineItems,
-      notes: doc.notes,
-      terms: doc.terms,
-      status: doc.status,
-    })
-  }
+  // Build DocViewData from a standalone document
+  const docToViewData = (doc: OrderDocument): DocViewData => ({
+    docType: doc.type, docNumber: doc.docNumber, date: doc.date,
+    clientName: doc.clientName, clientEmail: doc.clientEmail,
+    clientPhone: doc.clientPhone, clientAddress: doc.clientAddress,
+    lineItems: doc.lineItems, notes: doc.notes, terms: doc.terms, status: doc.status,
+  })
+
+  const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
+  const viewDocument = (doc: OrderDocument) => setViewData(docToViewData(doc))
 
   // Delete a standalone document
   const deleteDocument = async (id: string) => {
@@ -987,13 +1103,10 @@ export default function OrdersPage() {
                         <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Back Order</span>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => viewBackorder(b)}
-                            className="text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                          >
-                            👁️ View
-                          </button>
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => viewBackorder(b)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="View">👁️</button>
+                          <button onClick={() => doPrint(boToViewData(b), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Print">🖨️</button>
+                          <button onClick={() => doEmail(boToViewData(b), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Email">✉️</button>
                           <PushToSageBtn />
                         </div>
                       </td>
@@ -1018,13 +1131,10 @@ export default function OrdersPage() {
                           <span className="text-xs bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full">Standalone</span>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => viewDocument(doc)}
-                              className="text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 hover:border-gray-300"
-                            >
-                              👁️ View
-                            </button>
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => viewDocument(doc)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="View">👁️</button>
+                            <button onClick={() => doPrint(docToViewData(doc), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Print">🖨️</button>
+                            <button onClick={() => doEmail(docToViewData(doc), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Email">✉️</button>
                             <PushToSageBtn />
                             {deleteConfirm === doc.id ? (
                               <>
