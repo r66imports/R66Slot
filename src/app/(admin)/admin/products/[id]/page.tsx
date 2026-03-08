@@ -118,6 +118,16 @@ export default function EditProductPage({
   const [itemCategories, setItemCategories] = useState<string[]>([])
   const [itemCategoryDropdownOpen, setItemCategoryDropdownOpen] = useState(false)
 
+  // Sage Accounts
+  const [salesAccount, setSalesAccount] = useState<string[]>([])
+  const [purchaseAccount, setPurchaseAccount] = useState<string[]>([])
+  const [salesAccountOptions, setSalesAccountOptions] = useState<string[]>([])
+  const [purchaseAccountOptions, setPurchaseAccountOptions] = useState<string[]>([])
+  const [salesAccountDropdownOpen, setSalesAccountDropdownOpen] = useState(false)
+  const [purchaseAccountDropdownOpen, setPurchaseAccountDropdownOpen] = useState(false)
+  const [newSalesAccountInput, setNewSalesAccountInput] = useState('')
+  const [newPurchaseAccountInput, setNewPurchaseAccountInput] = useState('')
+
   // Dropdown open states for Product Organization
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
   const [carTypeDropdownOpen, setCarTypeDropdownOpen] = useState(false)
@@ -142,6 +152,8 @@ export default function EditProductPage({
   const carBrandRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef<HTMLDivElement>(null)
   const itemCategoryRef = useRef<HTMLDivElement>(null)
+  const salesAccountRef = useRef<HTMLDivElement>(null)
+  const purchaseAccountRef = useRef<HTMLDivElement>(null)
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -163,6 +175,8 @@ export default function EditProductPage({
         if (opts.scales?.length) setScales(opts.scales)
         if (opts.categories?.length) setProductTypes(opts.categories)
         if (opts.carTypes?.length) setCarTypeOptions(opts.carTypes)
+        if (opts.salesAccounts?.length) setSalesAccountOptions(opts.salesAccounts)
+        if (opts.purchaseAccounts?.length) setPurchaseAccountOptions(opts.purchaseAccounts)
       })
       .catch(() => {})
     fetch('/api/admin/pages')
@@ -226,6 +240,8 @@ export default function EditProductPage({
           setSeoTitle(found.seo?.metaTitle || '')
           setSeoDescription(found.seo?.metaDescription || '')
           setSeoKeywords(found.seo?.metaKeywords || '')
+          setSalesAccount(Array.isArray((found as any).salesAccount) ? (found as any).salesAccount : [])
+          setPurchaseAccount(Array.isArray((found as any).purchaseAccount) ? (found as any).purchaseAccount : [])
 
           // Load images
           const images: { name: string; url: string; type: string }[] = []
@@ -383,6 +399,8 @@ export default function EditProductPage({
       if (carBrandRef.current && !carBrandRef.current.contains(t)) setCarBrandDropdownOpen(false)
       if (pageRef.current && !pageRef.current.contains(t)) setPageDropdownOpen(false)
       if (itemCategoryRef.current && !itemCategoryRef.current.contains(t)) setItemCategoryDropdownOpen(false)
+      if (salesAccountRef.current && !salesAccountRef.current.contains(t)) setSalesAccountDropdownOpen(false)
+      if (purchaseAccountRef.current && !purchaseAccountRef.current.contains(t)) setPurchaseAccountDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -465,6 +483,8 @@ export default function EditProductPage({
           height: dimHeight ? cleanFloat(dimHeight) : null,
         },
         eta,
+        salesAccount,
+        purchaseAccount,
         images: imageUrls,
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : '',
         pageIds,
@@ -1372,6 +1392,109 @@ export default function EditProductPage({
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Sage Accounts */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-sm font-medium text-gray-700 mb-1">Sage Accounts</h3>
+              <p className="text-xs text-gray-400 mb-4">For Sage accounting &amp; CSV imports/exports</p>
+              <div className="space-y-4">
+
+                {/* Sales Account */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sales Account</label>
+                  <p className="text-xs text-gray-400 mb-2">For Sage accounting &amp; CSV imports/exports</p>
+                  <div className="relative" ref={salesAccountRef}>
+                    <button type="button" onClick={() => setSalesAccountDropdownOpen(!salesAccountDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={salesAccount.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {salesAccount.length === 0 ? 'Select account...' : salesAccount.length === 1 ? salesAccount[0] : `${salesAccount.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${salesAccountDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {salesAccountDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={salesAccount.length === 0} onChange={() => setSalesAccount([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {salesAccountOptions.map(opt => (
+                          <div key={opt} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={salesAccount.includes(opt)} onChange={e => setSalesAccount(e.target.checked ? [...salesAccount, opt] : salesAccount.filter(a => a !== opt))} className="rounded" />
+                              <span className="text-sm text-gray-900">{opt}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = salesAccountOptions.filter(o => o !== opt); setSalesAccountOptions(next); saveOptions('salesAccounts', next); setSalesAccount(prev => prev.filter(a => a !== opt)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newSalesAccountInput} onChange={e => setNewSalesAccountInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newSalesAccountInput.trim()) { e.preventDefault(); const v = newSalesAccountInput.trim(); if (!salesAccountOptions.includes(v)) { const next = [...salesAccountOptions, v]; setSalesAccountOptions(next); saveOptions('salesAccounts', next) }; setSalesAccount(prev => prev.includes(v) ? prev : [...prev, v]); setNewSalesAccountInput('') } }} placeholder="+ Add account..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { const v = newSalesAccountInput.trim(); if (!v) return; if (!salesAccountOptions.includes(v)) { const next = [...salesAccountOptions, v]; setSalesAccountOptions(next); saveOptions('salesAccounts', next) }; setSalesAccount(prev => prev.includes(v) ? prev : [...prev, v]); setNewSalesAccountInput('') }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {salesAccount.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {salesAccount.map(a => (
+                        <span key={a} className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-semibold">
+                          {a}<button type="button" onClick={() => setSalesAccount(salesAccount.filter(x => x !== a))} className="hover:text-green-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Purchase Account */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Account</label>
+                  <p className="text-xs text-gray-400 mb-2">For Sage accounting &amp; CSV imports/exports</p>
+                  <div className="relative" ref={purchaseAccountRef}>
+                    <button type="button" onClick={() => setPurchaseAccountDropdownOpen(!purchaseAccountDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={purchaseAccount.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {purchaseAccount.length === 0 ? 'Select account...' : purchaseAccount.length === 1 ? purchaseAccount[0] : `${purchaseAccount.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${purchaseAccountDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {purchaseAccountDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={purchaseAccount.length === 0} onChange={() => setPurchaseAccount([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {purchaseAccountOptions.map(opt => (
+                          <div key={opt} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={purchaseAccount.includes(opt)} onChange={e => setPurchaseAccount(e.target.checked ? [...purchaseAccount, opt] : purchaseAccount.filter(a => a !== opt))} className="rounded" />
+                              <span className="text-sm text-gray-900">{opt}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = purchaseAccountOptions.filter(o => o !== opt); setPurchaseAccountOptions(next); saveOptions('purchaseAccounts', next); setPurchaseAccount(prev => prev.filter(a => a !== opt)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newPurchaseAccountInput} onChange={e => setNewPurchaseAccountInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newPurchaseAccountInput.trim()) { e.preventDefault(); const v = newPurchaseAccountInput.trim(); if (!purchaseAccountOptions.includes(v)) { const next = [...purchaseAccountOptions, v]; setPurchaseAccountOptions(next); saveOptions('purchaseAccounts', next) }; setPurchaseAccount(prev => prev.includes(v) ? prev : [...prev, v]); setNewPurchaseAccountInput('') } }} placeholder="+ Add account..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { const v = newPurchaseAccountInput.trim(); if (!v) return; if (!purchaseAccountOptions.includes(v)) { const next = [...purchaseAccountOptions, v]; setPurchaseAccountOptions(next); saveOptions('purchaseAccounts', next) }; setPurchaseAccount(prev => prev.includes(v) ? prev : [...prev, v]); setNewPurchaseAccountInput('') }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {purchaseAccount.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {purchaseAccount.map(a => (
+                        <span key={a} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-semibold">
+                          {a}<button type="button" onClick={() => setPurchaseAccount(purchaseAccount.filter(x => x !== a))} className="hover:text-purple-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
 

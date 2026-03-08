@@ -843,8 +843,8 @@ export default function ProductsPage() {
                     <th className="w-6"></th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Product</th>
                     {visibleCols.sku && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">SKU</th>}
-                    {visibleCols.brand && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Brand</th>}
-                    {visibleCols.categories && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Categories</th>}
+                    {visibleCols.brand && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Category (Brand)</th>}
+                    {visibleCols.categories && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Item Categories (Unit)</th>}
                     {visibleCols.price && <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Price</th>}
                     {visibleCols.eta && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">ETA</th>}
                     {visibleCols.qty && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Qty</th>}
