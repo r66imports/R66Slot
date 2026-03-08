@@ -40,8 +40,10 @@ export interface Product {
   sageLastSynced: string | null
   unit: string
   units: string[]
-  salesAccount: string
-  purchaseAccount: string
+  categoryBrands: string[]
+  itemCategories: string[]
+  salesAccount: string[]
+  purchaseAccount: string[]
   createdAt: string
   updatedAt: string
 }
@@ -86,8 +88,10 @@ function rowToProduct(row: any): Product {
     sageLastSynced: row.sage_last_synced,
     unit: row.unit || 'Each',
     units: Array.isArray(row.units) ? row.units : [],
-    salesAccount: row.sales_account || '',
-    purchaseAccount: row.purchase_account || '',
+    categoryBrands: Array.isArray(row.category_brands) ? row.category_brands : [],
+    itemCategories: Array.isArray(row.item_categories) ? row.item_categories : [],
+    salesAccount: (() => { try { const v = JSON.parse(row.sales_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.sales_account ? [row.sales_account] : [] } })(),
+    purchaseAccount: (() => { try { const v = JSON.parse(row.purchase_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.purchase_account ? [row.purchase_account] : [] } })(),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -106,7 +110,9 @@ async function ensureProductColumns() {
         ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'Each',
         ADD COLUMN IF NOT EXISTS units JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS sales_account TEXT DEFAULT '',
-        ADD COLUMN IF NOT EXISTS purchase_account TEXT DEFAULT ''
+        ADD COLUMN IF NOT EXISTS purchase_account TEXT DEFAULT '',
+        ADD COLUMN IF NOT EXISTS category_brands JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS item_categories JSONB DEFAULT '[]'::jsonb
     `)
   } catch { /* ignore */ }
   _productColumnsMigrated = true
@@ -146,6 +152,8 @@ export async function POST(request: Request) {
     const primaryPageId = pageIds[0] || ''
     const carBrands: string[] = Array.isArray(body.carBrands) ? body.carBrands : []
     const revoParts: string[] = Array.isArray(body.revoParts) ? body.revoParts : []
+    const categoryBrands: string[] = Array.isArray(body.categoryBrands) ? body.categoryBrands : []
+    const itemCategories: string[] = Array.isArray(body.itemCategories) ? body.itemCategories : []
 
     await db.query(`
       INSERT INTO products (
@@ -154,11 +162,12 @@ export async function POST(request: Request) {
         scale, supplier, collections, tags, quantity, track_quantity,
         weight, weight_unit, box_size, dimensions, eta, status,
         image_url, images, page_id, page_ids, page_url, car_brands, revo_parts, is_pre_order,
-        seo, created_at, updated_at
+        seo, created_at, updated_at,
+        sales_account, purchase_account, category_brands, item_categories
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
         $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
-        $34,$35,$36
+        $34,$35,$36,$37,$38,$39,$40
       )
     `, [
       id, body.title, body.description || '',
@@ -174,6 +183,9 @@ export async function POST(request: Request) {
       primaryPageId, JSON.stringify(pageIds), body.pageUrl || '',
       JSON.stringify(carBrands), JSON.stringify(revoParts), body.isPreOrder || false,
       JSON.stringify(body.seo || {}), now, now,
+      JSON.stringify(Array.isArray(body.salesAccount) ? body.salesAccount : []),
+      JSON.stringify(Array.isArray(body.purchaseAccount) ? body.purchaseAccount : []),
+      JSON.stringify(categoryBrands), JSON.stringify(itemCategories),
     ])
 
     const result = await db.query(`SELECT * FROM products WHERE id = $1`, [id])

@@ -42,8 +42,10 @@ function rowToProduct(row: any): Product {
     sageLastSynced: row.sage_last_synced,
     units: Array.isArray(row.units) ? row.units : [],
     unit: row.unit || 'Each',
-    salesAccount: row.sales_account || '',
-    purchaseAccount: row.purchase_account || '',
+    categoryBrands: Array.isArray(row.category_brands) ? row.category_brands : [],
+    itemCategories: Array.isArray(row.item_categories) ? row.item_categories : [],
+    salesAccount: (() => { try { const v = JSON.parse(row.sales_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.sales_account ? [row.sales_account] : [] } })(),
+    purchaseAccount: (() => { try { const v = JSON.parse(row.purchase_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.purchase_account ? [row.purchase_account] : [] } })(),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -114,6 +116,10 @@ export async function PUT(
         is_pre_order = COALESCE($33, is_pre_order),
         seo = COALESCE($34, seo),
         units = COALESCE($35, units),
+        category_brands = COALESCE($37, category_brands),
+        item_categories = COALESCE($38, item_categories),
+        sales_account = COALESCE($39, sales_account),
+        purchase_account = COALESCE($40, purchase_account),
         updated_at = $36
       WHERE id = $1
       RETURNING *
@@ -154,6 +160,10 @@ export async function PUT(
       body.seo != null ? JSON.stringify(body.seo) : null,
       Array.isArray(body.units) ? JSON.stringify(body.units) : null,
       now,
+      Array.isArray(body.categoryBrands) ? JSON.stringify(body.categoryBrands) : null,
+      Array.isArray(body.itemCategories) ? JSON.stringify(body.itemCategories) : null,
+      body.salesAccount != null ? JSON.stringify(Array.isArray(body.salesAccount) ? body.salesAccount : []) : null,
+      body.purchaseAccount != null ? JSON.stringify(Array.isArray(body.purchaseAccount) ? body.purchaseAccount : []) : null,
     ])
 
     if (result.rowCount === 0) {
