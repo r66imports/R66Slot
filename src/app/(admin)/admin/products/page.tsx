@@ -41,6 +41,7 @@ interface Category {
   name: string
   slug: string
   class?: string
+  pageUrl?: string
 }
 
 interface PageItem {
@@ -287,7 +288,9 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [brandFilter, setBrandFilter] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState('')  // Task 2
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([])
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false)
+  const [showCatDropdown, setShowCatDropdown] = useState(false)
   const [revoFilter, setRevoFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
@@ -307,6 +310,8 @@ export default function ProductsPage() {
   const [fixingDupes, setFixingDupes] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const colPickerRef = useRef<HTMLDivElement>(null)
+  const brandDropdownRef = useRef<HTMLDivElement>(null)
+  const catDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!showColPicker) return
@@ -318,6 +323,28 @@ export default function ProductsPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showColPicker])
+
+  useEffect(() => {
+    if (!showBrandDropdown) return
+    const handler = (e: MouseEvent) => {
+      if (brandDropdownRef.current && !brandDropdownRef.current.contains(e.target as Node)) {
+        setShowBrandDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showBrandDropdown])
+
+  useEffect(() => {
+    if (!showCatDropdown) return
+    const handler = (e: MouseEvent) => {
+      if (catDropdownRef.current && !catDropdownRef.current.contains(e.target as Node)) {
+        setShowCatDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showCatDropdown])
 
   // Task 2: categories
   const [categories, setCategories] = useState<Category[]>([])
@@ -373,7 +400,7 @@ export default function ProductsPage() {
           title: `Copy of ${product.title}`,
           sku: product.sku ? `${product.sku}-copy` : '',
           status: 'draft',
-          mediaFiles: product.images?.length ? product.images : (product.imageUrl ? [product.imageUrl] : []),
+          mediaFiles: product.imageUrl ? [product.imageUrl] : [],
           imageUrl: product.imageUrl,
         }),
       })
@@ -580,7 +607,7 @@ export default function ProductsPage() {
   const filtered = products
     .filter((p) => {
       const matchBrand = !brandFilter || p.brand?.toLowerCase() === brandFilter.toLowerCase()
-      const matchCat = !categoryFilter || (p.collections || []).includes(categoryFilter) || (p.categories || []).includes(categoryFilter)
+      const matchCat = categoryFilters.length === 0 || categoryFilters.some((f) => (p.collections || []).includes(f) || (p.categories || []).includes(f))
       const matchRevo = !revoFilter || (p.revoParts || []).includes(revoFilter)
       const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
       return matchBrand && matchCat && matchRevo && matchSearch
@@ -634,29 +661,90 @@ export default function ProductsPage() {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1 min-w-[180px] max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
         />
-        {/* Brand filter */}
-        <select
-          value={brandFilter}
-          onChange={(e) => setBrandFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900"
-        >
-          <option value="">All Brands</option>
-          {brands.map((b) => <option key={b} value={b}>{b}</option>)}
-        </select>
+        {/* ── All Products dropdown ── */}
+        <div className="relative" ref={brandDropdownRef}>
+          <button
+            onClick={() => setShowBrandDropdown((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 ${brandFilter ? 'border-gray-900 font-semibold text-gray-900' : 'border-gray-300 text-gray-700'}`}
+          >
+            {brandFilter || 'All Products'}
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showBrandDropdown && (
+            <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[180px] py-1">
+              <button
+                onClick={() => { setBrandFilter(''); setShowBrandDropdown(false) }}
+                className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${!brandFilter ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
+              >
+                <span>All Products</span>
+                <span className="text-xs text-gray-400 ml-4">{products.length}</span>
+              </button>
+              <div className="border-t border-gray-100 my-1" />
+              {brands.map((b) => (
+                <button
+                  key={b}
+                  onClick={() => { setBrandFilter(b); setShowBrandDropdown(false) }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${brandFilter === b ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
+                >
+                  <span>{b}</span>
+                  <span className="text-xs text-gray-400 ml-4">{products.filter((p) => p.brand === b).length}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* ── Task 2: Category filter ── */}
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900"
-        >
-          <option value="">All Categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.slug}>
-              {c.name}{c.class ? ` (${c.class})` : ''}
-            </option>
-          ))}
-        </select>
+        {/* ── Category multi-select ── */}
+        <div className="relative" ref={catDropdownRef}>
+          <button
+            onClick={() => setShowCatDropdown((v) => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 ${categoryFilters.length > 0 ? 'border-gray-900 font-semibold text-gray-900 bg-gray-50' : 'border-gray-300 text-gray-700'}`}
+          >
+            {categoryFilters.length === 0 ? 'All Categories' : `${categoryFilters.length} selected`}
+            <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showCatDropdown && (
+            <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[240px] py-2 max-h-72 overflow-y-auto">
+              <div className="flex items-center justify-between px-3 pb-1.5 border-b border-gray-100 mb-1">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Filter by Category</p>
+                {categoryFilters.length > 0 && (
+                  <button onClick={() => setCategoryFilters([])} className="text-[10px] text-red-500 hover:text-red-700 font-medium">Clear all</button>
+                )}
+              </div>
+              {categories.map((c) => (
+                <label key={c.id} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={categoryFilters.includes(c.slug)}
+                    onChange={() =>
+                      setCategoryFilters((prev) =>
+                        prev.includes(c.slug) ? prev.filter((f) => f !== c.slug) : [...prev, c.slug]
+                      )
+                    }
+                    className="h-3.5 w-3.5 accent-gray-900 flex-shrink-0"
+                  />
+                  <span className="text-sm text-gray-700 flex-1 leading-tight">
+                    {c.name}{c.class ? <span className="text-gray-400 text-[11px]"> ({c.class})</span> : ''}
+                  </span>
+                  {c.pageUrl && (
+                    <a
+                      href={c.pageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[11px] text-blue-500 hover:text-blue-700 flex-shrink-0"
+                      title={`Open ${c.name} page`}
+                    >↗</a>
+                  )}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Revo Parts filter */}
         {allRevoParts.length > 0 && (
@@ -672,9 +760,9 @@ export default function ProductsPage() {
           </select>
         )}
 
-        {(searchQuery || brandFilter || categoryFilter || revoFilter) && (
+        {(searchQuery || brandFilter || categoryFilters.length > 0 || revoFilter) && (
           <button
-            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilter(''); setRevoFilter('') }}
+            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilters([]); setRevoFilter('') }}
             className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-lg"
           >
             Clear ✕
@@ -827,10 +915,22 @@ export default function ProductsPage() {
                         {visibleCols.categories && (
                           <td className="py-3 px-4">
                             {allCats.length > 0 ? (
-                              <div className="flex flex-wrap gap-1 max-w-[140px]">
-                                {allCats.slice(0, 3).map((c) => (
-                                  <span key={c} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full">{c}</span>
-                                ))}
+                              <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                {allCats.slice(0, 3).map((c) => {
+                                  const cat = categories.find((cat) => cat.slug === c || cat.name === c)
+                                  return cat?.pageUrl ? (
+                                    <a
+                                      key={c}
+                                      href={cat.pageUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full hover:bg-blue-100"
+                                      title={cat.pageUrl}
+                                    >{c}</a>
+                                  ) : (
+                                    <span key={c} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full">{c}</span>
+                                  )
+                                })}
                                 {allCats.length > 3 && <span className="text-[10px] text-gray-400">+{allCats.length - 3}</span>}
                               </div>
                             ) : (
