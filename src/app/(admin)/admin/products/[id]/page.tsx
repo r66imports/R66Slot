@@ -102,6 +102,11 @@ export default function EditProductPage({
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
   const [customCarBrands, setCustomCarBrands] = useState<string[]>([])
   const [newCarBrandInput, setNewCarBrandInput] = useState('')
+  const [sidewaysBrands, setSidewaysBrands] = useState<string[]>([])
+  const [sidewaysBrandDropdownOpen, setSidewaysBrandDropdownOpen] = useState(false)
+  const [customSidewaysBrands, setCustomSidewaysBrands] = useState<string[]>([])
+  const [newSidewaysBrandInput, setNewSidewaysBrandInput] = useState('')
+  const [saveInPlaceSuccess, setSaveInPlaceSuccess] = useState(false)
   const [isPreOrder, setIsPreOrder] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
@@ -168,6 +173,7 @@ export default function EditProductPage({
   const purchaseAccountRef = useRef<HTMLDivElement>(null)
   const carClassRef = useRef<HTMLDivElement>(null)
   const revoPartRef = useRef<HTMLDivElement>(null)
+  const sidewaysBrandRef = useRef<HTMLDivElement>(null)
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -251,6 +257,9 @@ export default function EditProductPage({
           const loadedBrands: string[] = Array.isArray((found as any).carBrands) ? (found as any).carBrands : []
           setCarBrands(loadedBrands)
           setCustomCarBrands(loadedBrands.filter(b => !BASE_CAR_BRANDS.includes(b)))
+          const loadedSidewaysBrands: string[] = Array.isArray((found as any).sidewaysBrands) ? (found as any).sidewaysBrands : []
+          setSidewaysBrands(loadedSidewaysBrands)
+          setCustomSidewaysBrands(loadedSidewaysBrands.filter(b => !BASE_CAR_BRANDS.includes(b)))
           setIsPreOrder((found as any).isPreOrder || false)
           setUnits(Array.isArray((found as any).units) ? (found as any).units : [])
           setSelectedCarClasses(Array.isArray((found as any).carClasses) ? (found as any).carClasses : ((found as any).carClass ? [(found as any).carClass] : []))
@@ -372,7 +381,7 @@ export default function EditProductPage({
           sku, barcode, trackQuantity, quantity: cleanInt(quantity),
           weight: weight ? cleanFloat(weight) : null, weightUnit,
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
-          carBrands, isPreOrder, units, salesAccount, purchaseAccount,
+          carBrands, sidewaysBrands, isPreOrder, units, salesAccount, purchaseAccount,
           carClass: selectedCarClasses[0] || '', revoParts: selectedRevoParts,
           carType: carTypes[0] || carType, carTypes, partType, scale, supplier, collections,
           tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
@@ -404,7 +413,7 @@ export default function EditProductPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
       quantity, weight, weightUnit, brand, productType, categoryBrands, itemCategories,
-      carBrands, isPreOrder, units, carTypes, partType, scale, supplier, collections,
+      carBrands, sidewaysBrands, isPreOrder, units, carTypes, partType, scale, supplier, collections,
       selectedCarClasses, selectedRevoParts,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
       seoTitle, seoDescription, seoKeywords, salesAccount, purchaseAccount])
@@ -424,6 +433,7 @@ export default function EditProductPage({
       if (purchaseAccountRef.current && !purchaseAccountRef.current.contains(t)) setPurchaseAccountDropdownOpen(false)
       if (carClassRef.current && !carClassRef.current.contains(t)) setCarClassDropdownOpen(false)
       if (revoPartRef.current && !revoPartRef.current.contains(t)) setRevoPartDropdownOpen(false)
+      if (sidewaysBrandRef.current && !sidewaysBrandRef.current.contains(t)) setSidewaysBrandDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -454,7 +464,7 @@ export default function EditProductPage({
     return uploadedUrls
   }
 
-  const handleSave = async () => {
+  const handleSave = async (shouldRedirect = true) => {
     setSaving(true)
     setSaveError('')
 
@@ -489,6 +499,7 @@ export default function EditProductPage({
         categoryBrands,
         itemCategories,
         carBrands,
+        sidewaysBrands,
         carClass: selectedCarClasses[0] || '',
         revoParts: selectedRevoParts,
         isPreOrder,
@@ -529,7 +540,13 @@ export default function EditProductPage({
       })
 
       if (res.ok) {
-        router.push('/admin/products')
+        if (shouldRedirect) {
+          router.push('/admin/products')
+        } else {
+          setSaving(false)
+          setSaveInPlaceSuccess(true)
+          setTimeout(() => setSaveInPlaceSuccess(false), 2500)
+        }
       } else {
         let errMsg = `Server error (${res.status})`
         try {
@@ -631,11 +648,18 @@ export default function EditProductPage({
               {autosaveStatus === 'saving' && <span className="text-xs text-gray-400">Saving...</span>}
               {autosaveStatus === 'saved' && <span className="text-xs text-green-600 font-medium">Saved ✓</span>}
               <button
-                onClick={handleSave}
+                onClick={() => handleSave(false)}
+                className="px-4 py-2 text-sm font-medium text-yellow-300 bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                disabled={saving}
+              >
+                {saveInPlaceSuccess ? 'Saved ✓' : saving ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => handleSave(true)}
                 className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
                 disabled={saving}
               >
-                {uploadingImages ? 'Uploading images...' : saving ? 'Saving...' : 'Save & Exit'}
+                {uploadingImages ? 'Uploading...' : saving ? 'Saving...' : 'Save & Exit'}
               </button>
             </div>
           </div>
@@ -1033,9 +1057,9 @@ export default function EditProductPage({
                   </button>
                 </div>
 
-                {/* Car Brands (multi-select checkbox dropdown) */}
+                {/* Revo Cars Brand Page (multi-select checkbox dropdown) */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Car Brand</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Revo Cars Brand Page</label>
                   <div className="relative" ref={carBrandRef}>
                     <button
                       type="button"
@@ -1208,6 +1232,95 @@ export default function EditProductPage({
                       {selectedRevoParts.map(part => (
                         <span key={part} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
                           {part}<button type="button" onClick={() => setSelectedRevoParts(selectedRevoParts.filter(p => p !== part))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sideways Cars Brand Page */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sideways Cars Brand Page</label>
+                  <div className="relative" ref={sidewaysBrandRef}>
+                    <button
+                      type="button"
+                      onClick={() => setSidewaysBrandDropdownOpen(!sidewaysBrandDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
+                    >
+                      <span className={sidewaysBrands.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {sidewaysBrands.length === 0
+                          ? 'No brand assigned'
+                          : sidewaysBrands.length === 1
+                          ? sidewaysBrands[0]
+                          : `${sidewaysBrands.length} brands selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${sidewaysBrandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {sidewaysBrandDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input
+                            type="checkbox"
+                            checked={sidewaysBrands.length === 0}
+                            onChange={() => setSidewaysBrands([])}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-gray-500 italic">None</span>
+                        </label>
+                        {[...BASE_CAR_BRANDS, ...customSidewaysBrands].map((cb) => (
+                          <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={sidewaysBrands.includes(cb)}
+                              onChange={(e) => setSidewaysBrands(e.target.checked ? [...sidewaysBrands, cb] : sidewaysBrands.filter(b => b !== cb))}
+                              className="rounded"
+                            />
+                            <span className="text-sm text-gray-900">{cb}</span>
+                          </label>
+                        ))}
+                        <div className="flex items-center gap-1 px-3 py-2 border-t border-gray-100">
+                          <input
+                            type="text"
+                            value={newSidewaysBrandInput}
+                            onChange={(e) => setNewSidewaysBrandInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                const val = newSidewaysBrandInput.trim()
+                                if (val && ![...BASE_CAR_BRANDS, ...customSidewaysBrands].includes(val)) {
+                                  setCustomSidewaysBrands(prev => [...prev, val])
+                                  setSidewaysBrands(prev => [...prev, val])
+                                }
+                                setNewSidewaysBrandInput('')
+                              }
+                            }}
+                            placeholder="Add brand..."
+                            className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = newSidewaysBrandInput.trim()
+                              if (val && ![...BASE_CAR_BRANDS, ...customSidewaysBrands].includes(val)) {
+                                setCustomSidewaysBrands(prev => [...prev, val])
+                                setSidewaysBrands(prev => [...prev, val])
+                              }
+                              setNewSidewaysBrandInput('')
+                            }}
+                            className="text-xs px-2 py-1 bg-gray-900 text-white rounded hover:bg-gray-700"
+                          >+Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {sidewaysBrands.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {sidewaysBrands.map(cb => (
+                        <span key={cb} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
+                          {cb}
+                          <button type="button" onClick={() => setSidewaysBrands(sidewaysBrands.filter(b => b !== cb))} className="hover:text-red-900">×</button>
                         </span>
                       ))}
                     </div>
