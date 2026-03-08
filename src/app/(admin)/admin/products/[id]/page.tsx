@@ -1263,44 +1263,6 @@ export default function EditProductPage({
                   </div>
                 </div>
 
-                {/* Units */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Units</label>
-                  <p className="text-xs text-gray-400 mb-2">e.g. Each, Pair, Box of 10 — autosaves on add</p>
-                  {units.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {units.map((u) => (
-                        <span key={u} className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-gray-100 text-gray-800 text-xs rounded-full font-medium">
-                          {u}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteUnit(u)}
-                            className="hover:text-red-600 text-gray-400 leading-none"
-                            title={`Delete "${u}"`}
-                          >×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newUnitInput}
-                      onChange={(e) => setNewUnitInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddUnit() } }}
-                      placeholder="Add unit…"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddUnit}
-                      disabled={!newUnitInput.trim()}
-                      className="px-3 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40"
-                    >Add</button>
-                  </div>
-                  {unitSaved && <p className="text-xs text-green-600 mt-1">Saved ✓</p>}
-                </div>
-
                 {/* Tags */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
