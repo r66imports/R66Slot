@@ -2,106 +2,42 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import type { Page } from '@/lib/pages/schema'
 
-// Frontend pages that customers see
 const FRONTEND_PAGES = [
-  {
-    id: 'homepage',
-    title: 'Homepage',
-    slug: '',
-    description: 'Main landing page customers see when they visit your site',
-    icon: '🏠',
-    editable: true,
-  },
-  {
-    id: 'products',
-    title: 'Products Page',
-    slug: 'products',
-    description: 'Product catalog and listings',
-    icon: '🛍️',
-    editable: true,
-  },
-  {
-    id: 'about',
-    title: 'About Page',
-    slug: 'about',
-    description: 'Tell customers about your business',
-    icon: 'ℹ️',
-    editable: true,
-  },
-  {
-    id: 'contact',
-    title: 'Contact Page',
-    slug: 'contact',
-    description: 'Contact information and form',
-    icon: '📧',
-    editable: true,
-  },
-  {
-    id: 'book-now',
-    title: 'Book Now Page',
-    slug: 'book',
-    description: 'Pre-order booking page for customers',
-    icon: '📋',
-    editable: true,
-  },
+  { id: 'homepage',  title: 'Homepage',  slug: '',        icon: '🏠' },
+  { id: 'products',  title: 'Products',  slug: 'products', icon: '🛍️' },
+  { id: 'about',     title: 'About',     slug: 'about',    icon: 'ℹ️' },
+  { id: 'contact',   title: 'Contact',   slug: 'contact',  icon: '📧' },
+  { id: 'book-now',  title: 'Book Now',  slug: 'book',     icon: '📋' },
 ]
 
 type PageGroup = 'isWebsitePage' | 'isRevoPage' | 'isPioneerPage' | 'isSidewaysPage' | 'isBrmPage'
 
-const BRAND_SECTIONS: { key: PageGroup; label: string; color: string; icon: string }[] = [
-  { key: 'isWebsitePage',  label: 'NSR Pages',      color: 'green',  icon: '🏎️' },
-  { key: 'isRevoPage',     label: 'Revo Pages',     color: 'teal',   icon: '🏁' },
-  { key: 'isPioneerPage',  label: 'Pioneer Pages',  color: 'blue',   icon: '🏎️' },
-  { key: 'isSidewaysPage', label: 'Sideways Pages', color: 'violet', icon: '🏎️' },
-  { key: 'isBrmPage',      label: 'BRM Pages',      color: 'red',    icon: '🏎️' },
+const BRAND_SECTIONS: { key: PageGroup; label: string }[] = [
+  { key: 'isWebsitePage',  label: 'NSR Pages'      },
+  { key: 'isRevoPage',     label: 'Revo Pages'     },
+  { key: 'isPioneerPage',  label: 'Pioneer Pages'  },
+  { key: 'isSidewaysPage', label: 'Sideways Pages' },
+  { key: 'isBrmPage',      label: 'BRM Pages'      },
 ]
 
-const COLOR_MAP: Record<string, { border: string; bg: string; badge: string; btn: string }> = {
-  green:  { border: 'border-green-200',  bg: 'bg-green-50',  badge: 'bg-green-100 text-green-700',   btn: 'bg-green-600 text-white hover:bg-green-700 border-green-600'  },
-  teal:   { border: 'border-teal-200',   bg: 'bg-teal-50',   badge: 'bg-teal-100 text-teal-700',     btn: 'bg-teal-600 text-white hover:bg-teal-700 border-teal-600'    },
-  blue:   { border: 'border-blue-200',   bg: 'bg-blue-50',   badge: 'bg-blue-100 text-blue-700',     btn: 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600'    },
-  violet: { border: 'border-violet-200', bg: 'bg-violet-50', badge: 'bg-violet-100 text-violet-700', btn: 'bg-violet-600 text-white hover:bg-violet-700 border-violet-600' },
-  red:    { border: 'border-red-200',    bg: 'bg-red-50',    badge: 'bg-red-100 text-red-700',       btn: 'bg-red-600 text-white hover:bg-red-700 border-red-600'       },
-}
-
-function getPageColor(page: Page): string | null {
-  for (const section of BRAND_SECTIONS) {
-    if (page[section.key]) return section.color
-  }
-  return null
-}
-
+// ─── Inline Editable Title ─────────────────────────────────────────────────
 function InlineEditableTitle({
-  value,
-  onSave,
-  className,
-}: {
-  value: string
-  onSave: (newTitle: string) => void
-  className?: string
-}) {
+  value, onSave, className,
+}: { value: string; onSave: (v: string) => void; className?: string }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value)
+  const [draft, setDraft]     = useState(value)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }
+    if (editing) { inputRef.current?.focus(); inputRef.current?.select() }
   }, [editing])
 
   const commit = () => {
-    const trimmed = draft.trim()
-    if (trimmed && trimmed !== value) {
-      onSave(trimmed)
-    } else {
-      setDraft(value)
-    }
+    const t = draft.trim()
+    if (t && t !== value) onSave(t)
+    else setDraft(value)
     setEditing(false)
   }
 
@@ -111,16 +47,14 @@ function InlineEditableTitle({
         ref={inputRef}
         type="text"
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={e => setDraft(e.target.value)}
         onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit()
-          if (e.key === 'Escape') {
-            setDraft(value)
-            setEditing(false)
-          }
+        onKeyDown={e => {
+          if (e.key === 'Enter')  commit()
+          if (e.key === 'Escape') { setDraft(value); setEditing(false) }
         }}
-        className={`${className} border border-blue-400 rounded px-2 py-0.5 outline-none focus:ring-2 focus:ring-blue-500 bg-white`}
+        className={`${className} border border-blue-400 rounded px-1 outline-none focus:ring-1 focus:ring-blue-500 bg-white w-full max-w-xs`}
+        onClick={e => e.stopPropagation()}
       />
     )
   }
@@ -128,7 +62,7 @@ function InlineEditableTitle({
   return (
     <span
       onDoubleClick={() => setEditing(true)}
-      className={`${className} cursor-pointer hover:bg-gray-100 rounded px-1 -mx-1`}
+      className={`${className} cursor-pointer hover:text-blue-600`}
       title="Double-click to rename"
     >
       {value}
@@ -136,65 +70,304 @@ function InlineEditableTitle({
   )
 }
 
+// ─── Drag Handle Icon ──────────────────────────────────────────────────────
+function DragHandle() {
+  return (
+    <svg className="w-4 h-4 text-gray-300 group-hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0" viewBox="0 0 16 16" fill="currentColor">
+      <circle cx="5" cy="4" r="1.2" />
+      <circle cx="5" cy="8" r="1.2" />
+      <circle cx="5" cy="12" r="1.2" />
+      <circle cx="11" cy="4" r="1.2" />
+      <circle cx="11" cy="8" r="1.2" />
+      <circle cx="11" cy="12" r="1.2" />
+    </svg>
+  )
+}
+
+// ─── Hidden Icon ──────────────────────────────────────────────────────────
+function HiddenIcon() {
+  return (
+    <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+    </svg>
+  )
+}
+
+// ─── Page Row ─────────────────────────────────────────────────────────────
+interface PageRowProps {
+  page: Page
+  isDragging: boolean
+  isDragOver: boolean
+  onDragStart: (e: React.DragEvent, id: string) => void
+  onDragOver:  (e: React.DragEvent, id: string) => void
+  onDrop:      (e: React.DragEvent, id: string) => void
+  onDragEnd:   () => void
+  onRename:      (id: string, title: string) => void
+  onDuplicate:   (page: Page) => void
+  onDelete:      (id: string) => void
+  onToggleGroup: (pageId: string, group: PageGroup) => void
+  togglingIds:   Set<string>
+}
+
+function PageRow({
+  page, isDragging, isDragOver,
+  onDragStart, onDragOver, onDrop, onDragEnd,
+  onRename, onDuplicate, onDelete, onToggleGroup, togglingIds,
+}: PageRowProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const h = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [menuOpen])
+
+  return (
+    <div
+      draggable
+      onDragStart={e => onDragStart(e, page.id)}
+      onDragOver={e => { e.preventDefault(); onDragOver(e, page.id) }}
+      onDrop={e => onDrop(e, page.id)}
+      onDragEnd={onDragEnd}
+      className={[
+        'group flex items-center gap-2 px-3 py-2 border-b border-gray-100 transition-colors',
+        'hover:bg-blue-50',
+        isDragging  ? 'opacity-30 bg-blue-50' : '',
+        isDragOver  ? 'border-t-2 border-t-blue-500 bg-blue-50/50' : '',
+      ].join(' ')}
+    >
+      <DragHandle />
+      <span className="text-sm select-none flex-shrink-0">📄</span>
+      <div className="flex-1 min-w-0">
+        <InlineEditableTitle
+          value={page.title}
+          onSave={title => onRename(page.id, title)}
+          className="text-sm font-medium text-gray-800 block truncate"
+        />
+        <span className="text-xs text-gray-400 truncate block">/{page.slug}</span>
+      </div>
+
+      {!page.published && <HiddenIcon />}
+
+      {/* ··· menu */}
+      <div className="relative flex-shrink-0" ref={menuRef}>
+        <button
+          onClick={() => setMenuOpen(v => !v)}
+          className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-gray-200 text-gray-500 hover:text-gray-700 select-none text-sm leading-none"
+          title="Page options"
+        >
+          •••
+        </button>
+        {menuOpen && (
+          <div className="absolute right-0 top-7 z-50 bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[190px]">
+            <Link
+              href={`/admin/pages/editor/${page.id}`}
+              onClick={() => setMenuOpen(false)}
+              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              ✏️ Edit Page
+            </Link>
+            {page.published && (
+              <Link
+                href={`/${page.slug}`}
+                target="_blank"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                👁 View Live ↗
+              </Link>
+            )}
+            <button
+              onClick={() => { onDuplicate(page); setMenuOpen(false) }}
+              className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              📋 Duplicate
+            </button>
+
+            <div className="border-t border-gray-100 mt-1">
+              <p className="px-4 pt-2 pb-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Sections</p>
+            </div>
+            {BRAND_SECTIONS.map(s => (
+              <button
+                key={s.key}
+                onClick={() => { onToggleGroup(page.id, s.key); setMenuOpen(false) }}
+                disabled={togglingIds.has(page.id)}
+                className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                <span className={[
+                  'w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 text-xs',
+                  page[s.key] ? 'bg-gray-800 border-gray-800 text-white' : 'border-gray-300',
+                ].join(' ')}>
+                  {page[s.key] ? '✓' : ''}
+                </span>
+                {s.label}
+              </button>
+            ))}
+
+            <div className="border-t border-gray-100 my-1" />
+            <button
+              onClick={() => { onDelete(page.id); setMenuOpen(false) }}
+              className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            >
+              🗑 Delete
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Section Header ───────────────────────────────────────────────────────
+function SectionHeader({
+  label, count, collapsed, onToggle, onAdd,
+}: {
+  label: string
+  count: number
+  collapsed: boolean
+  onToggle: () => void
+  onAdd?: () => void
+}) {
+  return (
+    <div className="bg-gray-50 border-b border-gray-200 flex items-center">
+      <button
+        onClick={onToggle}
+        className="flex-1 flex items-center justify-between px-3 py-2.5 hover:bg-gray-100 transition-colors text-left"
+      >
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          {label} <span className="font-normal text-gray-400">({count})</span>
+        </span>
+        <span className={[
+          'w-5 h-5 rounded border flex items-center justify-center text-sm font-bold flex-shrink-0',
+          collapsed ? 'border-gray-400 text-gray-600' : 'border-gray-300 text-gray-500',
+        ].join(' ')}>
+          {collapsed ? '+' : '−'}
+        </span>
+      </button>
+      {onAdd && (
+        <button
+          onClick={onAdd}
+          className="px-3 py-2.5 text-xs text-blue-600 hover:text-blue-700 font-medium border-l border-gray-200 hover:bg-blue-50 transition-colors"
+        >
+          + Add
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────
 export default function PagesManagementPage() {
-  const [customPages, setCustomPages] = useState<Page[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [customPages,   setCustomPages]   = useState<Page[]>([])
+  const [isLoading,     setIsLoading]     = useState(true)
+  const [searchQuery,   setSearchQuery]   = useState('')
+  const [togglingIds,   setTogglingIds]   = useState<Set<string>>(new Set())
+
+  // Collapsible sections — key → collapsed boolean, persisted in localStorage
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+
+  // Per-section page order — key → array of page IDs, persisted in localStorage
+  const [sectionOrders, setSectionOrders] = useState<Record<string, string[]>>({})
+
+  // Drag state
+  const [draggedId,  setDraggedId]  = useState<string | null>(null)
+  const [dragOverId, setDragOverId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchCustomPages()
+    try {
+      const c = localStorage.getItem('admin_pages_collapsed_v2')
+      if (c) setCollapsed(JSON.parse(c))
+      const o = localStorage.getItem('admin_pages_section_orders_v2')
+      if (o) setSectionOrders(JSON.parse(o))
+    } catch {}
   }, [])
 
   const fetchCustomPages = async () => {
     try {
-      const response = await fetch('/api/admin/pages', { cache: 'no-store' })
-      if (!response.ok) {
-        console.error('Error fetching pages:', response.status, response.statusText)
-        return
+      const res = await fetch('/api/admin/pages', { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        setCustomPages(Array.isArray(data) ? data : [])
       }
-      const data = await response.json()
-      setCustomPages(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Error fetching pages:', error)
-    } finally {
-      setIsLoading(false)
-    }
+    } catch {}
+    finally { setIsLoading(false) }
   }
 
-  const handleSaveAll = async () => {
-    setIsSaving(true)
-    setSaveMessage(null)
-    try {
-      const results = await Promise.all(
-        customPages.map((page) =>
-          fetch(`/api/admin/pages/${page.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(page),
-          })
-        )
-      )
-      const allOk = results.every((r) => r.ok)
-      setSaveMessage(allOk ? 'All pages saved successfully!' : 'Some pages failed to save.')
-    } catch (error) {
-      console.error('Error saving pages:', error)
-      setSaveMessage('Failed to save pages.')
-    } finally {
-      setIsSaving(false)
-      setTimeout(() => setSaveMessage(null), 3000)
-    }
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  const toggleSection = (key: string) => {
+    setCollapsed(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      try { localStorage.setItem('admin_pages_collapsed_v2', JSON.stringify(next)) } catch {}
+      return next
+    })
   }
+
+  const getSortedPages = (pages: Page[], sectionKey: string): Page[] => {
+    const order = sectionOrders[sectionKey] ?? []
+    return [...pages].sort((a, b) => {
+      const ai = order.indexOf(a.id)
+      const bi = order.indexOf(b.id)
+      if (ai === -1 && bi === -1) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      if (ai === -1) return 1
+      if (bi === -1) return -1
+      return ai - bi
+    })
+  }
+
+  const saveSectionOrder = (sectionKey: string, ids: string[]) => {
+    setSectionOrders(prev => {
+      const next = { ...prev, [sectionKey]: ids }
+      try { localStorage.setItem('admin_pages_section_orders_v2', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
+  // ── Drag & Drop ──────────────────────────────────────────────────────────
+
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    setDraggedId(id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (id !== dragOverId) setDragOverId(id)
+  }
+
+  const handleDrop = (e: React.DragEvent, targetId: string, sectionPages: Page[], sectionKey: string) => {
+    e.preventDefault()
+    if (!draggedId || draggedId === targetId) { setDraggedId(null); setDragOverId(null); return }
+
+    const ids = sectionPages.map(p => p.id)
+    const from = ids.indexOf(draggedId)
+    const to   = ids.indexOf(targetId)
+    if (from === -1 || to === -1) { setDraggedId(null); setDragOverId(null); return }
+
+    const newIds = [...ids]
+    newIds.splice(from, 1)
+    newIds.splice(to, 0, draggedId)
+    saveSectionOrder(sectionKey, newIds)
+
+    setDraggedId(null)
+    setDragOverId(null)
+  }
+
+  const handleDragEnd = () => { setDraggedId(null); setDragOverId(null) }
+
+  // ── Page Actions ─────────────────────────────────────────────────────────
 
   const handleRename = async (id: string, newTitle: string) => {
     try {
-      const newSlug = newTitle
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
+      const newSlug = newTitle.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+        .replace(/-+/g, '-').replace(/^-|-$/g, '')
       const res = await fetch(`/api/admin/pages/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -202,53 +375,22 @@ export default function PagesManagementPage() {
       })
       if (res.ok) {
         const updated = await res.json()
-        setCustomPages((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, title: updated.title, slug: updated.slug } : p))
-        )
+        setCustomPages(prev => prev.map(p => p.id === id ? { ...p, title: updated.title, slug: updated.slug } : p))
       }
-    } catch (error) {
-      console.error('Error renaming page:', error)
-    }
+    } catch {}
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this page?')) return
+    if (!confirm('Delete this page?')) return
     try {
-      const response = await fetch(`/api/admin/pages/${id}`, { method: 'DELETE' })
-      if (response.ok) {
-        setCustomPages(customPages.filter((p) => p.id !== id))
-      }
-    } catch (error) {
-      console.error('Error deleting page:', error)
-      alert('Failed to delete page')
-    }
-  }
-
-  const handleCreatePage = async () => {
-    try {
-      const response = await fetch('/api/admin/pages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: 'New Page',
-          slug: `page-${Date.now()}`,
-          published: false,
-          components: [],
-        }),
-      })
-      if (response.ok) {
-        const newPage = await response.json()
-        window.location.href = `/admin/pages/editor/${newPage.id}`
-      }
-    } catch (error) {
-      console.error('Error creating page:', error)
-      alert('Failed to create page')
-    }
+      const res = await fetch(`/api/admin/pages/${id}`, { method: 'DELETE' })
+      if (res.ok) setCustomPages(prev => prev.filter(p => p.id !== id))
+    } catch {}
   }
 
   const handleDuplicatePage = async (page: Page) => {
     try {
-      const response = await fetch('/api/admin/pages', {
+      const res = await fetch('/api/admin/pages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -258,548 +400,249 @@ export default function PagesManagementPage() {
           components: page.components,
           pageSettings: page.pageSettings,
           seo: {
-            metaTitle: `${page.seo?.metaTitle || page.title} (Copy)`,
+            metaTitle:       `${page.seo?.metaTitle || page.title} (Copy)`,
             metaDescription: page.seo?.metaDescription || '',
-            metaKeywords: page.seo?.metaKeywords || '',
+            metaKeywords:    page.seo?.metaKeywords || '',
           },
         }),
       })
-      if (response.ok) {
-        const newPage = await response.json()
-        setCustomPages((prev) => [...prev, newPage])
-      } else {
-        alert('Failed to duplicate page')
+      if (res.ok) {
+        const newPage = await res.json()
+        setCustomPages(prev => [...prev, newPage])
       }
-    } catch (error) {
-      console.error('Error duplicating page:', error)
-      alert('Failed to duplicate page')
-    }
+    } catch {}
   }
 
-  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set())
-
-  const handleTogglePageGroup = async (e: React.MouseEvent, id: string, group: PageGroup) => {
-    e.preventDefault()
-    e.stopPropagation()
-
-    const page = customPages.find((p) => p.id === id)
-    if (!page || togglingIds.has(id)) return
-
-    const newValue = !page[group]
-
-    setCustomPages((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, [group]: newValue } : p))
-    )
-    setTogglingIds((prev) => new Set(prev).add(id))
-
+  const handleCreatePage = async () => {
     try {
-      const res = await fetch(`/api/admin/pages/${id}`, {
+      const res = await fetch('/api/admin/pages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New Page', slug: `page-${Date.now()}`, published: false, components: [] }),
+      })
+      if (res.ok) {
+        const newPage = await res.json()
+        window.location.href = `/admin/pages/editor/${newPage.id}`
+      }
+    } catch {}
+  }
+
+  const handleToggleGroup = async (pageId: string, group: PageGroup) => {
+    const page = customPages.find(p => p.id === pageId)
+    if (!page || togglingIds.has(pageId)) return
+    const newValue = !page[group]
+    setCustomPages(prev => prev.map(p => p.id === pageId ? { ...p, [group]: newValue } : p))
+    setTogglingIds(prev => new Set(prev).add(pageId))
+    try {
+      const res = await fetch(`/api/admin/pages/${pageId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ [group]: newValue }),
       })
-      if (!res.ok) {
-        setCustomPages((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, [group]: !newValue } : p))
-        )
-      }
-    } catch (error) {
-      console.error('Error toggling page group:', error)
-      setCustomPages((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, [group]: !newValue } : p))
-      )
+      if (!res.ok) setCustomPages(prev => prev.map(p => p.id === pageId ? { ...p, [group]: !newValue } : p))
+    } catch {
+      setCustomPages(prev => prev.map(p => p.id === pageId ? { ...p, [group]: !newValue } : p))
     } finally {
-      setTogglingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(id)
-        return next
-      })
+      setTogglingIds(prev => { const n = new Set(prev); n.delete(pageId); return n })
     }
   }
 
-  // Search across all pages by URL/slug
-  const allSearchablePages = [
-    ...FRONTEND_PAGES.map((p) => ({
-      id: p.id,
-      title: p.title,
-      slug: p.slug,
-      type: 'frontend' as const,
-      icon: p.icon,
-      description: p.description,
-    })),
-    ...customPages.map((p) => ({
-      id: p.id,
-      title: p.title,
-      slug: p.slug,
-      type: 'custom' as const,
-      icon: '📄',
-      description: `/${p.slug}`,
-    })),
+  // ── Search ───────────────────────────────────────────────────────────────
+
+  const normalizeSearch = (q: string) => {
+    let s = q.trim().toLowerCase()
+    try { s = new URL(s).pathname.replace(/^\//, '').replace(/\/$/, '') }
+    catch { s = s.replace(/^\/+/, '').replace(/\/$/, '') }
+    return s
+  }
+
+  const allSearchable = [
+    ...FRONTEND_PAGES.map(p => ({ id: p.id, title: p.title, slug: p.slug, icon: p.icon, type: 'frontend' as const })),
+    ...customPages.map(p => ({ id: p.id, title: p.title, slug: p.slug, icon: '📄', type: 'custom' as const })),
   ]
 
-  const normalizeSearch = (query: string): string => {
-    let q = query.trim().toLowerCase()
-    try {
-      const url = new URL(q)
-      q = url.pathname.replace(/^\//, '').replace(/\/$/, '')
-    } catch {
-      q = q.replace(/^\/+/, '').replace(/\/$/, '')
-    }
-    return q
-  }
-
-  const normalizedQuery = normalizeSearch(searchQuery)
-
-  // Pages not assigned to any brand section — shown in Custom Pages
-  const unassignedPages = customPages.filter(
-    (p) => !BRAND_SECTIONS.some((s) => p[s.key])
-  )
-
-  const searchResults = searchQuery.trim()
-    ? allSearchablePages.filter(
-        (p) =>
-          p.slug.toLowerCase().includes(normalizedQuery) ||
-          p.title.toLowerCase().includes(normalizedQuery) ||
-          p.title.toLowerCase().includes(searchQuery.trim().toLowerCase())
-      )
+  const normalizedQuery  = normalizeSearch(searchQuery)
+  const searchResults    = searchQuery.trim()
+    ? allSearchable.filter(p =>
+        p.slug.toLowerCase().includes(normalizedQuery) ||
+        p.title.toLowerCase().includes(searchQuery.trim().toLowerCase()))
     : []
 
+  const unassigned = getSortedPages(
+    customPages.filter(p => !BRAND_SECTIONS.some(s => p[s.key])),
+    'custom'
+  )
+
+  // ── Common row props factory ──────────────────────────────────────────────
+
+  const rowProps = (page: Page, sectionPages: Page[], sectionKey: string) => ({
+    page,
+    isDragging:    draggedId === page.id,
+    isDragOver:    dragOverId === page.id && draggedId !== page.id,
+    onDragStart:   handleDragStart,
+    onDragOver:    handleDragOver,
+    onDrop:        (e: React.DragEvent, targetId: string) => handleDrop(e, targetId, sectionPages, sectionKey),
+    onDragEnd:     handleDragEnd,
+    onRename:      handleRename,
+    onDuplicate:   handleDuplicatePage,
+    onDelete:      handleDelete,
+    onToggleGroup: handleToggleGroup,
+    togglingIds,
+  })
+
   if (isLoading) {
-    return <div>Loading pages...</div>
+    return <div className="text-center py-12 text-gray-400 text-sm">Loading pages…</div>
   }
 
   return (
-    <div>
-      <div className="mb-8 flex items-start justify-between">
+    <div className="max-w-2xl">
+
+      {/* Header */}
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <span>✏️</span> Edit Site - Frontend Pages
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Edit the pages that your customers see on the website
-          </p>
+          <h1 className="text-2xl font-bold">Site Pages</h1>
+          <p className="text-gray-400 text-xs mt-0.5">Drag ⠿ to reorder • Double-click a title to rename</p>
         </div>
-        <div className="flex items-center gap-3">
-          {saveMessage && (
-            <span className={`text-sm font-medium ${saveMessage.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
-              {saveMessage}
-            </span>
-          )}
-          <Button
-            size="lg"
-            onClick={handleSaveAll}
-            disabled={isSaving}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isSaving ? 'Saving...' : 'Save All Pages'}
-          </Button>
-        </div>
+        <button
+          onClick={handleCreatePage}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          + Add Page
+        </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-8">
-        <div className="relative">
-          <svg
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search pages by URL or name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
 
-        {searchQuery.trim() && (
-          <div className="mt-2 border border-gray-200 rounded-lg bg-white shadow-lg">
-            <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 rounded-t-lg">
-              <p className="text-xs text-gray-500 font-play">
-                {searchResults.length} page{searchResults.length !== 1 ? 's' : ''} found
-                {normalizedQuery !== searchQuery.trim().toLowerCase() && (
-                  <span className="ml-1 text-blue-500">
-                    (searching: /{normalizedQuery || 'home'})
-                  </span>
-                )}
-              </p>
-            </div>
-            {searchResults.length === 0 ? (
-              <div className="p-6 text-center">
-                <div className="text-3xl mb-2">🔍</div>
-                <p className="text-sm text-gray-500">
-                  No pages found matching &ldquo;{searchQuery}&rdquo;
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Try searching by page name or URL path
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {searchResults.map((page) => (
-                  <div
-                    key={`${page.type}-${page.id}`}
-                    className="flex items-center justify-between p-4 hover:bg-blue-50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{page.icon}</span>
-                      <div>
-                        <p className="text-sm font-semibold">{page.title}</p>
-                        <p className="text-xs text-gray-500">
-                          https://r66slot.co.za/{page.slug || ''}
-                        </p>
-                      </div>
-                      <span
-                        className={`px-2 py-0.5 text-xs rounded font-medium ${
-                          page.type === 'frontend'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-purple-100 text-purple-700'
-                        }`}
-                      >
-                        {page.type === 'frontend' ? 'Main Page' : 'Custom Page'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={page.slug ? `/${page.slug}` : '/'} target="_blank">
-                          View Live
-                        </Link>
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                        asChild
-                      >
-                        <Link
-                          href={
-                            page.type === 'frontend'
-                              ? `/admin/pages/editor/frontend-${page.id}`
-                              : `/admin/pages/editor/${page.id}`
-                          }
-                        >
-                          Edit Page
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+      {/* Search */}
+      <div className="mb-5 relative">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Search pages by name or URL…"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
       </div>
 
-      {/* Frontend Pages - Main Site Pages */}
-      <div className="mb-12">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">Main Website Pages</h2>
-            <p className="text-gray-600 text-sm mt-1">
-              Edit the core pages of your storefront
-            </p>
+      {/* Search results overlay */}
+      {searchQuery.trim() && (
+        <div className="mb-6 border border-gray-200 rounded-lg shadow-lg overflow-hidden bg-white">
+          <div className="px-3 py-2 bg-gray-50 border-b text-xs text-gray-500">
+            {searchResults.length} page{searchResults.length !== 1 ? 's' : ''} found
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {FRONTEND_PAGES.map((page) => (
-            <Card key={page.id} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="text-4xl">{page.icon}</div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
-                    <p className="text-gray-600 text-sm mb-3">{page.description}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span>/{page.slug || 'home'}</span>
-                      <span>•</span>
-                      <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">
-                        Live
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      size="sm"
-                      className="bg-primary hover:bg-primary-dark text-white"
-                      asChild
-                    >
-                      <Link href={`/admin/pages/editor/frontend-${page.id}`}>
-                        Edit Page
-                      </Link>
-                    </Button>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={page.slug ? `/${page.slug}` : '/'} target="_blank">
-                        View Live
-                      </Link>
-                    </Button>
+          {searchResults.length === 0 ? (
+            <div className="px-4 py-6 text-center text-sm text-gray-400">No pages found for "{searchQuery}"</div>
+          ) : (
+            searchResults.map(p => (
+              <div key={`${p.type}-${p.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <span>{p.icon}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{p.title}</p>
+                    <p className="text-xs text-gray-400">/{p.slug || 'home'}</p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Brand Sections — NSR, Revo, Pioneer, Sideways, BRM */}
-      {BRAND_SECTIONS.map((section) => {
-        const sectionPages = customPages.filter((p) => p[section.key])
-        const colors = COLOR_MAP[section.color]
-        return (
-          <div key={section.key} className="mb-12">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-2xl font-bold">{section.label}</h2>
-                <p className="text-gray-600 text-sm mt-1">
-                  Custom pages assigned to the {section.label.replace(' Pages', '')} section
-                </p>
-              </div>
-            </div>
-
-            {sectionPages.length === 0 ? (
-              <Card>
-                <CardContent className="p-8 text-center text-gray-400">
-                  <div className="text-4xl mb-3">{section.icon}</div>
-                  <p className="text-sm">No pages assigned to {section.label} yet.</p>
-                  <p className="text-xs mt-1">
-                    Create a custom page below and click &ldquo;{section.label}&rdquo; to assign it here.
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {sectionPages.map((page) => (
-                  <Card
-                    key={page.id}
-                    className={`hover:shadow-lg transition-shadow ${colors.border} ${colors.bg}`}
+                <div className="flex gap-2">
+                  <Link href={p.slug ? `/${p.slug}` : '/'} target="_blank" className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50">View</Link>
+                  <Link
+                    href={p.type === 'frontend' ? `/admin/pages/editor/frontend-${p.id}` : `/admin/pages/editor/${p.id}`}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                   >
-                    <CardContent className="p-6">
-                      <div className="flex items-start gap-4">
-                        <div className="text-4xl">{section.icon}</div>
-                        <div className="flex-1">
-                          <h3 className="text-xl font-semibold mb-1">{page.title}</h3>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
-                            <span>/{page.slug}</span>
-                            <span className={`px-2 py-0.5 rounded ${colors.badge}`}>
-                              {section.label.replace(' Pages', '')}
-                            </span>
-                            {page.published ? (
-                              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded">Published</span>
-                            ) : (
-                              <span className="px-2 py-0.5 bg-gray-200 text-gray-700 rounded">Draft</span>
-                            )}
-                          </div>
-                          <p className="text-sm text-gray-500">{page.components.length} components</p>
-                        </div>
-                        <div className="flex flex-col gap-2">
-                          <Button size="sm" className="bg-primary hover:bg-primary-dark text-white" asChild>
-                            <Link href={`/admin/pages/editor/${page.id}`}>Edit Page</Link>
-                          </Button>
-                          {page.published && (
-                            <Button variant="outline" size="sm" asChild>
-                              <Link href={`/${page.slug}`} target="_blank">View Live</Link>
-                            </Button>
-                          )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => handleTogglePageGroup(e, page.id, section.key)}
-                            disabled={togglingIds.has(page.id)}
-                            className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                          >
-                            {togglingIds.has(page.id) ? '...' : 'Remove'}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(page.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                    Edit
+                  </Link>
+                </div>
               </div>
-            )}
-          </div>
-        )
-      })}
-
-      {/* Custom Pages - User Created */}
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold">Custom Pages</h2>
-            <p className="text-gray-600 text-sm mt-1">
-              Additional pages created with the visual editor.{' '}
-              <span className="text-blue-600">Double-click a page name to rename it.</span>
-            </p>
-          </div>
-          <Button
-            size="lg"
-            onClick={handleCreatePage}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            + Create Custom Page
-          </Button>
+            ))
+          )}
         </div>
+      )}
 
-        {unassignedPages.length === 0 && customPages.length > 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-gray-400">
-              <div className="text-4xl mb-3">📄</div>
-              <p className="text-sm">All custom pages have been assigned to a brand section.</p>
-              <p className="text-xs mt-1">
-                Use the &ldquo;Remove&rdquo; button in any brand section to move a page back here.
-              </p>
-            </CardContent>
-          </Card>
-        ) : customPages.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <div className="text-6xl mb-4">📄</div>
-              <h3 className="text-xl font-semibold mb-2">No custom pages yet</h3>
-              <p className="text-gray-600 mb-6 max-w-lg mx-auto">
-                Create additional pages like landing pages, promotional pages, or special content pages.
-              </p>
-              <Button onClick={handleCreatePage} className="bg-blue-600 hover:bg-blue-700">
-                Create Your First Custom Page
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            {unassignedPages.map((page) => {
-              const pageColor = getPageColor(page)
-              const colors = pageColor ? COLOR_MAP[pageColor] : null
-              return (
-                <Card
-                  key={page.id}
-                  className={colors ? `${colors.border} ${colors.bg}` : ''}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          <InlineEditableTitle
-                            value={page.title}
-                            onSave={(newTitle) => handleRename(page.id, newTitle)}
-                            className="text-xl font-semibold"
-                          />
-                          {!page.published && (
-                            <span className="px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded">
-                              Draft
-                            </span>
-                          )}
-                          {page.published && (
-                            <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
-                              Published
-                            </span>
-                          )}
-                          {BRAND_SECTIONS.map((section) =>
-                            page[section.key] ? (
-                              <span
-                                key={section.key}
-                                className={`px-2 py-1 text-xs rounded font-medium ${COLOR_MAP[section.color].badge}`}
-                              >
-                                {section.label.replace(' Pages', '')}
-                              </span>
-                            ) : null
-                          )}
-                        </div>
-                        <p className="text-gray-600 text-sm mb-3">/{page.slug}</p>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span>{page.components.length} components</span>
-                          <span>•</span>
-                          <span>
-                            Updated {new Date(page.updatedAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 ml-4 flex-wrap justify-end">
-                        {BRAND_SECTIONS.map((section) => (
-                          <Button
-                            key={section.key}
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => handleTogglePageGroup(e, page.id, section.key)}
-                            disabled={togglingIds.has(page.id)}
-                            className={
-                              page[section.key]
-                                ? COLOR_MAP[section.color].btn
-                                : ''
-                            }
-                          >
-                            {togglingIds.has(page.id) ? '...' : section.label}
-                          </Button>
-                        ))}
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/admin/pages/editor/${page.id}`}>Edit</Link>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDuplicatePage(page)}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          Duplicate
-                        </Button>
-                        {page.published && (
-                          <Button variant="outline" size="sm" asChild>
-                            <Link href={`/${page.slug}`} target="_blank">
-                              View
-                            </Link>
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(page.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        )}
-      </div>
+      {/* Pages List */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
 
-      {/* Help Section */}
-      <Card className="mt-8 bg-blue-50 border-blue-200">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="text-3xl">💡</div>
-            <div>
-              <h3 className="font-semibold mb-2">How to Edit Your Website</h3>
-              <ul className="space-y-1 text-sm text-gray-700">
-                <li>• Click &ldquo;Edit Page&rdquo; on any main website page to customize its content</li>
-                <li>• Use drag & drop to rearrange sections and components</li>
-                <li>• Double-click any custom page name to rename it</li>
-                <li>• Create custom pages for landing pages, promotions, or special content</li>
-                <li>• Use the brand section buttons (NSR Pages, Revo Pages, etc.) to move a page into that brand section</li>
-                <li>• Assigned pages are hidden from Custom Pages — use &ldquo;Remove&rdquo; in the brand section to move them back</li>
-                <li>• Use the search bar to quickly find pages by URL or name</li>
-              </ul>
+        {/* ── Site Menu (static frontend pages) ── */}
+        <div className="bg-gray-50 border-b border-gray-200 px-3 py-2.5">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Site Menu</span>
+        </div>
+        {FRONTEND_PAGES.map(p => (
+          <div key={p.id} className="group flex items-center gap-2 px-3 py-2.5 hover:bg-blue-50 border-b border-gray-100 transition-colors">
+            <span className="w-4 flex-shrink-0" /> {/* spacer for drag handle column */}
+            <span className="text-sm select-none flex-shrink-0">{p.icon}</span>
+            <div className="flex-1 min-w-0">
+              <span className="text-sm font-medium text-gray-800 truncate block">{p.title}</span>
+              <span className="text-xs text-gray-400 block">/{p.slug || 'home'}</span>
+            </div>
+            <span className="text-xs text-green-600 font-medium flex-shrink-0">Live</span>
+            <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Link href={p.slug ? `/${p.slug}` : '/'} target="_blank" className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors">↗</Link>
+              <Link href={`/admin/pages/editor/frontend-${p.id}`} className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors">Edit</Link>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        ))}
+
+        {/* ── Brand Sections ── */}
+        {BRAND_SECTIONS.map(section => {
+          const sectionPages = getSortedPages(customPages.filter(p => p[section.key]), section.key)
+          const isCollapsed  = collapsed[section.key] ?? false
+          return (
+            <div key={section.key}>
+              <SectionHeader
+                label={section.label}
+                count={sectionPages.length}
+                collapsed={isCollapsed}
+                onToggle={() => toggleSection(section.key)}
+              />
+              {!isCollapsed && (
+                <>
+                  {sectionPages.length === 0 ? (
+                    <div className="px-8 py-3 border-b border-gray-100 text-xs text-gray-400 italic">
+                      No pages in {section.label} — use ••• on any custom page to assign it here.
+                    </div>
+                  ) : (
+                    sectionPages.map(page => (
+                      <PageRow key={page.id} {...rowProps(page, sectionPages, section.key)} />
+                    ))
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
+
+        {/* ── Custom / Unassigned Pages ── */}
+        <div>
+          <SectionHeader
+            label="Custom Pages"
+            count={unassigned.length}
+            collapsed={collapsed['custom'] ?? false}
+            onToggle={() => toggleSection('custom')}
+            onAdd={handleCreatePage}
+          />
+          {!(collapsed['custom'] ?? false) && (
+            <>
+              {unassigned.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm text-gray-400">No custom pages yet.</p>
+                  <button onClick={handleCreatePage} className="mt-2 text-xs text-blue-600 hover:text-blue-700 font-medium">
+                    Create your first custom page →
+                  </button>
+                </div>
+              ) : (
+                unassigned.map(page => (
+                  <PageRow key={page.id} {...rowProps(page, unassigned, 'custom')} />
+                ))
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Help tip */}
+      <p className="mt-4 text-xs text-gray-400 text-center">
+        Tip: drag ⠿ to reorder • double-click a title to rename • ••• for more options
+      </p>
     </div>
   )
 }
