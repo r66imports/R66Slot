@@ -10,6 +10,7 @@ export interface OrderTemplate {
   companyPhone: string
   companyEmail: string
   logoUrl: string
+  imageBlock: string[] // 6 image URLs displayed below logo on documents
   bankName: string
   bankAccount: string
   bankBranch: string
@@ -27,6 +28,7 @@ const DEFAULT_TEMPLATE: OrderTemplate = {
   companyPhone: '',
   companyEmail: '',
   logoUrl: '',
+  imageBlock: ['', '', '', '', '', ''],
   bankName: '',
   bankAccount: '',
   bankBranch: '',
