@@ -41,6 +41,9 @@ function rowToProduct(row: any): Product {
     sageItemCode: row.sage_item_code,
     sageLastSynced: row.sage_last_synced,
     units: Array.isArray(row.units) ? row.units : [],
+    unit: row.unit || 'Each',
+    salesAccount: row.sales_account || '',
+    purchaseAccount: row.purchase_account || '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
