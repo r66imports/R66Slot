@@ -23,22 +23,48 @@ const BRAND_SECTIONS: { key: PageGroup; label: string }[] = [
 ]
 
 // ─── Inline Editable Title ─────────────────────────────────────────────────
+// Single click → navigate to editor  |  Double click → rename inline
 function InlineEditableTitle({
-  value, onSave, className,
-}: { value: string; onSave: (v: string) => void; className?: string }) {
+  value, onSave, onSingleClick, className,
+}: {
+  value: string
+  onSave: (v: string) => void
+  onSingleClick?: () => void
+  className?: string
+}) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft]     = useState(value)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef   = useRef<HTMLInputElement>(null)
+  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     if (editing) { inputRef.current?.focus(); inputRef.current?.select() }
   }, [editing])
+
+  // Cleanup timer on unmount
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
 
   const commit = () => {
     const t = draft.trim()
     if (t && t !== value) onSave(t)
     else setDraft(value)
     setEditing(false)
+  }
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (timerRef.current) {
+      // Second click within 300ms → double click → rename
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+      setEditing(true)
+      return
+    }
+    // First click → wait to see if double click follows
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null
+      onSingleClick?.()
+    }, 280)
   }
 
   if (editing) {
@@ -61,9 +87,9 @@ function InlineEditableTitle({
 
   return (
     <span
-      onDoubleClick={() => setEditing(true)}
-      className={`${className} cursor-pointer hover:text-blue-600`}
-      title="Double-click to rename"
+      onClick={handleClick}
+      className={`${className} cursor-pointer hover:text-blue-600 select-none`}
+      title="Click to edit • Double-click to rename"
     >
       {value}
     </span>
@@ -84,35 +110,27 @@ function DragHandle() {
   )
 }
 
-// ─── Hidden Icon ──────────────────────────────────────────────────────────
-function HiddenIcon() {
-  return (
-    <svg className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-    </svg>
-  )
-}
-
 // ─── Page Row ─────────────────────────────────────────────────────────────
 interface PageRowProps {
   page: Page
   isDragging: boolean
   isDragOver: boolean
-  onDragStart: (e: React.DragEvent, id: string) => void
-  onDragOver:  (e: React.DragEvent, id: string) => void
-  onDrop:      (e: React.DragEvent, id: string) => void
-  onDragEnd:   () => void
-  onRename:      (id: string, title: string) => void
-  onDuplicate:   (page: Page) => void
-  onDelete:      (id: string) => void
-  onToggleGroup: (pageId: string, group: PageGroup) => void
-  togglingIds:   Set<string>
+  onDragStart:       (e: React.DragEvent, id: string) => void
+  onDragOver:        (e: React.DragEvent, id: string) => void
+  onDrop:            (e: React.DragEvent, id: string) => void
+  onDragEnd:         () => void
+  onRename:          (id: string, title: string) => void
+  onDuplicate:       (page: Page) => void
+  onDelete:          (id: string) => void
+  onToggleGroup:     (pageId: string, group: PageGroup) => void
+  onTogglePublished: (id: string) => void
+  togglingIds:       Set<string>
 }
 
 function PageRow({
   page, isDragging, isDragOver,
   onDragStart, onDragOver, onDrop, onDragEnd,
-  onRename, onDuplicate, onDelete, onToggleGroup, togglingIds,
+  onRename, onDuplicate, onDelete, onToggleGroup, onTogglePublished, togglingIds,
 }: PageRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -136,8 +154,8 @@ function PageRow({
       className={[
         'group flex items-center gap-2 px-3 py-2 border-b border-gray-100 transition-colors',
         'hover:bg-blue-50',
-        isDragging  ? 'opacity-30 bg-blue-50' : '',
-        isDragOver  ? 'border-t-2 border-t-blue-500 bg-blue-50/50' : '',
+        isDragging ? 'opacity-30 bg-blue-50' : '',
+        isDragOver ? 'border-t-2 border-t-blue-500 bg-blue-50/50' : '',
       ].join(' ')}
     >
       <DragHandle />
@@ -146,12 +164,24 @@ function PageRow({
         <InlineEditableTitle
           value={page.title}
           onSave={title => onRename(page.id, title)}
+          onSingleClick={() => { window.location.href = `/admin/pages/editor/${page.id}` }}
           className="text-sm font-medium text-gray-800 block truncate"
         />
         <span className="text-xs text-gray-400 truncate block">/{page.slug}</span>
       </div>
 
-      {!page.published && <HiddenIcon />}
+      {/* Green/Red visibility dot — always visible, click to toggle */}
+      <button
+        onClick={() => onTogglePublished(page.id)}
+        className={[
+          'w-3 h-3 rounded-full flex-shrink-0 transition-colors ring-offset-1',
+          'hover:ring-2',
+          page.published
+            ? 'bg-green-500 hover:bg-green-600 hover:ring-green-300'
+            : 'bg-red-500 hover:bg-red-600 hover:ring-red-300',
+        ].join(' ')}
+        title={page.published ? 'Live — click to hide' : 'Hidden — click to show'}
+      />
 
       {/* ··· menu */}
       <div className="relative flex-shrink-0" ref={menuRef}>
@@ -182,10 +212,16 @@ function PageRow({
               </Link>
             )}
             <button
+              onClick={() => { onTogglePublished(page.id); setMenuOpen(false) }}
+              className={`flex items-center gap-2 w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${page.published ? 'text-orange-600' : 'text-green-600'}`}
+            >
+              {page.published ? '🙈 Hide Page' : '👁 Show Page'}
+            </button>
+            <button
               onClick={() => { onDuplicate(page); setMenuOpen(false) }}
               className="flex items-center gap-2 w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
             >
-              📋 Duplicate
+              📋 Copy Page
             </button>
 
             <div className="border-t border-gray-100 mt-1">
@@ -427,6 +463,23 @@ export default function PagesManagementPage() {
     } catch {}
   }
 
+  const handleTogglePublished = async (id: string) => {
+    const page = customPages.find(p => p.id === id)
+    if (!page) return
+    const newValue = !page.published
+    setCustomPages(prev => prev.map(p => p.id === id ? { ...p, published: newValue } : p))
+    try {
+      const res = await fetch(`/api/admin/pages/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ published: newValue }),
+      })
+      if (!res.ok) setCustomPages(prev => prev.map(p => p.id === id ? { ...p, published: !newValue } : p))
+    } catch {
+      setCustomPages(prev => prev.map(p => p.id === id ? { ...p, published: !newValue } : p))
+    }
+  }
+
   const handleToggleGroup = async (pageId: string, group: PageGroup) => {
     const page = customPages.find(p => p.id === pageId)
     if (!page || togglingIds.has(pageId)) return
@@ -483,10 +536,11 @@ export default function PagesManagementPage() {
     onDragOver:    handleDragOver,
     onDrop:        (e: React.DragEvent, targetId: string) => handleDrop(e, targetId, sectionPages, sectionKey),
     onDragEnd:     handleDragEnd,
-    onRename:      handleRename,
-    onDuplicate:   handleDuplicatePage,
-    onDelete:      handleDelete,
-    onToggleGroup: handleToggleGroup,
+    onRename:          handleRename,
+    onDuplicate:       handleDuplicatePage,
+    onDelete:          handleDelete,
+    onToggleGroup:     handleToggleGroup,
+    onTogglePublished: handleTogglePublished,
     togglingIds,
   })
 
@@ -574,7 +628,7 @@ export default function PagesManagementPage() {
               <span className="text-sm font-medium text-gray-800 truncate block">{p.title}</span>
               <span className="text-xs text-gray-400 block">/{p.slug || 'home'}</span>
             </div>
-            <span className="text-xs text-green-600 font-medium flex-shrink-0">Live</span>
+            <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" title="Always live" />
             <div className="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
               <Link href={p.slug ? `/${p.slug}` : '/'} target="_blank" className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors">↗</Link>
               <Link href={`/admin/pages/editor/frontend-${p.id}`} className="px-2 py-1 text-xs text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded transition-colors">Edit</Link>
@@ -641,7 +695,7 @@ export default function PagesManagementPage() {
 
       {/* Help tip */}
       <p className="mt-4 text-xs text-gray-400 text-center">
-        Tip: drag ⠿ to reorder • double-click a title to rename • ••• for more options
+        🟢 Live &nbsp;•&nbsp; 🔴 Hidden &nbsp;•&nbsp; Click dot to toggle &nbsp;•&nbsp; Click title to edit &nbsp;•&nbsp; Double-click title to rename
       </p>
     </div>
   )

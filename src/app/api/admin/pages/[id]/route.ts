@@ -362,10 +362,11 @@ export async function PUT(
       )
     }
 
-    // Validate required fields (allow group toggles through)
+    // Validate required fields (allow group toggles and published through)
     const hasGroupToggle = [
       'isBrandPage', 'isCarsPage', 'isWebsitePage',
       'isRevoPage', 'isPioneerPage', 'isSidewaysPage', 'isBrmPage',
+      'published',
     ].some((key) => body[key] !== undefined)
     if (!body.title && !body.components && !hasGroupToggle) {
       return NextResponse.json(
