@@ -23,6 +23,8 @@ interface Product {
   revoParts?: string[]
   collections: string[]
   categories?: string[]
+  categoryBrands?: string[]
+  itemCategories?: string[]
   quantity: number
   eta: string
   status: 'draft' | 'active'
@@ -857,7 +859,9 @@ export default function ProductsPage() {
                   {filtered.map((product) => {
                     const pageTitle = getPageTitle(product)
                     const isEditingPage = editingPageId === product.id
-                    const allCats = Array.from(new Set([...(product.collections || []), ...(product.categories || [])]))
+                    const allCats = (product.itemCategories && product.itemCategories.length > 0)
+                      ? product.itemCategories
+                      : Array.from(new Set([...(product.collections || []), ...(product.categories || [])]))
                     return (
                       <React.Fragment key={product.id}>
                       <tr className={`border-b hover:bg-gray-50 ${selectedIds.has(product.id) ? 'bg-blue-50' : ''}`}>
@@ -904,10 +908,10 @@ export default function ProductsPage() {
                           </td>
                         )}
 
-                        {/* Brand */}
+                        {/* Category (Brand) */}
                         {visibleCols.brand && (
                           <td className="py-3 px-4">
-                            <span>{product.brand || '—'}</span>
+                            <span>{(product.categoryBrands && product.categoryBrands.length > 0) ? product.categoryBrands.join(', ') : (product.brand || '—')}</span>
                           </td>
                         )}
 

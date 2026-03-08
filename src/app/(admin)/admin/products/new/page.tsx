@@ -262,7 +262,7 @@ export default function NewProductPage() {
         quantity: cleanInt(quantity),
         weight: weight ? cleanFloat(weight) : null,
         weightUnit,
-        brand,
+        brand: categoryBrands[0] || brand,
         productType: itemCategories[0] || productType,
         categoryBrands,
         itemCategories,
