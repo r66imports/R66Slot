@@ -125,6 +125,7 @@ export default function EditProductPage({
   const [scaleDropdownOpen, setScaleDropdownOpen] = useState(false)
 
   // Inline add inputs
+  const [newBrandInput, setNewBrandInput] = useState('')
   const [newCategoryInput, setNewCategoryInput] = useState('')
   const [newCarTypeInput, setNewCarTypeInput] = useState('')
   const [newScaleInput, setNewScaleInput] = useState('')
@@ -141,6 +142,7 @@ export default function EditProductPage({
   const scaleRef = useRef<HTMLDivElement>(null)
   const carBrandRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef<HTMLDivElement>(null)
+  const itemCategoryRef = useRef<HTMLDivElement>(null)
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -381,11 +383,12 @@ export default function EditProductPage({
       if (scaleDropdownOpen && scaleRef.current && !scaleRef.current.contains(e.target as Node)) setScaleDropdownOpen(false)
       if (carBrandDropdownOpen && carBrandRef.current && !carBrandRef.current.contains(e.target as Node)) setCarBrandDropdownOpen(false)
       if (pageDropdownOpen && pageRef.current && !pageRef.current.contains(e.target as Node)) setPageDropdownOpen(false)
+      if (itemCategoryDropdownOpen && itemCategoryRef.current && !itemCategoryRef.current.contains(e.target as Node)) setItemCategoryDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [brandDropdownOpen, categoryDropdownOpen, carTypeDropdownOpen, scaleDropdownOpen,
-      carBrandDropdownOpen, pageDropdownOpen])
+      carBrandDropdownOpen, pageDropdownOpen, itemCategoryDropdownOpen])
 
   // Upload base64 images to server and return real URLs
   const uploadPendingImages = async (): Promise<string[]> => {
@@ -972,44 +975,48 @@ export default function EditProductPage({
               <h3 className="text-sm font-medium text-gray-700 mb-4">Product organization</h3>
               <div className="space-y-4">
 
-                {/* Category (Brand) — editable text boxes */}
+                {/* Category (Brand) — multi-select dropdown */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Category (Brand)</label>
-                      <p className="text-xs text-gray-400">For Sage accounting &amp; CSV imports/exports</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setCategoryBrands([...categoryBrands, ''])}
-                      className="flex items-center gap-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 hover:border-gray-400"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                      Add
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Category (Brand)</label>
+                  <p className="text-xs text-gray-400 mb-2">For Sage accounting &amp; CSV imports/exports</p>
+                  <div className="relative" ref={brandRef}>
+                    <button type="button" onClick={() => setBrandDropdownOpen(!brandDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={categoryBrands.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {categoryBrands.length === 0 ? 'Select brand...' : categoryBrands.length === 1 ? categoryBrands[0] : `${categoryBrands.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${brandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
-                  </div>
-                  {categoryBrands.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic px-1">No categories added — click Add</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {categoryBrands.map((cb, i) => (
-                        <div key={i} className="flex items-center gap-2">
-                          <input
-                            type="text"
-                            value={cb}
-                            onChange={e => { const next = [...categoryBrands]; next[i] = e.target.value; setCategoryBrands(next) }}
-                            placeholder="e.g. NSR, Revo, Pioneer…"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setCategoryBrands(categoryBrands.filter((_, j) => j !== i))}
-                            className="p-2 text-gray-400 hover:text-red-600 border border-gray-200 rounded-lg hover:border-red-300 transition-colors"
-                            title="Delete"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </button>
+                    {brandDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={categoryBrands.length === 0} onChange={() => setCategoryBrands([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {brands.map(b => (
+                          <div key={b} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={categoryBrands.includes(b)} onChange={e => setCategoryBrands(e.target.checked ? [...categoryBrands, b] : categoryBrands.filter(c => c !== b))} className="rounded" />
+                              <span className="text-sm text-gray-900">{b}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = brands.filter(x => x !== b); setBrands(next); saveOptions('brands', next); setCategoryBrands(prev => prev.filter(c => c !== b)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newBrandInput} onChange={e => setNewBrandInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newBrandInput.trim()) { e.preventDefault(); const v = newBrandInput.trim(); if (!brands.includes(v)) { const next = [...brands, v]; setBrands(next); saveOptions('brands', next) }; setCategoryBrands(prev => prev.includes(v) ? prev : [...prev, v]); setNewBrandInput('') } }} placeholder="+ Add brand..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { const v = newBrandInput.trim(); if (!v) return; if (!brands.includes(v)) { const next = [...brands, v]; setBrands(next); saveOptions('brands', next) }; setCategoryBrands(prev => prev.includes(v) ? prev : [...prev, v]); setNewBrandInput('') }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
                         </div>
+                      </div>
+                    )}
+                  </div>
+                  {categoryBrands.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {categoryBrands.map(cb => (
+                        <span key={cb} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-semibold">
+                          {cb}<button type="button" onClick={() => setCategoryBrands(categoryBrands.filter(c => c !== cb))} className="hover:text-blue-900">×</button>
+                        </span>
                       ))}
                     </div>
                   )}
@@ -1123,7 +1130,7 @@ export default function EditProductPage({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Item Categories (Unit)</label>
                   <p className="text-xs text-gray-400 mb-2">For Sage accounting &amp; CSV imports/exports</p>
-                  <div className="relative">
+                  <div className="relative" ref={itemCategoryRef}>
                     <button type="button" onClick={() => setItemCategoryDropdownOpen(!itemCategoryDropdownOpen)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
                       <span className={itemCategories.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
