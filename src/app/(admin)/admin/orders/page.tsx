@@ -377,16 +377,19 @@ function ViewDocumentModal({
             <p className="text-xs text-gray-400 mt-0.5">{docTypeLabel} • {data.clientName}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
-              🖨️ Print
+            <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 hover:border-gray-600 shadow-sm font-medium transition-colors" title="Print">
+              <IconPrint /> Print
             </button>
-            <button onClick={handlePrintAndEmail} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50 font-medium">
-              🖨️✉️ Print &amp; Email
+            <button onClick={handlePrintAndEmail} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-blue-400 rounded-lg text-blue-700 hover:bg-blue-50 hover:border-blue-600 shadow-sm font-medium transition-colors" title="Print & Email">
+              <IconPrint /><IconEmail /> Print &amp; Email
             </button>
-            <button onClick={handleEmail} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">
-              ✉️ Email
+            <button onClick={handleEmail} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 hover:border-gray-600 shadow-sm font-medium transition-colors" title="Email">
+              <IconEmail /> Email
             </button>
-            <button onClick={onClose} className="ml-1 text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            <button onClick={() => doDownload(data, template)} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 hover:border-gray-600 shadow-sm font-medium transition-colors" title="Download">
+              <IconDownload /> Download
+            </button>
+            <button onClick={onClose} className="ml-1 text-gray-500 hover:text-gray-800 text-xl leading-none font-bold">✕</button>
           </div>
         </div>
         <div className="overflow-y-auto flex-1 p-6">
@@ -909,16 +912,74 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
   window.location.href = `mailto:${data.clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
+function doDownload(data: DocViewData, template: OrderTemplate) {
+  const html = generateDocHTML(data, template)
+  const blob = new Blob([html], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${data.docNumber}.html`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// ─── Shared icon button style ──────────────────────────────────────────────────
+const ICON_BTN = 'p-1.5 border border-gray-400 rounded-lg bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-600 shadow-sm transition-colors'
+
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+
+function IconView() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/>
+      <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/>
+    </svg>
+  )
+}
+function IconPrint() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/>
+      <path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z"/>
+    </svg>
+  )
+}
+function IconEmail() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M0 4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4Zm2-1a1 1 0 0 0-1 1v.217l7 4.2 7-4.2V4a1 1 0 0 0-1-1H2Zm13 2.383-4.708 2.825L15 11.105V5.383Zm-.034 6.876-5.64-3.471L8 9.583l-1.326-.795-5.64 3.47A1 1 0 0 0 2 13h12a1 1 0 0 0 .966-.741ZM1 11.105l4.708-2.897L1 5.383v5.722Z"/>
+    </svg>
+  )
+}
+function IconDownload() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="black" aria-hidden>
+      <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+      <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+    </svg>
+  )
+}
+function IconTrash() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+      <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"/>
+      <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"/>
+    </svg>
+  )
+}
+
 // ─── Push to Sage Button ───────────────────────────────────────────────────────
 
 function PushToSageBtn() {
   return (
     <div className="relative group inline-block">
-      <button disabled className="flex items-center gap-1 text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg text-gray-300 cursor-not-allowed">
-        📤 Sage
+      <button disabled className="p-1.5 border border-gray-300 rounded-lg bg-white text-gray-300 cursor-not-allowed shadow-sm opacity-60">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+          <path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm.5 4.5v3.793l2.146 2.147a.5.5 0 0 1-.708.707L7.5 8.707V4.5a.5.5 0 0 1 1 0z"/>
+        </svg>
       </button>
       <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block text-xs bg-gray-800 text-white rounded px-2 py-1 whitespace-nowrap z-20">
-        Coming soon
+        Push to Sage — coming soon
       </span>
     </div>
   )
@@ -1104,9 +1165,10 @@ export default function OrdersPage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => viewBackorder(b)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="View">👁️</button>
-                          <button onClick={() => doPrint(boToViewData(b), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Print">🖨️</button>
-                          <button onClick={() => doEmail(boToViewData(b), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Email">✉️</button>
+                          <button onClick={() => viewBackorder(b)} className={ICON_BTN} title="View"><IconView /></button>
+                          <button onClick={() => doPrint(boToViewData(b), template)} className={ICON_BTN} title="Print"><IconPrint /></button>
+                          <button onClick={() => doEmail(boToViewData(b), template)} className={ICON_BTN} title="Email"><IconEmail /></button>
+                          <button onClick={() => doDownload(boToViewData(b), template)} className={ICON_BTN} title="Download"><IconDownload /></button>
                           <PushToSageBtn />
                         </div>
                       </td>
@@ -1132,9 +1194,10 @@ export default function OrdersPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-center gap-1">
-                            <button onClick={() => viewDocument(doc)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="View">👁️</button>
-                            <button onClick={() => doPrint(docToViewData(doc), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Print">🖨️</button>
-                            <button onClick={() => doEmail(docToViewData(doc), template)} className="text-xs px-2 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50" title="Email">✉️</button>
+                            <button onClick={() => viewDocument(doc)} className={ICON_BTN} title="View"><IconView /></button>
+                            <button onClick={() => doPrint(docToViewData(doc), template)} className={ICON_BTN} title="Print"><IconPrint /></button>
+                            <button onClick={() => doEmail(docToViewData(doc), template)} className={ICON_BTN} title="Email"><IconEmail /></button>
+                            <button onClick={() => doDownload(docToViewData(doc), template)} className={ICON_BTN} title="Download"><IconDownload /></button>
                             <PushToSageBtn />
                             {deleteConfirm === doc.id ? (
                               <>
@@ -1154,9 +1217,10 @@ export default function OrdersPage() {
                             ) : (
                               <button
                                 onClick={() => setDeleteConfirm(doc.id)}
-                                className="text-xs px-2.5 py-1.5 border border-red-200 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600"
+                                className="p-1.5 border border-red-300 rounded-lg bg-white text-red-500 hover:bg-red-50 hover:border-red-500 shadow-sm transition-colors"
+                                title="Delete"
                               >
-                                🗑️
+                                <IconTrash />
                               </button>
                             )}
                           </div>
