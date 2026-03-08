@@ -24,6 +24,8 @@ export default function NewProductPage() {
   const [weightUnit, setWeightUnit] = useState('kg')
   const [brand, setBrand] = useState('')
   const [productType, setProductType] = useState('')
+  const [itemCategories, setItemCategories] = useState<string[]>([])
+  const [itemCategoryDropdownOpen, setItemCategoryDropdownOpen] = useState(false)
   const [carType, setCarType] = useState('')
   const [partType, setPartType] = useState('')
   const [scale, setScale] = useState('')
@@ -239,7 +241,8 @@ export default function NewProductPage() {
         weight: weight ? cleanFloat(weight) : null,
         weightUnit,
         brand,
-        productType,
+        productType: itemCategories[0] || productType,
+        itemCategories,
         carType,
         partType,
         scale,
@@ -773,52 +776,84 @@ export default function NewProductPage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Product Organization</h3>
               <div className="space-y-4">
-                {/* Unit (Brand) */}
+                {/* Category (Brand) — multi-select */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Unit (Brand)
+                    Category (Brand)
                   </label>
-                  <select
-                    value={brand}
-                    onChange={(e) => setBrand(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select brand...</option>
-                    {brands.map((b) => (
-                      <option key={b} value={b.toLowerCase()}>{b}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddBrand(true)}
-                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    + Add Brand
-                  </button>
-                </div>
-
-                {/* Category */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category
-                  </label>
-                  <select
-                    value={productType}
-                    onChange={(e) => setProductType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select type...</option>
-                    {productTypes.map((pt) => (
-                      <option key={pt} value={pt.toLowerCase().replace(/ /g, '-')}>{pt}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddProductType(true)}
-                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    + Add Category
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setItemCategoryDropdownOpen(!itemCategoryDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white"
+                    >
+                      <span className={itemCategories.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {itemCategories.length === 0 ? 'Select category...' : itemCategories.length === 1 ? itemCategories[0] : `${itemCategories.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${itemCategoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {itemCategoryDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={itemCategories.length === 0} onChange={() => setItemCategories([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {productTypes.map((pt) => (
+                          <label key={pt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={itemCategories.includes(pt)}
+                              onChange={(e) => setItemCategories(e.target.checked ? [...itemCategories, pt] : itemCategories.filter(c => c !== pt))}
+                              className="rounded"
+                            />
+                            <span className="text-sm text-gray-900">{pt}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input
+                            type="text"
+                            value={newProductType}
+                            onChange={(e) => setNewProductType(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && newProductType.trim()) {
+                                e.preventDefault()
+                                const val = newProductType.trim()
+                                const next = productTypes.includes(val) ? productTypes : [...productTypes, val]
+                                setProductTypes(next)
+                                saveOptions('categories', next)
+                                if (!itemCategories.includes(val)) setItemCategories(prev => [...prev, val])
+                                setNewProductType('')
+                              }
+                            }}
+                            placeholder="+ Add category..."
+                            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = newProductType.trim()
+                              if (!val) return
+                              const next = productTypes.includes(val) ? productTypes : [...productTypes, val]
+                              setProductTypes(next)
+                              saveOptions('categories', next)
+                              if (!itemCategories.includes(val)) setItemCategories(prev => [...prev, val])
+                              setNewProductType('')
+                            }}
+                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700"
+                          >Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {itemCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {itemCategories.map(cat => (
+                        <span key={cat} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-semibold">
+                          {cat}<button type="button" onClick={() => setItemCategories(itemCategories.filter(c => c !== cat))} className="hover:text-blue-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Car Type */}

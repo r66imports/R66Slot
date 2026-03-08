@@ -123,6 +123,9 @@ export default function EditProductPage({
   const [productTypes, setProductTypes] = useState<string[]>([])
   const [carTypeOptions, setCarTypeOptions] = useState(['Livery', 'White Kit', 'White Body Kit', 'White Body'])
 
+  const [itemCategories, setItemCategories] = useState<string[]>([])
+  const [itemCategoryDropdownOpen, setItemCategoryDropdownOpen] = useState(false)
+
   // Dropdown open states for Product Organization
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
@@ -130,7 +133,6 @@ export default function EditProductPage({
   const [scaleDropdownOpen, setScaleDropdownOpen] = useState(false)
 
   // Inline add inputs
-  const [newBrandInput, setNewBrandInput] = useState('')
   const [newCategoryInput, setNewCategoryInput] = useState('')
   const [newCarTypeInput, setNewCarTypeInput] = useState('')
   const [newScaleInput, setNewScaleInput] = useState('')
@@ -210,6 +212,7 @@ export default function EditProductPage({
           setWeightUnit(found.weightUnit || 'kg')
           setBrand(found.brand || '')
           setProductType(found.productType || '')
+          setItemCategories(Array.isArray((found as any).itemCategories) ? (found as any).itemCategories : (found.productType ? [found.productType] : []))
           setCarType(found.carType || '')
           setCarTypes(Array.isArray((found as any).carTypes) ? (found as any).carTypes : (found.carType ? [found.carType] : []))
           setPartType(found.partType || '')
@@ -266,17 +269,6 @@ export default function EditProductPage({
   }
 
   // Add new item functions — update local state and persist to DB
-  const handleAddBrand = (val: string) => {
-    const v = val.trim()
-    if (v && !brands.includes(v)) {
-      const next = [...brands, v]
-      setBrands(next)
-      saveOptions('brands', next)
-    }
-    if (v) setBrand(v.toLowerCase())
-    setNewBrandInput('')
-    setBrandDropdownOpen(false)
-  }
   const handleAddScale = (val: string) => {
     const v = val.trim()
     if (v && !scales.includes(v)) {
@@ -467,7 +459,8 @@ export default function EditProductPage({
         weight: weight ? cleanFloat(weight) : null,
         weightUnit,
         brand,
-        productType,
+        productType: itemCategories[0] || productType,
+        itemCategories,
         carClass,
         revoPart,
         revoParts,
@@ -1256,56 +1249,26 @@ export default function EditProductPage({
                   </button>
                 </div>
 
-                {/* Brand */}
+                {/* Category (Brand) — multi-select */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Unit (Brand)</label>
-                  <div className="relative" ref={brandRef}>
-                    <button type="button" onClick={() => setBrandDropdownOpen(!brandDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
-                      <span className={brand ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
-                        {brand ? (brands.find(b => b.toLowerCase() === brand) || brand) : 'Select brand...'}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Category (Brand)</label>
+                  <div className="relative">
+                    <button type="button" onClick={() => setItemCategoryDropdownOpen(!itemCategoryDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={itemCategories.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {itemCategories.length === 0 ? 'Select category...' : itemCategories.length === 1 ? itemCategories[0] : `${itemCategories.length} selected`}
                       </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${brandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${itemCategoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
-                    {brandDropdownOpen && (
+                    {itemCategoryDropdownOpen && (
                       <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input type="radio" checked={brand === ''} onChange={() => { setBrand(''); setBrandDropdownOpen(false) }} className="rounded" />
-                          <span className="text-sm text-gray-400 italic">— None —</span>
-                        </label>
-                        {brands.map(b => (
-                          <label key={b} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="radio" checked={brand === b.toLowerCase()} onChange={() => { setBrand(b.toLowerCase()); setBrandDropdownOpen(false) }} className="rounded" />
-                            <span className="text-sm text-gray-900">{b}</span>
-                          </label>
-                        ))}
-                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
-                          <input type="text" value={newBrandInput} onChange={e => setNewBrandInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newBrandInput.trim()) { e.preventDefault(); handleAddBrand(newBrandInput) } }} placeholder="+ Add brand..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
-                          <button type="button" onClick={() => { if (newBrandInput.trim()) handleAddBrand(newBrandInput) }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Item Category */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Item Category</label>
-                  <div className="relative" ref={categoryRef}>
-                    <button type="button" onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
-                      <span className={productType ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
-                        {productType ? (productTypes.find(pt => pt.toLowerCase().replace(/ /g, '-') === productType) || productType) : 'Select category...'}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${categoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    {categoryDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input type="radio" checked={productType === ''} onChange={() => { setProductType(''); setCategoryDropdownOpen(false) }} className="rounded" />
+                          <input type="checkbox" checked={itemCategories.length === 0} onChange={() => setItemCategories([])} className="rounded" />
                           <span className="text-sm text-gray-400 italic">— None —</span>
                         </label>
                         {productTypes.map(pt => (
                           <label key={pt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="radio" checked={productType === pt.toLowerCase().replace(/ /g, '-')} onChange={() => { setProductType(pt.toLowerCase().replace(/ /g, '-')); setCategoryDropdownOpen(false) }} className="rounded" />
+                            <input type="checkbox" checked={itemCategories.includes(pt)} onChange={e => setItemCategories(e.target.checked ? [...itemCategories, pt] : itemCategories.filter(c => c !== pt))} className="rounded" />
                             <span className="text-sm text-gray-900">{pt}</span>
                           </label>
                         ))}
@@ -1316,6 +1279,15 @@ export default function EditProductPage({
                       </div>
                     )}
                   </div>
+                  {itemCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {itemCategories.map(cat => (
+                        <span key={cat} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-semibold">
+                          {cat}<button type="button" onClick={() => setItemCategories(itemCategories.filter(c => c !== cat))} className="hover:text-blue-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Car Type */}

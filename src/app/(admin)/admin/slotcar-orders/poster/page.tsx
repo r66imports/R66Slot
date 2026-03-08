@@ -825,7 +825,7 @@ export default function PreOrderPosterPage() {
                 <input type="date" value={estimatedDeliveryDate} onChange={(e) => setEstimatedDeliveryDate(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Brand (Unit)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Category (Brand)</label>
                 <select value={brand} onChange={(e) => setBrand(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play">
                   <option value="">Select Brand…</option>
                   {BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
