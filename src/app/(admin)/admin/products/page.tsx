@@ -32,8 +32,8 @@ interface Product {
   pageId?: string
   pageUrl?: string
   unit?: string
-  salesAccount?: string
-  purchaseAccount?: string
+  salesAccount?: string[]
+  purchaseAccount?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -147,26 +147,34 @@ type ImportProfile = {
 const IMPORT_PROFILES: Record<string, ImportProfile> = {
   generic: {
     label: 'Generic',
-    hint: 'Columns: Code (SKU), Unit (Brand), Category, Retail Price, Cost Price, Quantity, Brand',
-    template: 'Code,Unit,Category,Retail Price,Cost Price,Quantity,Brand',
-    placeholder: 'NSR-0001,NSR,Slot Car,450,280,5,NSR',
+    hint: 'Columns: Code, Description, Category, Unit, SRP Exclusive, Cost Exclusive, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,SRP Exclusive,Cost Exclusive,Sales Account,Purchases Account',
+    placeholder: 'NSR-0001,NSR Slot Car,NSR,Slot Car,450,280,Retail Sales,Retail Purchases',
     mapRow: (obj) => ({
-      title: obj['title'] || obj['name'] || obj['product'] || obj['description'] || '',
-      description: obj['description'] || obj['desc'] || '',
-      price: obj['retail price'] || obj['price'] || obj['retail'] || '0',
-      costPerItem: obj['cost price'] || obj['cost'] || '',
       sku: obj['code'] || obj['sku'] || '',
-      brand: obj['brand'] || obj['unit'] || '',
-      productType: obj['category'] || obj['type'] || obj['producttype'] || '',
-      carClass: obj['category'] || obj['car_class'] || obj['carclass'] || obj['class'] || '',
-      scale: obj['scale'] || '',
+      title: obj['description'] || obj['title'] || obj['name'] || '',
+      brand: obj['category'] || obj['brand'] || '',
+      productType: obj['unit'] || obj['category'] || obj['type'] || '',
+      price: obj['srp exclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
+      salesAccount: obj['sales account'] || '',
+      purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
       quantity: obj['quantity'] || obj['qty'] || '0',
       eta: obj['eta'] || obj['delivery'] || '',
       status: obj['status'] || 'active',
     }),
     brandKey: '',
-    exportHeaders: ['Code', 'Unit', 'Category', 'Retail Price', 'Cost Price', 'Quantity', 'Brand'],
-    exportRow: (p) => [p.sku, p.brand, p.productType || p.carClass || '', p.price, p.costPerItem ?? '', p.quantity, p.brand],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportRow: (p) => [
+      p.sku,
+      p.title,
+      (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
+      (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
+      p.price,
+      p.costPerItem ?? '',
+      Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
+      Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
+    ],
   },
   nsr: {
     label: 'NSR',
@@ -188,8 +196,15 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'NSR',
-    exportHeaders: ['Code', 'Unit', 'Category', 'Retail Price', 'Cost Price', 'Quantity', 'Brand'],
-    exportRow: (p) => [p.sku, p.brand, p.carClass || p.productType || '', p.price, p.costPerItem ?? '', p.quantity, p.brand],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportRow: (p) => [
+      p.sku, p.title,
+      (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
+      (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
+      p.price, p.costPerItem ?? '',
+      Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
+      Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
+    ],
   },
   revo: {
     label: 'Revo',
@@ -210,8 +225,15 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Revo',
-    exportHeaders: ['Code', 'Unit', 'Category', 'Retail Price', 'Cost Price', 'Quantity', 'Brand'],
-    exportRow: (p) => [p.sku, p.brand, p.productType || '', p.price, p.costPerItem ?? '', p.quantity, p.brand],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportRow: (p) => [
+      p.sku, p.title,
+      (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
+      (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
+      p.price, p.costPerItem ?? '',
+      Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
+      Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
+    ],
   },
   brm: {
     label: 'BRM',
@@ -233,8 +255,15 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'BRM',
-    exportHeaders: ['Code', 'Unit', 'Category', 'Retail Price', 'Cost Price', 'Quantity', 'Brand'],
-    exportRow: (p) => [p.sku, p.brand, p.carClass || p.productType || '', p.price, p.costPerItem ?? '', p.quantity, p.brand],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportRow: (p) => [
+      p.sku, p.title,
+      (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
+      (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
+      p.price, p.costPerItem ?? '',
+      Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
+      Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
+    ],
   },
   pioneer: {
     label: 'Pioneer',
@@ -256,8 +285,15 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Pioneer',
-    exportHeaders: ['Code', 'Unit', 'Category', 'Retail Price', 'Cost Price', 'Quantity', 'Brand'],
-    exportRow: (p) => [p.sku, p.brand, p.carClass || p.productType || '', p.price, p.costPerItem ?? '', p.quantity, p.brand],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportRow: (p) => [
+      p.sku, p.title,
+      (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
+      (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
+      p.price, p.costPerItem ?? '',
+      Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
+      Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
+    ],
   },
   sideways: {
     label: 'Sideways',
@@ -279,8 +315,15 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Sideways',
-    exportHeaders: ['Code', 'Unit', 'Category', 'Retail Price', 'Cost Price', 'Quantity', 'Brand'],
-    exportRow: (p) => [p.sku, p.brand, p.carClass || p.productType || '', p.price, p.costPerItem ?? '', p.quantity, p.brand],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportRow: (p) => [
+      p.sku, p.title,
+      (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
+      (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
+      p.price, p.costPerItem ?? '',
+      Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
+      Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
+    ],
   },
 }
 
