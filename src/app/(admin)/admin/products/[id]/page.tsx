@@ -95,15 +95,6 @@ export default function EditProductPage({
   const [pageIds, setPageIds] = useState<string[]>([])
   const [pageDropdownOpen, setPageDropdownOpen] = useState(false)
   const [pageUrl, setPageUrl] = useState('')
-  const [carClass, setCarClass] = useState('')
-  const [carClassDropdownOpen, setCarClassDropdownOpen] = useState(false)
-  const [carClassOptions, setCarClassOptions] = useState(['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'])
-  const [newCarClassInput, setNewCarClassInput] = useState('')
-  const [revoPart, setRevoPart] = useState('')
-  const [revoParts, setRevoParts] = useState<string[]>([])
-  const [revoPartDropdownOpen, setRevoPartDropdownOpen] = useState(false)
-  const [revoPartOptions, setRevoPartOptions] = useState(['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set'])
-  const [newRevoPartInput, setNewRevoPartInput] = useState('')
   const [units, setUnits] = useState<string[]>([])
   const [newUnitInput, setNewUnitInput] = useState('')
   const [unitSaved, setUnitSaved] = useState(false)
@@ -123,6 +114,7 @@ export default function EditProductPage({
   const [productTypes, setProductTypes] = useState<string[]>([])
   const [carTypeOptions, setCarTypeOptions] = useState(['Livery', 'White Kit', 'White Body Kit', 'White Body'])
 
+  const [categoryBrands, setCategoryBrands] = useState<string[]>([])
   const [itemCategories, setItemCategories] = useState<string[]>([])
   const [itemCategoryDropdownOpen, setItemCategoryDropdownOpen] = useState(false)
 
@@ -147,8 +139,6 @@ export default function EditProductPage({
   const categoryRef = useRef<HTMLDivElement>(null)
   const carTypeRef = useRef<HTMLDivElement>(null)
   const scaleRef = useRef<HTMLDivElement>(null)
-  const carClassRef = useRef<HTMLDivElement>(null)
-  const revoPartRef = useRef<HTMLDivElement>(null)
   const carBrandRef = useRef<HTMLDivElement>(null)
   const pageRef = useRef<HTMLDivElement>(null)
 
@@ -171,8 +161,6 @@ export default function EditProductPage({
         if (opts.brands?.length) setBrands(opts.brands)
         if (opts.scales?.length) setScales(opts.scales)
         if (opts.categories?.length) setProductTypes(opts.categories)
-        if (opts.carClasses?.length) setCarClassOptions(opts.carClasses)
-        if (opts.revoParts?.length) setRevoPartOptions(opts.revoParts)
         if (opts.carTypes?.length) setCarTypeOptions(opts.carTypes)
       })
       .catch(() => {})
@@ -212,6 +200,7 @@ export default function EditProductPage({
           setWeightUnit(found.weightUnit || 'kg')
           setBrand(found.brand || '')
           setProductType(found.productType || '')
+          setCategoryBrands(Array.isArray((found as any).categoryBrands) ? (found as any).categoryBrands : [])
           setItemCategories(Array.isArray((found as any).itemCategories) ? (found as any).itemCategories : (found.productType ? [found.productType] : []))
           setCarType(found.carType || '')
           setCarTypes(Array.isArray((found as any).carTypes) ? (found as any).carTypes : (found.carType ? [found.carType] : []))
@@ -228,9 +217,6 @@ export default function EditProductPage({
           setDimHeight(found.dimensions?.height?.toString() || '')
           setPageIds(Array.isArray((found as any).pageIds) ? (found as any).pageIds : (found.pageId ? [found.pageId] : []))
           setPageUrl((found as any).pageUrl || '')
-          setCarClass((found as any).carClass || '')
-          setRevoPart((found as any).revoPart || '')
-          setRevoParts(Array.isArray((found as any).revoParts) ? (found as any).revoParts : [])
           const loadedBrands: string[] = Array.isArray((found as any).carBrands) ? (found as any).carBrands : []
           setCarBrands(loadedBrands)
           setCustomCarBrands(loadedBrands.filter(b => !BASE_CAR_BRANDS.includes(b)))
@@ -351,7 +337,7 @@ export default function EditProductPage({
           costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
           sku, barcode, trackQuantity, quantity: cleanInt(quantity),
           weight: weight ? cleanFloat(weight) : null, weightUnit,
-          brand, productType, carClass, revoPart, revoParts, carBrands, isPreOrder, units,
+          brand, productType, carBrands, isPreOrder, units,
           carType: carTypes[0] || carType, carTypes, partType, scale, supplier, collections,
           tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
           status, boxSize,
@@ -381,7 +367,7 @@ export default function EditProductPage({
     autosaveTimer.current = setTimeout(doAutosave, 1500)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
-      quantity, weight, weightUnit, brand, productType, carClass, revoPart, revoParts,
+      quantity, weight, weightUnit, brand, productType,
       carBrands, isPreOrder, units, carTypes, partType, scale, supplier, collections,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
       seoTitle, seoDescription, seoKeywords])
@@ -393,15 +379,13 @@ export default function EditProductPage({
       if (categoryDropdownOpen && categoryRef.current && !categoryRef.current.contains(e.target as Node)) setCategoryDropdownOpen(false)
       if (carTypeDropdownOpen && carTypeRef.current && !carTypeRef.current.contains(e.target as Node)) setCarTypeDropdownOpen(false)
       if (scaleDropdownOpen && scaleRef.current && !scaleRef.current.contains(e.target as Node)) setScaleDropdownOpen(false)
-      if (carClassDropdownOpen && carClassRef.current && !carClassRef.current.contains(e.target as Node)) setCarClassDropdownOpen(false)
-      if (revoPartDropdownOpen && revoPartRef.current && !revoPartRef.current.contains(e.target as Node)) setRevoPartDropdownOpen(false)
       if (carBrandDropdownOpen && carBrandRef.current && !carBrandRef.current.contains(e.target as Node)) setCarBrandDropdownOpen(false)
       if (pageDropdownOpen && pageRef.current && !pageRef.current.contains(e.target as Node)) setPageDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [brandDropdownOpen, categoryDropdownOpen, carTypeDropdownOpen, scaleDropdownOpen,
-      carClassDropdownOpen, revoPartDropdownOpen, carBrandDropdownOpen, pageDropdownOpen])
+      carBrandDropdownOpen, pageDropdownOpen])
 
   // Upload base64 images to server and return real URLs
   const uploadPendingImages = async (): Promise<string[]> => {
@@ -460,10 +444,8 @@ export default function EditProductPage({
         weightUnit,
         brand,
         productType: itemCategories[0] || productType,
+        categoryBrands,
         itemCategories,
-        carClass,
-        revoPart,
-        revoParts,
         carBrands,
         isPreOrder,
         units,
@@ -527,7 +509,6 @@ export default function EditProductPage({
     const parts: string[] = [header, '']
     if (brand) parts.push(`*Brand:* ${brand}`)
     if (carBrands.length > 0) parts.push(`*Car Brand:* ${carBrands.join(', ')}`)
-    if (carClass) parts.push(`*Class:* ${carClass}`)
     if (carTypes.length) parts.push(`*Car Type:* ${carTypes.join(', ')}`)
     if (scale) parts.push(`*Scale:* ${scale}`)
     if (productType) parts.push(`*Type:* ${productType}`)
@@ -990,156 +971,45 @@ export default function EditProductPage({
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <h3 className="text-sm font-medium text-gray-700 mb-4">Product organization</h3>
               <div className="space-y-4">
-                {/* Revo Racing Class */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Revo Racing Class</label>
-                  <div className="relative" ref={carClassRef}>
-                    <button
-                      type="button"
-                      onClick={() => setCarClassDropdownOpen(!carClassDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white"
-                    >
-                      <span className={carClass ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
-                        {carClass || '— No class —'}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${carClassDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    {carClassDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input type="radio" checked={carClass === ''} onChange={() => { setCarClass(''); setCarClassDropdownOpen(false) }} className="rounded" />
-                          <span className="text-sm text-gray-400 italic">— No class —</span>
-                        </label>
-                        {carClassOptions.map(cls => (
-                          <label key={cls} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="radio" checked={carClass === cls} onChange={() => { setCarClass(cls); setCarClassDropdownOpen(false) }} className="rounded" />
-                            <span className="text-sm text-gray-900">{cls}</span>
-                          </label>
-                        ))}
-                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
-                          <input
-                            type="text"
-                            value={newCarClassInput}
-                            onChange={e => setNewCarClassInput(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' && newCarClassInput.trim()) {
-                                e.preventDefault()
-                                const val = newCarClassInput.trim()
-                                if (!carClassOptions.includes(val)) {
-                                  const next = [...carClassOptions, val]
-                                  setCarClassOptions(next)
-                                  saveOptions('carClasses', next)
-                                }
-                                setCarClass(val)
-                                setNewCarClassInput('')
-                                setCarClassDropdownOpen(false)
-                              }
-                            }}
-                            placeholder="+ Add class..."
-                            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const val = newCarClassInput.trim()
-                              if (!val) return
-                              if (!carClassOptions.includes(val)) {
-                                const next = [...carClassOptions, val]
-                                setCarClassOptions(next)
-                                saveOptions('carClasses', next)
-                              }
-                              setCarClass(val)
-                              setNewCarClassInput('')
-                              setCarClassDropdownOpen(false)
-                            }}
-                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700"
-                          >Add</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {carClass && (
-                    <button type="button" onClick={() => setCarClass('')} className="text-xs text-gray-400 hover:text-red-500 mt-1">✕ Clear</button>
-                  )}
-                </div>
 
-                {/* Revo Parts (multi-select) */}
+                {/* Category (Brand) — editable text boxes */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Revo Parts</label>
-                  <div className="relative" ref={revoPartRef}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Category (Brand)</label>
+                      <p className="text-xs text-gray-400">For Sage accounting &amp; CSV imports/exports</p>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setRevoPartDropdownOpen(!revoPartDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white"
+                      onClick={() => setCategoryBrands([...categoryBrands, ''])}
+                      className="flex items-center gap-1 text-xs font-medium text-gray-700 border border-gray-300 rounded-lg px-2.5 py-1.5 hover:bg-gray-50 hover:border-gray-400"
                     >
-                      <span className={revoParts.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
-                        {revoParts.length === 0 ? '— None —' : revoParts.length === 1 ? revoParts[0] : `${revoParts.length} selected`}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${revoPartDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      Add
                     </button>
-                    {revoPartDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input type="checkbox" checked={revoParts.length === 0} onChange={() => setRevoParts([])} className="rounded" />
-                          <span className="text-sm text-gray-400 italic">— None —</span>
-                        </label>
-                        {revoPartOptions.map(part => (
-                          <label key={part} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={revoParts.includes(part)}
-                              onChange={e => setRevoParts(e.target.checked ? [...revoParts, part] : revoParts.filter(p => p !== part))}
-                              className="rounded"
-                            />
-                            <span className="text-sm text-gray-900">{part}</span>
-                          </label>
-                        ))}
-                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                  </div>
+                  {categoryBrands.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic px-1">No categories added — click Add</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {categoryBrands.map((cb, i) => (
+                        <div key={i} className="flex items-center gap-2">
                           <input
                             type="text"
-                            value={newRevoPartInput}
-                            onChange={e => setNewRevoPartInput(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter' && newRevoPartInput.trim()) {
-                                e.preventDefault()
-                                const val = newRevoPartInput.trim()
-                                if (!revoPartOptions.includes(val)) {
-                                  const next = [...revoPartOptions, val]
-                                  setRevoPartOptions(next)
-                                  saveOptions('revoParts', next)
-                                }
-                                if (!revoParts.includes(val)) setRevoParts(prev => [...prev, val])
-                                setNewRevoPartInput('')
-                              }
-                            }}
-                            placeholder="+ Add part..."
-                            className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                            value={cb}
+                            onChange={e => { const next = [...categoryBrands]; next[i] = e.target.value; setCategoryBrands(next) }}
+                            placeholder="e.g. NSR, Revo, Pioneer…"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                           />
                           <button
                             type="button"
-                            onClick={() => {
-                              const val = newRevoPartInput.trim()
-                              if (!val) return
-                              if (!revoPartOptions.includes(val)) {
-                                const next = [...revoPartOptions, val]
-                                setRevoPartOptions(next)
-                                saveOptions('revoParts', next)
-                              }
-                              if (!revoParts.includes(val)) setRevoParts(prev => [...prev, val])
-                              setNewRevoPartInput('')
-                            }}
-                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700"
-                          >Add</button>
+                            onClick={() => setCategoryBrands(categoryBrands.filter((_, j) => j !== i))}
+                            className="p-2 text-gray-400 hover:text-red-600 border border-gray-200 rounded-lg hover:border-red-300 transition-colors"
+                            title="Delete"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                  {revoParts.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {revoParts.map(p => (
-                        <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
-                          {p}<button type="button" onClick={() => setRevoParts(revoParts.filter(x => x !== p))} className="hover:text-red-900">×</button>
-                        </span>
                       ))}
                     </div>
                   )}
@@ -1249,9 +1119,10 @@ export default function EditProductPage({
                   </button>
                 </div>
 
-                {/* Category (Brand) — multi-select */}
+                {/* Item Categories (Unit) — multi-select */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Category (Brand)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Item Categories (Unit)</label>
+                  <p className="text-xs text-gray-400 mb-2">For Sage accounting &amp; CSV imports/exports</p>
                   <div className="relative">
                     <button type="button" onClick={() => setItemCategoryDropdownOpen(!itemCategoryDropdownOpen)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
@@ -1267,10 +1138,15 @@ export default function EditProductPage({
                           <span className="text-sm text-gray-400 italic">— None —</span>
                         </label>
                         {productTypes.map(pt => (
-                          <label key={pt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="checkbox" checked={itemCategories.includes(pt)} onChange={e => setItemCategories(e.target.checked ? [...itemCategories, pt] : itemCategories.filter(c => c !== pt))} className="rounded" />
-                            <span className="text-sm text-gray-900">{pt}</span>
-                          </label>
+                          <div key={pt} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={itemCategories.includes(pt)} onChange={e => setItemCategories(e.target.checked ? [...itemCategories, pt] : itemCategories.filter(c => c !== pt))} className="rounded" />
+                              <span className="text-sm text-gray-900">{pt}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = productTypes.filter(t => t !== pt); setProductTypes(next); saveOptions('categories', next); setItemCategories(prev => prev.filter(c => c !== pt)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
                         ))}
                         <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
                           <input type="text" value={newCategoryInput} onChange={e => setNewCategoryInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newCategoryInput.trim()) { e.preventDefault(); handleAddProductType(newCategoryInput) } }} placeholder="+ Add category..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
