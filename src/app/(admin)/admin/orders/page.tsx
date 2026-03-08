@@ -912,15 +912,189 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
   window.location.href = `mailto:${data.clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
-function doDownload(data: DocViewData, template: OrderTemplate) {
-  const html = generateDocHTML(data, template)
-  const blob = new Blob([html], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${data.docNumber}.html`
-  a.click()
-  URL.revokeObjectURL(url)
+async function doDownload(data: DocViewData, template: OrderTemplate) {
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
+
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  const margin = 18
+  const col2 = pageW / 2 + 5
+  let y = 18
+
+  const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
+  const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const vat = subtotal * 0.15
+  const total = subtotal + vat
+
+  // ── Logo (top left) ──────────────────────────────────────────────────────────
+  if (template.logoUrl) {
+    try {
+      const res = await fetch(template.logoUrl)
+      const blob = await res.blob()
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.readAsDataURL(blob)
+      })
+      const ext = (template.logoUrl.split('.').pop() ?? 'png').toUpperCase()
+      const fmt = ext === 'JPG' ? 'JPEG' : ['PNG', 'JPEG', 'WEBP'].includes(ext) ? ext : 'PNG'
+      doc.addImage(dataUrl, fmt as 'PNG', margin, y, 0, 16)
+    } catch { /* logo optional */ }
+  }
+
+  // ── Doc title block (top right) ──────────────────────────────────────────────
+  doc.setFontSize(20)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(31, 41, 55)
+  doc.text(docTitle, pageW - margin, y + 6, { align: 'right' })
+
+  doc.setFontSize(11)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(50)
+  doc.text(data.docNumber, pageW - margin, y + 13, { align: 'right' })
+
+  doc.setFontSize(9)
+  doc.setTextColor(120)
+  doc.text(fmtDateLong(data.date), pageW - margin, y + 19, { align: 'right' })
+
+  y += 30
+
+  // ── Divider ──────────────────────────────────────────────────────────────────
+  doc.setDrawColor(220)
+  doc.setLineWidth(0.3)
+  doc.line(margin, y, pageW - margin, y)
+  y += 6
+
+  // ── From / Bill To ───────────────────────────────────────────────────────────
+  doc.setFontSize(7)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(160)
+  doc.text('FROM', margin, y)
+  doc.text('BILL TO', col2, y)
+  y += 4
+
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(30)
+  doc.text(template.companyName || 'R66 Slot', margin, y)
+  doc.text(data.clientName, col2, y)
+
+  doc.setFontSize(8.5)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(80)
+
+  let fromY = y + 5
+  if (template.companyAddress) {
+    const lines = doc.splitTextToSize(template.companyAddress, pageW / 2 - margin - 5)
+    doc.text(lines, margin, fromY); fromY += lines.length * 4.5
+  }
+  if (template.companyVAT) { doc.text(`VAT: ${template.companyVAT}`, margin, fromY); fromY += 4.5 }
+  if (template.companyPhone) { doc.text(`Tel: ${template.companyPhone}`, margin, fromY); fromY += 4.5 }
+  if (template.companyEmail) { doc.text(template.companyEmail, margin, fromY); fromY += 4.5 }
+
+  let toY = y + 5
+  if (data.clientEmail) { doc.text(data.clientEmail, col2, toY); toY += 4.5 }
+  if (data.clientPhone) { doc.text(data.clientPhone, col2, toY); toY += 4.5 }
+  if (data.clientAddress) {
+    const lines = doc.splitTextToSize(data.clientAddress, pageW / 2 - margin - 5)
+    doc.text(lines, col2, toY); toY += lines.length * 4.5
+  }
+
+  y = Math.max(fromY, toY) + 8
+
+  // ── Line items table ─────────────────────────────────────────────────────────
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Description', 'Qty', 'Unit Price', 'Total']],
+    body: data.lineItems.map((li, i) => [
+      i + 1,
+      li.description || '—',
+      li.qty,
+      fmtPrice(li.unitPrice),
+      fmtPrice(li.qty * li.unitPrice),
+    ]),
+    foot: [
+      ['', '', '', 'Subtotal (excl. VAT)', fmtPrice(subtotal)],
+      ['', '', '', 'VAT (15%)', fmtPrice(vat)],
+      ['', '', '', 'TOTAL (incl. VAT)', fmtPrice(total)],
+    ],
+    headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
+    bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
+    footStyles: { fontSize: 8.5, textColor: [31, 41, 55] },
+    alternateRowStyles: { fillColor: [249, 250, 251] },
+    columnStyles: {
+      0: { cellWidth: 8, halign: 'center' },
+      2: { halign: 'right', cellWidth: 12 },
+      3: { halign: 'right', cellWidth: 38 },
+      4: { halign: 'right', cellWidth: 38, fontStyle: 'bold' },
+    },
+    margin: { left: margin, right: margin },
+    didParseCell(hookData) {
+      if (hookData.section === 'foot' && hookData.row.index === 2) {
+        hookData.cell.styles.fillColor = [31, 41, 55]
+        hookData.cell.styles.textColor = [255, 255, 255]
+        hookData.cell.styles.fontStyle = 'bold'
+      }
+    },
+  })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  y = (doc as any).lastAutoTable.finalY + 8
+
+  // ── Notes ────────────────────────────────────────────────────────────────────
+  if (data.notes) {
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(150)
+    doc.text('NOTES', margin, y)
+    y += 4
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(70)
+    const noteLines = doc.splitTextToSize(data.notes, pageW - margin * 2)
+    doc.text(noteLines, margin, y)
+    y += noteLines.length * 4.5 + 6
+  }
+
+  // ── Banking ──────────────────────────────────────────────────────────────────
+  if (template.bankName) {
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(29, 78, 216)
+    doc.text('BANKING DETAILS', margin, y)
+    y += 4
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(50)
+    doc.text(`Bank: ${template.bankName}   |   Account: ${template.bankAccount}`, margin, y); y += 4.5
+    doc.text(`Branch Code: ${template.bankBranch}   |   Account Type: ${template.bankType}`, margin, y); y += 8
+  }
+
+  // ── Terms ────────────────────────────────────────────────────────────────────
+  if (data.terms) {
+    doc.setFontSize(7)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(150)
+    doc.text('TERMS & CONDITIONS', margin, y)
+    y += 4
+    doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(120)
+    const termLines = doc.splitTextToSize(data.terms, pageW - margin * 2)
+    doc.text(termLines, margin, y)
+  }
+
+  // ── Footer ───────────────────────────────────────────────────────────────────
+  if (template.footerText) {
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(160)
+    doc.text(template.footerText, pageW / 2, pageH - 10, { align: 'center' })
+  }
+
+  doc.save(`${data.docNumber}.pdf`)
 }
 
 // ─── Shared icon button style ──────────────────────────────────────────────────
