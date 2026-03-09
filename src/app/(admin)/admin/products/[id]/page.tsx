@@ -100,12 +100,18 @@ export default function EditProductPage({
   const [unitSaved, setUnitSaved] = useState(false)
   const [carBrands, setCarBrands] = useState<string[]>([])
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
-  const [customCarBrands, setCustomCarBrands] = useState<string[]>([])
+  const [carBrandOptions, setCarBrandOptions] = useState<string[]>([...BASE_CAR_BRANDS])
   const [newCarBrandInput, setNewCarBrandInput] = useState('')
   const [sidewaysBrands, setSidewaysBrands] = useState<string[]>([])
   const [sidewaysBrandDropdownOpen, setSidewaysBrandDropdownOpen] = useState(false)
-  const [customSidewaysBrands, setCustomSidewaysBrands] = useState<string[]>([])
+  const [sidewaysBrandOptions, setSidewaysBrandOptions] = useState<string[]>([...BASE_CAR_BRANDS])
   const [newSidewaysBrandInput, setNewSidewaysBrandInput] = useState('')
+  // Sideways Parts Filter
+  const DEFAULT_REVO_PARTS = ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set']
+  const [sidewaysPartOptions, setSidewaysPartOptions] = useState<string[]>(DEFAULT_REVO_PARTS)
+  const [selectedSidewaysParts, setSelectedSidewaysParts] = useState<string[]>([])
+  const [sidewaysPartDropdownOpen, setSidewaysPartDropdownOpen] = useState(false)
+  const [newSidewaysPartInput, setNewSidewaysPartInput] = useState('')
   const [saveInPlaceSuccess, setSaveInPlaceSuccess] = useState(false)
   const [isPreOrder, setIsPreOrder] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
@@ -114,7 +120,6 @@ export default function EditProductPage({
   const [seoKeywords, setSeoKeywords] = useState('')
   // Revo Racing Class Filter
   const DEFAULT_CAR_CLASSES = ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA']
-  const DEFAULT_REVO_PARTS = ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set']
   const [carClassOptions, setCarClassOptions] = useState<string[]>(DEFAULT_CAR_CLASSES)
   const [selectedCarClasses, setSelectedCarClasses] = useState<string[]>([])
   const [carClassDropdownOpen, setCarClassDropdownOpen] = useState(false)
@@ -174,6 +179,7 @@ export default function EditProductPage({
   const carClassRef = useRef<HTMLDivElement>(null)
   const revoPartRef = useRef<HTMLDivElement>(null)
   const sidewaysBrandRef = useRef<HTMLDivElement>(null)
+  const sidewaysPartRef = useRef<HTMLDivElement>(null)
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -199,6 +205,7 @@ export default function EditProductPage({
         if (opts.purchaseAccounts?.length) setPurchaseAccountOptions(opts.purchaseAccounts)
         if (opts.carClasses?.length) setCarClassOptions(opts.carClasses)
         if (opts.revoParts?.length) setRevoPartOptions(opts.revoParts)
+        if (opts.sidewaysParts?.length) setSidewaysPartOptions(opts.sidewaysParts)
       })
       .catch(() => {})
     fetch('/api/admin/pages')
@@ -256,10 +263,13 @@ export default function EditProductPage({
           setPageUrl((found as any).pageUrl || '')
           const loadedBrands: string[] = Array.isArray((found as any).carBrands) ? (found as any).carBrands : []
           setCarBrands(loadedBrands)
-          setCustomCarBrands(loadedBrands.filter(b => !BASE_CAR_BRANDS.includes(b)))
+          const extraCarBrands = loadedBrands.filter(b => !BASE_CAR_BRANDS.includes(b))
+          if (extraCarBrands.length) setCarBrandOptions(prev => [...prev, ...extraCarBrands.filter(x => !prev.includes(x))])
           const loadedSidewaysBrands: string[] = Array.isArray((found as any).sidewaysBrands) ? (found as any).sidewaysBrands : []
           setSidewaysBrands(loadedSidewaysBrands)
-          setCustomSidewaysBrands(loadedSidewaysBrands.filter(b => !BASE_CAR_BRANDS.includes(b)))
+          const extraSidewaysBrands = loadedSidewaysBrands.filter(b => !BASE_CAR_BRANDS.includes(b))
+          if (extraSidewaysBrands.length) setSidewaysBrandOptions(prev => [...prev, ...extraSidewaysBrands.filter(x => !prev.includes(x))])
+          setSelectedSidewaysParts(Array.isArray((found as any).sidewaysParts) ? (found as any).sidewaysParts : [])
           setIsPreOrder((found as any).isPreOrder || false)
           setUnits(Array.isArray((found as any).units) ? (found as any).units : [])
           setSelectedCarClasses(Array.isArray((found as any).carClasses) ? (found as any).carClasses : ((found as any).carClass ? [(found as any).carClass] : []))
@@ -382,7 +392,7 @@ export default function EditProductPage({
           weight: weight ? cleanFloat(weight) : null, weightUnit,
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
           carBrands, sidewaysBrands, isPreOrder, units, salesAccount, purchaseAccount,
-          carClass: selectedCarClasses[0] || '', revoParts: selectedRevoParts,
+          carClass: selectedCarClasses[0] || '', revoParts: selectedRevoParts, sidewaysParts: selectedSidewaysParts,
           carType: carTypes[0] || carType, carTypes, partType, scale, supplier, collections,
           tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
           status, boxSize,
@@ -414,7 +424,7 @@ export default function EditProductPage({
   }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
       quantity, weight, weightUnit, brand, productType, categoryBrands, itemCategories,
       carBrands, sidewaysBrands, isPreOrder, units, carTypes, partType, scale, supplier, collections,
-      selectedCarClasses, selectedRevoParts,
+      selectedCarClasses, selectedRevoParts, selectedSidewaysParts,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
       seoTitle, seoDescription, seoKeywords, salesAccount, purchaseAccount])
 
@@ -434,6 +444,7 @@ export default function EditProductPage({
       if (carClassRef.current && !carClassRef.current.contains(t)) setCarClassDropdownOpen(false)
       if (revoPartRef.current && !revoPartRef.current.contains(t)) setRevoPartDropdownOpen(false)
       if (sidewaysBrandRef.current && !sidewaysBrandRef.current.contains(t)) setSidewaysBrandDropdownOpen(false)
+      if (sidewaysPartRef.current && !sidewaysPartRef.current.contains(t)) setSidewaysPartDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -502,6 +513,7 @@ export default function EditProductPage({
         sidewaysBrands,
         carClass: selectedCarClasses[0] || '',
         revoParts: selectedRevoParts,
+        sidewaysParts: selectedSidewaysParts,
         isPreOrder,
         units,
         carType: carTypes[0] || carType,
@@ -1088,16 +1100,21 @@ export default function EditProductPage({
                           />
                           <span className="text-sm text-gray-500 italic">None</span>
                         </label>
-                        {[...BASE_CAR_BRANDS, ...customCarBrands].map((cb) => (
-                          <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={carBrands.includes(cb)}
-                              onChange={(e) => setCarBrands(e.target.checked ? [...carBrands, cb] : carBrands.filter(b => b !== cb))}
-                              className="rounded"
-                            />
-                            <span className="text-sm text-gray-900">{cb}</span>
-                          </label>
+                        {carBrandOptions.map((cb) => (
+                          <div key={cb} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={carBrands.includes(cb)}
+                                onChange={(e) => setCarBrands(e.target.checked ? [...carBrands, cb] : carBrands.filter(b => b !== cb))}
+                                className="rounded"
+                              />
+                              <span className="text-sm text-gray-900">{cb}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = carBrandOptions.filter(x => x !== cb); setCarBrandOptions(next); setCarBrands(prev => prev.filter(b => b !== cb)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
                         ))}
                         <div className="flex items-center gap-1 px-3 py-2 border-t border-gray-100">
                           <input
@@ -1108,8 +1125,8 @@ export default function EditProductPage({
                               if (e.key === 'Enter') {
                                 e.preventDefault()
                                 const val = newCarBrandInput.trim()
-                                if (val && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(val)) {
-                                  setCustomCarBrands(prev => [...prev, val])
+                                if (val && !carBrandOptions.includes(val)) {
+                                  setCarBrandOptions(prev => [...prev, val])
                                   setCarBrands(prev => [...prev, val])
                                 }
                                 setNewCarBrandInput('')
@@ -1122,8 +1139,8 @@ export default function EditProductPage({
                             type="button"
                             onClick={() => {
                               const val = newCarBrandInput.trim()
-                              if (val && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(val)) {
-                                setCustomCarBrands(prev => [...prev, val])
+                              if (val && !carBrandOptions.includes(val)) {
+                                setCarBrandOptions(prev => [...prev, val])
                                 setCarBrands(prev => [...prev, val])
                               }
                               setNewCarBrandInput('')
@@ -1269,16 +1286,21 @@ export default function EditProductPage({
                           />
                           <span className="text-sm text-gray-500 italic">None</span>
                         </label>
-                        {[...BASE_CAR_BRANDS, ...customSidewaysBrands].map((cb) => (
-                          <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={sidewaysBrands.includes(cb)}
-                              onChange={(e) => setSidewaysBrands(e.target.checked ? [...sidewaysBrands, cb] : sidewaysBrands.filter(b => b !== cb))}
-                              className="rounded"
-                            />
-                            <span className="text-sm text-gray-900">{cb}</span>
-                          </label>
+                        {sidewaysBrandOptions.map((cb) => (
+                          <div key={cb} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={sidewaysBrands.includes(cb)}
+                                onChange={(e) => setSidewaysBrands(e.target.checked ? [...sidewaysBrands, cb] : sidewaysBrands.filter(b => b !== cb))}
+                                className="rounded"
+                              />
+                              <span className="text-sm text-gray-900">{cb}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = sidewaysBrandOptions.filter(x => x !== cb); setSidewaysBrandOptions(next); setSidewaysBrands(prev => prev.filter(b => b !== cb)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
                         ))}
                         <div className="flex items-center gap-1 px-3 py-2 border-t border-gray-100">
                           <input
@@ -1289,8 +1311,8 @@ export default function EditProductPage({
                               if (e.key === 'Enter') {
                                 e.preventDefault()
                                 const val = newSidewaysBrandInput.trim()
-                                if (val && ![...BASE_CAR_BRANDS, ...customSidewaysBrands].includes(val)) {
-                                  setCustomSidewaysBrands(prev => [...prev, val])
+                                if (val && !sidewaysBrandOptions.includes(val)) {
+                                  setSidewaysBrandOptions(prev => [...prev, val])
                                   setSidewaysBrands(prev => [...prev, val])
                                 }
                                 setNewSidewaysBrandInput('')
@@ -1303,8 +1325,8 @@ export default function EditProductPage({
                             type="button"
                             onClick={() => {
                               const val = newSidewaysBrandInput.trim()
-                              if (val && ![...BASE_CAR_BRANDS, ...customSidewaysBrands].includes(val)) {
-                                setCustomSidewaysBrands(prev => [...prev, val])
+                              if (val && !sidewaysBrandOptions.includes(val)) {
+                                setSidewaysBrandOptions(prev => [...prev, val])
                                 setSidewaysBrands(prev => [...prev, val])
                               }
                               setNewSidewaysBrandInput('')
@@ -1321,6 +1343,52 @@ export default function EditProductPage({
                         <span key={cb} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
                           {cb}
                           <button type="button" onClick={() => setSidewaysBrands(sidewaysBrands.filter(b => b !== cb))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sideways Parts Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sideways Parts Filter</label>
+                  <div className="relative" ref={sidewaysPartRef}>
+                    <button type="button" onClick={() => setSidewaysPartDropdownOpen(!sidewaysPartDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={selectedSidewaysParts.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {selectedSidewaysParts.length === 0 ? 'Select part...' : selectedSidewaysParts.length === 1 ? selectedSidewaysParts[0] : `${selectedSidewaysParts.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${sidewaysPartDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {sidewaysPartDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={selectedSidewaysParts.length === 0} onChange={() => setSelectedSidewaysParts([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {sidewaysPartOptions.map(part => (
+                          <div key={part} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={selectedSidewaysParts.includes(part)} onChange={e => setSelectedSidewaysParts(e.target.checked ? [...selectedSidewaysParts, part] : selectedSidewaysParts.filter(p => p !== part))} className="rounded" />
+                              <span className="text-sm text-gray-900">{part}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = sidewaysPartOptions.filter(x => x !== part); setSidewaysPartOptions(next); saveOptions('sidewaysParts', next); setSelectedSidewaysParts(prev => prev.filter(p => p !== part)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newSidewaysPartInput} onChange={e => setNewSidewaysPartInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newSidewaysPartInput.trim()) { e.preventDefault(); const v = newSidewaysPartInput.trim(); if (!sidewaysPartOptions.includes(v)) { const next = [...sidewaysPartOptions, v]; setSidewaysPartOptions(next); saveOptions('sidewaysParts', next) }; setSelectedSidewaysParts(prev => prev.includes(v) ? prev : [...prev, v]); setNewSidewaysPartInput('') } }} placeholder="+ Add part..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { const v = newSidewaysPartInput.trim(); if (!v) return; if (!sidewaysPartOptions.includes(v)) { const next = [...sidewaysPartOptions, v]; setSidewaysPartOptions(next); saveOptions('sidewaysParts', next) }; setSelectedSidewaysParts(prev => prev.includes(v) ? prev : [...prev, v]); setNewSidewaysPartInput('') }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {selectedSidewaysParts.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedSidewaysParts.map(part => (
+                        <span key={part} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
+                          {part}<button type="button" onClick={() => setSelectedSidewaysParts(selectedSidewaysParts.filter(p => p !== part))} className="hover:text-red-900">×</button>
                         </span>
                       ))}
                     </div>

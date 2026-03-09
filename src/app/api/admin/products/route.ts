@@ -35,6 +35,7 @@ export interface Product {
   carBrands: string[]
   sidewaysBrands: string[]
   revoParts: string[]
+  sidewaysParts: string[]
   isPreOrder: boolean
   seo: { metaTitle: string; metaDescription: string; metaKeywords: string }
   sageItemCode: string | null
@@ -84,6 +85,7 @@ function rowToProduct(row: any): Product {
     carBrands: Array.isArray(row.car_brands) ? row.car_brands : [],
     sidewaysBrands: Array.isArray(row.sideways_brands) ? row.sideways_brands : [],
     revoParts: Array.isArray(row.revo_parts) ? row.revo_parts : [],
+    sidewaysParts: Array.isArray(row.sideways_parts) ? row.sideways_parts : [],
     isPreOrder: row.is_pre_order || false,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
@@ -115,7 +117,8 @@ async function ensureProductColumns() {
         ADD COLUMN IF NOT EXISTS purchase_account TEXT DEFAULT '',
         ADD COLUMN IF NOT EXISTS category_brands JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS item_categories JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS sideways_brands JSONB DEFAULT '[]'::jsonb
+        ADD COLUMN IF NOT EXISTS sideways_brands JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS sideways_parts JSONB DEFAULT '[]'::jsonb
     `)
   } catch { /* ignore */ }
   _productColumnsMigrated = true
@@ -166,11 +169,11 @@ export async function POST(request: Request) {
         weight, weight_unit, box_size, dimensions, eta, status,
         image_url, images, page_id, page_ids, page_url, car_brands, revo_parts, is_pre_order,
         seo, created_at, updated_at,
-        sales_account, purchase_account, category_brands, item_categories, sideways_brands
+        sales_account, purchase_account, category_brands, item_categories, sideways_brands, sideways_parts
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
         $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
-        $34,$35,$36,$37,$38,$39,$40,$41
+        $34,$35,$36,$37,$38,$39,$40,$41,$42
       )
     `, [
       id, body.title, body.description || '',
@@ -190,6 +193,7 @@ export async function POST(request: Request) {
       JSON.stringify(Array.isArray(body.purchaseAccount) ? body.purchaseAccount : []),
       JSON.stringify(categoryBrands), JSON.stringify(itemCategories),
       JSON.stringify(Array.isArray(body.sidewaysBrands) ? body.sidewaysBrands : []),
+      JSON.stringify(Array.isArray(body.sidewaysParts) ? body.sidewaysParts : []),
     ])
 
     const result = await db.query(`SELECT * FROM products WHERE id = $1`, [id])
