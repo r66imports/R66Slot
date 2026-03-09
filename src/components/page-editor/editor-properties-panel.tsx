@@ -3143,6 +3143,72 @@ function SettingsTab({
       {component.type === 'product-grid' && (
         <>
           {/* ── Reusable filter helper ──────────────────────────────────────────── */}
+          {/* Revo Cars Brand Page filter */}
+          {(([open, setOpen, selected, toggle, clearFn, items, label]: any) => (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
+              <div className="relative">
+                <button type="button" onClick={() => setOpen(!open)}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${
+                    selected.length > 0 ? (selected.includes(KEEP_EMPTY) ? 'border-orange-300 bg-orange-50' : 'border-red-300 bg-red-50') : 'border-gray-200'
+                  }`}>
+                  <span className={selected.length === 0 ? 'text-gray-400' : selected.includes(KEEP_EMPTY) ? 'text-orange-700 font-semibold' : 'text-gray-800'}>
+                    {selected.length === 0 ? '— No Filter —' : selected.includes(KEEP_EMPTY) ? 'Keep Empty' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
+                  </span>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {open && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-gray-50">
+                      <input type="checkbox" checked={selected.length === 0} onChange={() => clearFn()} className="rounded" />
+                      <span className="text-xs text-gray-700 font-play font-semibold">— No Filter — (show all)</span>
+                    </label>
+                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-orange-50 cursor-pointer border-b-2 border-gray-200 bg-orange-50/40">
+                      <input type="checkbox" checked={selected.includes(KEEP_EMPTY)} onChange={() => toggle(KEEP_EMPTY)} className="rounded accent-orange-500" />
+                      <span className="text-xs text-orange-700 font-play font-semibold">Keep Empty <span className="font-normal text-orange-500">(products with no {label})</span></span>
+                    </label>
+                    {items.map((item: string) => (
+                      <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                        <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
+                        <span className="text-xs text-gray-800 font-play">{item}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {selected.length > 0 ? (
+                <div className="mt-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className={`text-[10px] font-play font-medium ${selected.includes(KEEP_EMPTY) ? 'text-orange-600' : 'text-red-600'}`}>
+                      {selected.includes(KEEP_EMPTY) ? 'Keep Empty — showing products with no value' : `Active: ${selected.length} selected`}
+                    </p>
+                    <button onClick={() => clearFn()} className="text-[10px] text-gray-400 hover:text-red-500 font-play underline">Clear</button>
+                  </div>
+                  {!selected.includes(KEEP_EMPTY) && (
+                    <div className="flex flex-wrap gap-1">
+                      {selected.map((v: string) => (
+                        <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
+                          {v}<button onClick={() => toggle(v)} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-[10px] text-gray-400 mt-1 font-play">No filter — all shown</p>
+              )}
+            </div>
+          ))([
+            carBrandDropdownOpen, setCarBrandDropdownOpen,
+            selectedCarBrands,
+            toggleCarBrand,
+            () => updateSetting('carBrands', []),
+            CAR_BRANDS,
+            'Revo Cars Brand Page',
+          ])}
+
           {/* Racing Class filter */}
           {(([open, setOpen, selected, toggle, clearFn, items, label]: any) => (
             <div>
@@ -3275,71 +3341,6 @@ function SettingsTab({
             'Revo Parts Filter',
           ])}
 
-          {/* Car Brand filter */}
-          {(([open, setOpen, selected, toggle, clearFn, items, label]: any) => (
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
-              <div className="relative">
-                <button type="button" onClick={() => setOpen(!open)}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${
-                    selected.length > 0 ? (selected.includes(KEEP_EMPTY) ? 'border-orange-300 bg-orange-50' : 'border-red-300 bg-red-50') : 'border-gray-200'
-                  }`}>
-                  <span className={selected.length === 0 ? 'text-gray-400' : selected.includes(KEEP_EMPTY) ? 'text-orange-700 font-semibold' : 'text-gray-800'}>
-                    {selected.length === 0 ? '— No Filter —' : selected.includes(KEEP_EMPTY) ? 'Keep Empty' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
-                  </span>
-                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {open && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-gray-50">
-                      <input type="checkbox" checked={selected.length === 0} onChange={() => clearFn()} className="rounded" />
-                      <span className="text-xs text-gray-700 font-play font-semibold">— No Filter — (show all)</span>
-                    </label>
-                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-orange-50 cursor-pointer border-b-2 border-gray-200 bg-orange-50/40">
-                      <input type="checkbox" checked={selected.includes(KEEP_EMPTY)} onChange={() => toggle(KEEP_EMPTY)} className="rounded accent-orange-500" />
-                      <span className="text-xs text-orange-700 font-play font-semibold">Keep Empty <span className="font-normal text-orange-500">(products with no {label.replace(' Filter','')})</span></span>
-                    </label>
-                    {items.map((item: string) => (
-                      <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                        <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
-                        <span className="text-xs text-gray-800 font-play">{item}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-              {selected.length > 0 ? (
-                <div className="mt-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className={`text-[10px] font-play font-medium ${selected.includes(KEEP_EMPTY) ? 'text-orange-600' : 'text-red-600'}`}>
-                      {selected.includes(KEEP_EMPTY) ? 'Keep Empty — showing products with no value' : `Active: ${selected.length} selected`}
-                    </p>
-                    <button onClick={() => clearFn()} className="text-[10px] text-gray-400 hover:text-red-500 font-play underline">Clear</button>
-                  </div>
-                  {!selected.includes(KEEP_EMPTY) && (
-                    <div className="flex flex-wrap gap-1">
-                      {selected.map((v: string) => (
-                        <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
-                          {v}<button onClick={() => toggle(v)} className="hover:text-red-900">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-[10px] text-gray-400 mt-1 font-play">No filter — all shown</p>
-              )}
-            </div>
-          ))([
-            carBrandDropdownOpen, setCarBrandDropdownOpen,
-            selectedCarBrands,
-            toggleCarBrand,
-            () => updateSetting('carBrands', []),
-            CAR_BRANDS,
-            'Car Brand Filter',
-          ])}
 
           <div className="flex items-center gap-2">
             <input
