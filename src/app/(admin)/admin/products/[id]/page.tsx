@@ -133,13 +133,19 @@ export default function EditProductPage({
   const [sageCollapsed, setSageCollapsed] = useState(false)
   const [seoCollapsed, setSeoCollapsed] = useState(false)
   const [infoCollapsed, setInfoCollapsed] = useState(false)
+  const [generalOrgCollapsed, setGeneralOrgCollapsed] = useState(false)
   const [productOrgCollapsed, setProductOrgCollapsed] = useState(false)
   const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(false)
   const [carClassPillsHidden, setCarClassPillsHidden] = useState(false)
   const [carBrandPillsHidden, setCarBrandPillsHidden] = useState(false)
   const [sidewaysBrandPillsHidden, setSidewaysBrandPillsHidden] = useState(false)
   const [carTypePillsHidden, setCarTypePillsHidden] = useState(false)
+  const [sidewaysCarTypePillsHidden, setSidewaysCarTypePillsHidden] = useState(false)
   const [pagePillsHidden, setPagePillsHidden] = useState(false)
+  // Sideways Car Type
+  const [sidewaysCarTypes, setSidewaysCarTypes] = useState<string[]>([])
+  const [sidewaysCarTypeDropdownOpen, setSidewaysCarTypeDropdownOpen] = useState(false)
+  const [newSidewaysCarTypeInput, setNewSidewaysCarTypeInput] = useState('')
 
   // Revo Parts Filter
   const [revoPartOptions, setRevoPartOptions] = useState<string[]>(DEFAULT_REVO_PARTS)
@@ -199,6 +205,7 @@ export default function EditProductPage({
   const revoPartRef = useRef<HTMLDivElement>(null)
   const sidewaysBrandRef = useRef<HTMLDivElement>(null)
   const sidewaysPartRef = useRef<HTMLDivElement>(null)
+  const sidewaysCarTypeRef = useRef<HTMLDivElement>(null)
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -289,6 +296,7 @@ export default function EditProductPage({
           const extraSidewaysBrands = loadedSidewaysBrands.filter(b => !BASE_CAR_BRANDS.includes(b))
           if (extraSidewaysBrands.length) setSidewaysBrandOptions(prev => [...prev, ...extraSidewaysBrands.filter(x => !prev.includes(x))])
           setSelectedSidewaysParts(Array.isArray((found as any).sidewaysParts) ? (found as any).sidewaysParts : [])
+          setSidewaysCarTypes(Array.isArray((found as any).sidewaysCarTypes) ? (found as any).sidewaysCarTypes : ((found as any).sidewaysCarType ? [(found as any).sidewaysCarType] : []))
           setIsPreOrder((found as any).isPreOrder || false)
           setUnits(Array.isArray((found as any).units) ? (found as any).units : [])
           setSelectedCarClasses(Array.isArray((found as any).carClasses) ? (found as any).carClasses : ((found as any).carClass ? [(found as any).carClass] : []))
@@ -412,7 +420,7 @@ export default function EditProductPage({
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
           carBrands, sidewaysBrands, isPreOrder, units, salesAccount, purchaseAccount,
           carClass: selectedCarClasses[0] || '', revoParts: selectedRevoParts, sidewaysParts: selectedSidewaysParts,
-          carType: carTypes[0] || carType, carTypes, partType, scale, supplier, collections,
+          carType: carTypes[0] || carType, carTypes, sidewaysCarTypes, partType, scale, supplier, collections,
           tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
           status, boxSize,
           dimensions: {
@@ -442,7 +450,7 @@ export default function EditProductPage({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
       quantity, weight, weightUnit, brand, productType, categoryBrands, itemCategories,
-      carBrands, sidewaysBrands, isPreOrder, units, carTypes, partType, scale, supplier, collections,
+      carBrands, sidewaysBrands, isPreOrder, units, carTypes, sidewaysCarTypes, partType, scale, supplier, collections,
       selectedCarClasses, selectedRevoParts, selectedSidewaysParts,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
       seoTitle, seoDescription, seoKeywords, salesAccount, purchaseAccount])
@@ -464,6 +472,7 @@ export default function EditProductPage({
       if (revoPartRef.current && !revoPartRef.current.contains(t)) setRevoPartDropdownOpen(false)
       if (sidewaysBrandRef.current && !sidewaysBrandRef.current.contains(t)) setSidewaysBrandDropdownOpen(false)
       if (sidewaysPartRef.current && !sidewaysPartRef.current.contains(t)) setSidewaysPartDropdownOpen(false)
+      if (sidewaysCarTypeRef.current && !sidewaysCarTypeRef.current.contains(t)) setSidewaysCarTypeDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -537,6 +546,7 @@ export default function EditProductPage({
         units,
         carType: carTypes[0] || carType,
         carTypes,
+        sidewaysCarTypes,
         partType,
         scale,
         supplier,
@@ -1087,13 +1097,13 @@ export default function EditProductPage({
               </div></>}
             </div>
 
-            {/* Revo Product Organization */}
+            {/* Product Organization */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <button type="button" onClick={() => setProductOrgCollapsed(!productOrgCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
-                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Revo Product Organization</h3>
-                <svg className={`w-4 h-4 text-gray-400 transition-transform ${productOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              <button type="button" onClick={() => setGeneralOrgCollapsed(!generalOrgCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Product Organization</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${generalOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </button>
-              {!productOrgCollapsed && <div className="space-y-4">
+              {!generalOrgCollapsed && <div className="space-y-4">
 
                 {/* Pre Order Toggle */}
                 <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -1109,6 +1119,151 @@ export default function EditProductPage({
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isPreOrder ? 'translate-x-6' : 'translate-x-0'}`} />
                   </button>
                 </div>
+
+                {/* Scale */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Scale</label>
+                  <div className="relative" ref={scaleRef}>
+                    <button type="button" onClick={() => setScaleDropdownOpen(!scaleDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={scale ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
+                        {scale || 'Select scale...'}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${scaleDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {scaleDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="radio" checked={scale === ''} onChange={() => { setScale(''); setScaleDropdownOpen(false) }} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {scales.map(s => (
+                          <label key={s} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="radio" checked={scale === s} onChange={() => { setScale(s); setScaleDropdownOpen(false) }} className="rounded" />
+                            <span className="text-sm text-gray-900">{s}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newScaleInput} onChange={e => setNewScaleInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newScaleInput.trim()) { e.preventDefault(); handleAddScale(newScaleInput) } }} placeholder="+ Add scale..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { if (newScaleInput.trim()) handleAddScale(newScaleInput) }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tags */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                  <input
+                    type="text"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="Separate with commas"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Page Assignment */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Assign to Page</label>
+                    {pageIds.length > 0 && (
+                      <button type="button" onClick={() => setPagePillsHidden(!pagePillsHidden)} className="text-gray-400 hover:text-gray-600" title={pagePillsHidden ? 'Show selected' : 'Hide selected'}>
+                        {pagePillsHidden
+                          ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                        }
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative" ref={pageRef}>
+                    <button
+                      type="button"
+                      onClick={() => setPageDropdownOpen(!pageDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
+                    >
+                      <span className={pageIds.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {pageIds.length === 0
+                          ? 'No page assigned'
+                          : pageIds.length === 1
+                            ? (availablePages.find(p => p.id === pageIds[0])?.title || pageIds[0])
+                            : `${pageIds.length} pages selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${pageDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {pageDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input
+                            type="checkbox"
+                            checked={pageIds.length === 0}
+                            onChange={() => setPageIds([])}
+                            className="rounded"
+                          />
+                          <span className="text-sm text-gray-500 italic">No page assigned</span>
+                        </label>
+                        {availablePages.map((p) => (
+                          <label key={p.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={pageIds.includes(p.id)}
+                              onChange={(e) => setPageIds(e.target.checked ? [...pageIds, p.id] : pageIds.filter(id => id !== p.id))}
+                              className="rounded"
+                            />
+                            <span className="text-sm text-gray-900">{p.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {pageIds.length > 0 && !pagePillsHidden ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {pageIds.map(pid => (
+                        <span key={pid} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
+                          <a href={`/admin/pages/editor/${pid}`} target="_blank" className="text-blue-600 hover:underline">
+                            {availablePages.find(p => p.id === pid)?.title || pid}
+                          </a>
+                          <button type="button" onClick={() => setPageIds(pageIds.filter(id => id !== pid))} className="ml-0.5 text-gray-400 hover:text-red-500" title="Remove page">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">Select pages where this product will appear</p>
+                  )}
+
+                  {/* Custom Page URL */}
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Custom Page URL</label>
+                    <input
+                      type="text"
+                      value={pageUrl}
+                      onChange={(e) => setPageUrl(e.target.value)}
+                      placeholder="/products/my-product or https://..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">Manually set a custom URL for this product</p>
+                    {pageUrl && (
+                      <a
+                        href={pageUrl.startsWith('http') ? pageUrl : `${pageUrl}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 hover:underline mt-1 block"
+                      >
+                        Open URL →
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>}
+            </div>
+
+            {/* Revo Product Organization */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <button type="button" onClick={() => setProductOrgCollapsed(!productOrgCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Revo Product Organization</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${productOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!productOrgCollapsed && <div className="space-y-4">
 
                 {/* Revo Cars Brand Page (multi-select checkbox dropdown) */}
                 <div>
@@ -1326,10 +1481,10 @@ export default function EditProductPage({
                   )}
                 </div>
 
-                {/* Car Type */}
+                {/* Revo Car Type */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">Car Type</label>
+                    <label className="text-sm font-medium text-gray-700">Revo Car Type</label>
                     {carTypes.length > 0 && (
                       <button type="button" onClick={() => setCarTypePillsHidden(!carTypePillsHidden)} className="text-gray-400 hover:text-gray-600" title={carTypePillsHidden ? 'Show selected' : 'Hide selected'}>
                         {carTypePillsHidden
@@ -1376,140 +1531,6 @@ export default function EditProductPage({
                   )}
                 </div>
 
-                {/* Scale */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Scale</label>
-                  <div className="relative" ref={scaleRef}>
-                    <button type="button" onClick={() => setScaleDropdownOpen(!scaleDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
-                      <span className={scale ? 'text-gray-900 font-semibold' : 'text-gray-400'}>
-                        {scale || 'Select scale...'}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${scaleDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    {scaleDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input type="radio" checked={scale === ''} onChange={() => { setScale(''); setScaleDropdownOpen(false) }} className="rounded" />
-                          <span className="text-sm text-gray-400 italic">— None —</span>
-                        </label>
-                        {scales.map(s => (
-                          <label key={s} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="radio" checked={scale === s} onChange={() => { setScale(s); setScaleDropdownOpen(false) }} className="rounded" />
-                            <span className="text-sm text-gray-900">{s}</span>
-                          </label>
-                        ))}
-                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
-                          <input type="text" value={newScaleInput} onChange={e => setNewScaleInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newScaleInput.trim()) { e.preventDefault(); handleAddScale(newScaleInput) } }} placeholder="+ Add scale..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
-                          <button type="button" onClick={() => { if (newScaleInput.trim()) handleAddScale(newScaleInput) }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-                  <input
-                    type="text"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    placeholder="Separate with commas"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
-                </div>
-
-                {/* Page Assignment */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">Assign to Page</label>
-                    {pageIds.length > 0 && (
-                      <button type="button" onClick={() => setPagePillsHidden(!pagePillsHidden)} className="text-gray-400 hover:text-gray-600" title={pagePillsHidden ? 'Show selected' : 'Hide selected'}>
-                        {pagePillsHidden
-                          ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-                          : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
-                        }
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative" ref={pageRef}>
-                    <button
-                      type="button"
-                      onClick={() => setPageDropdownOpen(!pageDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
-                    >
-                      <span className={pageIds.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
-                        {pageIds.length === 0
-                          ? 'No page assigned'
-                          : pageIds.length === 1
-                            ? (availablePages.find(p => p.id === pageIds[0])?.title || pageIds[0])
-                            : `${pageIds.length} pages selected`}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${pageDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    {pageDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input
-                            type="checkbox"
-                            checked={pageIds.length === 0}
-                            onChange={() => setPageIds([])}
-                            className="rounded"
-                          />
-                          <span className="text-sm text-gray-500 italic">No page assigned</span>
-                        </label>
-                        {availablePages.map((p) => (
-                          <label key={p.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={pageIds.includes(p.id)}
-                              onChange={(e) => setPageIds(e.target.checked ? [...pageIds, p.id] : pageIds.filter(id => id !== p.id))}
-                              className="rounded"
-                            />
-                            <span className="text-sm text-gray-900">{p.title}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {pageIds.length > 0 && !pagePillsHidden ? (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {pageIds.map(pid => (
-                        <span key={pid} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
-                          <a href={`/admin/pages/editor/${pid}`} target="_blank" className="text-blue-600 hover:underline">
-                            {availablePages.find(p => p.id === pid)?.title || pid}
-                          </a>
-                          <button type="button" onClick={() => setPageIds(pageIds.filter(id => id !== pid))} className="ml-0.5 text-gray-400 hover:text-red-500" title="Remove page">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-xs text-gray-500">Select pages where this product will appear</p>
-                  )}
-
-                  {/* Custom Page URL */}
-                  <div className="mt-3">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Custom Page URL</label>
-                    <input
-                      type="text"
-                      value={pageUrl}
-                      onChange={(e) => setPageUrl(e.target.value)}
-                      placeholder="/products/my-product or https://..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                    />
-                    <p className="mt-1 text-xs text-gray-400">Manually set a custom URL for this product</p>
-                    {pageUrl && (
-                      <a
-                        href={pageUrl.startsWith('http') ? pageUrl : `${pageUrl}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-blue-600 hover:underline mt-1 block"
-                      >
-                        Open URL →
-                      </a>
-                    )}
-                  </div>
-                </div>
               </div>}
             </div>
 
@@ -1625,6 +1646,56 @@ export default function EditProductPage({
                       {selectedSidewaysParts.map(part => (
                         <span key={part} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
                           {part}<button type="button" onClick={() => setSelectedSidewaysParts(selectedSidewaysParts.filter(p => p !== part))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sideways Car Type */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Sideways Car Type</label>
+                    {sidewaysCarTypes.length > 0 && (
+                      <button type="button" onClick={() => setSidewaysCarTypePillsHidden(!sidewaysCarTypePillsHidden)} className="text-gray-400 hover:text-gray-600" title={sidewaysCarTypePillsHidden ? 'Show selected' : 'Hide selected'}>
+                        {sidewaysCarTypePillsHidden
+                          ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                        }
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative" ref={sidewaysCarTypeRef}>
+                    <button type="button" onClick={() => setSidewaysCarTypeDropdownOpen(!sidewaysCarTypeDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={sidewaysCarTypes.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {sidewaysCarTypes.length === 0 ? '— None —' : sidewaysCarTypes.length === 1 ? sidewaysCarTypes[0] : `${sidewaysCarTypes.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${sidewaysCarTypeDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {sidewaysCarTypeDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={sidewaysCarTypes.length === 0} onChange={() => setSidewaysCarTypes([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {carTypeOptions.map(ct => (
+                          <label key={ct} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" checked={sidewaysCarTypes.includes(ct)} onChange={e => setSidewaysCarTypes(e.target.checked ? [...sidewaysCarTypes, ct] : sidewaysCarTypes.filter(t => t !== ct))} className="rounded" />
+                            <span className="text-sm text-gray-900">{ct}</span>
+                          </label>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newSidewaysCarTypeInput} onChange={e => setNewSidewaysCarTypeInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newSidewaysCarTypeInput.trim()) { e.preventDefault(); const v = newSidewaysCarTypeInput.trim(); if (!carTypeOptions.includes(v)) { const next = [...carTypeOptions, v]; setCarTypeOptions(next); saveOptions('carTypes', next) }; setSidewaysCarTypes(prev => prev.includes(v) ? prev : [...prev, v]); setNewSidewaysCarTypeInput('') } }} placeholder="+ Add car type..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { const v = newSidewaysCarTypeInput.trim(); if (!v) return; if (!carTypeOptions.includes(v)) { const next = [...carTypeOptions, v]; setCarTypeOptions(next); saveOptions('carTypes', next) }; setSidewaysCarTypes(prev => prev.includes(v) ? prev : [...prev, v]); setNewSidewaysCarTypeInput('') }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {sidewaysCarTypes.length > 0 && !sidewaysCarTypePillsHidden && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {sidewaysCarTypes.map(ct => (
+                        <span key={ct} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
+                          {ct}<button type="button" onClick={() => setSidewaysCarTypes(sidewaysCarTypes.filter(t => t !== ct))} className="hover:text-red-900">×</button>
                         </span>
                       ))}
                     </div>

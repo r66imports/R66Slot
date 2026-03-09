@@ -36,6 +36,7 @@ export interface Product {
   sidewaysBrands: string[]
   revoParts: string[]
   sidewaysParts: string[]
+  sidewaysCarTypes: string[]
   isPreOrder: boolean
   seo: { metaTitle: string; metaDescription: string; metaKeywords: string }
   sageItemCode: string | null
@@ -86,6 +87,7 @@ function rowToProduct(row: any): Product {
     sidewaysBrands: Array.isArray(row.sideways_brands) ? row.sideways_brands : [],
     revoParts: Array.isArray(row.revo_parts) ? row.revo_parts : [],
     sidewaysParts: Array.isArray(row.sideways_parts) ? row.sideways_parts : [],
+    sidewaysCarTypes: Array.isArray(row.sideways_car_type) ? row.sideways_car_type : [],
     isPreOrder: row.is_pre_order || false,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
     sageItemCode: row.sage_item_code,
@@ -118,7 +120,8 @@ async function ensureProductColumns() {
         ADD COLUMN IF NOT EXISTS category_brands JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS item_categories JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS sideways_brands JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS sideways_parts JSONB DEFAULT '[]'::jsonb
+        ADD COLUMN IF NOT EXISTS sideways_parts JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS sideways_car_type JSONB DEFAULT '[]'::jsonb
     `)
   } catch { /* ignore */ }
   _productColumnsMigrated = true

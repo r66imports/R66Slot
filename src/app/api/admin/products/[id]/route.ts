@@ -37,6 +37,7 @@ function rowToProduct(row: any): Product {
     carBrands: Array.isArray(row.car_brands) ? row.car_brands : [],
     sidewaysBrands: Array.isArray(row.sideways_brands) ? row.sideways_brands : [],
     sidewaysParts: Array.isArray(row.sideways_parts) ? row.sideways_parts : [],
+    sidewaysCarTypes: Array.isArray(row.sideways_car_type) ? row.sideways_car_type : [],
     revoParts: Array.isArray(row.revo_parts) ? row.revo_parts : [],
     isPreOrder: row.is_pre_order || false,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
@@ -124,6 +125,7 @@ export async function PUT(
         purchase_account = COALESCE($40, purchase_account),
         sideways_brands = COALESCE($41, sideways_brands),
         sideways_parts = COALESCE($42, sideways_parts),
+        sideways_car_type = COALESCE($43, sideways_car_type),
         updated_at = $36
       WHERE id = $1
       RETURNING *
@@ -170,6 +172,7 @@ export async function PUT(
       body.purchaseAccount != null ? JSON.stringify(Array.isArray(body.purchaseAccount) ? body.purchaseAccount : []) : null,
       Array.isArray(body.sidewaysBrands) ? JSON.stringify(body.sidewaysBrands) : null,
       Array.isArray(body.sidewaysParts) ? JSON.stringify(body.sidewaysParts) : null,
+      Array.isArray(body.sidewaysCarTypes) ? JSON.stringify(body.sidewaysCarTypes) : null,
     ])
 
     if (result.rowCount === 0) {
