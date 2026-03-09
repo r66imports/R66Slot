@@ -77,6 +77,14 @@ export default function NewProductPage() {
   const [selectedRevoParts, setSelectedRevoParts] = useState<string[]>([])
   const [revoPartDropdownOpen, setRevoPartDropdownOpen] = useState(false)
   const [newRevoPartInput, setNewRevoPartInput] = useState('')
+  // Revo Car Type (multi-select)
+  const [carTypes, setCarTypes] = useState<string[]>([])
+  const [carTypeOptions, setCarTypeOptions] = useState<string[]>(['Livery', 'White Kit', 'White Body Kit', 'White Body'])
+  const [carTypeDropdownOpen, setCarTypeDropdownOpen] = useState(false)
+  const [newCarTypeInput, setNewCarTypeInput] = useState('')
+  // Collapse states
+  const [productOrgCollapsed, setProductOrgCollapsed] = useState(false)
+  const [revoOrgCollapsed, setRevoOrgCollapsed] = useState(false)
 
   // Load available pages and categories on mount
   useEffect(() => {
@@ -141,6 +149,8 @@ export default function NewProductPage() {
       if (purchaseAccountRef.current && !purchaseAccountRef.current.contains(t)) setPurchaseAccountDropdownOpen(false)
       if (carClassRef.current && !carClassRef.current.contains(t)) setCarClassDropdownOpen(false)
       if (revoPartRef.current && !revoPartRef.current.contains(t)) setRevoPartDropdownOpen(false)
+      if (carBrandRef.current && !carBrandRef.current.contains(t)) setCarBrandDropdownOpen(false)
+      if (carTypeRef.current && !carTypeRef.current.contains(t)) setCarTypeDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -220,6 +230,8 @@ export default function NewProductPage() {
   const purchaseAccountRef = useRef<HTMLDivElement>(null)
   const carClassRef = useRef<HTMLDivElement>(null)
   const revoPartRef = useRef<HTMLDivElement>(null)
+  const carBrandRef = useRef<HTMLDivElement>(null)
+  const carTypeRef = useRef<HTMLDivElement>(null)
 
   // Upload base64 images to server and return real URLs
   const uploadPendingImages = async (): Promise<string[]> => {
@@ -284,7 +296,8 @@ export default function NewProductPage() {
         productType: itemCategories[0] || productType,
         categoryBrands,
         itemCategories,
-        carType,
+        carType: carTypes[0] || carType,
+        carTypes,
         partType,
         scale,
         supplier,
@@ -816,8 +829,11 @@ export default function NewProductPage() {
 
             {/* Product Organization */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Product Organization</h3>
-              <div className="space-y-4">
+              <button type="button" onClick={() => setProductOrgCollapsed(!productOrgCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Product Organization</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${productOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!productOrgCollapsed && <div className="space-y-4">
 
                 {/* Pre Order Toggle */}
                 <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
@@ -834,84 +850,150 @@ export default function NewProductPage() {
                   </button>
                 </div>
 
-                {/* Car Type */}
+                {/* Scale */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Car Type
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Scale</label>
                   <select
-                    value={carType}
-                    onChange={(e) => setCarType(e.target.value)}
+                    value={scale}
+                    onChange={(e) => setScale(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   >
-                    <option value="">Select car type...</option>
-                    <option value="livery">Livery</option>
-                    <option value="white-kit">White Kit</option>
-                    <option value="white-body-kit">White Body Kit</option>
-                    <option value="white-body">White Body</option>
+                    <option value="">Select scale...</option>
+                    {scales.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                   </select>
+                  <button type="button" onClick={() => setShowAddScale(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Scale</button>
                 </div>
 
-                {/* Car Brands (multi-select checkbox dropdown) */}
+                {/* Tags */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Car Brand</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
+                  <input
+                    type="text"
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="Separate with commas"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+
+                {/* Page Assignment */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Assign to Page</label>
                   <div className="relative">
                     <button
                       type="button"
-                      onClick={() => setCarBrandDropdownOpen(!carBrandDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white"
+                      onClick={() => setPageDropdownOpen(!pageDropdownOpen)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
                     >
+                      <span className={pageIds.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {pageIds.length === 0 ? 'No page assigned' : pageIds.length === 1 ? (availablePages.find(p => p.id === pageIds[0])?.title || pageIds[0]) : `${pageIds.length} pages selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${pageDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {pageDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={pageIds.length === 0} onChange={() => setPageIds([])} className="rounded" />
+                          <span className="text-sm text-gray-500 italic">No page assigned</span>
+                        </label>
+                        {availablePages.map((p) => (
+                          <label key={p.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" checked={pageIds.includes(p.id)} onChange={(e) => setPageIds(e.target.checked ? [...pageIds, p.id] : pageIds.filter(id => id !== p.id))} className="rounded" />
+                            <span className="text-sm text-gray-900">{p.title}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {pageIds.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {pageIds.map(pid => (
+                        <span key={pid} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
+                          <a href={`/admin/pages/editor/${pid}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            {availablePages.find(p => p.id === pid)?.title || pid}
+                          </a>
+                          <button type="button" onClick={() => setPageIds(pageIds.filter(id => id !== pid))} className="ml-0.5 text-gray-400 hover:text-red-500" title="Remove page">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-500">Select pages where this product will appear</p>
+                  )}
+                </div>
+
+                {/* Page Categories */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Page Categories <span className="text-xs text-gray-400">(select multiple)</span></label>
+                  <div className="border border-gray-300 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
+                    {categories.length === 0 ? (
+                      <p className="text-xs text-gray-400 px-2 py-1">Loading categories...</p>
+                    ) : (
+                      categories.map((cat) => (
+                        <label key={cat.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCategories.includes(cat.slug)}
+                            onChange={(e) => { if (e.target.checked) { setSelectedCategories(prev => [...prev, cat.slug]) } else { setSelectedCategories(prev => prev.filter(s => s !== cat.slug)) } }}
+                            className="h-3.5 w-3.5 text-gray-900 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">{cat.name}</span>
+                          {cat.class && <span className="text-xs text-red-600 font-medium">({cat.class})</span>}
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  {selectedCategories.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">{selectedCategories.length} selected: {selectedCategories.join(', ')}</p>
+                  )}
+                  <div className="flex gap-2 mt-2">
+                    <a href="/admin/catalogue/categories" target="_blank" className="text-xs text-blue-600 hover:text-blue-800">Manage Categories →</a>
+                  </div>
+                </div>
+              </div>}
+            </div>
+
+            {/* Revo Product Organization */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <button type="button" onClick={() => setRevoOrgCollapsed(!revoOrgCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Revo Product Organization</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${revoOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!revoOrgCollapsed && <div className="space-y-4">
+
+                {/* Revo Cars Brand Page */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Revo Cars Brand Page</label>
+                  <div className="relative" ref={carBrandRef}>
+                    <button type="button" onClick={() => setCarBrandDropdownOpen(!carBrandDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
                       <span className={carBrands.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
                         {carBrands.length === 0 ? 'No brand assigned' : carBrands.length === 1 ? carBrands[0] : `${carBrands.length} brands selected`}
                       </span>
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${carBrandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {carBrandDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                           <input type="checkbox" checked={carBrands.length === 0} onChange={() => setCarBrands([])} className="rounded" />
-                          <span className="text-sm text-gray-500 italic">No brand assigned</span>
+                          <span className="text-sm text-gray-500 italic">None</span>
                         </label>
                         {[...BASE_CAR_BRANDS, ...customCarBrands].map((cb) => (
-                          <label key={cb} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="checkbox" checked={carBrands.includes(cb)} onChange={(e) => setCarBrands(e.target.checked ? [...carBrands, cb] : carBrands.filter(b => b !== cb))} className="rounded" />
-                            <span className="text-sm text-gray-900">{cb}</span>
-                          </label>
+                          <div key={cb} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={carBrands.includes(cb)} onChange={(e) => setCarBrands(e.target.checked ? [...carBrands, cb] : carBrands.filter(b => b !== cb))} className="rounded" />
+                              <span className="text-sm text-gray-900">{cb}</span>
+                            </label>
+                            {!BASE_CAR_BRANDS.includes(cb) && (
+                              <button type="button" onClick={() => { setCustomCarBrands(prev => prev.filter(x => x !== cb)); setCarBrands(prev => prev.filter(b => b !== cb)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            )}
+                          </div>
                         ))}
-                        {/* Add custom brand */}
-                        <div className="flex gap-1 px-2 py-2 border-t border-gray-100">
-                          <input
-                            type="text"
-                            value={newCarBrandInput}
-                            onChange={(e) => setNewCarBrandInput(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                const t = newCarBrandInput.trim()
-                                if (t && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(t)) {
-                                  setCustomCarBrands(prev => [...prev, t])
-                                  setCarBrands(prev => [...prev, t])
-                                  setNewCarBrandInput('')
-                                }
-                              }
-                            }}
-                            placeholder="New car brand…"
-                            className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const t = newCarBrandInput.trim()
-                              if (t && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(t)) {
-                                setCustomCarBrands(prev => [...prev, t])
-                                setCarBrands(prev => [...prev, t])
-                                setNewCarBrandInput('')
-                              }
-                            }}
-                            className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700"
-                          >
-                            + Add
-                          </button>
+                        <div className="flex items-center gap-1 px-3 py-2 border-t border-gray-100">
+                          <input type="text" value={newCarBrandInput} onChange={(e) => setNewCarBrandInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const val = newCarBrandInput.trim(); if (val && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(val)) { setCustomCarBrands(prev => [...prev, val]); setCarBrands(prev => [...prev, val]) }; setNewCarBrandInput('') } }} placeholder="Add brand..." className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900" />
+                          <button type="button" onClick={() => { const val = newCarBrandInput.trim(); if (val && ![...BASE_CAR_BRANDS, ...customCarBrands].includes(val)) { setCustomCarBrands(prev => [...prev, val]); setCarBrands(prev => [...prev, val]) }; setNewCarBrandInput('') }} className="text-xs px-2 py-1 bg-gray-900 text-white rounded hover:bg-gray-700">+Add</button>
                         </div>
                       </div>
                     )}
@@ -920,8 +1002,7 @@ export default function NewProductPage() {
                     <div className="mt-2 flex flex-wrap gap-1">
                       {carBrands.map(cb => (
                         <span key={cb} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">
-                          {cb}
-                          <button type="button" onClick={() => setCarBrands(carBrands.filter(b => b !== cb))} className="hover:text-red-900">×</button>
+                          {cb}<button type="button" onClick={() => setCarBrands(carBrands.filter(b => b !== cb))} className="hover:text-red-900">×</button>
                         </span>
                       ))}
                     </div>
@@ -932,8 +1013,7 @@ export default function NewProductPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Revo Racing Class Filter</label>
                   <div className="relative" ref={carClassRef}>
-                    <button type="button" onClick={() => setCarClassDropdownOpen(!carClassDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                    <button type="button" onClick={() => setCarClassDropdownOpen(!carClassDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
                       <span className={selectedCarClasses.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
                         {selectedCarClasses.length === 0 ? 'Select class...' : selectedCarClasses.length === 1 ? selectedCarClasses[0] : `${selectedCarClasses.length} selected`}
                       </span>
@@ -978,8 +1058,7 @@ export default function NewProductPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Revo Parts Filter</label>
                   <div className="relative" ref={revoPartRef}>
-                    <button type="button" onClick={() => setRevoPartDropdownOpen(!revoPartDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                    <button type="button" onClick={() => setRevoPartDropdownOpen(!revoPartDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
                       <span className={selectedRevoParts.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
                         {selectedRevoParts.length === 0 ? 'Select part...' : selectedRevoParts.length === 1 ? selectedRevoParts[0] : `${selectedRevoParts.length} selected`}
                       </span>
@@ -1020,147 +1099,46 @@ export default function NewProductPage() {
                   )}
                 </div>
 
-                {/* Page Categories — multi-select */}
+                {/* Revo Car Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Page Categories <span className="text-xs text-gray-400">(select multiple)</span>
-                  </label>
-                  <div className="border border-gray-300 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
-                    {categories.length === 0 ? (
-                      <p className="text-xs text-gray-400 px-2 py-1">Loading categories...</p>
-                    ) : (
-                      categories.map((cat) => (
-                        <label key={cat.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedCategories.includes(cat.slug)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCategories(prev => [...prev, cat.slug])
-                              } else {
-                                setSelectedCategories(prev => prev.filter(s => s !== cat.slug))
-                              }
-                            }}
-                            className="h-3.5 w-3.5 text-gray-900 border-gray-300 rounded"
-                          />
-                          <span className="text-sm text-gray-700">{cat.name}</span>
-                          {cat.class && <span className="text-xs text-red-600 font-medium">({cat.class})</span>}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  {selectedCategories.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">{selectedCategories.length} selected: {selectedCategories.join(', ')}</p>
-                  )}
-                  <div className="flex gap-2 mt-2">
-                    <a href="/admin/catalogue/categories" target="_blank" className="text-xs text-blue-600 hover:text-blue-800">
-                      Manage Categories →
-                    </a>
-                  </div>
-                </div>
-
-                {/* Part Type */}
-                {/* Scale */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Scale
-                  </label>
-                  <select
-                    value={scale}
-                    onChange={(e) => setScale(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select scale...</option>
-                    {scales.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddScale(true)}
-                    className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    + Add Scale
-                  </button>
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tags
-                  </label>
-                  <input
-                    type="text"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    placeholder="Separate with commas"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
-                </div>
-
-                {/* Page Assignment */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assign to Page
-                  </label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setPageDropdownOpen(!pageDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
-                    >
-                      <span className={pageIds.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
-                        {pageIds.length === 0
-                          ? 'No page assigned'
-                          : pageIds.length === 1
-                            ? (availablePages.find(p => p.id === pageIds[0])?.title || pageIds[0])
-                            : `${pageIds.length} pages selected`}
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Revo Car Type</label>
+                  <div className="relative" ref={carTypeRef}>
+                    <button type="button" onClick={() => setCarTypeDropdownOpen(!carTypeDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={carTypes.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {carTypes.length === 0 ? '— None —' : carTypes.length === 1 ? carTypes[0] : `${carTypes.length} selected`}
                       </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${pageDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${carTypeDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
-                    {pageDropdownOpen && (
+                    {carTypeDropdownOpen && (
                       <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input
-                            type="checkbox"
-                            checked={pageIds.length === 0}
-                            onChange={() => setPageIds([])}
-                            className="rounded"
-                          />
-                          <span className="text-sm text-gray-500 italic">No page assigned</span>
+                          <input type="checkbox" checked={carTypes.length === 0} onChange={() => setCarTypes([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
                         </label>
-                        {availablePages.map((p) => (
-                          <label key={p.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={pageIds.includes(p.id)}
-                              onChange={(e) => setPageIds(e.target.checked ? [...pageIds, p.id] : pageIds.filter(id => id !== p.id))}
-                              className="rounded"
-                            />
-                            <span className="text-sm text-gray-900">{p.title}</span>
+                        {carTypeOptions.map(ct => (
+                          <label key={ct} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                            <input type="checkbox" checked={carTypes.includes(ct)} onChange={e => setCarTypes(e.target.checked ? [...carTypes, ct] : carTypes.filter(t => t !== ct))} className="rounded" />
+                            <span className="text-sm text-gray-900">{ct}</span>
                           </label>
                         ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newCarTypeInput} onChange={e => setNewCarTypeInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newCarTypeInput.trim()) { e.preventDefault(); const v = newCarTypeInput.trim(); if (!carTypeOptions.includes(v)) { const next = [...carTypeOptions, v]; setCarTypeOptions(next); saveOptions('carTypes', next) }; setCarTypes(prev => prev.includes(v) ? prev : [...prev, v]); setNewCarTypeInput('') } }} placeholder="+ Add car type..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { const v = newCarTypeInput.trim(); if (!v) return; if (!carTypeOptions.includes(v)) { const next = [...carTypeOptions, v]; setCarTypeOptions(next); saveOptions('carTypes', next) }; setCarTypes(prev => prev.includes(v) ? prev : [...prev, v]); setNewCarTypeInput('') }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
                       </div>
                     )}
                   </div>
-                  {pageIds.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {pageIds.map(pid => (
-                        <span key={pid} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
-                          <a href={`/admin/pages/editor/${pid}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                            {availablePages.find(p => p.id === pid)?.title || pid}
-                          </a>
-                          <button type="button" onClick={() => setPageIds(pageIds.filter(id => id !== pid))} className="ml-0.5 text-gray-400 hover:text-red-500" title="Remove page">×</button>
+                  {carTypes.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {carTypes.map(ct => (
+                        <span key={ct} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
+                          {ct}<button type="button" onClick={() => setCarTypes(carTypes.filter(t => t !== ct))} className="hover:text-red-900">×</button>
                         </span>
                       ))}
                     </div>
-                  ) : (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Select pages where this product will appear
-                    </p>
                   )}
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* Sage Accounts */}
