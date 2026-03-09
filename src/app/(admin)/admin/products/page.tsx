@@ -147,8 +147,8 @@ type ImportProfile = {
 const IMPORT_PROFILES: Record<string, ImportProfile> = {
   generic: {
     label: 'Generic',
-    hint: 'Columns: Code, Description, Category, Unit, SRP Exclusive, Cost Exclusive, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP Exclusive,Cost Exclusive,Sales Account,Purchases Account',
+    hint: 'Columns: Code, Description, Category, Unit, SRP – Exclusive, Cost – Exclusive, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,SRP – Exclusive,Cost – Exclusive,Sales Account,Purchases Account',
     placeholder: 'NSR-0001,NSR Slot Car,NSR,Slot Car,450,280,Retail Sales,Retail Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || '',
@@ -164,7 +164,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: obj['status'] || 'active',
     }),
     brandKey: '',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku,
       p.title,
@@ -196,7 +196,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'NSR',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -225,7 +225,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Revo',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -255,7 +255,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'BRM',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -285,7 +285,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Pioneer',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -315,7 +315,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Sideways',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP Exclusive', 'Cost Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
