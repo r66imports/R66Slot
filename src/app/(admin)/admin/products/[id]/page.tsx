@@ -124,6 +124,15 @@ export default function EditProductPage({
   const [selectedCarClasses, setSelectedCarClasses] = useState<string[]>([])
   const [carClassDropdownOpen, setCarClassDropdownOpen] = useState(false)
   const [newCarClassInput, setNewCarClassInput] = useState('')
+  const [titleCollapsed, setTitleCollapsed] = useState(false)
+  const [mediaCollapsed, setMediaCollapsed] = useState(false)
+  const [pricingCollapsed, setPricingCollapsed] = useState(false)
+  const [inventoryCollapsed, setInventoryCollapsed] = useState(false)
+  const [shippingCollapsed, setShippingCollapsed] = useState(false)
+  const [statusCollapsed, setStatusCollapsed] = useState(false)
+  const [sageCollapsed, setSageCollapsed] = useState(false)
+  const [seoCollapsed, setSeoCollapsed] = useState(false)
+  const [infoCollapsed, setInfoCollapsed] = useState(false)
   const [productOrgCollapsed, setProductOrgCollapsed] = useState(false)
   const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(false)
   const [carClassPillsHidden, setCarClassPillsHidden] = useState(false)
@@ -705,7 +714,11 @@ export default function EditProductPage({
           <div className="lg:col-span-2 space-y-6">
             {/* Title & Description */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="space-y-4">
+              <button type="button" onClick={() => setTitleCollapsed(!titleCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Title &amp; Description</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${titleCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!titleCollapsed && <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
                   <input
@@ -726,14 +739,16 @@ export default function EditProductPage({
                     placeholder="Product description..."
                   />
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* Media */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-1">Media</h3>
-              <p className="text-xs text-gray-400 mb-4">Drag to reorder · First image is the main image</p>
-              {mediaFiles.length > 0 && (
+              <button type="button" onClick={() => setMediaCollapsed(!mediaCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Media</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${mediaCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!mediaCollapsed && <>{mediaFiles.length > 0 && (
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   {mediaFiles.map((file, index) => (
                     <div
@@ -851,12 +866,16 @@ export default function EditProductPage({
                   setMediaFiles(prev => [...prev, { name, url, type: 'image/jpeg' }])
                 }}
               />
+              </>}
             </div>
 
             {/* Pricing */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Pricing (Rand)</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <button type="button" onClick={() => setPricingCollapsed(!pricingCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Pricing (Rand)</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${pricingCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!pricingCollapsed && <><div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Price</label>
                   <div className="relative">
@@ -900,13 +919,16 @@ export default function EditProductPage({
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-500">Customers won&apos;t see this</p>
-              </div>
+              </div></>}
             </div>
 
             {/* Inventory */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Inventory</h3>
-              <div className="space-y-4">
+              <button type="button" onClick={() => setInventoryCollapsed(!inventoryCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Inventory</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${inventoryCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!inventoryCollapsed && <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">SKU (Stock Keeping Unit)</label>
@@ -948,13 +970,16 @@ export default function EditProductPage({
                     />
                   </div>
                 )}
-              </div>
+              </div>}
             </div>
 
             {/* Shipping */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Shipping</h3>
-              <div className="mb-4">
+              <button type="button" onClick={() => setShippingCollapsed(!shippingCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Shipping</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${shippingCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!shippingCollapsed && <><div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Box Size</label>
                 <select
                   value={boxSize}
@@ -1030,7 +1055,7 @@ export default function EditProductPage({
                     <option value="lb">lbs</option>
                   </select>
                 </div>
-              </div>
+              </div></>}
             </div>
           </div>
 
@@ -1038,8 +1063,11 @@ export default function EditProductPage({
           <div className="space-y-6">
             {/* Product Status */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">Product status</h3>
-              <select
+              <button type="button" onClick={() => setStatusCollapsed(!statusCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Product status</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${statusCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!statusCollapsed && <><select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
@@ -1056,7 +1084,7 @@ export default function EditProductPage({
                   placeholder="e.g. 2-3 weeks"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                 />
-              </div>
+              </div></>}
             </div>
 
             {/* Revo Product Organization */}
@@ -1608,9 +1636,12 @@ export default function EditProductPage({
 
             {/* Sage Accounts */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-1">Sage Accounts</h3>
+              <button type="button" onClick={() => setSageCollapsed(!sageCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Sage Accounts</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${sageCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
               <p className="text-xs text-gray-400 mb-4">For Sage accounting &amp; CSV imports/exports</p>
-              <div className="space-y-4">
+              {!sageCollapsed && <div className="space-y-4">
 
                 {/* Category (Brand) */}
                 <div>
@@ -1798,13 +1829,16 @@ export default function EditProductPage({
                   )}
                 </div>
 
-              </div>
+              </div>}
             </div>
 
             {/* SEO Settings */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-4">SEO Settings</h3>
-              <div className="space-y-4">
+              <button type="button" onClick={() => setSeoCollapsed(!seoCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">SEO Settings</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${seoCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!seoCollapsed && <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Meta Title</label>
                   <input
@@ -1838,17 +1872,20 @@ export default function EditProductPage({
                   />
                   <p className="mt-1 text-xs text-gray-500">Separate with commas</p>
                 </div>
-              </div>
+              </div>}
             </div>
 
             {/* Metadata */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Info</h3>
-              <div className="space-y-2 text-xs text-gray-500">
+              <button type="button" onClick={() => setInfoCollapsed(!infoCollapsed)} className="w-full flex items-center justify-between mb-3 text-left group">
+                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Info</h3>
+                <svg className={`w-4 h-4 text-gray-400 transition-transform ${infoCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!infoCollapsed && <div className="space-y-2 text-xs text-gray-500">
                 <p>Created: {new Date(product.createdAt).toLocaleString()}</p>
                 <p>Updated: {new Date(product.updatedAt).toLocaleString()}</p>
                 <p className="font-mono text-[10px] text-gray-400">ID: {product.id}</p>
-              </div>
+              </div>}
             </div>
           </div>
         </div>
