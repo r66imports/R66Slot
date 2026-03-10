@@ -62,7 +62,6 @@ export default function AdminLayout({
           { name: 'BRM', href: '/admin/products?brand=BRM', icon: '🏁' },
           { name: 'Pioneer', href: '/admin/products?brand=Pioneer', icon: '🚗' },
           { name: 'Sideways', href: '/admin/products?brand=Sideways', icon: '🔄' },
-          { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
         ]
       },
     ],
@@ -90,6 +89,7 @@ export default function AdminLayout({
           { name: 'Orders', href: '/admin/orders', icon: '📦' },
           { name: 'Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
           { name: 'Back Orders', href: '/admin/backorders', icon: '🔄' },
+          { name: 'Suppliers', href: '/admin/suppliers', icon: '📥' },
         ],
       },
     ],
