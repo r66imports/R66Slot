@@ -93,6 +93,30 @@ const EMPTY_PRODUCT_FIELDS = {
   supplierName: '',
 }
 
+type LineItem = {
+  sku: string
+  brand: string
+  description: string
+  qty: number
+  price: number
+  supplierLink: string
+  supplierId: string
+  supplierName: string
+  notes: string
+}
+
+const EMPTY_LINE_ITEM: LineItem = {
+  sku: '',
+  brand: '',
+  description: '',
+  qty: 1,
+  price: 0,
+  supplierLink: '',
+  supplierId: '',
+  supplierName: '',
+  notes: '',
+}
+
 const formatDate = (iso: string) => {
   const d = new Date(iso)
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).toUpperCase()
@@ -410,6 +434,250 @@ function BrandDropdown({
   )
 }
 
+// ─── Line Item Row ────────────────────────────────────────────────────────────
+
+function LineItemRow({
+  item,
+  index,
+  showRemove,
+  brands,
+  suppliers,
+  onChange,
+  onRemove,
+  onBrandCreated,
+  onSupplierCreated,
+}: {
+  item: LineItem
+  index: number
+  showRemove: boolean
+  brands: string[]
+  suppliers: Supplier[]
+  onChange: (updates: Partial<LineItem>) => void
+  onRemove: () => void
+  onBrandCreated: (name: string) => void
+  onSupplierCreated: (s: Supplier) => void
+}) {
+  const [showAddBrand, setShowAddBrand] = useState(false)
+  const [newBrandName, setNewBrandName] = useState('')
+  const [savingBrand, setSavingBrand] = useState(false)
+  const [showAddSupplier, setShowAddSupplier] = useState(false)
+  const [newSupplier, setNewSupplier] = useState({ name: '', code: '', country: '', email: '', phone: '', website: '', notes: '' })
+  const [savingSupplier, setSavingSupplier] = useState(false)
+
+  const handleCreateBrand = async () => {
+    const trimmed = newBrandName.trim()
+    if (!trimmed) return
+    setSavingBrand(true)
+    try {
+      const res = await fetch('/api/admin/brands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      if (res.ok) {
+        onBrandCreated(trimmed)
+        onChange({ brand: trimmed })
+        setNewBrandName('')
+        setShowAddBrand(false)
+      }
+    } finally {
+      setSavingBrand(false)
+    }
+  }
+
+  const handleCreateSupplier = async () => {
+    if (!newSupplier.name.trim()) return
+    setSavingSupplier(true)
+    try {
+      const res = await fetch('/api/admin/supplier-contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSupplier),
+      })
+      if (res.ok) {
+        const created: Supplier = await res.json()
+        onSupplierCreated(created)
+        onChange({ supplierId: created.id, supplierName: created.name })
+        setShowAddSupplier(false)
+        setNewSupplier({ name: '', code: '', country: '', email: '', phone: '', website: '', notes: '' })
+      }
+    } finally {
+      setSavingSupplier(false)
+    }
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+          Item #{index + 1}
+        </span>
+        {showRemove && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-md transition-colors font-medium"
+          >
+            × Remove
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* SKU */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            SKU <span className="text-red-500">*</span>
+          </label>
+          <input
+            value={item.sku}
+            onChange={(e) => onChange({ sku: e.target.value })}
+            placeholder="NSR-0170-AW"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+
+        {/* Brand */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-semibold text-gray-600">Brand</label>
+            <button
+              type="button"
+              onClick={() => setShowAddBrand((v) => !v)}
+              className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddBrand ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}
+            >
+              <span className="text-sm leading-none">+</span> Add
+            </button>
+          </div>
+          {!showAddBrand ? (
+            <BrandDropdown brands={brands} value={item.brand} onChange={(b) => onChange({ brand: b })} />
+          ) : (
+            <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
+              <input
+                value={newBrandName}
+                onChange={(e) => setNewBrandName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateBrand() } }}
+                placeholder="Brand name…"
+                className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={handleCreateBrand} disabled={savingBrand || !newBrandName.trim()} className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  {savingBrand ? 'Saving…' : 'Save Brand'}
+                </button>
+                <button type="button" onClick={() => { setShowAddBrand(false); setNewBrandName('') }} className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Description */}
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">
+            Description <span className="text-red-500">*</span>
+          </label>
+          <input
+            value={item.description}
+            onChange={(e) => onChange({ description: e.target.value })}
+            placeholder="NSR Formula 86/89 Red Bull Livery Kit"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+
+        {/* Qty */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">QTY</label>
+          <input
+            type="number"
+            min={1}
+            value={item.qty}
+            onChange={(e) => onChange({ qty: Number(e.target.value) })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+
+        {/* Price */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Price (R)</label>
+          <input
+            type="number"
+            min={0}
+            step="0.01"
+            value={item.price}
+            onChange={(e) => onChange({ price: Number(e.target.value) })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+
+        {/* Supplier */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-xs font-semibold text-gray-600">Supplier</label>
+            <button
+              type="button"
+              onClick={() => setShowAddSupplier((v) => !v)}
+              className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddSupplier ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}
+            >
+              <span className="text-sm leading-none">+</span> Add
+            </button>
+          </div>
+          {!showAddSupplier ? (
+            <SupplierDropdown
+              suppliers={suppliers}
+              value={item.supplierId}
+              onSelect={(s) => onChange({ supplierId: s?.id || '', supplierName: s?.name || '' })}
+            />
+          ) : (
+            <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2">
+                  <input value={newSupplier.name} onChange={(e) => setNewSupplier((p) => ({ ...p, name: e.target.value }))} placeholder="Supplier name *" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                </div>
+                <input value={newSupplier.code} onChange={(e) => setNewSupplier((p) => ({ ...p, code: e.target.value }))} placeholder="Code" className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                <input value={newSupplier.country} onChange={(e) => setNewSupplier((p) => ({ ...p, country: e.target.value }))} placeholder="Country" className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={handleCreateSupplier} disabled={savingSupplier || !newSupplier.name.trim()} className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  {savingSupplier ? 'Saving…' : 'Save Supplier'}
+                </button>
+                <button type="button" onClick={() => setShowAddSupplier(false)} className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Supplier Link */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Supplier Link</label>
+          <input
+            type="url"
+            value={item.supplierLink}
+            onChange={(e) => onChange({ supplierLink: e.target.value })}
+            placeholder="https://..."
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          />
+        </div>
+
+        {/* Notes */}
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
+          <textarea
+            value={item.notes}
+            onChange={(e) => onChange({ notes: e.target.value })}
+            rows={2}
+            placeholder="Any notes…"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none bg-white"
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
@@ -456,6 +724,7 @@ function BackorderModal({
   const [selectedClientName, setSelectedClientName] = useState(
     initial?.clientName ? `${initial.clientName}` : ''
   )
+  const [lineItems, setLineItems] = useState<LineItem[]>([{ ...EMPTY_LINE_ITEM }])
   const [showAddSupplier, setShowAddSupplier] = useState(false)
   const [newSupplier, setNewSupplier] = useState({ name: '', code: '', country: '', email: '', phone: '', website: '', notes: '' })
   const [savingSupplier, setSavingSupplier] = useState(false)
@@ -549,12 +818,38 @@ function BackorderModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.clientName.trim()) return setError('Client name is required')
-    if (!form.sku.trim()) return setError('SKU is required')
-    if (!form.description.trim()) return setError('Description is required')
+
+    if (isEditing) {
+      if (!form.sku.trim()) return setError('SKU is required')
+      if (!form.description.trim()) return setError('Description is required')
+    } else {
+      for (let i = 0; i < lineItems.length; i++) {
+        if (!lineItems[i].sku.trim()) return setError(`Item #${i + 1}: SKU is required`)
+        if (!lineItems[i].description.trim()) return setError(`Item #${i + 1}: Description is required`)
+      }
+    }
+
     setSaving(true)
     setError('')
     try {
-      await onSave({ ...form, id: initial?.id })
+      if (isEditing) {
+        await onSave({ ...form, id: initial?.id })
+      } else {
+        const clientData = {
+          clientId: form.clientId,
+          clientName: form.clientName,
+          clientEmail: form.clientEmail,
+          clientPhone: form.clientPhone,
+          clubName: form.clubName,
+          clubMemberId: form.clubMemberId,
+          companyName: form.companyName,
+          companyVAT: form.companyVAT,
+          companyAddress: form.companyAddress,
+        }
+        for (const item of lineItems) {
+          await onSave({ ...clientData, ...item })
+        }
+      }
       onClose()
     } catch {
       setError('Failed to save. Please try again.')
@@ -731,203 +1026,114 @@ function BackorderModal({
           {/* ── Product Details ───────────────────────────────────── */}
           <div>
             <SectionHeader icon="📦" title="Product Details" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  SKU <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={form.sku}
-                  onChange={(e) => str('sku', e.target.value)}
-                  placeholder="NSR-0170-AW"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-gray-600">Brand</label>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddBrand((v) => !v)}
-                    className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddBrand ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}
-                  >
-                    <span className="text-sm leading-none">+</span> Add
-                  </button>
+
+            {isEditing ? (
+              /* Edit mode — single item (existing form fields) */
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">
+                    SKU <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={form.sku}
+                    onChange={(e) => str('sku', e.target.value)}
+                    placeholder="NSR-0170-AW"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
-                {!showAddBrand && (
-                  <BrandDropdown
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-gray-600">Brand</label>
+                    <button type="button" onClick={() => setShowAddBrand((v) => !v)} className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddBrand ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}>
+                      <span className="text-sm leading-none">+</span> Add
+                    </button>
+                  </div>
+                  {!showAddBrand && <BrandDropdown brands={brands} value={form.brand} onChange={(b) => str('brand', b)} />}
+                  {showAddBrand && (
+                    <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
+                      <input value={newBrandName} onChange={(e) => setNewBrandName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateBrand() } }} placeholder="Brand name…" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" autoFocus />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={handleCreateBrand} disabled={savingBrand || !newBrandName.trim()} className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">{savingBrand ? 'Saving…' : 'Save Brand'}</button>
+                        <button type="button" onClick={() => { setShowAddBrand(false); setNewBrandName('') }} className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-gray-600">Supplier</label>
+                    <button type="button" onClick={() => setShowAddSupplier((v) => !v)} className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddSupplier ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}>
+                      <span className="text-sm leading-none">+</span> Add
+                    </button>
+                  </div>
+                  {!showAddSupplier && <SupplierDropdown suppliers={suppliers} value={form.supplierId} onSelect={(s) => setForm((p) => ({ ...p, supplierId: s?.id || '', supplierName: s?.name || '' }))} />}
+                  {showAddSupplier && (
+                    <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="col-span-2"><input value={newSupplier.name} onChange={(e) => setNewSupplier((p) => ({ ...p, name: e.target.value }))} placeholder="Supplier name *" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" /></div>
+                        <input value={newSupplier.code} onChange={(e) => setNewSupplier((p) => ({ ...p, code: e.target.value }))} placeholder="Code" className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <input value={newSupplier.country} onChange={(e) => setNewSupplier((p) => ({ ...p, country: e.target.value }))} placeholder="Country" className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <input value={newSupplier.email} onChange={(e) => setNewSupplier((p) => ({ ...p, email: e.target.value }))} placeholder="Email" className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <input value={newSupplier.phone} onChange={(e) => setNewSupplier((p) => ({ ...p, phone: e.target.value }))} placeholder="Phone" className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                        <div className="col-span-2"><input value={newSupplier.website} onChange={(e) => setNewSupplier((p) => ({ ...p, website: e.target.value }))} placeholder="Website URL" className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" /></div>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button type="button" onClick={handleCreateSupplier} disabled={savingSupplier || !newSupplier.name.trim()} className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">{savingSupplier ? 'Saving…' : 'Save Supplier'}</button>
+                        <button type="button" onClick={() => setShowAddSupplier(false)} className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Description <span className="text-red-500">*</span></label>
+                  <input value={form.description} onChange={(e) => str('description', e.target.value)} placeholder="NSR Formula 86/89 Red Bull Livery Kit" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">QTY</label>
+                  <input type="number" min={1} value={form.qty} onChange={(e) => set('qty', Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Price (R)</label>
+                  <input type="number" min={0} step="0.01" value={form.price} onChange={(e) => set('price', Number(e.target.value))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Supplier Link</label>
+                  <input type="url" value={form.supplierLink} onChange={(e) => str('supplierLink', e.target.value)} placeholder="https://supplier.com/product/nsr-0170" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
+                  <textarea value={form.notes} onChange={(e) => str('notes', e.target.value)} rows={2} placeholder="Any additional notes…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+                </div>
+              </div>
+            ) : (
+              /* Create mode — multi item list */
+              <div className="space-y-4">
+                {lineItems.map((item, idx) => (
+                  <LineItemRow
+                    key={idx}
+                    item={item}
+                    index={idx}
+                    showRemove={lineItems.length > 1}
                     brands={brands}
-                    value={form.brand}
-                    onChange={(b) => str('brand', b)}
-                  />
-                )}
-                {showAddBrand && (
-                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
-                    <input
-                      value={newBrandName}
-                      onChange={(e) => setNewBrandName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateBrand() } }}
-                      placeholder="Brand name e.g. NSR, Slot.it…"
-                      className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      autoFocus
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCreateBrand}
-                        disabled={savingBrand || !newBrandName.trim()}
-                        className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                      >
-                        {savingBrand ? 'Saving…' : 'Save Brand'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowAddBrand(false); setNewBrandName('') }}
-                        className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-gray-600">Supplier</label>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddSupplier((v) => !v)}
-                    className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddSupplier ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}
-                  >
-                    <span className="text-sm leading-none">+</span> Add
-                  </button>
-                </div>
-                {!showAddSupplier && (
-                  <SupplierDropdown
                     suppliers={suppliers}
-                    value={form.supplierId}
-                    onSelect={(s) => setForm((p) => ({ ...p, supplierId: s?.id || '', supplierName: s?.name || '' }))}
+                    onChange={(updates) =>
+                      setLineItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...updates } : it))
+                    }
+                    onRemove={() => setLineItems((prev) => prev.filter((_, i) => i !== idx))}
+                    onBrandCreated={onBrandCreated}
+                    onSupplierCreated={onSupplierCreated}
                   />
-                )}
-                {showAddSupplier && (
-                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="col-span-2">
-                        <input
-                          value={newSupplier.name}
-                          onChange={(e) => setNewSupplier((p) => ({ ...p, name: e.target.value }))}
-                          placeholder="Supplier name *"
-                          className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                      <input
-                        value={newSupplier.code}
-                        onChange={(e) => setNewSupplier((p) => ({ ...p, code: e.target.value }))}
-                        placeholder="Code (e.g. NSR)"
-                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <input
-                        value={newSupplier.country}
-                        onChange={(e) => setNewSupplier((p) => ({ ...p, country: e.target.value }))}
-                        placeholder="Country"
-                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <input
-                        value={newSupplier.email}
-                        onChange={(e) => setNewSupplier((p) => ({ ...p, email: e.target.value }))}
-                        placeholder="Email"
-                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <input
-                        value={newSupplier.phone}
-                        onChange={(e) => setNewSupplier((p) => ({ ...p, phone: e.target.value }))}
-                        placeholder="Phone"
-                        className="border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
-                      <div className="col-span-2">
-                        <input
-                          value={newSupplier.website}
-                          onChange={(e) => setNewSupplier((p) => ({ ...p, website: e.target.value }))}
-                          placeholder="Website URL"
-                          className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={handleCreateSupplier}
-                        disabled={savingSupplier || !newSupplier.name.trim()}
-                        className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                      >
-                        {savingSupplier ? 'Saving…' : 'Save Supplier'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddSupplier(false)}
-                        className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setLineItems((prev) => [...prev, { ...EMPTY_LINE_ITEM }])}
+                  className="w-full border-2 border-dashed border-gray-300 text-gray-500 rounded-xl py-3 text-sm font-medium hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/30 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="text-lg font-bold leading-none">+</span>
+                  Add Another Item
+                </button>
               </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-600 mb-1">
-                  Description <span className="text-red-500">*</span>
-                </label>
-                <input
-                  value={form.description}
-                  onChange={(e) => str('description', e.target.value)}
-                  placeholder="NSR Formula 86/89 Red Bull Livery Kit"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">QTY</label>
-                <input
-                  type="number"
-                  min={1}
-                  value={form.qty}
-                  onChange={(e) => set('qty', Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Price (R)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.price}
-                  onChange={(e) => set('price', Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Supplier Link</label>
-                <input
-                  type="url"
-                  value={form.supplierLink}
-                  onChange={(e) => str('supplierLink', e.target.value)}
-                  placeholder="https://supplier.com/product/nsr-0170"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => str('notes', e.target.value)}
-                  rows={2}
-                  placeholder="Any additional notes…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                />
-              </div>
-            </div>
+            )}
           </div>
 
           {error && (
@@ -947,6 +1153,8 @@ function BackorderModal({
                 ? 'Saving…'
                 : isEditing
                 ? 'Save Changes'
+                : lineItems.length > 1
+                ? `Create ${lineItems.length} Backorders`
                 : isNewClient
                 ? 'Create Backorder + Save Client'
                 : 'Create Backorder'}
