@@ -56,7 +56,7 @@ interface Backorder {
   phaseInvoiceDate?: string
   phaseDepositPaid: boolean
   phaseDepositPaidDate?: string
-  orderStatus?: 'booked' | 'confirmed' | 'shipping' | 'tracking'
+  orderStatus?: 'booked' | 'confirmed' | 'shipping' | 'tracking' | 'in_stock' | 'not_available'
   quoteNumber?: string
   salesOrderNumber?: string
   invoiceNumber?: string
@@ -1485,6 +1485,8 @@ export default function BackordersPage() {
             <option value="confirmed">Confirmed</option>
             <option value="shipping">Shipping</option>
             <option value="tracking">Tracking Info</option>
+            <option value="in_stock">In Stock</option>
+            <option value="not_available">Not Available</option>
           </select>
           <select
             defaultValue=""
@@ -1728,6 +1730,8 @@ export default function BackordersPage() {
                             bo.orderStatus === 'confirmed' ? 'border-green-300 bg-green-50 text-green-700' :
                             bo.orderStatus === 'shipping' ? 'border-orange-300 bg-orange-50 text-orange-700' :
                             bo.orderStatus === 'tracking' ? 'border-purple-300 bg-purple-50 text-purple-700' :
+                            bo.orderStatus === 'in_stock' ? 'border-green-600 bg-green-600 text-yellow-300' :
+                            bo.orderStatus === 'not_available' ? 'border-red-600 bg-red-600 text-white' :
                             'border-gray-200 bg-white text-gray-400'
                           }`}
                         >
@@ -1736,6 +1740,8 @@ export default function BackordersPage() {
                           <option value="confirmed">Confirmed</option>
                           <option value="shipping">Shipping</option>
                           <option value="tracking">Tracking Info</option>
+                          <option value="in_stock">In Stock</option>
+                          <option value="not_available">Not Available</option>
                         </select>
                       </td>
 
