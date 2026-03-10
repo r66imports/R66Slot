@@ -348,6 +348,68 @@ function SupplierDropdown({
   )
 }
 
+// ─── Brand Dropdown ───────────────────────────────────────────────────────────
+
+function BrandDropdown({
+  brands,
+  value,
+  onChange,
+}: {
+  brands: string[]
+  value: string
+  onChange: (brand: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+      >
+        <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>
+          {value || 'Select brand…'}
+        </span>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto">
+          <li
+            onMouseDown={() => { onChange(''); setOpen(false) }}
+            className="px-4 py-2.5 text-sm text-gray-400 cursor-pointer hover:bg-gray-50 italic"
+          >
+            — No brand —
+          </li>
+          {brands.map((b) => (
+            <li
+              key={b}
+              onMouseDown={() => { onChange(b); setOpen(false) }}
+              className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-blue-50 font-medium ${value === b ? 'text-blue-600 bg-blue-50' : 'text-gray-900'}`}
+            >
+              {b}
+            </li>
+          ))}
+          {brands.length === 0 && (
+            <li className="px-4 py-2.5 text-xs text-gray-400 italic">No brands saved yet — use +Add</li>
+          )}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ─── Section Header ───────────────────────────────────────────────────────────
 
 function SectionHeader({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
@@ -368,16 +430,20 @@ function BackorderModal({
   initial,
   clients,
   suppliers,
+  brands,
   onSave,
   onClose,
   onSupplierCreated,
+  onBrandCreated,
 }: {
   initial?: Partial<FormData> & { id?: string }
   clients: Client[]
   suppliers: Supplier[]
+  brands: string[]
   onSave: (data: FormData & { id?: string }) => Promise<void>
   onClose: () => void
   onSupplierCreated: (s: Supplier) => void
+  onBrandCreated: (name: string) => void
 }) {
   const [form, setForm] = useState<FormData>({
     ...EMPTY_CLIENT_FIELDS,
@@ -393,6 +459,9 @@ function BackorderModal({
   const [showAddSupplier, setShowAddSupplier] = useState(false)
   const [newSupplier, setNewSupplier] = useState({ name: '', code: '', country: '', email: '', phone: '', website: '', notes: '' })
   const [savingSupplier, setSavingSupplier] = useState(false)
+  const [showAddBrand, setShowAddBrand] = useState(false)
+  const [newBrandName, setNewBrandName] = useState('')
+  const [savingBrand, setSavingBrand] = useState(false)
 
   const handleCreateSupplier = async () => {
     if (!newSupplier.name.trim()) return
@@ -412,6 +481,27 @@ function BackorderModal({
       }
     } finally {
       setSavingSupplier(false)
+    }
+  }
+
+  const handleCreateBrand = async () => {
+    const trimmed = newBrandName.trim()
+    if (!trimmed) return
+    setSavingBrand(true)
+    try {
+      const res = await fetch('/api/admin/brands', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed }),
+      })
+      if (res.ok) {
+        onBrandCreated(trimmed)
+        setForm((p) => ({ ...p, brand: trimmed }))
+        setNewBrandName('')
+        setShowAddBrand(false)
+      }
+    } finally {
+      setSavingBrand(false)
     }
   }
 
@@ -655,13 +745,52 @@ function BackorderModal({
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Brand</label>
-                <input
-                  value={form.brand}
-                  onChange={(e) => str('brand', e.target.value)}
-                  placeholder="NSR, Slot.it, Scalextric…"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-gray-600">Brand</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddBrand((v) => !v)}
+                    className={`text-xs font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${showAddBrand ? 'bg-gray-200 text-gray-700' : 'text-blue-600 hover:bg-blue-50'}`}
+                  >
+                    <span className="text-sm leading-none">+</span> Add
+                  </button>
+                </div>
+                {!showAddBrand && (
+                  <BrandDropdown
+                    brands={brands}
+                    value={form.brand}
+                    onChange={(b) => str('brand', b)}
+                  />
+                )}
+                {showAddBrand && (
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-3 space-y-2">
+                    <input
+                      value={newBrandName}
+                      onChange={(e) => setNewBrandName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateBrand() } }}
+                      placeholder="Brand name e.g. NSR, Slot.it…"
+                      className="w-full border border-gray-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCreateBrand}
+                        disabled={savingBrand || !newBrandName.trim()}
+                        className="flex-1 bg-blue-600 text-white rounded-md py-1.5 text-xs font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        {savingBrand ? 'Saving…' : 'Save Brand'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowAddBrand(false); setNewBrandName('') }}
+                        className="px-3 border border-gray-300 text-gray-600 rounded-md text-xs hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -954,18 +1083,21 @@ export default function BackordersPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [supplierPopup, setSupplierPopup] = useState<Supplier | null>(null)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [brands, setBrands] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, clRes, supRes] = await Promise.all([
+      const [boRes, clRes, supRes, brandRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/clients'),
         fetch('/api/admin/supplier-contacts'),
+        fetch('/api/admin/brands'),
       ])
       if (boRes.ok) setBackorders(await boRes.json())
       if (clRes.ok) setClients(await clRes.json())
       if (supRes.ok) setSuppliers(await supRes.json())
+      if (brandRes.ok) setBrands(await brandRes.json())
     } finally {
       setLoading(false)
     }
@@ -1699,9 +1831,11 @@ export default function BackordersPage() {
           initial={editFormData}
           clients={clients}
           suppliers={suppliers}
+          brands={brands}
           onSave={editItem ? handleEdit : handleCreate}
           onClose={() => { setShowModal(false); setEditItem(null) }}
           onSupplierCreated={(s) => setSuppliers((prev) => [...prev, s])}
+          onBrandCreated={(name) => setBrands((prev) => [...prev, name].sort((a, b) => a.localeCompare(b)))}
         />
       )}
 
