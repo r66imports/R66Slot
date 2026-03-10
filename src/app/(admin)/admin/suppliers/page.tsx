@@ -74,8 +74,6 @@ const EMPTY_COMPANY: CompanyInfo = {
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function SuppliersNetworkPage() {
-  const [activeTab, setActiveTab] = useState<'network' | 'ordersheet'>('network')
-
   // Suppliers
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [suppliersLoading, setSuppliersLoading] = useState(true)
@@ -139,11 +137,8 @@ export default function SuppliersNetworkPage() {
   useEffect(() => {
     loadSuppliers()
     loadCompanyInfo()
-  }, [loadSuppliers, loadCompanyInfo])
-
-  useEffect(() => {
-    if (activeTab === 'ordersheet') loadBackorders()
-  }, [activeTab, loadBackorders])
+    loadBackorders()
+  }, [loadSuppliers, loadCompanyInfo, loadBackorders])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -284,86 +279,12 @@ export default function SuppliersNetworkPage() {
         {/* Page Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Suppliers Network</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage your supplier relationships and order sheets</p>
+            <h1 className="text-2xl font-bold text-gray-900">Suppliers Orders</h1>
+            <p className="text-sm text-gray-500 mt-1">Supplier order sheets and backorder management</p>
           </div>
-          {activeTab === 'network' && (
-            <button
-              onClick={openAddModal}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Supplier
-            </button>
-          )}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('network')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'network'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Network
-          </button>
-          <button
-            onClick={() => setActiveTab('ordersheet')}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'ordersheet'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            Order Sheet
-          </button>
-        </div>
-
-        {/* ── Network Tab ────────────────────────────────────────────── */}
-        {activeTab === 'network' && (
-          <div>
-            {suppliersLoading ? (
-              <div className="flex items-center justify-center h-48 text-gray-400">
-                <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Loading suppliers...
-              </div>
-            ) : suppliers.length === 0 ? (
-              <div className="text-center py-16 text-gray-400">
-                <svg className="w-12 h-12 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                <p className="text-sm font-medium">No suppliers yet</p>
-                <p className="text-xs mt-1">Click &quot;Add Supplier&quot; to get started</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {suppliers.map((s) => (
-                  <SupplierCard
-                    key={s.id}
-                    supplier={s}
-                    onEdit={() => openEditModal(s)}
-                    onDelete={() => setDeleteConfirmId(s.id)}
-                    confirmingDelete={deleteConfirmId === s.id}
-                    onConfirmDelete={() => deleteSupplier(s.id)}
-                    onCancelDelete={() => setDeleteConfirmId(null)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Order Sheet Tab ─────────────────────────────────────────── */}
-        {activeTab === 'ordersheet' && (
-          <div>
+        <div>
             {/* Controls bar */}
             <div className="flex items-start justify-between mb-6 gap-4">
               {/* Company Info Block */}
@@ -635,7 +556,6 @@ export default function SuppliersNetworkPage() {
               )}
             </div>
           </div>
-        )}
       </div>
 
       {/* ── Add / Edit Supplier Modal ──────────────────────────────────── */}
