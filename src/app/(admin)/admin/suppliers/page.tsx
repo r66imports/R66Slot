@@ -95,6 +95,7 @@ export default function SuppliersNetworkPage() {
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all')
   const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false)
   const supplierDropdownRef = useRef<HTMLDivElement>(null)
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
 
   // ─── Data Loading ──────────────────────────────────────────────────────
 
@@ -253,6 +254,83 @@ export default function SuppliersNetworkPage() {
 
   function handlePrint() {
     window.print()
+  }
+
+  function toggleGroup(name: string) {
+    setClosedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  function downloadSupplierOrder(supplierName: string, items: Backorder[]) {
+    // Consolidate duplicate SKUs — sum their qtys
+    const consolidated = Object.values(
+      items.reduce<Record<string, { sku: string; description: string; qty: number }>>((acc, b) => {
+        if (!acc[b.sku]) acc[b.sku] = { sku: b.sku, description: b.description, qty: 0 }
+        acc[b.sku].qty += b.qty
+        return acc
+      }, {})
+    )
+    const date = new Date().toLocaleDateString('en-ZA')
+    const totalQtyVal = consolidated.reduce((s, i) => s + i.qty, 0)
+    const rows = consolidated
+      .map(
+        (item, i) => `
+        <tr>
+          <td style="padding:8px 12px;color:#6b7280;font-size:13px;">${i + 1}</td>
+          <td style="padding:8px 12px;font-family:monospace;font-size:13px;font-weight:600;">${item.sku}</td>
+          <td style="padding:8px 12px;font-size:13px;">${item.description}</td>
+          <td style="padding:8px 12px;text-align:center;font-weight:700;font-size:13px;">${item.qty}</td>
+        </tr>`
+      )
+      .join('')
+    const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <title>Order Sheet – ${supplierName}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
+    h1{font-size:22px;font-weight:800;margin-bottom:4px}
+    .meta{font-size:13px;color:#6b7280;margin-bottom:28px}
+    table{width:100%;border-collapse:collapse}
+    thead tr{border-bottom:2px solid #111827}
+    th{padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280}
+    th.center{text-align:center}
+    tbody tr{border-bottom:1px solid #f3f4f6}
+    tbody tr:nth-child(even){background:#f9fafb}
+    tfoot tr{border-top:2px solid #111827}
+    tfoot td{padding:10px 12px;font-weight:700;font-size:13px}
+    @page{size:A4;margin:0}
+  </style>
+</head>
+<body>
+  <h1>ORDER SHEET</h1>
+  <p class="meta">Supplier: <strong>${supplierName}</strong>&nbsp;&nbsp;·&nbsp;&nbsp;Date: ${date}&nbsp;&nbsp;·&nbsp;&nbsp;${consolidated.length} line${consolidated.length !== 1 ? 's' : ''}</p>
+  <table>
+    <thead><tr>
+      <th style="width:40px">#</th>
+      <th>SKU</th>
+      <th>Description</th>
+      <th class="center" style="width:80px">Qty</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td colspan="3" style="text-align:right;padding-right:12px;color:#6b7280">Total</td>
+      <td style="text-align:center">${totalQtyVal}</td>
+    </tr></tfoot>
+  </table>
+</body></html>`
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+      win.focus()
+      setTimeout(() => win.print(), 350)
+    }
   }
 
   // ─── Render ────────────────────────────────────────────────────────────
@@ -530,14 +608,47 @@ export default function SuppliersNetworkPage() {
                     </div>
                   </div>
 
-                  {/* Supplier groups */}
-                  {Object.entries(groupedBackorders).map(([supplierName, items]) => (
-                    <BackorderTable
-                      key={supplierName}
-                      supplierName={supplierName}
-                      backorders={items}
-                    />
-                  ))}
+                  {/* Supplier groups — collapsible accordion */}
+                  {Object.entries(groupedBackorders).map(([supplierName, items]) => {
+                    const isOpen = !closedGroups.has(supplierName)
+                    const subtotalQty = items.reduce((s, b) => s + b.qty, 0)
+                    return (
+                      <div key={supplierName} className="border border-gray-200 rounded-xl overflow-hidden">
+                        {/* Accordion header */}
+                        <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
+                          <button
+                            type="button"
+                            onClick={() => toggleGroup(supplierName)}
+                            className="flex items-center gap-3 flex-1 text-left"
+                          >
+                            <svg
+                              className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-0' : '-rotate-90'}`}
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                            <span className="font-semibold text-gray-900 text-sm">{supplierName}</span>
+                            <span className="text-xs text-gray-400">{items.length} line{items.length !== 1 ? 's' : ''} · {subtotalQty} items</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => downloadSupplierOrder(supplierName, items)}
+                            className="flex items-center gap-1.5 bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-700 transition-colors flex-shrink-0"
+                            title="Download order sheet as PDF"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Download Order
+                          </button>
+                        </div>
+                        {/* Collapsible table */}
+                        {isOpen && (
+                          <BackorderTable backorders={items} />
+                        )}
+                      </div>
+                    )
+                  })}
 
                   {/* Summary */}
                   <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex items-center justify-between">
@@ -788,28 +899,15 @@ function SupplierCard({
 // ─── Backorder Table (per supplier group) ───────────────────────────────────
 
 function BackorderTable({
-  supplierName,
   backorders,
 }: {
-  supplierName: string
   backorders: Backorder[]
 }) {
   const subtotalQty = backorders.reduce((s, b) => s + b.qty, 0)
   const subtotalValue = backorders.reduce((s, b) => s + b.qty * b.price, 0)
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      {/* Group header */}
-      <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <h3 className="font-semibold text-gray-900 text-sm">{supplierName}</h3>
-          <span className="text-xs text-gray-400">{backorders.length} line{backorders.length !== 1 ? 's' : ''}</span>
-        </div>
-        <span className="text-sm font-semibold text-gray-700">
-          R {subtotalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </span>
-      </div>
-
+    <div className="bg-white overflow-hidden">
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
