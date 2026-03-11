@@ -16,7 +16,7 @@ interface ClientContact {
 }
 
 type DocType = 'quote' | 'salesorder' | 'invoice'
-type Tab = 'quotes' | 'salesorders' | 'invoices'
+type Tab = 'backorders' | 'quotes' | 'salesorders' | 'invoices'
 
 interface LineItem {
   id: string
@@ -721,12 +721,16 @@ function CreateDocumentModal({
   docType,
   template,
   clients,
+  prefilledClient,
+  prefilledItems,
   onCreated,
   onClose,
 }: {
   docType: DocType
   template: OrderTemplate
   clients: ClientContact[]
+  prefilledClient?: { name: string; email: string; phone: string; address: string }
+  prefilledItems?: LineItem[]
   onCreated: (doc: OrderDocument) => void
   onClose: () => void
 }) {
@@ -735,15 +739,15 @@ function CreateDocumentModal({
   const [form, setForm] = useState({
     docNumber: '',
     date: new Date().toISOString().slice(0, 10),
-    clientName: '',
-    clientEmail: '',
-    clientPhone: '',
-    clientAddress: '',
+    clientName: prefilledClient?.name || '',
+    clientEmail: prefilledClient?.email || '',
+    clientPhone: prefilledClient?.phone || '',
+    clientAddress: prefilledClient?.address || '',
     notes: '',
     terms: template[cfg.termsKey] as string,
     status: 'draft' as const,
   })
-  const [lineItems, setLineItems] = useState<LineItem[]>([newLine()])
+  const [lineItems, setLineItems] = useState<LineItem[]>(prefilledItems?.length ? prefilledItems : [newLine()])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -780,6 +784,12 @@ function CreateDocumentModal({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
         <div className="overflow-y-auto flex-1 p-6 space-y-5">
+          {prefilledClient && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2.5 rounded-lg text-sm">
+              <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+              <span>Compiled from <strong>{prefilledItems?.length} back order{prefilledItems?.length !== 1 ? 's' : ''}</strong> for <strong>{prefilledClient.name}</strong> — review and add a document number to save.</span>
+            </div>
+          )}
           {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>}
 
           <div className="grid grid-cols-2 gap-4">
@@ -1271,9 +1281,11 @@ export default function OrdersPage() {
   const [template, setTemplate] = useState<OrderTemplate>(DEFAULT_TEMPLATE)
   const [clients, setClients] = useState<ClientContact[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('quotes')
+  const [tab, setTab] = useState<Tab>('backorders')
   const [showTemplate, setShowTemplate] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [compileDocType, setCompileDocType] = useState<DocType>('quote')
+  const [compileClient, setCompileClient] = useState<{ name: string; email: string; phone: string; address: string; items: LineItem[] } | null>(null)
   const [viewData, setViewData] = useState<DocViewData | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
@@ -1312,25 +1324,54 @@ export default function OrdersPage() {
 
   useEffect(() => { load() }, [load])
 
-  const cfg = TAB_CFG[tab]
+  const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders
 
-  const boRows = backorders.filter(cfg.boPhase)
-  const docRows = documents.filter((d) => d.type === cfg.docType)
+  const boRows = tab !== 'backorders' ? backorders.filter(cfg.boPhase) : []
+  const docRows = tab !== 'backorders' ? documents.filter((d) => d.type === cfg.docType) : []
   const totalCount = boRows.length + docRows.length
 
   const grandTotal =
     boRows.reduce((s, b) => s + b.price * b.qty, 0) +
     docRows.reduce((s, d) => s + d.lineItems.reduce((ls, li) => ls + li.qty * li.unitPrice, 0), 0)
 
+  // Group all active backorders by client for the Back Orders tab
+  const backordersByClient: Record<string, Backorder[]> = {}
+  for (const b of backorders) {
+    if (b.status === 'cancelled') continue
+    const key = b.clientName || 'Unknown Client'
+    if (!backordersByClient[key]) backordersByClient[key] = []
+    backordersByClient[key].push(b)
+  }
+
   const tabCounts = {
+    backorders: backorders.filter((b) => b.status !== 'cancelled').length,
     quotes: backorders.filter(TAB_CFG.quotes.boPhase).length + documents.filter((d) => d.type === 'quote').length,
     salesorders: backorders.filter(TAB_CFG.salesorders.boPhase).length + documents.filter((d) => d.type === 'salesorder').length,
     invoices: backorders.filter(TAB_CFG.invoices.boPhase).length + documents.filter((d) => d.type === 'invoice').length,
   }
 
+  const handleCompile = (clientName: string, docType: DocType) => {
+    const items = backordersByClient[clientName] || []
+    const first = items[0]
+    setCompileDocType(docType)
+    setCompileClient({
+      name: first?.clientName || clientName,
+      email: first?.clientEmail || '',
+      phone: first?.clientPhone || '',
+      address: first?.companyAddress || '',
+      items: items.map((b) => ({
+        id: `li_${b.id}`,
+        description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`,
+        qty: b.qty,
+        unitPrice: b.price,
+      })),
+    })
+    setShowCreate(true)
+  }
+
   // Build DocViewData from a backorder row (current tab context)
   const boToViewData = useCallback((b: Backorder): DocViewData => {
-    const c = TAB_CFG[tab]
+    const c = TAB_CFG[tab === 'backorders' ? 'quotes' : tab]
     return {
       docType: c.docType,
       docNumber: c.boDocNum(b),
@@ -1367,6 +1408,7 @@ export default function OrdersPage() {
   }
 
   const TABS: { key: Tab; label: string; icon: string }[] = [
+    { key: 'backorders', label: 'Back Orders', icon: '🔄' },
     { key: 'quotes', label: 'Quotes', icon: '📄' },
     { key: 'salesorders', label: 'Sales Orders', icon: '🧾' },
     { key: 'invoices', label: 'Invoices', icon: '💰' },
@@ -1401,14 +1443,93 @@ export default function OrdersPage() {
         </div>
         <div className="flex gap-2 pb-2">
           <button onClick={() => setShowTemplate(true)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">Edit Template</button>
-          <button onClick={() => setShowCreate(true)} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">{cfg.createLabel}</button>
+          {tab !== 'backorders' && (
+            <button onClick={() => { setCompileClient(null); setShowCreate(true) }} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">{cfg.createLabel}</button>
+          )}
         </div>
       </div>
 
+      {/* ── Back Orders Tab ── */}
+      {tab === 'backorders' && !loading && (
+        <div className="space-y-4">
+          {Object.keys(backordersByClient).length === 0 ? (
+            <div className="text-center py-16">
+              <div className="text-5xl mb-4">🔄</div>
+              <p className="text-lg font-semibold text-gray-600">No active back orders</p>
+              <p className="text-sm text-gray-400 mt-1">Add backorders from the Back Orders page.</p>
+            </div>
+          ) : (
+            Object.entries(backordersByClient)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([clientName, items]) => {
+                const total = items.reduce((s, b) => s + b.price * b.qty, 0)
+                return (
+                  <div key={clientName} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    {/* Client header */}
+                    <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
+                      <div>
+                        <span className="font-semibold text-gray-900">{clientName}</span>
+                        <span className="ml-3 text-xs text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''} · {fmtPrice(total)}</span>
+                        {items[0]?.clientEmail && (
+                          <span className="ml-3 text-xs text-gray-400">{items[0].clientEmail}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 mr-1">Compile →</span>
+                        <button
+                          onClick={() => handleCompile(clientName, 'quote')}
+                          className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
+                        >Quote</button>
+                        <button
+                          onClick={() => handleCompile(clientName, 'salesorder')}
+                          className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
+                        >Sales Order</button>
+                        <button
+                          onClick={() => handleCompile(clientName, 'invoice')}
+                          className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
+                        >Invoice</button>
+                      </div>
+                    </div>
+                    {/* Line items */}
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100">
+                          <th className="text-left px-5 py-2">SKU</th>
+                          <th className="text-left px-5 py-2">Description</th>
+                          <th className="text-left px-5 py-2">Brand</th>
+                          <th className="text-center px-5 py-2">Qty</th>
+                          <th className="text-right px-5 py-2">Price</th>
+                          <th className="text-right px-5 py-2">Total</th>
+                          <th className="text-center px-5 py-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((b) => (
+                          <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                            <td className="px-5 py-2.5 font-mono text-xs text-blue-700 font-semibold">{b.sku || '—'}</td>
+                            <td className="px-5 py-2.5 text-gray-700 max-w-[220px] truncate">{b.description}</td>
+                            <td className="px-5 py-2.5 text-gray-500 text-xs">{b.brand || '—'}</td>
+                            <td className="px-5 py-2.5 text-center text-gray-700">{b.qty}</td>
+                            <td className="px-5 py-2.5 text-right text-gray-700">{fmtPrice(b.price)}</td>
+                            <td className="px-5 py-2.5 text-right font-semibold">{fmtPrice(b.price * b.qty)}</td>
+                            <td className="px-5 py-2.5 text-center">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })
+          )}
+        </div>
+      )}
+
       {/* Content */}
-      {loading ? (
+      {tab !== 'backorders' && loading ? (
         <div className="text-center py-16 text-gray-400">Loading...</div>
-      ) : totalCount === 0 ? (
+      ) : tab !== 'backorders' && totalCount === 0 ? (
         <div className="text-center py-16">
           <div className="text-5xl mb-4">{cfg.icon}</div>
           <p className="text-lg font-semibold text-gray-600">No {cfg.label} yet</p>
@@ -1534,11 +1655,13 @@ export default function OrdersPage() {
       )}
       {showCreate && (
         <CreateDocumentModal
-          docType={cfg.docType}
+          docType={compileClient ? compileDocType : cfg.docType}
           template={template}
           clients={clients}
-          onCreated={(doc) => setDocuments((prev) => [doc, ...prev])}
-          onClose={() => setShowCreate(false)}
+          prefilledClient={compileClient ?? undefined}
+          prefilledItems={compileClient?.items}
+          onCreated={(doc) => { setDocuments((prev) => [doc, ...prev]); setCompileClient(null) }}
+          onClose={() => { setShowCreate(false); setCompileClient(null) }}
         />
       )}
       {viewData && (
