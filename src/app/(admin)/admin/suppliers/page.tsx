@@ -96,6 +96,7 @@ export default function SuppliersNetworkPage() {
   const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false)
   const supplierDropdownRef = useRef<HTMLDivElement>(null)
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
+  const [showCreateOrder, setShowCreateOrder] = useState(false)
 
   // ─── Data Loading ──────────────────────────────────────────────────────
 
@@ -360,6 +361,15 @@ export default function SuppliersNetworkPage() {
             <h1 className="text-2xl font-bold text-gray-900">Suppliers Orders</h1>
             <p className="text-sm text-gray-500 mt-1">Supplier order sheets and backorder management</p>
           </div>
+          <button
+            onClick={() => setShowCreateOrder(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Supplier Order
+          </button>
         </div>
 
         <div>
@@ -669,6 +679,15 @@ export default function SuppliersNetworkPage() {
           </div>
       </div>
 
+      {/* ── Create Supplier Order Modal ────────────────────────────────── */}
+      {showCreateOrder && (
+        <CreateSupplierOrderModal
+          suppliers={suppliers}
+          companyInfo={companyInfo}
+          onClose={() => setShowCreateOrder(false)}
+        />
+      )}
+
       {/* ── Add / Edit Supplier Modal ──────────────────────────────────── */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -958,6 +977,260 @@ function BackorderTable({
             </tr>
           </tfoot>
         </table>
+      </div>
+    </div>
+  )
+}
+
+// ─── Create Supplier Order Modal ─────────────────────────────────────────────
+
+const EMPTY_ORDER_ITEM = { sku: '', description: '', qty: 1 }
+
+function CreateSupplierOrderModal({
+  suppliers,
+  companyInfo,
+  onClose,
+}: {
+  suppliers: Supplier[]
+  companyInfo: CompanyInfo
+  onClose: () => void
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [selectedSupplier, setSelectedSupplier] = useState('')
+  const [poNumber, setPoNumber] = useState('')
+  const [orderDate, setOrderDate] = useState(today)
+  const [items, setItems] = useState([{ ...EMPTY_ORDER_ITEM }])
+
+  function updateItem(idx: number, field: string, value: string | number) {
+    setItems((prev) => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
+  }
+
+  function addItem() {
+    setItems((prev) => [...prev, { ...EMPTY_ORDER_ITEM }])
+  }
+
+  function removeItem(idx: number) {
+    setItems((prev) => prev.filter((_, i) => i !== idx))
+  }
+
+  function generatePDF() {
+    const supplier = suppliers.find((s) => s.id === selectedSupplier)
+    const supplierName = supplier?.name || selectedSupplier || 'Supplier'
+    const date = new Date(orderDate).toLocaleDateString('en-ZA')
+    const totalQty = items.reduce((s, i) => s + Number(i.qty), 0)
+
+    const rows = items
+      .filter((it) => it.sku || it.description)
+      .map(
+        (it, i) => `
+        <tr>
+          <td style="padding:8px 12px;color:#6b7280;font-size:13px;">${i + 1}</td>
+          <td style="padding:8px 12px;font-family:monospace;font-size:13px;font-weight:600;">${it.sku}</td>
+          <td style="padding:8px 12px;font-size:13px;">${it.description}</td>
+          <td style="padding:8px 12px;text-align:center;font-weight:700;font-size:13px;">${it.qty}</td>
+        </tr>`
+      )
+      .join('')
+
+    const companyBlock = companyInfo.name
+      ? `<p style="font-size:13px;font-weight:700;">${companyInfo.name}</p>
+         ${companyInfo.address ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.address}</p>` : ''}
+         ${companyInfo.phone ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.phone}</p>` : ''}
+         ${companyInfo.email ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.email}</p>` : ''}
+         ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;">VAT: ${companyInfo.vatNumber}</p>` : ''}`
+      : ''
+
+    const html = `<!DOCTYPE html>
+<html><head>
+  <meta charset="utf-8">
+  <title>Supplier Order – ${supplierName}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
+    .title{font-size:24px;font-weight:800;margin-bottom:2px}
+    .meta{font-size:13px;color:#6b7280;margin-top:4px}
+    .supplier-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin-bottom:28px}
+    .supplier-box p{font-size:13px;margin-bottom:2px}
+    table{width:100%;border-collapse:collapse}
+    thead tr{border-bottom:2px solid #111827}
+    th{padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280}
+    th.center{text-align:center}
+    tbody tr{border-bottom:1px solid #f3f4f6}
+    tbody tr:nth-child(even){background:#f9fafb}
+    tfoot tr{border-top:2px solid #111827}
+    tfoot td{padding:10px 12px;font-weight:700;font-size:13px}
+    @page{size:A4;margin:0}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>${companyBlock}</div>
+    <div style="text-align:right">
+      <p class="title">SUPPLIER ORDER</p>
+      ${poNumber ? `<p class="meta">PO: <strong>${poNumber}</strong></p>` : ''}
+      <p class="meta">Date: ${date}</p>
+    </div>
+  </div>
+  <div class="supplier-box">
+    <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Supplier</p>
+    <p style="font-weight:700;font-size:14px;">${supplierName}</p>
+    ${supplier?.email ? `<p style="font-size:12px;color:#6b7280;">${supplier.email}</p>` : ''}
+    ${supplier?.phone ? `<p style="font-size:12px;color:#6b7280;">${supplier.phone}</p>` : ''}
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:40px">#</th>
+      <th>SKU</th>
+      <th>Description</th>
+      <th class="center" style="width:80px">Qty</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr>
+      <td colspan="3" style="text-align:right;padding-right:12px;color:#6b7280">Total</td>
+      <td style="text-align:center">${totalQty}</td>
+    </tr></tfoot>
+  </table>
+</body></html>`
+
+    const win = window.open('', '_blank')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+      win.focus()
+      setTimeout(() => win.print(), 350)
+    }
+  }
+
+  const hasItems = items.some((it) => it.sku || it.description)
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="text-base font-semibold text-gray-900">Create Supplier Order</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          {/* Order details */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-1">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Supplier *</label>
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                value={selectedSupplier}
+                onChange={(e) => setSelectedSupplier(e.target.value)}
+              >
+                <option value="">— Select supplier —</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">PO / Reference</label>
+              <input
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={poNumber}
+                onChange={(e) => setPoNumber(e.target.value)}
+                placeholder="PO-001"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Order Date</label>
+              <input
+                type="date"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={orderDate}
+                onChange={(e) => setOrderDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Line items */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Order Items</p>
+              <span className="text-xs text-gray-400">{items.length} line{items.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="space-y-2">
+              {/* Column headers */}
+              <div className="grid grid-cols-[1fr_2fr_60px_32px] gap-2 px-1">
+                <p className="text-xs text-gray-400">SKU</p>
+                <p className="text-xs text-gray-400">Description</p>
+                <p className="text-xs text-gray-400 text-center">Qty</p>
+                <span />
+              </div>
+              {items.map((item, idx) => (
+                <div key={idx} className="grid grid-cols-[1fr_2fr_60px_32px] gap-2 items-center">
+                  <input
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={item.sku}
+                    onChange={(e) => updateItem(idx, 'sku', e.target.value)}
+                    placeholder="SKU"
+                  />
+                  <input
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={item.description}
+                    onChange={(e) => updateItem(idx, 'description', e.target.value)}
+                    placeholder="Item description"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={item.qty}
+                    onChange={(e) => updateItem(idx, 'qty', Math.max(1, Number(e.target.value)))}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(idx)}
+                    disabled={items.length === 1}
+                    className="text-gray-300 hover:text-red-500 disabled:opacity-20 transition-colors flex items-center justify-center"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addItem}
+                className="w-full border-2 border-dashed border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 rounded-lg py-2 text-sm transition-colors"
+              >
+                + Add Item
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={generatePDF}
+            disabled={!selectedSupplier || !hasItems}
+            className="flex-1 flex items-center justify-center gap-2 bg-gray-900 text-white py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Generate PDF
+          </button>
+        </div>
       </div>
     </div>
   )
