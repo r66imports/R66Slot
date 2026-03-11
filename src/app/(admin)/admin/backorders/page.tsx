@@ -984,36 +984,34 @@ function BackorderModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
 
           {/* ── Client Search ─────────────────────────────────────── */}
-          {!isEditing && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
-              <SectionHeader
-                icon="🔍"
-                title="Search Client"
-                subtitle="Select existing client to autofill details, or add a new one"
-              />
-              <ClientSearchDropdown
-                clients={clients}
-                onSelect={handleClientSelect}
-                onAddNew={handleAddNew}
-              />
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+            <SectionHeader
+              icon="🔍"
+              title="Search Client"
+              subtitle={isEditing ? "Search to replace client, or edit the fields below directly" : "Select existing client to autofill details, or add a new one"}
+            />
+            <ClientSearchDropdown
+              clients={clients}
+              onSelect={handleClientSelect}
+              onAddNew={handleAddNew}
+            />
 
-              {/* Status pill after selection */}
-              {clientIsSelected && !isNewClient && (
-                <div className="mt-2 flex items-center gap-2 text-xs text-blue-700 bg-blue-100 rounded-lg px-3 py-1.5 w-fit">
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>Client autofilled: <strong>{selectedClientName}</strong></span>
-                </div>
-              )}
-              {isNewClient && (
-                <div className="mt-2 flex items-center gap-2 text-xs text-green-700 bg-green-100 rounded-lg px-3 py-1.5 w-fit">
-                  <span>✚</span>
-                  <span>New client — fill in details below to save to database</span>
-                </div>
-              )}
-            </div>
-          )}
+            {/* Status pill after selection */}
+            {clientIsSelected && !isNewClient && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-blue-700 bg-blue-100 rounded-lg px-3 py-1.5 w-fit">
+                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>Client autofilled: <strong>{selectedClientName}</strong></span>
+              </div>
+            )}
+            {isNewClient && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-green-700 bg-green-100 rounded-lg px-3 py-1.5 w-fit">
+                <span>✚</span>
+                <span>New client — fill in details below to save to database</span>
+              </div>
+            )}
+          </div>
 
           {/* ── Client Details ────────────────────────────────────── */}
           <div>
