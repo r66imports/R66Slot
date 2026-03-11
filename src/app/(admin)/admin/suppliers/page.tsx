@@ -288,6 +288,15 @@ export default function SuppliersNetworkPage() {
         </tr>`
       )
       .join('')
+    const companyBlock = companyInfo.name
+      ? `<p style="font-size:13px;font-weight:700;">${companyInfo.name}</p>
+         ${companyInfo.address ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.address}</p>` : ''}
+         ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#6b7280;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
+         ${companyInfo.phone ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.phone}</p>` : ''}
+         ${companyInfo.email ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.email}</p>` : ''}
+         ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;">VAT: ${companyInfo.vatNumber}</p>` : ''}`
+      : ''
+
     const html = `<!DOCTYPE html>
 <html><head>
   <meta charset="utf-8">
@@ -295,8 +304,11 @@ export default function SuppliersNetworkPage() {
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
-    h1{font-size:22px;font-weight:800;margin-bottom:4px}
-    .meta{font-size:13px;color:#6b7280;margin-bottom:28px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
+    .title{font-size:24px;font-weight:800;margin-bottom:2px}
+    .meta{font-size:13px;color:#6b7280;margin-top:4px}
+    .supplier-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin-bottom:28px}
+    .supplier-box p{font-size:13px;margin-bottom:2px}
     table{width:100%;border-collapse:collapse}
     thead tr{border-bottom:2px solid #111827}
     th{padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280}
@@ -309,8 +321,17 @@ export default function SuppliersNetworkPage() {
   </style>
 </head>
 <body>
-  <h1>ORDER SHEET</h1>
-  <p class="meta">Supplier: <strong>${supplierName}</strong>&nbsp;&nbsp;·&nbsp;&nbsp;Date: ${date}&nbsp;&nbsp;·&nbsp;&nbsp;${consolidated.length} line${consolidated.length !== 1 ? 's' : ''}</p>
+  <div class="header">
+    <div>${companyBlock}</div>
+    <div style="text-align:right">
+      <p class="title">ORDER SHEET</p>
+      <p class="meta">Date: ${date}</p>
+    </div>
+  </div>
+  <div class="supplier-box">
+    <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Supplier</p>
+    <p style="font-weight:700;font-size:14px;">${supplierName}</p>
+  </div>
   <table>
     <thead><tr>
       <th style="width:40px">#</th>
