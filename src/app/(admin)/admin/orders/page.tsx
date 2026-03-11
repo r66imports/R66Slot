@@ -5,6 +5,16 @@ import type { Backorder } from '@/app/api/admin/backorders/route'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface ClientContact {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  companyName: string
+  companyAddress: string
+}
+
 type DocType = 'quote' | 'salesorder' | 'invoice'
 type Tab = 'quotes' | 'salesorders' | 'invoices'
 
@@ -626,16 +636,97 @@ function TemplateModal({
   )
 }
 
+// ─── Client Autofill Dropdown ─────────────────────────────────────────────────
+
+function ClientAutofill({
+  clients,
+  onSelect,
+}: {
+  clients: ClientContact[]
+  onSelect: (c: ClientContact) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  const filtered = query.trim()
+    ? clients.filter((c) => {
+        const q = query.toLowerCase()
+        return (
+          `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) ||
+          c.email.toLowerCase().includes(q) ||
+          c.phone.includes(q) ||
+          c.companyName.toLowerCase().includes(q)
+        )
+      })
+    : clients
+
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const handleSelect = (c: ClientContact) => {
+    setQuery(`${c.firstName} ${c.lastName}`)
+    setOpen(false)
+    onSelect(c)
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm">🔍</span>
+        <input
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          placeholder="Search saved clients to autofill…"
+          className="w-full border-2 border-blue-200 focus:border-blue-400 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none bg-blue-50 focus:bg-white transition-colors"
+          autoComplete="off"
+        />
+      </div>
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto">
+          {filtered.map((c) => (
+            <li
+              key={c.id}
+              onMouseDown={() => handleSelect(c)}
+              className="flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-blue-50 transition-colors"
+            >
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
+                {c.firstName.charAt(0)}{c.lastName.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm">{c.firstName} {c.lastName}</p>
+                <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                  {c.email && <span className="text-xs text-gray-500">{c.email}</span>}
+                  {c.phone && <span className="text-xs text-gray-500">{c.phone}</span>}
+                  {c.companyName && <span className="text-xs text-emerald-600 font-medium">{c.companyName}</span>}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ─── Create Document Modal ─────────────────────────────────────────────────────
 
 function CreateDocumentModal({
   docType,
   template,
+  clients,
   onCreated,
   onClose,
 }: {
   docType: DocType
   template: OrderTemplate
+  clients: ClientContact[]
   onCreated: (doc: OrderDocument) => void
   onClose: () => void
 }) {
@@ -704,6 +795,19 @@ function CreateDocumentModal({
 
           <section>
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Client Details</h3>
+            {clients.length > 0 && (
+              <div className="mb-3">
+                <ClientAutofill
+                  clients={clients}
+                  onSelect={(c) => {
+                    setField('clientName', `${c.firstName} ${c.lastName}`.trim())
+                    setField('clientEmail', c.email)
+                    setField('clientPhone', c.phone)
+                    setField('clientAddress', c.companyAddress || '')
+                  }}
+                />
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div><label className="text-xs text-gray-500 mb-1 block">Name *</label><input className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.clientName} onChange={(e) => setField('clientName', e.target.value)} /></div>
               <div><label className="text-xs text-gray-500 mb-1 block">Email</label><input className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.clientEmail} onChange={(e) => setField('clientEmail', e.target.value)} /></div>
@@ -1165,6 +1269,7 @@ export default function OrdersPage() {
   const [backorders, setBackorders] = useState<Backorder[]>([])
   const [documents, setDocuments] = useState<OrderDocument[]>([])
   const [template, setTemplate] = useState<OrderTemplate>(DEFAULT_TEMPLATE)
+  const [clients, setClients] = useState<ClientContact[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('quotes')
   const [showTemplate, setShowTemplate] = useState(false)
@@ -1175,10 +1280,12 @@ export default function OrdersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, docRes, tmplRes] = await Promise.all([
+      const [boRes, docRes, tmplRes, clRes, contactRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/orders/documents'),
         fetch('/api/admin/orders/template'),
+        fetch('/api/admin/clients'),
+        fetch('/api/admin/contacts'),
       ])
       if (boRes.ok) setBackorders(await boRes.json())
       if (docRes.ok) setDocuments(await docRes.json())
@@ -1186,6 +1293,18 @@ export default function OrdersPage() {
         const t = await tmplRes.json()
         setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: t.imageBlock?.length === 6 ? t.imageBlock : ['', '', '', '', '', ''] })
       }
+      // Merge clients + contacts for autofill
+      const clList: ClientContact[] = clRes.ok ? await clRes.json() : []
+      const ctList: any[] = contactRes.ok ? await contactRes.json() : []
+      const emailSet = new Set(clList.map((c) => c.email?.toLowerCase()).filter(Boolean))
+      for (const ct of ctList) {
+        if (!ct.firstName && !ct.lastName) continue
+        if (ct.email && emailSet.has(ct.email.toLowerCase())) continue
+        clList.push({ id: ct.id, firstName: ct.firstName || '', lastName: ct.lastName || '', email: ct.email || '', phone: ct.phone || '', companyName: ct.companyName || '', companyAddress: ct.companyAddress || '' })
+        if (ct.email) emailSet.add(ct.email.toLowerCase())
+      }
+      clList.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
+      setClients(clList)
     } finally {
       setLoading(false)
     }
@@ -1417,6 +1536,7 @@ export default function OrdersPage() {
         <CreateDocumentModal
           docType={cfg.docType}
           template={template}
+          clients={clients}
           onCreated={(doc) => setDocuments((prev) => [doc, ...prev])}
           onClose={() => setShowCreate(false)}
         />

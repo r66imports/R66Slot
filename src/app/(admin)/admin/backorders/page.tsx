@@ -1296,16 +1296,45 @@ export default function BackordersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, clRes, supRes, brandRes] = await Promise.all([
+      const [boRes, clRes, supRes, brandRes, contactRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/clients'),
         fetch('/api/admin/supplier-contacts'),
         fetch('/api/admin/brands'),
+        fetch('/api/admin/contacts'),
       ])
       if (boRes.ok) setBackorders(await boRes.json())
-      if (clRes.ok) setClients(await clRes.json())
       if (supRes.ok) setSuppliers(await supRes.json())
       if (brandRes.ok) setBrands(await brandRes.json())
+
+      // Merge clients + contacts into a single autofill list (deduplicated by email)
+      const clientsList: Client[] = clRes.ok ? await clRes.json() : []
+      const contactsList: any[]   = contactRes.ok ? await contactRes.json() : []
+      const emailSet = new Set(clientsList.map((c) => c.email?.toLowerCase()).filter(Boolean))
+      for (const ct of contactsList) {
+        if (!ct.firstName && !ct.lastName) continue
+        if (ct.email && emailSet.has(ct.email.toLowerCase())) continue
+        clientsList.push({
+          id: ct.id,
+          firstName: ct.firstName || '',
+          lastName:  ct.lastName  || '',
+          email:     ct.email     || '',
+          phone:     ct.phone     || '',
+          clubName:       ct.clubName       || '',
+          clubMemberId:   ct.clubMemberId   || '',
+          companyName:    ct.companyName    || '',
+          companyVAT:     ct.companyVAT     || '',
+          companyAddress: ct.companyAddress || '',
+          notes:     ct.notes     || '',
+          createdAt: ct.createdAt || '',
+          updatedAt: ct.updatedAt || '',
+        })
+        if (ct.email) emailSet.add(ct.email.toLowerCase())
+      }
+      clientsList.sort((a, b) =>
+        `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
+      )
+      setClients(clientsList)
     } finally {
       setLoading(false)
     }
@@ -1343,26 +1372,27 @@ export default function BackordersPage() {
 
   // ── Create ──────────────────────────────────────────────────────────────────
   const handleCreate = async (data: FormData & { id?: string }) => {
-    // If it's a new client (no clientId), save to clients DB first
+    // If it's a new client (no clientId), save to clients DB + contacts
     if (!data.clientId && data.clientName.trim()) {
       const nameParts = data.clientName.trim().split(' ')
       const firstName = nameParts[0] || ''
       const lastName = nameParts.slice(1).join(' ') || ''
+      const clientPayload = {
+        firstName,
+        lastName,
+        email: data.clientEmail,
+        phone: data.clientPhone,
+        clubName: data.clubName,
+        clubMemberId: data.clubMemberId,
+        companyName: data.companyName,
+        companyVAT: data.companyVAT,
+        companyAddress: data.companyAddress,
+      }
       try {
         const clientRes = await fetch('/api/admin/clients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            email: data.clientEmail,
-            phone: data.clientPhone,
-            clubName: data.clubName,
-            clubMemberId: data.clubMemberId,
-            companyName: data.companyName,
-            companyVAT: data.companyVAT,
-            companyAddress: data.companyAddress,
-          }),
+          body: JSON.stringify(clientPayload),
         })
         if (clientRes.ok) {
           const newClient = await clientRes.json()
@@ -1378,6 +1408,13 @@ export default function BackordersPage() {
       } catch {
         // Non-fatal — backorder can still be saved without a clientId
       }
+
+      // Also sync to /admin/contacts so the client appears in the Contacts page
+      fetch('/api/admin/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...clientPayload, source: 'manual', addressCountry: 'South Africa' }),
+      }).catch(() => {}) // Non-fatal — ignore duplicate (409) silently
     }
 
     const res = await fetch('/api/admin/backorders', {
