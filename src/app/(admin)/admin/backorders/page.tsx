@@ -69,6 +69,15 @@ interface Backorder {
   updatedAt: string
 }
 
+interface ProductRef {
+  id: string
+  sku: string
+  title: string
+  brand: string
+  price: number
+  supplier: string
+}
+
 const EMPTY_CLIENT_FIELDS = {
   clientId: '',
   clientName: '',
@@ -434,6 +443,84 @@ function BrandDropdown({
   )
 }
 
+// ─── SKU Search Dropdown ──────────────────────────────────────────────────────
+
+function SkuSearchDropdown({
+  value,
+  products,
+  onChange,
+  onSelect,
+}: {
+  value: string
+  products: ProductRef[]
+  onChange: (sku: string) => void
+  onSelect: (p: ProductRef) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  const q = value.trim().toLowerCase()
+  const filtered = q.length > 0
+    ? products.filter((p) =>
+        p.sku.toLowerCase().includes(q) ||
+        p.title.toLowerCase().includes(q) ||
+        p.brand.toLowerCase().includes(q)
+      ).slice(0, 12)
+    : []
+
+  useEffect(() => {
+    function h(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  const handleSelect = (p: ProductRef) => {
+    setOpen(false)
+    onSelect(p)
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <input
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => value.trim().length > 0 && setOpen(true)}
+        placeholder="NSR-0170-AW"
+        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-56 overflow-y-auto">
+          {filtered.map((p) => (
+            <li
+              key={p.id}
+              onMouseDown={() => handleSelect(p)}
+              className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-blue-50 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                    {p.sku}
+                  </span>
+                  {p.brand && (
+                    <span className="text-xs text-gray-400">{p.brand}</span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600 mt-0.5 truncate">{p.title}</p>
+              </div>
+              {p.price > 0 && (
+                <span className="text-xs font-semibold text-gray-500 flex-shrink-0">R{p.price.toFixed(2)}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ─── Line Item Row ────────────────────────────────────────────────────────────
 
 function LineItemRow({
@@ -442,6 +529,7 @@ function LineItemRow({
   showRemove,
   brands,
   suppliers,
+  products,
   onChange,
   onRemove,
   onBrandCreated,
@@ -452,6 +540,7 @@ function LineItemRow({
   showRemove: boolean
   brands: string[]
   suppliers: Supplier[]
+  products: ProductRef[]
   onChange: (updates: Partial<LineItem>) => void
   onRemove: () => void
   onBrandCreated: (name: string) => void
@@ -529,11 +618,17 @@ function LineItemRow({
           <label className="block text-xs font-semibold text-gray-600 mb-1">
             SKU <span className="text-red-500">*</span>
           </label>
-          <input
+          <SkuSearchDropdown
             value={item.sku}
-            onChange={(e) => onChange({ sku: e.target.value })}
-            placeholder="NSR-0170-AW"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            products={products}
+            onChange={(sku) => onChange({ sku })}
+            onSelect={(p) => onChange({
+              sku: p.sku,
+              description: p.title,
+              brand: p.brand,
+              price: p.price || item.price,
+              supplierLink: item.supplierLink,
+            })}
           />
         </div>
 
@@ -699,6 +794,7 @@ function BackorderModal({
   clients,
   suppliers,
   brands,
+  products,
   onSave,
   onClose,
   onSupplierCreated,
@@ -708,6 +804,7 @@ function BackorderModal({
   clients: Client[]
   suppliers: Supplier[]
   brands: string[]
+  products: ProductRef[]
   onSave: (data: FormData & { id?: string }) => Promise<void>
   onClose: () => void
   onSupplierCreated: (s: Supplier) => void
@@ -1034,11 +1131,17 @@ function BackorderModal({
                   <label className="block text-xs font-semibold text-gray-600 mb-1">
                     SKU <span className="text-red-500">*</span>
                   </label>
-                  <input
+                  <SkuSearchDropdown
                     value={form.sku}
-                    onChange={(e) => str('sku', e.target.value)}
-                    placeholder="NSR-0170-AW"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    products={products}
+                    onChange={(sku) => str('sku', sku)}
+                    onSelect={(p) => setForm((f) => ({
+                      ...f,
+                      sku: p.sku,
+                      description: p.title,
+                      brand: p.brand,
+                      price: p.price || f.price,
+                    }))}
                   />
                 </div>
                 <div>
@@ -1116,6 +1219,7 @@ function BackorderModal({
                     showRemove={lineItems.length > 1}
                     brands={brands}
                     suppliers={suppliers}
+                    products={products}
                     onChange={(updates) =>
                       setLineItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...updates } : it))
                     }
@@ -1292,20 +1396,33 @@ export default function BackordersPage() {
   const [supplierPopup, setSupplierPopup] = useState<Supplier | null>(null)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [brands, setBrands] = useState<string[]>([])
+  const [products, setProducts] = useState<ProductRef[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, clRes, supRes, brandRes, contactRes] = await Promise.all([
+      const [boRes, clRes, supRes, brandRes, contactRes, prodRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/clients'),
         fetch('/api/admin/supplier-contacts'),
         fetch('/api/admin/brands'),
         fetch('/api/admin/contacts'),
+        fetch('/api/admin/products'),
       ])
       if (boRes.ok) setBackorders(await boRes.json())
       if (supRes.ok) setSuppliers(await supRes.json())
       if (brandRes.ok) setBrands(await brandRes.json())
+      if (prodRes.ok) {
+        const rawProducts: any[] = await prodRes.json()
+        setProducts(rawProducts.map((p) => ({
+          id: p.id,
+          sku: p.sku || '',
+          title: p.title || '',
+          brand: p.brand || '',
+          price: p.price || 0,
+          supplier: p.supplier || '',
+        })).filter((p) => p.sku))
+      }
 
       // Merge clients + contacts into a single autofill list (deduplicated by email)
       const clientsList: Client[] = clRes.ok ? await clRes.json() : []
@@ -1425,6 +1542,38 @@ export default function BackordersPage() {
     if (!res.ok) throw new Error('Failed to create backorder')
     const created = await res.json()
     setBackorders((prev) => [created, ...prev])
+
+    // Auto-save to products if this SKU doesn't exist yet
+    if (data.sku?.trim()) {
+      const skuLower = data.sku.trim().toLowerCase()
+      const exists = products.some((p) => p.sku.toLowerCase() === skuLower)
+      if (!exists) {
+        fetch('/api/admin/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: data.description || data.sku,
+            sku: data.sku.trim(),
+            brand: data.brand || '',
+            price: data.price || 0,
+            supplier: data.supplierName || '',
+            status: 'draft',
+          }),
+        }).then(async (r) => {
+          if (r.ok) {
+            const newProd = await r.json()
+            setProducts((prev) => [...prev, {
+              id: newProd.id,
+              sku: newProd.sku,
+              title: newProd.title,
+              brand: newProd.brand,
+              price: newProd.price,
+              supplier: newProd.supplier,
+            }].sort((a, b) => a.sku.localeCompare(b.sku)))
+          }
+        }).catch(() => {}) // Non-fatal
+      }
+    }
   }
 
   // ── Edit Save ───────────────────────────────────────────────────────────────
@@ -2083,6 +2232,7 @@ export default function BackordersPage() {
           clients={clients}
           suppliers={suppliers}
           brands={brands}
+          products={products}
           onSave={editItem ? handleEdit : handleCreate}
           onClose={() => { setShowModal(false); setEditItem(null) }}
           onSupplierCreated={(s) => setSuppliers((prev) => [...prev, s])}
