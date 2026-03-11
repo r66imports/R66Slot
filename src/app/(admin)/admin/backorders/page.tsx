@@ -1397,6 +1397,8 @@ export default function BackordersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [brands, setBrands] = useState<string[]>([])
   const [products, setProducts] = useState<ProductRef[]>([])
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1594,6 +1596,38 @@ export default function BackordersPage() {
     const res = await fetch(`/api/admin/backorders/${id}`, { method: 'DELETE' })
     if (res.ok) setBackorders((prev) => prev.filter((b) => b.id !== id))
     setDeleteConfirm(null)
+  }
+
+  // ── Sync Backorders → Products ───────────────────────────────────────────────
+  const handleSyncProducts = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/admin/backorders/sync-products', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setSyncResult(data.message || `Created ${data.created} products.`)
+        // Refresh the products list so new SKUs show in the dropdown
+        const prodRes = await fetch('/api/admin/products')
+        if (prodRes.ok) {
+          const rawProducts: any[] = await prodRes.json()
+          setProducts(rawProducts.map((p) => ({
+            id: p.id,
+            sku: p.sku || '',
+            title: p.title || '',
+            brand: p.brand || '',
+            price: p.price || 0,
+            supplier: p.supplier || '',
+          })).filter((p) => p.sku))
+        }
+      } else {
+        setSyncResult(`Error: ${data.error || 'Sync failed'}`)
+      }
+    } catch {
+      setSyncResult('Error: Could not reach sync endpoint')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   // ── Duplicate ────────────────────────────────────────────────────────────────
@@ -1812,14 +1846,51 @@ export default function BackordersPage() {
             Track client backorders — Quote → Sales Order → Invoice → Deposit
           </p>
         </div>
-        <button
-          onClick={() => { setEditItem(null); setShowModal(true) }}
-          className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
-        >
-          <span className="text-base font-bold">+</span>
-          Add Backorder
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncProducts}
+            disabled={syncing}
+            title="Sync all backorder SKUs to Products (creates draft products for any missing SKUs)"
+            className="flex items-center gap-2 border border-gray-300 bg-white text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            {syncing ? (
+              <>
+                <svg className="w-4 h-4 animate-spin text-gray-500" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/>
+                </svg>
+                Syncing…
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Sync to Products
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => { setEditItem(null); setShowModal(true) }}
+            className="flex items-center gap-2 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+          >
+            <span className="text-base font-bold">+</span>
+            Add Backorder
+          </button>
+        </div>
       </div>
+
+      {/* Sync result banner */}
+      {syncResult && (
+        <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-sm font-medium ${
+          syncResult.startsWith('Error')
+            ? 'bg-red-50 border-red-200 text-red-700'
+            : 'bg-green-50 border-green-200 text-green-700'
+        }`}>
+          <span>{syncResult.startsWith('Error') ? '⚠️' : '✅'} {syncResult}</span>
+          <button onClick={() => setSyncResult(null)} className="text-current opacity-60 hover:opacity-100 text-lg leading-none">×</button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
