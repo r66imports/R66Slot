@@ -123,6 +123,10 @@ function WorksheetEditor({ companyInfo, customers }: { companyInfo: CompanyInfo;
     setExchangeRate(CURRENCY_DEFAULTS[c] ?? 1)
   }
 
+  function calcLanded(wholesalePrice: number): number {
+    return wholesalePrice * exchangeRate * (1 + shippingPct / 100)
+  }
+
   function calcRetail(wholesalePrice: number): number {
     return wholesalePrice * exchangeRate * (1 + shippingPct / 100) * (1 + markupPct / 100) * (1 + vatPct / 100)
   }
@@ -151,12 +155,14 @@ function WorksheetEditor({ companyInfo, customers }: { companyInfo: CompanyInfo;
     const rows = items
       .filter((it) => it.sku || it.description)
       .map((it, i) => {
+        const landed = calcLanded(it.wholesalePrice)
         const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
         return `<tr>
           <td style="padding:7px 10px;color:#6b7280;font-size:12px;">${i + 1}</td>
           <td style="padding:7px 10px;font-family:monospace;font-size:12px;font-weight:600;">${it.sku || '—'}</td>
           <td style="padding:7px 10px;font-size:12px;">${it.description || '—'}</td>
           <td style="padding:7px 10px;text-align:right;font-size:12px;">${currency} ${fmtFC(it.wholesalePrice)}</td>
+          <td style="padding:7px 10px;text-align:right;font-size:12px;">R ${fmtFC(landed)}</td>
           <td style="padding:7px 10px;text-align:right;font-weight:700;font-size:12px;">R ${fmtFC(retail)}</td>
         </tr>`
       }).join('')
@@ -209,6 +215,7 @@ function WorksheetEditor({ companyInfo, customers }: { companyInfo: CompanyInfo;
       <th>SKU</th>
       <th>Description</th>
       <th class="right">Wholesale (${currency})</th>
+      <th class="right">Landed Cost (ZAR)</th>
       <th class="right">Est Retail (ZAR incl. VAT)</th>
     </tr></thead>
     <tbody>${rows}</tbody>
@@ -226,12 +233,13 @@ function WorksheetEditor({ companyInfo, customers }: { companyInfo: CompanyInfo;
 
   // ── CSV export ──
   function downloadCSV() {
-    const headers = ['#', 'SKU', 'Description', `Wholesale Price (${currency})`, 'Est Retail Price (ZAR incl. VAT)']
+    const headers = ['#', 'SKU', 'Description', `Wholesale Price (${currency})`, 'Landed Cost (ZAR)', 'Est Retail Price (ZAR incl. VAT)']
     const rows = items
       .filter((it) => it.sku || it.description)
       .map((it, i) => {
+        const landed = calcLanded(it.wholesalePrice)
         const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
-        return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, it.wholesalePrice.toFixed(2), retail.toFixed(2)]
+        return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, it.wholesalePrice.toFixed(2), landed.toFixed(2), retail.toFixed(2)]
       })
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -376,12 +384,14 @@ function WorksheetEditor({ companyInfo, customers }: { companyInfo: CompanyInfo;
                 <th className="text-left pb-2 px-2">SKU</th>
                 <th className="text-left pb-2 px-2">Description</th>
                 <th className="text-right pb-2 px-2">Wholesale ({currency})</th>
+                <th className="text-right pb-2 px-2">Landed Cost (ZAR)</th>
                 <th className="text-right pb-2 px-2">Est Retail (ZAR)</th>
                 <th className="w-8" />
               </tr>
             </thead>
             <tbody>
               {items.map((it, i) => {
+                const landedCost = calcLanded(it.wholesalePrice)
                 const autoRetail = calcRetail(it.wholesalePrice)
                 return (
                   <tr key={it.id} className="border-b border-gray-50 group">
@@ -412,6 +422,15 @@ function WorksheetEditor({ companyInfo, customers }: { companyInfo: CompanyInfo;
                           placeholder="0.00"
                           className="w-28 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
                         />
+                      </div>
+                    </td>
+                    {/* Landed Cost — read-only, auto-calculated */}
+                    <td className="py-2 px-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-gray-400">R</span>
+                        <span className={`w-28 px-2.5 py-1.5 text-xs text-right rounded-lg ${it.wholesalePrice > 0 ? 'text-gray-700 bg-gray-50 border border-gray-100' : 'text-gray-300'}`}>
+                          {it.wholesalePrice > 0 ? fmtFC(landedCost) : '—'}
+                        </span>
                       </div>
                     </td>
                     <td className="py-2 px-2">
