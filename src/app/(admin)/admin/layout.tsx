@@ -90,6 +90,7 @@ export default function AdminLayout({
           { name: 'Pre-Orders', href: '/admin/preorder-list', icon: '📋' },
           { name: 'Back Orders', href: '/admin/backorders', icon: '🔄' },
           { name: 'Suppliers Orders', href: '/admin/suppliers', icon: '📥' },
+          { name: 'Work Sheet', href: '/admin/worksheet', icon: '🧮' },
         ],
       },
     ],
