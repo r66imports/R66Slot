@@ -38,6 +38,8 @@ function rowToProduct(row: any): Product {
     sidewaysBrands: Array.isArray(row.sideways_brands) ? row.sideways_brands : [],
     sidewaysParts: Array.isArray(row.sideways_parts) ? row.sideways_parts : [],
     sidewaysCarTypes: Array.isArray(row.sideways_car_type) ? row.sideways_car_type : [],
+    sidewaysCarClasses: Array.isArray(row.sideways_car_classes) ? row.sideways_car_classes : [],
+    customOrgs: (typeof row.custom_orgs === 'object' && row.custom_orgs !== null) ? row.custom_orgs : {},
     revoParts: Array.isArray(row.revo_parts) ? row.revo_parts : [],
     isPreOrder: row.is_pre_order || false,
     seo: row.seo || { metaTitle: '', metaDescription: '', metaKeywords: '' },
@@ -126,6 +128,8 @@ export async function PUT(
         sideways_brands = COALESCE($41, sideways_brands),
         sideways_parts = COALESCE($42, sideways_parts),
         sideways_car_type = COALESCE($43, sideways_car_type),
+        sideways_car_classes = COALESCE($44, sideways_car_classes),
+        custom_orgs = COALESCE($45, custom_orgs),
         updated_at = $36
       WHERE id = $1
       RETURNING *
@@ -173,6 +177,8 @@ export async function PUT(
       Array.isArray(body.sidewaysBrands) ? JSON.stringify(body.sidewaysBrands) : null,
       Array.isArray(body.sidewaysParts) ? JSON.stringify(body.sidewaysParts) : null,
       Array.isArray(body.sidewaysCarTypes) ? JSON.stringify(body.sidewaysCarTypes) : null,
+      Array.isArray(body.sidewaysCarClasses) ? JSON.stringify(body.sidewaysCarClasses) : null,
+      (typeof body.customOrgs === 'object' && body.customOrgs !== null) ? JSON.stringify(body.customOrgs) : null,
     ])
 
     if (result.rowCount === 0) {

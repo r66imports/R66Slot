@@ -72,6 +72,38 @@ function ProductGridLive({
               activeBrands.some((b) => p.tags?.includes(b))
           )
         }
+        // Sideways brand filter
+        const activeSidewaysBrands = Array.isArray(settings.sidewaysBrands) ? (settings.sidewaysBrands as string[]) : []
+        if (activeSidewaysBrands.length > 0) {
+          list = list.filter((p: any) => Array.isArray(p.sidewaysBrands) && p.sidewaysBrands.some((b: string) => activeSidewaysBrands.includes(b)))
+        }
+        // Sideways race class filter
+        const activeSidewaysClasses = Array.isArray(settings.sidewaysCarClasses) ? (settings.sidewaysCarClasses as string[]) : []
+        if (activeSidewaysClasses.length > 0) {
+          list = list.filter((p: any) => Array.isArray(p.sidewaysCarClasses) && p.sidewaysCarClasses.some((c: string) => activeSidewaysClasses.includes(c)))
+        }
+        // Sideways parts filter
+        const activeSidewaysParts = Array.isArray(settings.sidewaysParts) ? (settings.sidewaysParts as string[]) : []
+        if (activeSidewaysParts.length > 0) {
+          list = list.filter((p: any) => Array.isArray(p.sidewaysParts) && p.sidewaysParts.some((pt: string) => activeSidewaysParts.includes(pt)))
+        }
+        // Custom org card filters (keys: customOrg_{id}_brands, customOrg_{id}_carClasses)
+        Object.entries(settings).forEach(([key, val]) => {
+          if (!key.startsWith('customOrg_') || !Array.isArray(val) || (val as string[]).length === 0) return
+          const parts = key.split('_')
+          if (parts.length < 3) return
+          const field = parts[parts.length - 1] // 'brands' or 'carClasses'
+          const cardId = parts.slice(1, parts.length - 1).join('_')
+          const activeVals = val as string[]
+          list = list.filter((p: any) => {
+            const customOrgs = p.customOrgs || {}
+            const cardData = customOrgs[cardId]
+            if (!cardData) return false
+            if (field === 'brands') return Array.isArray(cardData.brands) && cardData.brands.some((b: string) => activeVals.includes(b))
+            if (field === 'carClasses') return Array.isArray(cardData.carClasses) && cardData.carClasses.some((c: string) => activeVals.includes(c))
+            return false
+          })
+        })
         // Sort by SKU — numeric where possible, else alphabetical
         list.sort((a: any, b: any) => {
           const aNum = parseFloat(a.sku)
@@ -86,7 +118,7 @@ function ProductGridLive({
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.productCount, settings.productRows, settings.gridColumns])
+  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.sidewaysBrands, settings.sidewaysCarClasses, settings.sidewaysParts, settings.productCount, settings.productRows, settings.gridColumns, settings])
 
   const handleAddToCart = (p: any) => {
     addItem({

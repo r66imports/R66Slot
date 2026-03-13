@@ -10,12 +10,14 @@ const DEFAULTS = {
   carClasses: ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'],
   revoParts: ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set'],
   carTypes: ['Livery', 'White Kit', 'White Body Kit', 'White Body'],
+  sidewaysParts: [] as string[],
+  customOrgCards: [] as { id: string; name: string }[],
+  customOrgBrands: {} as Record<string, string[]>,
 }
 
 export async function GET() {
   try {
     const saved = await blobRead<typeof DEFAULTS>(OPTIONS_KEY, DEFAULTS)
-    // Merge saved values with defaults so new hardcoded defaults always appear
     return NextResponse.json({
       brands: Array.from(new Set([...DEFAULTS.brands, ...(saved.brands || [])])),
       categories: Array.from(new Set([...(saved.categories || [])])),
@@ -23,9 +25,12 @@ export async function GET() {
       carClasses: Array.from(new Set([...DEFAULTS.carClasses, ...(saved.carClasses || [])])),
       revoParts: Array.from(new Set([...DEFAULTS.revoParts, ...(saved.revoParts || [])])),
       carTypes: Array.from(new Set([...DEFAULTS.carTypes, ...((saved as any).carTypes || [])])),
+      sidewaysParts: Array.from(new Set([...DEFAULTS.sidewaysParts, ...((saved as any).sidewaysParts || [])])),
+      customOrgCards: (saved as any).customOrgCards || [],
+      customOrgBrands: (saved as any).customOrgBrands || {},
     })
   } catch {
-    return NextResponse.json(DEFAULTS)
+    return NextResponse.json({ ...DEFAULTS, customOrgCards: [], customOrgBrands: {} })
   }
 }
 

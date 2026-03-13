@@ -2909,14 +2909,42 @@ function SettingsTab({
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
   const [carClassDropdownOpen, setCarClassDropdownOpen] = useState(false)
   const [revoPartDropdownOpen, setRevoPartDropdownOpen] = useState(false)
+  const [sidewaysBrandDropdownOpen, setSidewaysBrandDropdownOpen] = useState(false)
+  const [sidewaysClassDropdownOpen, setSidewaysClassDropdownOpen] = useState(false)
+  const [sidewaysPartDropdownOpen, setSidewaysPartDropdownOpen] = useState(false)
+  const [customOrgDropdowns, setCustomOrgDropdowns] = useState<Record<string, boolean>>({})
+  const [revoOrgCollapsed, setRevoOrgCollapsed] = useState(false)
+  const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(true)
+  const [customOrgCollapsed, setCustomOrgCollapsed] = useState<Record<string, boolean>>({})
 
-  const CAR_BRANDS = [
-    'Ford Escort MK I',
-    'Datsun 510',
-  ]
+  const [productOpts, setProductOpts] = useState<{
+    carBrandOptions: string[]
+    carClassOptions: string[]
+    revoPartOptions: string[]
+    sidewaysPartOptions: string[]
+    customOrgCards: { id: string; name: string }[]
+    customOrgBrands: Record<string, string[]>
+  }>({
+    carBrandOptions: ['Ford Escort MK I', 'Ford Escort MK II', 'Datsun 510', 'BMW M3 E30', 'Porsche 911', 'Ferrari 308', 'Lancia Delta', 'Audi Quattro'],
+    carClassOptions: ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'],
+    revoPartOptions: ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set'],
+    sidewaysPartOptions: [],
+    customOrgCards: [],
+    customOrgBrands: {},
+  })
 
-  const CAR_CLASSES = ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA']
-  const REVO_PARTS = ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors', 'Guides', 'Body Plates & Chassis', 'White body parts set', 'Clear parts set', 'Lexan Cockpit Set']
+  useEffect(() => {
+    fetch('/api/admin/product-options').then(r => r.json()).then(opts => {
+      setProductOpts({
+        carBrandOptions: opts.brands?.length ? opts.brands : ['Ford Escort MK I', 'Datsun 510'],
+        carClassOptions: opts.carClasses?.length ? opts.carClasses : ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA'],
+        revoPartOptions: opts.revoParts?.length ? opts.revoParts : ['Tyres', 'Wheels', 'Axle', 'Bearings', 'Gears', 'Pinions', 'Screws and Nuts', 'Motors'],
+        sidewaysPartOptions: opts.sidewaysParts || [],
+        customOrgCards: opts.customOrgCards || [],
+        customOrgBrands: opts.customOrgBrands || {},
+      })
+    }).catch(() => {})
+  }, [])
 
   const selectedCarBrands: string[] = Array.isArray(component.settings.carBrands)
     ? (component.settings.carBrands as string[])
@@ -3143,8 +3171,21 @@ function SettingsTab({
       {component.type === 'product-grid' && (
         <>
           {/* ── Reusable filter helper ──────────────────────────────────────────── */}
-          {/* Revo Cars Brand Page filter */}
-          {(([open, setOpen, selected, toggle, clearFn, items, label]: any) => (
+          {/* ── Product Organization Filters ─────────────────────────────────── */}
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider font-play">Product Organization Filters</p>
+
+            {/* ── Revo Product Organization ── */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => setRevoOrgCollapsed(!revoOrgCollapsed)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 text-left">
+                <span className="text-xs font-semibold text-gray-700 font-play">Revo Product Organization</span>
+                <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${revoOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!revoOrgCollapsed && (
+                <div className="p-3 space-y-3">
+                  {/* Revo Cars Brand Page filter */}
+                  {(([open, setOpen, selected, toggle, clearFn, items, label]: any) => (
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
               <div className="relative">
@@ -3205,35 +3246,27 @@ function SettingsTab({
             selectedCarBrands,
             toggleCarBrand,
             () => updateSetting('carBrands', []),
-            CAR_BRANDS,
+            productOpts.carBrandOptions,
             'Revo Cars Brand Page',
           ])}
 
-          {/* Racing Class filter */}
+          {/* Racing Class filter (Revo) */}
           {(([open, setOpen, selected, toggle, clearFn, items, label]: any) => (
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
               <div className="relative">
                 <button type="button" onClick={() => setOpen(!open)}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${
-                    selected.length > 0 ? (selected.includes(KEEP_EMPTY) ? 'border-orange-300 bg-orange-50' : 'border-red-300 bg-red-50') : 'border-gray-200'
-                  }`}>
-                  <span className={selected.length === 0 ? 'text-gray-400' : selected.includes(KEEP_EMPTY) ? 'text-orange-700 font-semibold' : 'text-gray-800'}>
-                    {selected.length === 0 ? '— No Filter —' : selected.includes(KEEP_EMPTY) ? 'Keep Empty' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${selected.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                  <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}>
+                    {selected.length === 0 ? '— No Filter —' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
                   </span>
-                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
                 {open && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
                     <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-gray-50">
                       <input type="checkbox" checked={selected.length === 0} onChange={() => clearFn()} className="rounded" />
-                      <span className="text-xs text-gray-700 font-play font-semibold">— No Filter — (show all)</span>
-                    </label>
-                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-orange-50 cursor-pointer border-b-2 border-gray-200 bg-orange-50/40">
-                      <input type="checkbox" checked={selected.includes(KEEP_EMPTY)} onChange={() => toggle(KEEP_EMPTY)} className="rounded accent-orange-500" />
-                      <span className="text-xs text-orange-700 font-play font-semibold">Keep Empty <span className="font-normal text-orange-500">(products with no {label.replace(' Filter','')})</span></span>
+                      <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
                     </label>
                     {items.map((item: string) => (
                       <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
@@ -3244,34 +3277,14 @@ function SettingsTab({
                   </div>
                 )}
               </div>
-              {selected.length > 0 ? (
-                <div className="mt-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className={`text-[10px] font-play font-medium ${selected.includes(KEEP_EMPTY) ? 'text-orange-600' : 'text-red-600'}`}>
-                      {selected.includes(KEEP_EMPTY) ? 'Keep Empty — showing products with no value' : `Active: ${selected.length} selected`}
-                    </p>
-                    <button onClick={() => clearFn()} className="text-[10px] text-gray-400 hover:text-red-500 font-play underline">Clear</button>
-                  </div>
-                  {!selected.includes(KEEP_EMPTY) && (
-                    <div className="flex flex-wrap gap-1">
-                      {selected.map((v: string) => (
-                        <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
-                          {v}<button onClick={() => toggle(v)} className="hover:text-red-900">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-[10px] text-gray-400 mt-1 font-play">No filter — all shown</p>
-              )}
+              {selected.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{selected.map((v: string) => <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">{v}<button onClick={() => toggle(v)}>×</button></span>)}</div>}
             </div>
           ))([
             carClassDropdownOpen, setCarClassDropdownOpen,
             selectedCarClasses,
             toggleCarClass,
             () => { onUpdate({ settings: { ...component.settings, carClasses: [], carClass: '' } }) },
-            CAR_CLASSES,
+            productOpts.carClassOptions,
             'Racing Class Filter',
           ])}
 
@@ -3281,25 +3294,17 @@ function SettingsTab({
               <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
               <div className="relative">
                 <button type="button" onClick={() => setOpen(!open)}
-                  className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${
-                    selected.length > 0 ? (selected.includes(KEEP_EMPTY) ? 'border-orange-300 bg-orange-50' : 'border-red-300 bg-red-50') : 'border-gray-200'
-                  }`}>
-                  <span className={selected.length === 0 ? 'text-gray-400' : selected.includes(KEEP_EMPTY) ? 'text-orange-700 font-semibold' : 'text-gray-800'}>
-                    {selected.length === 0 ? '— No Filter —' : selected.includes(KEEP_EMPTY) ? 'Keep Empty' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${selected.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                  <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}>
+                    {selected.length === 0 ? '— No Filter —' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
                   </span>
-                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
+                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                 </button>
                 {open && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
                     <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-gray-50">
                       <input type="checkbox" checked={selected.length === 0} onChange={() => clearFn()} className="rounded" />
-                      <span className="text-xs text-gray-700 font-play font-semibold">— No Filter — (show all)</span>
-                    </label>
-                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-orange-50 cursor-pointer border-b-2 border-gray-200 bg-orange-50/40">
-                      <input type="checkbox" checked={selected.includes(KEEP_EMPTY)} onChange={() => toggle(KEEP_EMPTY)} className="rounded accent-orange-500" />
-                      <span className="text-xs text-orange-700 font-play font-semibold">Keep Empty <span className="font-normal text-orange-500">(products with no {label.replace(' Filter','')})</span></span>
+                      <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
                     </label>
                     {items.map((item: string) => (
                       <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
@@ -3310,37 +3315,197 @@ function SettingsTab({
                   </div>
                 )}
               </div>
-              {selected.length > 0 ? (
-                <div className="mt-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className={`text-[10px] font-play font-medium ${selected.includes(KEEP_EMPTY) ? 'text-orange-600' : 'text-red-600'}`}>
-                      {selected.includes(KEEP_EMPTY) ? 'Keep Empty — showing products with no value' : `Active: ${selected.length} selected`}
-                    </p>
-                    <button onClick={() => clearFn()} className="text-[10px] text-gray-400 hover:text-red-500 font-play underline">Clear</button>
-                  </div>
-                  {!selected.includes(KEEP_EMPTY) && (
-                    <div className="flex flex-wrap gap-1">
-                      {selected.map((v: string) => (
-                        <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">
-                          {v}<button onClick={() => toggle(v)} className="hover:text-red-900">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-[10px] text-gray-400 mt-1 font-play">No filter — all shown</p>
-              )}
+              {selected.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{selected.map((v: string) => <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">{v}<button onClick={() => toggle(v)}>×</button></span>)}</div>}
             </div>
           ))([
             revoPartDropdownOpen, setRevoPartDropdownOpen,
             selectedRevoParts,
             toggleRevoPart,
             () => { onUpdate({ settings: { ...component.settings, revoParts: [], revoPart: '' } }) },
-            REVO_PARTS,
+            productOpts.revoPartOptions,
             'Revo Parts Filter',
           ])}
+                </div>
+              )}
+            </div>
 
+            {/* ── Sideways Product Organization ── */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button type="button" onClick={() => setSidewaysOrgCollapsed(!sidewaysOrgCollapsed)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 text-left">
+                <span className="text-xs font-semibold text-gray-700 font-play">Sideways Product Organization</span>
+                <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${sidewaysOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {!sidewaysOrgCollapsed && (
+                <div className="p-3 space-y-3">
+                  {/* Sideways Brands */}
+                  {(([open, setOpen, selected, clearFn, items, label]: any) => {
+                    const toggleItem = (v: string) => { const base = selected.filter((x: string) => x !== '__EMPTY__'); updateSetting(label === 'Sideways Cars Brand Page' ? 'sidewaysBrands' : label === 'Sideways Race Class Filter' ? 'sidewaysCarClasses' : 'sidewaysParts', base.includes(v) ? base.filter((x: string) => x !== v) : [...base, v]) }
+                    return (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setOpen(!open)} className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${selected.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                            <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}>{selected.length === 0 ? '— No Filter —' : selected.length === 1 ? selected[0] : `${selected.length} selected`}</span>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {open && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-gray-50">
+                                <input type="checkbox" checked={selected.length === 0} onChange={() => clearFn()} className="rounded" />
+                                <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
+                              </label>
+                              {items.map((item: string) => (
+                                <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                  <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
+                                  <span className="text-xs text-gray-800 font-play">{item}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {selected.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{selected.map((v: string) => <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">{v}<button onClick={() => toggleItem(v)}>×</button></span>)}</div>}
+                      </div>
+                    )
+                  })([
+                    sidewaysBrandDropdownOpen, setSidewaysBrandDropdownOpen,
+                    Array.isArray(component.settings.sidewaysBrands) ? component.settings.sidewaysBrands : [],
+                    () => updateSetting('sidewaysBrands', []),
+                    productOpts.carBrandOptions,
+                    'Sideways Cars Brand Page',
+                  ])}
+                  {(([open, setOpen, selected, clearFn, items, label]: any) => {
+                    const toggleItem = (v: string) => { const base = Array.isArray(component.settings.sidewaysCarClasses) ? (component.settings.sidewaysCarClasses as string[]).filter(x => x !== v) : []; const next = (Array.isArray(component.settings.sidewaysCarClasses) ? component.settings.sidewaysCarClasses as string[] : []).includes(v) ? base : [...base, v]; updateSetting('sidewaysCarClasses', next) }
+                    return (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setOpen(!open)} className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${selected.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                            <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}>{selected.length === 0 ? '— No Filter —' : selected.length === 1 ? selected[0] : `${selected.length} selected`}</span>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {open && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-gray-50">
+                                <input type="checkbox" checked={selected.length === 0} onChange={() => clearFn()} className="rounded" />
+                                <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
+                              </label>
+                              {items.map((item: string) => (
+                                <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                  <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
+                                  <span className="text-xs text-gray-800 font-play">{item}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {selected.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{selected.map((v: string) => <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">{v}<button onClick={() => toggleItem(v)}>×</button></span>)}</div>}
+                      </div>
+                    )
+                  })([
+                    sidewaysClassDropdownOpen, setSidewaysClassDropdownOpen,
+                    Array.isArray(component.settings.sidewaysCarClasses) ? component.settings.sidewaysCarClasses : [],
+                    () => updateSetting('sidewaysCarClasses', []),
+                    productOpts.carClassOptions,
+                    'Sideways Race Class Filter',
+                  ])}
+                  {(([open, setOpen, selected, clearFn, items, label]: any) => {
+                    const toggleItem = (v: string) => { const cur = Array.isArray(component.settings.sidewaysParts) ? (component.settings.sidewaysParts as string[]) : []; updateSetting('sidewaysParts', cur.includes(v) ? cur.filter(x => x !== v) : [...cur, v]) }
+                    return (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{label}</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setOpen(!open)} className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${selected.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                            <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}>{selected.length === 0 ? '— No Filter —' : selected.length === 1 ? selected[0] : `${selected.length} selected`}</span>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {open && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 bg-gray-50">
+                                <input type="checkbox" checked={selected.length === 0} onChange={() => clearFn()} className="rounded" />
+                                <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
+                              </label>
+                              {items.map((item: string) => (
+                                <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                  <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
+                                  <span className="text-xs text-gray-800 font-play">{item}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {selected.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{selected.map((v: string) => <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-[10px] font-play font-semibold rounded-full">{v}<button onClick={() => toggleItem(v)}>×</button></span>)}</div>}
+                      </div>
+                    )
+                  })([
+                    sidewaysPartDropdownOpen, setSidewaysPartDropdownOpen,
+                    Array.isArray(component.settings.sidewaysParts) ? component.settings.sidewaysParts : [],
+                    () => updateSetting('sidewaysParts', []),
+                    productOpts.sidewaysPartOptions.length ? productOpts.sidewaysPartOptions : productOpts.revoPartOptions,
+                    'Sideways Parts Filter',
+                  ])}
+                </div>
+              )}
+            </div>
+
+            {/* ── Custom Brand Org Cards ── */}
+            {productOpts.customOrgCards.map((card) => {
+              const collapsed = customOrgCollapsed[card.id] ?? true
+              const brandKey = `customOrg_${card.id}_brands`
+              const classKey = `customOrg_${card.id}_carClasses`
+              const selectedBrands: string[] = Array.isArray(component.settings[brandKey]) ? (component.settings[brandKey] as string[]) : []
+              const selectedClasses: string[] = Array.isArray(component.settings[classKey]) ? (component.settings[classKey] as string[]) : []
+              const brandOptions = productOpts.customOrgBrands[card.id] || []
+              return (
+                <div key={card.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button type="button" onClick={() => setCustomOrgCollapsed(prev => ({ ...prev, [card.id]: !collapsed }))}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 text-left">
+                    <span className="text-xs font-semibold text-gray-700 font-play">{card.name} Product Organization</span>
+                    <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${collapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {!collapsed && (
+                    <div className="p-3 space-y-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{card.name} Cars Brand Page</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setCustomOrgDropdowns(prev => ({ ...prev, [card.id]: !prev[card.id] }))} className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${selectedBrands.length > 0 ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+                            <span className={selectedBrands.length === 0 ? 'text-gray-400' : 'text-gray-800'}>{selectedBrands.length === 0 ? '— No Filter —' : selectedBrands.length === 1 ? selectedBrands[0] : `${selectedBrands.length} selected`}</span>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {customOrgDropdowns[card.id] && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                                <input type="checkbox" checked={selectedBrands.length === 0} onChange={() => updateSetting(brandKey, [])} className="rounded" />
+                                <span className="text-xs font-play">— No Filter —</span>
+                              </label>
+                              {brandOptions.map((b: string) => (
+                                <label key={b} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                  <input type="checkbox" checked={selectedBrands.includes(b)} onChange={() => updateSetting(brandKey, selectedBrands.includes(b) ? selectedBrands.filter(x => x !== b) : [...selectedBrands, b])} className="rounded" />
+                                  <span className="text-xs font-play">{b}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {selectedBrands.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{selectedBrands.map(v => <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-play font-semibold rounded-full">{v}<button onClick={() => updateSetting(brandKey, selectedBrands.filter(x => x !== v))}>×</button></span>)}</div>}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{card.name} Race Class Filter</label>
+                        <div className="flex flex-wrap gap-1">
+                          {productOpts.carClassOptions.map(cls => (
+                            <button key={cls} type="button" onClick={() => updateSetting(classKey, selectedClasses.includes(cls) ? selectedClasses.filter(c => c !== cls) : [...selectedClasses, cls])}
+                              className={`px-2 py-0.5 text-[10px] font-play rounded-full border transition-colors ${selectedClasses.includes(cls) ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'}`}>
+                              {cls}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
 
           <div className="flex items-center gap-2">
             <input

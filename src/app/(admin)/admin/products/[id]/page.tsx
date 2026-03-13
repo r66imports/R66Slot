@@ -155,6 +155,22 @@ export default function EditProductPage({
   const [revoPartsPillsHidden, setRevoPartsPillsHidden] = useState(false)
   const [sidewaysPartsPillsHidden, setSidewaysPartsPillsHidden] = useState(false)
 
+  // Sideways Race Class Filter
+  const [selectedSidewaysCarClasses, setSelectedSidewaysCarClasses] = useState<string[]>([])
+  const [sidewaysCarClassDropdownOpen, setSidewaysCarClassDropdownOpen] = useState(false)
+  const [newSidewaysCarClassInput, setNewSidewaysCarClassInput] = useState('')
+  const [sidewaysCarClassPillsHidden, setSidewaysCarClassPillsHidden] = useState(false)
+
+  // Custom Brand Org Cards
+  const [customOrgCards, setCustomOrgCards] = useState<{ id: string; name: string }[]>([])
+  const [customOrgData, setCustomOrgData] = useState<Record<string, { brands: string[]; carClasses: string[]; parts: string[]; carTypes: string[] }>>({})
+  const [customOrgBrands, setCustomOrgBrands] = useState<Record<string, string[]>>({})
+  const [customOrgDropdowns, setCustomOrgDropdowns] = useState<Record<string, string | null>>({}) // cardId → 'brands'|'carClasses'|'parts'|'carTypes'|null
+  const [customOrgNewInput, setCustomOrgNewInput] = useState<Record<string, string>>({})
+  const [customOrgCollapsed, setCustomOrgCollapsed] = useState<Record<string, boolean>>({})
+  const [showNewOrgInput, setShowNewOrgInput] = useState(false)
+  const [newOrgName, setNewOrgName] = useState('')
+
   // Lists for custom options (loaded from API)
   const [brands, setBrands] = useState(['NSR', 'Revo', 'Pioneer', 'Sideways'])
   const [scales, setScales] = useState(['1/32', '1/24'])
@@ -206,6 +222,7 @@ export default function EditProductPage({
   const sidewaysBrandRef = useRef<HTMLDivElement>(null)
   const sidewaysPartRef = useRef<HTMLDivElement>(null)
   const sidewaysCarTypeRef = useRef<HTMLDivElement>(null)
+  const sidewaysCarClassRef = useRef<HTMLDivElement>(null)
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -232,6 +249,8 @@ export default function EditProductPage({
         if (opts.carClasses?.length) setCarClassOptions(opts.carClasses)
         if (opts.revoParts?.length) setRevoPartOptions(opts.revoParts)
         if (opts.sidewaysParts?.length) setSidewaysPartOptions(opts.sidewaysParts)
+        if (opts.customOrgCards?.length) setCustomOrgCards(opts.customOrgCards)
+        if (opts.customOrgBrands) setCustomOrgBrands(opts.customOrgBrands)
       })
       .catch(() => {})
     fetch('/api/admin/pages')
@@ -297,6 +316,8 @@ export default function EditProductPage({
           if (extraSidewaysBrands.length) setSidewaysBrandOptions(prev => [...prev, ...extraSidewaysBrands.filter(x => !prev.includes(x))])
           setSelectedSidewaysParts(Array.isArray((found as any).sidewaysParts) ? (found as any).sidewaysParts : [])
           setSidewaysCarTypes(Array.isArray((found as any).sidewaysCarTypes) ? (found as any).sidewaysCarTypes : ((found as any).sidewaysCarType ? [(found as any).sidewaysCarType] : []))
+          setSelectedSidewaysCarClasses(Array.isArray((found as any).sidewaysCarClasses) ? (found as any).sidewaysCarClasses : [])
+          setCustomOrgData((found as any).customOrgs && typeof (found as any).customOrgs === 'object' ? (found as any).customOrgs : {})
           setIsPreOrder((found as any).isPreOrder || false)
           setUnits(Array.isArray((found as any).units) ? (found as any).units : [])
           setSelectedCarClasses(Array.isArray((found as any).carClasses) ? (found as any).carClasses : ((found as any).carClass ? [(found as any).carClass] : []))
@@ -420,6 +441,7 @@ export default function EditProductPage({
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
           carBrands, sidewaysBrands, isPreOrder, units, salesAccount, purchaseAccount,
           carClass: selectedCarClasses[0] || '', revoParts: selectedRevoParts, sidewaysParts: selectedSidewaysParts,
+          sidewaysCarClasses: selectedSidewaysCarClasses, customOrgs: customOrgData,
           carType: carTypes[0] || carType, carTypes, sidewaysCarTypes, partType, scale, supplier, collections,
           tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
           status, boxSize,
@@ -451,7 +473,8 @@ export default function EditProductPage({
   }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
       quantity, weight, weightUnit, brand, productType, categoryBrands, itemCategories,
       carBrands, sidewaysBrands, isPreOrder, units, carTypes, sidewaysCarTypes, partType, scale, supplier, collections,
-      selectedCarClasses, selectedRevoParts, selectedSidewaysParts,
+      selectedCarClasses, selectedRevoParts, selectedSidewaysParts, selectedSidewaysCarClasses,
+      customOrgData,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
       seoTitle, seoDescription, seoKeywords, salesAccount, purchaseAccount])
 
@@ -473,6 +496,7 @@ export default function EditProductPage({
       if (sidewaysBrandRef.current && !sidewaysBrandRef.current.contains(t)) setSidewaysBrandDropdownOpen(false)
       if (sidewaysPartRef.current && !sidewaysPartRef.current.contains(t)) setSidewaysPartDropdownOpen(false)
       if (sidewaysCarTypeRef.current && !sidewaysCarTypeRef.current.contains(t)) setSidewaysCarTypeDropdownOpen(false)
+      if (sidewaysCarClassRef.current && !sidewaysCarClassRef.current.contains(t)) setSidewaysCarClassDropdownOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -1702,7 +1726,261 @@ export default function EditProductPage({
                   )}
                 </div>
 
+                {/* Sideways Race Class Filter */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Sideways Race Class Filter</label>
+                    {selectedSidewaysCarClasses.length > 0 && (
+                      <button type="button" onClick={() => setSidewaysCarClassPillsHidden(!sidewaysCarClassPillsHidden)} className="text-gray-400 hover:text-gray-600" title={sidewaysCarClassPillsHidden ? 'Show selected' : 'Hide selected'}>
+                        {sidewaysCarClassPillsHidden
+                          ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                        }
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative" ref={sidewaysCarClassRef}>
+                    <button type="button" onClick={() => setSidewaysCarClassDropdownOpen(!sidewaysCarClassDropdownOpen)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                      <span className={selectedSidewaysCarClasses.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                        {selectedSidewaysCarClasses.length === 0 ? 'Select class...' : selectedSidewaysCarClasses.length === 1 ? selectedSidewaysCarClasses[0] : `${selectedSidewaysCarClasses.length} selected`}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${sidewaysCarClassDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    {sidewaysCarClassDropdownOpen && (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                          <input type="checkbox" checked={selectedSidewaysCarClasses.length === 0} onChange={() => setSelectedSidewaysCarClasses([])} className="rounded" />
+                          <span className="text-sm text-gray-400 italic">— None —</span>
+                        </label>
+                        {carClassOptions.map(cls => (
+                          <div key={cls} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={selectedSidewaysCarClasses.includes(cls)} onChange={e => setSelectedSidewaysCarClasses(e.target.checked ? [...selectedSidewaysCarClasses, cls] : selectedSidewaysCarClasses.filter(c => c !== cls))} className="rounded" />
+                              <span className="text-sm text-gray-900">{cls}</span>
+                            </label>
+                          </div>
+                        ))}
+                        <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                          <input type="text" value={newSidewaysCarClassInput} onChange={e => setNewSidewaysCarClassInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newSidewaysCarClassInput.trim()) { e.preventDefault(); const v = newSidewaysCarClassInput.trim(); if (!carClassOptions.includes(v)) { const next = [...carClassOptions, v]; setCarClassOptions(next); saveOptions('carClasses', next) }; setSelectedSidewaysCarClasses(prev => prev.includes(v) ? prev : [...prev, v]); setNewSidewaysCarClassInput('') } }} placeholder="+ Add class..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
+                          <button type="button" onClick={() => { const v = newSidewaysCarClassInput.trim(); if (!v) return; if (!carClassOptions.includes(v)) { const next = [...carClassOptions, v]; setCarClassOptions(next); saveOptions('carClasses', next) }; setSelectedSidewaysCarClasses(prev => prev.includes(v) ? prev : [...prev, v]); setNewSidewaysCarClassInput('') }} className="px-2 py-1 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {selectedSidewaysCarClasses.length > 0 && !sidewaysCarClassPillsHidden && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedSidewaysCarClasses.map(cls => (
+                        <span key={cls} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-semibold">
+                          {cls}<button type="button" onClick={() => setSelectedSidewaysCarClasses(selectedSidewaysCarClasses.filter(c => c !== cls))} className="hover:text-red-900">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>}
+            </div>
+
+            {/* Custom Brand Org Cards */}
+            {customOrgCards.map((card) => {
+              const cardData = customOrgData[card.id] || { brands: [], carClasses: [], parts: [], carTypes: [] }
+              const cardBrandOptions = customOrgBrands[card.id] || []
+              const collapsed = customOrgCollapsed[card.id] ?? false
+              const openDropdown = customOrgDropdowns[card.id] ?? null
+              const getInput = (field: string) => customOrgNewInput[`${card.id}_${field}`] || ''
+              const setInput = (field: string, val: string) => setCustomOrgNewInput(prev => ({ ...prev, [`${card.id}_${field}`]: val }))
+              const updateCardField = (field: 'brands' | 'carClasses' | 'parts' | 'carTypes', val: string[]) => {
+                setCustomOrgData(prev => ({ ...prev, [card.id]: { ...cardData, [field]: val } }))
+              }
+              return (
+                <div key={card.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <button type="button" onClick={() => setCustomOrgCollapsed(prev => ({ ...prev, [card.id]: !collapsed }))} className="w-full flex items-center justify-between mb-4 text-left group">
+                    <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{card.name} Product Organization</h3>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {!collapsed && (
+                    <div className="space-y-4">
+                      {/* Brands */}
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 mb-2 block">{card.name} Cars Brand Page</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setCustomOrgDropdowns(prev => ({ ...prev, [card.id]: openDropdown === 'brands' ? null : 'brands' }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                            <span className={cardData.brands.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                              {cardData.brands.length === 0 ? 'No brand assigned' : cardData.brands.length === 1 ? cardData.brands[0] : `${cardData.brands.length} brands selected`}
+                            </span>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === 'brands' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {openDropdown === 'brands' && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                                <input type="checkbox" checked={cardData.brands.length === 0} onChange={() => updateCardField('brands', [])} className="rounded" />
+                                <span className="text-sm text-gray-400 italic">None</span>
+                              </label>
+                              {cardBrandOptions.map(b => (
+                                <div key={b} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={cardData.brands.includes(b)} onChange={e => updateCardField('brands', e.target.checked ? [...cardData.brands, b] : cardData.brands.filter(x => x !== b))} className="rounded" />
+                                    <span className="text-sm">{b}</span>
+                                  </label>
+                                  <button type="button" onClick={() => {
+                                    const next = cardBrandOptions.filter(x => x !== b)
+                                    setCustomOrgBrands(prev => ({ ...prev, [card.id]: next }))
+                                    saveOptions('customOrgBrands', { ...customOrgBrands, [card.id]: next } as any)
+                                    updateCardField('brands', cardData.brands.filter(x => x !== b))
+                                  }} className="p-0.5 text-gray-300 hover:text-red-500"><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                </div>
+                              ))}
+                              <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                                <input type="text" value={getInput('brands')} onChange={e => setInput('brands', e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && getInput('brands').trim()) { e.preventDefault(); const v = getInput('brands').trim(); const next = [...cardBrandOptions, v]; setCustomOrgBrands(prev => ({ ...prev, [card.id]: next })); saveOptions('customOrgBrands', { ...customOrgBrands, [card.id]: next } as any); updateCardField('brands', [...cardData.brands, v]); setInput('brands', '') } }} placeholder="Add brand..." className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900" />
+                                <button type="button" onClick={() => { const v = getInput('brands').trim(); if (!v) return; const next = [...cardBrandOptions, v]; setCustomOrgBrands(prev => ({ ...prev, [card.id]: next })); saveOptions('customOrgBrands', { ...customOrgBrands, [card.id]: next } as any); updateCardField('brands', [...cardData.brands, v]); setInput('brands', '') }} className="text-xs px-2 py-1 bg-gray-900 text-white rounded hover:bg-gray-700">+Add</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {cardData.brands.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {cardData.brands.map(b => (
+                              <span key={b} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
+                                {b}<button type="button" onClick={() => updateCardField('brands', cardData.brands.filter(x => x !== b))} className="hover:text-purple-900">×</button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Race Class */}
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 mb-2 block">{card.name} Race Class Filter</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setCustomOrgDropdowns(prev => ({ ...prev, [card.id]: openDropdown === 'carClasses' ? null : 'carClasses' }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                            <span className={cardData.carClasses.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                              {cardData.carClasses.length === 0 ? 'Select class...' : cardData.carClasses.length === 1 ? cardData.carClasses[0] : `${cardData.carClasses.length} selected`}
+                            </span>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === 'carClasses' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {openDropdown === 'carClasses' && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                              {carClassOptions.map(cls => (
+                                <label key={cls} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                  <input type="checkbox" checked={cardData.carClasses.includes(cls)} onChange={e => updateCardField('carClasses', e.target.checked ? [...cardData.carClasses, cls] : cardData.carClasses.filter(c => c !== cls))} className="rounded" />
+                                  <span className="text-sm">{cls}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {cardData.carClasses.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {cardData.carClasses.map(c => (
+                              <span key={c} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
+                                {c}<button type="button" onClick={() => updateCardField('carClasses', cardData.carClasses.filter(x => x !== c))} className="hover:text-purple-900">×</button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {/* Parts */}
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 mb-2 block">{card.name} Parts Filter</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setCustomOrgDropdowns(prev => ({ ...prev, [card.id]: openDropdown === 'parts' ? null : 'parts' }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                            <span className={cardData.parts.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                              {cardData.parts.length === 0 ? 'Select part...' : cardData.parts.length === 1 ? cardData.parts[0] : `${cardData.parts.length} selected`}
+                            </span>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === 'parts' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {openDropdown === 'parts' && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                              {revoPartOptions.map(p => (
+                                <label key={p} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                  <input type="checkbox" checked={cardData.parts.includes(p)} onChange={e => updateCardField('parts', e.target.checked ? [...cardData.parts, p] : cardData.parts.filter(x => x !== p))} className="rounded" />
+                                  <span className="text-sm">{p}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      {/* Car Type */}
+                      <div>
+                        <label className="text-sm font-medium text-gray-700 mb-2 block">{card.name} Car Type</label>
+                        <div className="relative">
+                          <button type="button" onClick={() => setCustomOrgDropdowns(prev => ({ ...prev, [card.id]: openDropdown === 'carTypes' ? null : 'carTypes' }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
+                            <span className={cardData.carTypes.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
+                              {cardData.carTypes.length === 0 ? '— None —' : cardData.carTypes.length === 1 ? cardData.carTypes[0] : `${cardData.carTypes.length} selected`}
+                            </span>
+                            <svg className={`w-4 h-4 text-gray-400 transition-transform ${openDropdown === 'carTypes' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {openDropdown === 'carTypes' && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                              {carTypeOptions.map(ct => (
+                                <label key={ct} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                                  <input type="checkbox" checked={cardData.carTypes.includes(ct)} onChange={e => updateCardField('carTypes', e.target.checked ? [...cardData.carTypes, ct] : cardData.carTypes.filter(x => x !== ct))} className="rounded" />
+                                  <span className="text-sm">{ct}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        {cardData.carTypes.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {cardData.carTypes.map(ct => (
+                              <span key={ct} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
+                                {ct}<button type="button" onClick={() => updateCardField('carTypes', cardData.carTypes.filter(x => x !== ct))} className="hover:text-purple-900">×</button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Add New Brand Org Card */}
+            <div className="bg-white rounded-lg shadow-sm border border-dashed border-gray-300 p-4">
+              {!showNewOrgInput ? (
+                <button type="button" onClick={() => setShowNewOrgInput(true)}
+                  className="w-full flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors py-1">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add Brand Organization
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newOrgName}
+                    onChange={e => setNewOrgName(e.target.value)}
+                    onKeyDown={async e => {
+                      if (e.key === 'Enter' && newOrgName.trim()) {
+                        e.preventDefault()
+                        const id = `org_${Date.now()}`
+                        const newCard = { id, name: newOrgName.trim() }
+                        const next = [...customOrgCards, newCard]
+                        setCustomOrgCards(next)
+                        await saveOptions('customOrgCards', next as any)
+                        setNewOrgName('')
+                        setShowNewOrgInput(false)
+                      }
+                      if (e.key === 'Escape') { setShowNewOrgInput(false); setNewOrgName('') }
+                    }}
+                    placeholder="Brand name (e.g. NSR, Pioneer)..."
+                    className="flex-1 border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                  />
+                  <button type="button" onClick={async () => {
+                    if (!newOrgName.trim()) { setShowNewOrgInput(false); return }
+                    const id = `org_${Date.now()}`
+                    const newCard = { id, name: newOrgName.trim() }
+                    const next = [...customOrgCards, newCard]
+                    setCustomOrgCards(next)
+                    await saveOptions('customOrgCards', next as any)
+                    setNewOrgName('')
+                    setShowNewOrgInput(false)
+                  }} className="px-3 py-1.5 text-xs bg-gray-900 text-white rounded hover:bg-gray-700">Add</button>
+                  <button type="button" onClick={() => { setShowNewOrgInput(false); setNewOrgName('') }} className="text-gray-400 hover:text-gray-600 text-xs">Cancel</button>
+                </div>
+              )}
             </div>
 
             {/* Sage Accounts */}
