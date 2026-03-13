@@ -1532,10 +1532,15 @@ export default function EditProductPage({
                           <span className="text-sm text-gray-400 italic">— None —</span>
                         </label>
                         {carTypeOptions.map(ct => (
-                          <label key={ct} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="checkbox" checked={carTypes.includes(ct)} onChange={e => setCarTypes(e.target.checked ? [...carTypes, ct] : carTypes.filter(t => t !== ct))} className="rounded" />
-                            <span className="text-sm text-gray-900">{ct}</span>
-                          </label>
+                          <div key={ct} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={carTypes.includes(ct)} onChange={e => setCarTypes(e.target.checked ? [...carTypes, ct] : carTypes.filter(t => t !== ct))} className="rounded" />
+                              <span className="text-sm text-gray-900">{ct}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = carTypeOptions.filter(x => x !== ct); setCarTypeOptions(next); saveOptions('carTypes', next); setCarTypes(prev => prev.filter(t => t !== ct)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
                         ))}
                         <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
                           <input type="text" value={newCarTypeInput} onChange={e => setNewCarTypeInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newCarTypeInput.trim()) { e.preventDefault(); handleAddCarType(newCarTypeInput) } }} placeholder="+ Add car type..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
@@ -1703,10 +1708,15 @@ export default function EditProductPage({
                           <span className="text-sm text-gray-400 italic">— None —</span>
                         </label>
                         {carTypeOptions.map(ct => (
-                          <label key={ct} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="checkbox" checked={sidewaysCarTypes.includes(ct)} onChange={e => setSidewaysCarTypes(e.target.checked ? [...sidewaysCarTypes, ct] : sidewaysCarTypes.filter(t => t !== ct))} className="rounded" />
-                            <span className="text-sm text-gray-900">{ct}</span>
-                          </label>
+                          <div key={ct} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                            <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                              <input type="checkbox" checked={sidewaysCarTypes.includes(ct)} onChange={e => setSidewaysCarTypes(e.target.checked ? [...sidewaysCarTypes, ct] : sidewaysCarTypes.filter(t => t !== ct))} className="rounded" />
+                              <span className="text-sm text-gray-900">{ct}</span>
+                            </label>
+                            <button type="button" onClick={() => { const next = carTypeOptions.filter(x => x !== ct); setCarTypeOptions(next); saveOptions('carTypes', next); setSidewaysCarTypes(prev => prev.filter(t => t !== ct)); setCarTypes(prev => prev.filter(t => t !== ct)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
                         ))}
                         <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
                           <input type="text" value={newSidewaysCarTypeInput} onChange={e => setNewSidewaysCarTypeInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && newSidewaysCarTypeInput.trim()) { e.preventDefault(); const v = newSidewaysCarTypeInput.trim(); if (!carTypeOptions.includes(v)) { const next = [...carTypeOptions, v]; setCarTypeOptions(next); saveOptions('carTypes', next) }; setSidewaysCarTypes(prev => prev.includes(v) ? prev : [...prev, v]); setNewSidewaysCarTypeInput('') } }} placeholder="+ Add car type..." className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-gray-400" />
@@ -1758,6 +1768,9 @@ export default function EditProductPage({
                               <input type="checkbox" checked={selectedSidewaysCarClasses.includes(cls)} onChange={e => setSelectedSidewaysCarClasses(e.target.checked ? [...selectedSidewaysCarClasses, cls] : selectedSidewaysCarClasses.filter(c => c !== cls))} className="rounded" />
                               <span className="text-sm text-gray-900">{cls}</span>
                             </label>
+                            <button type="button" onClick={() => { const next = carClassOptions.filter(x => x !== cls); setCarClassOptions(next); saveOptions('carClasses', next); setSelectedSidewaysCarClasses(prev => prev.filter(c => c !== cls)); setSelectedCarClasses(prev => prev.filter(c => c !== cls)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
                           </div>
                         ))}
                         <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
@@ -1794,10 +1807,23 @@ export default function EditProductPage({
               }
               return (
                 <div key={card.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <button type="button" onClick={() => setCustomOrgCollapsed(prev => ({ ...prev, [card.id]: !collapsed }))} className="w-full flex items-center justify-between mb-4 text-left group">
-                    <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{card.name} Product Organization</h3>
-                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                  </button>
+                  <div className="w-full flex items-center gap-2 mb-4">
+                    <button type="button" onClick={() => setCustomOrgCollapsed(prev => ({ ...prev, [card.id]: !collapsed }))} className="flex-1 flex items-center justify-between text-left group">
+                      <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">{card.name} Product Organization</h3>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${collapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <button type="button" onClick={async () => {
+                      const nextCards = customOrgCards.filter(c => c.id !== card.id)
+                      const nextBrands = { ...customOrgBrands }
+                      delete nextBrands[card.id]
+                      setCustomOrgCards(nextCards)
+                      setCustomOrgBrands(nextBrands)
+                      setCustomOrgData(prev => { const n = { ...prev }; delete n[card.id]; return n })
+                      await fetch('/api/admin/product-options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ customOrgCards: nextCards, customOrgBrands: nextBrands }) })
+                    }} className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0" title="Delete this card">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
                   {!collapsed && (
                     <div className="space-y-4">
                       {/* Brands */}
@@ -1860,11 +1886,20 @@ export default function EditProductPage({
                           {openDropdown === 'carClasses' && (
                             <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
                               {carClassOptions.map(cls => (
-                                <label key={cls} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                  <input type="checkbox" checked={cardData.carClasses.includes(cls)} onChange={e => updateCardField('carClasses', e.target.checked ? [...cardData.carClasses, cls] : cardData.carClasses.filter(c => c !== cls))} className="rounded" />
-                                  <span className="text-sm">{cls}</span>
-                                </label>
+                                <div key={cls} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={cardData.carClasses.includes(cls)} onChange={e => updateCardField('carClasses', e.target.checked ? [...cardData.carClasses, cls] : cardData.carClasses.filter(c => c !== cls))} className="rounded" />
+                                    <span className="text-sm">{cls}</span>
+                                  </label>
+                                  <button type="button" onClick={() => { const next = carClassOptions.filter(x => x !== cls); setCarClassOptions(next); saveOptions('carClasses', next); updateCardField('carClasses', cardData.carClasses.filter(c => c !== cls)); setSelectedCarClasses(prev => prev.filter(c => c !== cls)); setSelectedSidewaysCarClasses(prev => prev.filter(c => c !== cls)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
+                                </div>
                               ))}
+                              <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                                <input type="text" value={getInput('carClasses')} onChange={e => setInput('carClasses', e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && getInput('carClasses').trim()) { e.preventDefault(); const v = getInput('carClasses').trim(); if (!carClassOptions.includes(v)) { const next = [...carClassOptions, v]; setCarClassOptions(next); saveOptions('carClasses', next) }; updateCardField('carClasses', cardData.carClasses.includes(v) ? cardData.carClasses : [...cardData.carClasses, v]); setInput('carClasses', '') } }} placeholder="+ Add class..." className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900" />
+                                <button type="button" onClick={() => { const v = getInput('carClasses').trim(); if (!v) return; if (!carClassOptions.includes(v)) { const next = [...carClassOptions, v]; setCarClassOptions(next); saveOptions('carClasses', next) }; updateCardField('carClasses', cardData.carClasses.includes(v) ? cardData.carClasses : [...cardData.carClasses, v]); setInput('carClasses', '') }} className="text-xs px-2 py-1 bg-gray-900 text-white rounded hover:bg-gray-700">+Add</button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1891,11 +1926,20 @@ export default function EditProductPage({
                           {openDropdown === 'parts' && (
                             <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
                               {revoPartOptions.map(p => (
-                                <label key={p} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                  <input type="checkbox" checked={cardData.parts.includes(p)} onChange={e => updateCardField('parts', e.target.checked ? [...cardData.parts, p] : cardData.parts.filter(x => x !== p))} className="rounded" />
-                                  <span className="text-sm">{p}</span>
-                                </label>
+                                <div key={p} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={cardData.parts.includes(p)} onChange={e => updateCardField('parts', e.target.checked ? [...cardData.parts, p] : cardData.parts.filter(x => x !== p))} className="rounded" />
+                                    <span className="text-sm">{p}</span>
+                                  </label>
+                                  <button type="button" onClick={() => { const next = revoPartOptions.filter(x => x !== p); setRevoPartOptions(next); saveOptions('revoParts', next); updateCardField('parts', cardData.parts.filter(x => x !== p)); setSelectedRevoParts(prev => prev.filter(x => x !== p)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
+                                </div>
                               ))}
+                              <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                                <input type="text" value={getInput('parts')} onChange={e => setInput('parts', e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && getInput('parts').trim()) { e.preventDefault(); const v = getInput('parts').trim(); if (!revoPartOptions.includes(v)) { const next = [...revoPartOptions, v]; setRevoPartOptions(next); saveOptions('revoParts', next) }; updateCardField('parts', cardData.parts.includes(v) ? cardData.parts : [...cardData.parts, v]); setInput('parts', '') } }} placeholder="+ Add part..." className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900" />
+                                <button type="button" onClick={() => { const v = getInput('parts').trim(); if (!v) return; if (!revoPartOptions.includes(v)) { const next = [...revoPartOptions, v]; setRevoPartOptions(next); saveOptions('revoParts', next) }; updateCardField('parts', cardData.parts.includes(v) ? cardData.parts : [...cardData.parts, v]); setInput('parts', '') }} className="text-xs px-2 py-1 bg-gray-900 text-white rounded hover:bg-gray-700">+Add</button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1913,11 +1957,20 @@ export default function EditProductPage({
                           {openDropdown === 'carTypes' && (
                             <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
                               {carTypeOptions.map(ct => (
-                                <label key={ct} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                  <input type="checkbox" checked={cardData.carTypes.includes(ct)} onChange={e => updateCardField('carTypes', e.target.checked ? [...cardData.carTypes, ct] : cardData.carTypes.filter(x => x !== ct))} className="rounded" />
-                                  <span className="text-sm">{ct}</span>
-                                </label>
+                                <div key={ct} className="flex items-center gap-1 px-3 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={cardData.carTypes.includes(ct)} onChange={e => updateCardField('carTypes', e.target.checked ? [...cardData.carTypes, ct] : cardData.carTypes.filter(x => x !== ct))} className="rounded" />
+                                    <span className="text-sm">{ct}</span>
+                                  </label>
+                                  <button type="button" onClick={() => { const next = carTypeOptions.filter(x => x !== ct); setCarTypeOptions(next); saveOptions('carTypes', next); updateCardField('carTypes', cardData.carTypes.filter(x => x !== ct)); setCarTypes(prev => prev.filter(t => t !== ct)); setSidewaysCarTypes(prev => prev.filter(t => t !== ct)) }} className="p-0.5 text-gray-300 hover:text-red-500" title="Remove option">
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
+                                </div>
                               ))}
+                              <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                                <input type="text" value={getInput('carTypes')} onChange={e => setInput('carTypes', e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && getInput('carTypes').trim()) { e.preventDefault(); const v = getInput('carTypes').trim(); if (!carTypeOptions.includes(v)) { const next = [...carTypeOptions, v]; setCarTypeOptions(next); saveOptions('carTypes', next) }; updateCardField('carTypes', cardData.carTypes.includes(v) ? cardData.carTypes : [...cardData.carTypes, v]); setInput('carTypes', '') } }} placeholder="+ Add car type..." className="flex-1 text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gray-900" />
+                                <button type="button" onClick={() => { const v = getInput('carTypes').trim(); if (!v) return; if (!carTypeOptions.includes(v)) { const next = [...carTypeOptions, v]; setCarTypeOptions(next); saveOptions('carTypes', next) }; updateCardField('carTypes', cardData.carTypes.includes(v) ? cardData.carTypes : [...cardData.carTypes, v]); setInput('carTypes', '') }} className="text-xs px-2 py-1 bg-gray-900 text-white rounded hover:bg-gray-700">+Add</button>
+                              </div>
                             </div>
                           )}
                         </div>
