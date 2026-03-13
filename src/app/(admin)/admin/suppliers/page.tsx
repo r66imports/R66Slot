@@ -1311,6 +1311,7 @@ function SupplierWorksheet({ companyInfo, customers }: { companyInfo: CompanyInf
   const [currency, setCurrency] = useState('USD')
   const [exchangeRate, setExchangeRate] = useState(18.5)
   const [markupPct, setMarkupPct] = useState(40)
+  const [shippingPct, setShippingPct] = useState(0)
   const [vatPct, setVatPct] = useState(15)
   const [clientSearch, setClientSearch] = useState('')
   const [clientName, setClientName] = useState('')
@@ -1332,7 +1333,7 @@ function SupplierWorksheet({ companyInfo, customers }: { companyInfo: CompanyInf
   }
 
   function calcRetail(wholesalePrice: number): number {
-    return wholesalePrice * exchangeRate * (1 + markupPct / 100) * (1 + vatPct / 100)
+    return wholesalePrice * exchangeRate * (1 + shippingPct / 100) * (1 + markupPct / 100) * (1 + vatPct / 100)
   }
 
   function fmtZAR(n: number) {
@@ -1409,6 +1410,7 @@ function SupplierWorksheet({ companyInfo, customers }: { companyInfo: CompanyInf
   <div class="meta-box">
     <div><span>Currency </span><strong>${currency}</strong></div>
     <div><span>Exchange Rate </span><strong>1 ${currency} = R ${exchangeRate}</strong></div>
+    <div><span>Shipping &amp; Customs </span><strong>${shippingPct}%</strong></div>
     <div><span>Markup </span><strong>${markupPct}%</strong></div>
     <div><span>VAT </span><strong>${vatPct}%</strong></div>
   </div>
@@ -1548,6 +1550,19 @@ function SupplierWorksheet({ companyInfo, customers }: { companyInfo: CompanyInf
                 value={vatPct}
                 onChange={(e) => setVatPct(Number(e.target.value))}
                 className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+
+            {/* Shipping & Customs */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">Shipping &amp; Customs %</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={shippingPct}
+                onChange={(e) => setShippingPct(Number(e.target.value))}
+                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
             </div>
 
