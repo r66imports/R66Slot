@@ -62,6 +62,7 @@ export default function AdminLayout({
           { name: 'BRM', href: '/admin/products?brand=BRM', icon: '🏁' },
           { name: 'Pioneer', href: '/admin/products?brand=Pioneer', icon: '🚗' },
           { name: 'Sideways', href: '/admin/products?brand=Sideways', icon: '🔄' },
+          { name: 'POS / Scanner', href: '/admin/pos', icon: '🔍' },
         ]
       },
     ],
