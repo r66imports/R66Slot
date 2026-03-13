@@ -1286,7 +1286,8 @@ export default function OrdersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [compileDocType, setCompileDocType] = useState<DocType>('quote')
   const [compileClient, setCompileClient] = useState<{ name: string; email: string; phone: string; address: string; items: LineItem[] } | null>(null)
-  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
+  // Groups the user has explicitly opened — starts empty (all collapsed). Never reset on focus reload.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [viewData, setViewData] = useState<DocViewData | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
@@ -1303,14 +1304,7 @@ export default function OrdersPage() {
       if (boRes.ok) {
         const bos: Backorder[] = await boRes.json()
         setBackorders(bos)
-        // Collapse all groups by default on first load
-        const keys = new Set<string>()
-        for (const b of bos) {
-          if (b.status === 'cancelled') continue
-          const k = b.clientEmail?.toLowerCase().trim() || b.clientId || b.clientName || 'Unknown Client'
-          keys.add(k)
-        }
-        setClosedGroups(keys)
+        // openGroups is intentionally NOT reset here — preserves user's open/closed state across focus reloads
       }
       if (docRes.ok) setDocuments(await docRes.json())
       if (tmplRes.ok) {
@@ -1390,7 +1384,7 @@ export default function OrdersPage() {
   }
 
   const toggleGroup = (key: string) => {
-    setClosedGroups((prev) => {
+    setOpenGroups((prev) => {
       const next = new Set(prev)
       if (next.has(key)) next.delete(key)
       else next.add(key)
@@ -1493,7 +1487,7 @@ export default function OrdersPage() {
               .map(([key, group]) => {
                 const { displayName, email, items } = group
                 const total = items.reduce((s, b) => s + b.price * b.qty, 0)
-                const isOpen = !closedGroups.has(key)
+                const isOpen = openGroups.has(key)
                 return (
                   <div key={key} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                     {/* Client header — click anywhere to toggle */}
