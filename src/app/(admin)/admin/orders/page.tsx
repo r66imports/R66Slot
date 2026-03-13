@@ -1286,6 +1286,7 @@ export default function OrdersPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [compileDocType, setCompileDocType] = useState<DocType>('quote')
   const [compileClient, setCompileClient] = useState<{ name: string; email: string; phone: string; address: string; items: LineItem[] } | null>(null)
+  const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
   const [viewData, setViewData] = useState<DocViewData | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
@@ -1299,7 +1300,18 @@ export default function OrdersPage() {
         fetch('/api/admin/clients'),
         fetch('/api/admin/contacts'),
       ])
-      if (boRes.ok) setBackorders(await boRes.json())
+      if (boRes.ok) {
+        const bos: Backorder[] = await boRes.json()
+        setBackorders(bos)
+        // Collapse all groups by default on first load
+        const keys = new Set<string>()
+        for (const b of bos) {
+          if (b.status === 'cancelled') continue
+          const k = b.clientEmail?.toLowerCase().trim() || b.clientId || b.clientName || 'Unknown Client'
+          keys.add(k)
+        }
+        setClosedGroups(keys)
+      }
       if (docRes.ok) setDocuments(await docRes.json())
       if (tmplRes.ok) {
         const t = await tmplRes.json()
@@ -1323,6 +1335,10 @@ export default function OrdersPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    window.addEventListener('focus', load)
+    return () => window.removeEventListener('focus', load)
+  }, [load])
 
   const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders
 
@@ -1334,13 +1350,17 @@ export default function OrdersPage() {
     boRows.reduce((s, b) => s + b.price * b.qty, 0) +
     docRows.reduce((s, d) => s + d.lineItems.reduce((ls, li) => ls + li.qty * li.unitPrice, 0), 0)
 
-  // Group all active backorders by client for the Back Orders tab
-  const backordersByClient: Record<string, Backorder[]> = {}
+  // Group all active backorders by client — use email (lowercase) as key for reliable deduplication
+  const backordersByClient: Record<string, { displayName: string; email: string; phone: string; items: Backorder[] }> = {}
   for (const b of backorders) {
     if (b.status === 'cancelled') continue
-    const key = b.clientName || 'Unknown Client'
-    if (!backordersByClient[key]) backordersByClient[key] = []
-    backordersByClient[key].push(b)
+    const key = b.clientEmail?.toLowerCase().trim() || b.clientId || b.clientName || 'Unknown Client'
+    if (!backordersByClient[key]) {
+      backordersByClient[key] = { displayName: b.clientName || key, email: b.clientEmail || '', phone: b.clientPhone || '', items: [] }
+    } else if (b.clientName && !backordersByClient[key].displayName) {
+      backordersByClient[key].displayName = b.clientName
+    }
+    backordersByClient[key].items.push(b)
   }
 
   const tabCounts = {
@@ -1350,16 +1370,16 @@ export default function OrdersPage() {
     invoices: backorders.filter(TAB_CFG.invoices.boPhase).length + documents.filter((d) => d.type === 'invoice').length,
   }
 
-  const handleCompile = (clientName: string, docType: DocType) => {
-    const items = backordersByClient[clientName] || []
-    const first = items[0]
+  const handleCompile = (groupKey: string, docType: DocType) => {
+    const group = backordersByClient[groupKey]
+    if (!group) return
     setCompileDocType(docType)
     setCompileClient({
-      name: first?.clientName || clientName,
-      email: first?.clientEmail || '',
-      phone: first?.clientPhone || '',
-      address: first?.companyAddress || '',
-      items: items.map((b) => ({
+      name: group.displayName,
+      email: group.email,
+      phone: group.phone,
+      address: group.items[0]?.companyAddress || '',
+      items: group.items.map((b) => ({
         id: `li_${b.id}`,
         description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`,
         qty: b.qty,
@@ -1367,6 +1387,15 @@ export default function OrdersPage() {
       })),
     })
     setShowCreate(true)
+  }
+
+  const toggleGroup = (key: string) => {
+    setClosedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   // Build DocViewData from a backorder row (current tab context)
@@ -1460,65 +1489,77 @@ export default function OrdersPage() {
             </div>
           ) : (
             Object.entries(backordersByClient)
-              .sort(([a], [b]) => a.localeCompare(b))
-              .map(([clientName, items]) => {
+              .sort(([, a], [, b]) => a.displayName.localeCompare(b.displayName))
+              .map(([key, group]) => {
+                const { displayName, email, items } = group
                 const total = items.reduce((s, b) => s + b.price * b.qty, 0)
+                const isOpen = !closedGroups.has(key)
                 return (
-                  <div key={clientName} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                    {/* Client header */}
-                    <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
-                      <div>
-                        <span className="font-semibold text-gray-900">{clientName}</span>
-                        <span className="ml-3 text-xs text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''} · {fmtPrice(total)}</span>
-                        {items[0]?.clientEmail && (
-                          <span className="ml-3 text-xs text-gray-400">{items[0].clientEmail}</span>
-                        )}
+                  <div key={key} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    {/* Client header — click anywhere to toggle */}
+                    <div
+                      className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200 cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                      onClick={() => toggleGroup(key)}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Chevron */}
+                        <svg
+                          className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-0' : '-rotate-90'}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                        <span className="font-semibold text-gray-900">{displayName}</span>
+                        <span className="text-xs text-gray-500">{items.length} item{items.length !== 1 ? 's' : ''} · {fmtPrice(total)}</span>
+                        {email && <span className="text-xs text-gray-400 hidden sm:inline">{email}</span>}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs text-gray-400 mr-1">Compile →</span>
                         <button
-                          onClick={() => handleCompile(clientName, 'quote')}
+                          onClick={() => handleCompile(key, 'quote')}
                           className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
                         >Quote</button>
                         <button
-                          onClick={() => handleCompile(clientName, 'salesorder')}
+                          onClick={() => handleCompile(key, 'salesorder')}
                           className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
                         >Sales Order</button>
                         <button
-                          onClick={() => handleCompile(clientName, 'invoice')}
+                          onClick={() => handleCompile(key, 'invoice')}
                           className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
                         >Invoice</button>
                       </div>
                     </div>
-                    {/* Line items */}
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100">
-                          <th className="text-left px-5 py-2">SKU</th>
-                          <th className="text-left px-5 py-2">Description</th>
-                          <th className="text-left px-5 py-2">Brand</th>
-                          <th className="text-center px-5 py-2">Qty</th>
-                          <th className="text-right px-5 py-2">Price</th>
-                          <th className="text-right px-5 py-2">Total</th>
-                          <th className="text-center px-5 py-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((b) => (
-                          <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                            <td className="px-5 py-2.5 font-mono text-xs text-blue-700 font-semibold">{b.sku || '—'}</td>
-                            <td className="px-5 py-2.5 text-gray-700 max-w-[220px] truncate">{b.description}</td>
-                            <td className="px-5 py-2.5 text-gray-500 text-xs">{b.brand || '—'}</td>
-                            <td className="px-5 py-2.5 text-center text-gray-700">{b.qty}</td>
-                            <td className="px-5 py-2.5 text-right text-gray-700">{fmtPrice(b.price)}</td>
-                            <td className="px-5 py-2.5 text-right font-semibold">{fmtPrice(b.price * b.qty)}</td>
-                            <td className="px-5 py-2.5 text-center">
-                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
-                            </td>
+                    {/* Line items — only when open */}
+                    {isOpen && (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100">
+                            <th className="text-left px-5 py-2">SKU</th>
+                            <th className="text-left px-5 py-2">Description</th>
+                            <th className="text-left px-5 py-2">Brand</th>
+                            <th className="text-center px-5 py-2">Qty</th>
+                            <th className="text-right px-5 py-2">Price</th>
+                            <th className="text-right px-5 py-2">Total</th>
+                            <th className="text-center px-5 py-2">Status</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {items.map((b) => (
+                            <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                              <td className="px-5 py-2.5 font-mono text-xs text-blue-700 font-semibold">{b.sku || '—'}</td>
+                              <td className="px-5 py-2.5 text-gray-700 max-w-[220px] truncate">{b.description}</td>
+                              <td className="px-5 py-2.5 text-gray-500 text-xs">{b.brand || '—'}</td>
+                              <td className="px-5 py-2.5 text-center text-gray-700">{b.qty}</td>
+                              <td className="px-5 py-2.5 text-right text-gray-700">{fmtPrice(b.price)}</td>
+                              <td className="px-5 py-2.5 text-right font-semibold">{fmtPrice(b.price * b.qty)}</td>
+                              <td className="px-5 py-2.5 text-center">
+                                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 )
               })
