@@ -128,6 +128,13 @@ function WorksheetEditor({
   const [headerClientSearch, setHeaderClientSearch] = useState('')
   const [showHeaderClientDrop, setShowHeaderClientDrop] = useState(false)
   const [items, setItems] = useState<WsItem[]>([newWsItem()])
+  // Final Costing Calculator — independent settings
+  const [finalCurrency, setFinalCurrency] = useState('USD')
+  const [finalExRate, setFinalExRate] = useState(18.5)
+  const [finalShippingPct, setFinalShippingPct] = useState(0)
+  const [finalMarkupPct, setFinalMarkupPct] = useState(40)
+  const [finalVatPct, setFinalVatPct] = useState(15)
+
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showAddClient, setShowAddClient] = useState(false)
   // track which row's dropdown is open
@@ -152,6 +159,8 @@ function WorksheetEditor({
 
   function calcLanded(w: number) { return w * exchangeRate * (1 + shippingPct / 100) }
   function calcRetail(w: number) { return w * exchangeRate * (1 + shippingPct / 100) * (1 + markupPct / 100) * (1 + vatPct / 100) }
+  function calcFinalLanded(w: number) { return w * finalExRate * (1 + finalShippingPct / 100) }
+  function calcFinalRetail(w: number) { return w * finalExRate * (1 + finalShippingPct / 100) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
   function fmtFC(n: number) { return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
   function updateItem(id: string, patch: Partial<WsItem>) {
@@ -190,6 +199,8 @@ function WorksheetEditor({
       .map((it, i) => {
         const landed = calcLanded(it.wholesalePrice)
         const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
+        const finalLanded = calcFinalLanded(it.wholesalePrice)
+        const landedRetail = calcFinalRetail(it.wholesalePrice)
         return `<tr>
           <td style="padding:7px 10px;color:#6b7280;font-size:12px;">${i + 1}</td>
           <td style="padding:7px 10px;font-family:monospace;font-size:12px;font-weight:600;">${it.sku || '—'}</td>
@@ -199,6 +210,8 @@ function WorksheetEditor({
           <td style="padding:7px 10px;text-align:right;font-size:12px;">${currency} ${fmtFC(it.wholesalePrice)}</td>
           <td style="padding:7px 10px;text-align:right;font-size:12px;">R ${fmtFC(landed)}</td>
           <td style="padding:7px 10px;text-align:right;font-weight:700;font-size:12px;">R ${fmtFC(retail)}</td>
+          <td style="padding:7px 10px;text-align:right;font-size:12px;color:#065f46;">R ${it.wholesalePrice > 0 ? fmtFC(finalLanded) : '—'}</td>
+          <td style="padding:7px 10px;text-align:right;font-weight:700;font-size:12px;color:#065f46;">R ${it.wholesalePrice > 0 ? fmtFC(landedRetail) : '—'}</td>
         </tr>`
       }).join('')
 
@@ -242,6 +255,13 @@ function WorksheetEditor({
     <div><span>Markup </span><strong>${markupPct}%</strong></div>
     <div><span>VAT </span><strong>${vatPct}%</strong></div>
   </div>
+  <div class="meta-box" style="background:#ecfdf5;border-color:#a7f3d0;">
+    <div><span style="color:#065f46;">Final Currency </span><strong>${finalCurrency}</strong></div>
+    <div><span style="color:#065f46;">Final Ex Rate </span><strong>1 ${finalCurrency} = R ${finalExRate}</strong></div>
+    <div><span style="color:#065f46;">Final Shipping </span><strong>${finalShippingPct}%</strong></div>
+    <div><span style="color:#065f46;">Final Markup </span><strong>${finalMarkupPct}%</strong></div>
+    <div><span style="color:#065f46;">Final VAT </span><strong>${finalVatPct}%</strong></div>
+  </div>
   <table>
     <thead><tr>
       <th style="width:36px">#</th><th>SKU</th><th>Description</th><th>Client</th>
@@ -249,6 +269,8 @@ function WorksheetEditor({
       <th class="right">Wholesale (${currency})</th>
       <th class="right">Landed Cost (ZAR)</th>
       <th class="right">Est Retail (ZAR incl. VAT)</th>
+      <th class="right" style="color:#065f46;">Final Landed (ZAR)</th>
+      <th class="right" style="color:#065f46;">Landed Retail (ZAR)</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
@@ -260,11 +282,13 @@ function WorksheetEditor({
 
   // ── CSV export ──
   function downloadCSV() {
-    const headers = ['#', 'SKU', 'Description', 'Client', 'Qty', `Wholesale (${currency})`, 'Landed Cost (ZAR)', 'Est Retail (ZAR incl. VAT)']
+    const headers = ['#', 'SKU', 'Description', 'Client', 'Qty', `Wholesale (${currency})`, 'Landed Cost (ZAR)', 'Est Retail (ZAR incl. VAT)', 'Final Landed (ZAR)', 'Landed Retail (ZAR)']
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
       const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
-      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, `"${it.clientName}"`, it.qty, it.wholesalePrice.toFixed(2), landed.toFixed(2), retail.toFixed(2)]
+      const finalLanded = calcFinalLanded(it.wholesalePrice)
+      const landedRetail = calcFinalRetail(it.wholesalePrice)
+      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, `"${it.clientName}"`, it.qty, it.wholesalePrice.toFixed(2), landed.toFixed(2), retail.toFixed(2), it.wholesalePrice > 0 ? finalLanded.toFixed(2) : '', it.wholesalePrice > 0 ? landedRetail.toFixed(2) : '']
     })
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -381,6 +405,8 @@ function WorksheetEditor({
                 <th className="text-right pb-2 px-2" style={{minWidth:'130px'}}>Wholesale ({currency})</th>
                 <th className="text-right pb-2 px-2" style={{minWidth:'120px'}}>Landed (ZAR)</th>
                 <th className="text-right pb-2 px-2" style={{minWidth:'120px'}}>Est Retail (ZAR)</th>
+                <th className="text-right pb-2 px-2" style={{minWidth:'130px'}}>Final Landed (ZAR)</th>
+                <th className="text-right pb-2 px-2" style={{minWidth:'130px'}}>Landed Retail (ZAR)</th>
                 <th className="w-8" />
               </tr>
             </thead>
@@ -520,6 +546,26 @@ function WorksheetEditor({
                       </div>
                     </td>
 
+                    {/* Final Landed Cost — read-only, uses Final calculator */}
+                    <td className="py-2 px-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-gray-400">R</span>
+                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg ${it.wholesalePrice > 0 ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-gray-300'}`}>
+                          {it.wholesalePrice > 0 ? fmtFC(calcFinalLanded(it.wholesalePrice)) : '—'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Landed Retail — read-only, uses Final calculator */}
+                    <td className="py-2 px-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-gray-400">R</span>
+                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold ${it.wholesalePrice > 0 ? 'text-emerald-800 bg-emerald-100 border border-emerald-200' : 'text-gray-300'}`}>
+                          {it.wholesalePrice > 0 ? fmtFC(calcFinalRetail(it.wholesalePrice)) : '—'}
+                        </span>
+                      </div>
+                    </td>
+
                     {/* Remove */}
                     <td className="py-2 w-8">
                       <button onClick={() => removeItem(it.id)} disabled={items.length === 1}
@@ -536,6 +582,41 @@ function WorksheetEditor({
             className="mt-3 w-full border-2 border-dashed border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 rounded-xl py-2 text-sm transition-colors">
             + Add Row
           </button>
+        </div>
+      </div>
+
+      {/* Final Costing Calculator */}
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
+        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Final Costing Calculator</p>
+        <p className="text-xs text-emerald-600 mb-3">Drives the <span className="font-semibold">Final Landed</span> and <span className="font-semibold">Landed Retail</span> columns in the table above.</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Currency</label>
+            <select value={finalCurrency} onChange={(e) => { setFinalCurrency(e.target.value); setFinalExRate(CURRENCY_DEFAULTS[e.target.value] ?? 1) }}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+              {Object.keys(CURRENCY_DEFAULTS).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">1 {finalCurrency} = R</label>
+            <input type="number" min={0} step={0.01} value={finalExRate} onChange={(e) => setFinalExRate(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Shipping &amp; Customs %</label>
+            <input type="number" min={0} step={1} value={finalShippingPct} onChange={(e) => setFinalShippingPct(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Markup %</label>
+            <input type="number" min={0} step={1} value={finalMarkupPct} onChange={(e) => setFinalMarkupPct(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">VAT %</label>
+            <input type="number" min={0} step={1} value={finalVatPct} onChange={(e) => setFinalVatPct(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
         </div>
       </div>
 
