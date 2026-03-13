@@ -2916,6 +2916,12 @@ function SettingsTab({
   const [revoOrgCollapsed, setRevoOrgCollapsed] = useState(false)
   const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(true)
   const [customOrgCollapsed, setCustomOrgCollapsed] = useState<Record<string, boolean>>({})
+  const [newOptInput, setNewOptInput] = useState<Record<string, string>>({})
+  const [customOrgClassDropdowns, setCustomOrgClassDropdowns] = useState<Record<string, boolean>>({})
+
+  const saveOpts = async (key: string, value: any) => {
+    try { await fetch('/api/admin/product-options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value }) }) } catch {}
+  }
 
   const [productOpts, setProductOpts] = useState<{
     carBrandOptions: string[]
@@ -3211,11 +3217,18 @@ function SettingsTab({
                       <span className="text-xs text-orange-700 font-play font-semibold">Keep Empty <span className="font-normal text-orange-500">(products with no {label})</span></span>
                     </label>
                     {items.map((item: string) => (
-                      <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                        <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
-                        <span className="text-xs text-gray-800 font-play">{item}</span>
-                      </label>
+                      <div key={item} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                        <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
+                          <span className="text-xs text-gray-800 font-play">{item}</span>
+                        </label>
+                        <button type="button" onClick={() => { const next = productOpts.carBrandOptions.filter((x: string) => x !== item); setProductOpts(prev => ({ ...prev, carBrandOptions: next })); saveOpts('brands', next); if (selected.includes(item)) toggle(item) }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                      </div>
                     ))}
+                    <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                      <input type="text" value={newOptInput['brands'] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, brands: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput['brands'] || '').trim()) { e.preventDefault(); const v = (newOptInput['brands'] || '').trim(); if (!productOpts.carBrandOptions.includes(v)) { const next = [...productOpts.carBrandOptions, v]; setProductOpts(prev => ({ ...prev, carBrandOptions: next })); saveOpts('brands', next) }; toggle(v); setNewOptInput(prev => ({ ...prev, brands: '' })) } }} placeholder="+ Add brand..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                      <button type="button" onClick={() => { const v = (newOptInput['brands'] || '').trim(); if (!v) return; if (!productOpts.carBrandOptions.includes(v)) { const next = [...productOpts.carBrandOptions, v]; setProductOpts(prev => ({ ...prev, carBrandOptions: next })); saveOpts('brands', next) }; toggle(v); setNewOptInput(prev => ({ ...prev, brands: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -3269,11 +3282,18 @@ function SettingsTab({
                       <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
                     </label>
                     {items.map((item: string) => (
-                      <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                        <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
-                        <span className="text-xs text-gray-800 font-play">{item}</span>
-                      </label>
+                      <div key={item} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                        <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
+                          <span className="text-xs text-gray-800 font-play">{item}</span>
+                        </label>
+                        <button type="button" onClick={() => { const next = productOpts.carClassOptions.filter((x: string) => x !== item); setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next); if (selected.includes(item)) toggle(item) }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                      </div>
                     ))}
+                    <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                      <input type="text" value={newOptInput['carClasses'] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, carClasses: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput['carClasses'] || '').trim()) { e.preventDefault(); const v = (newOptInput['carClasses'] || '').trim(); if (!productOpts.carClassOptions.includes(v)) { const next = [...productOpts.carClassOptions, v]; setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next) }; toggle(v); setNewOptInput(prev => ({ ...prev, carClasses: '' })) } }} placeholder="+ Add class..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                      <button type="button" onClick={() => { const v = (newOptInput['carClasses'] || '').trim(); if (!v) return; if (!productOpts.carClassOptions.includes(v)) { const next = [...productOpts.carClassOptions, v]; setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next) }; toggle(v); setNewOptInput(prev => ({ ...prev, carClasses: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -3307,11 +3327,18 @@ function SettingsTab({
                       <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
                     </label>
                     {items.map((item: string) => (
-                      <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                        <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
-                        <span className="text-xs text-gray-800 font-play">{item}</span>
-                      </label>
+                      <div key={item} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                        <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={selected.includes(item)} onChange={() => toggle(item)} className="rounded" />
+                          <span className="text-xs text-gray-800 font-play">{item}</span>
+                        </label>
+                        <button type="button" onClick={() => { const next = productOpts.revoPartOptions.filter((x: string) => x !== item); setProductOpts(prev => ({ ...prev, revoPartOptions: next })); saveOpts('revoParts', next); if (selected.includes(item)) toggle(item) }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                      </div>
                     ))}
+                    <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                      <input type="text" value={newOptInput['revoParts'] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, revoParts: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput['revoParts'] || '').trim()) { e.preventDefault(); const v = (newOptInput['revoParts'] || '').trim(); if (!productOpts.revoPartOptions.includes(v)) { const next = [...productOpts.revoPartOptions, v]; setProductOpts(prev => ({ ...prev, revoPartOptions: next })); saveOpts('revoParts', next) }; toggle(v); setNewOptInput(prev => ({ ...prev, revoParts: '' })) } }} placeholder="+ Add part..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                      <button type="button" onClick={() => { const v = (newOptInput['revoParts'] || '').trim(); if (!v) return; if (!productOpts.revoPartOptions.includes(v)) { const next = [...productOpts.revoPartOptions, v]; setProductOpts(prev => ({ ...prev, revoPartOptions: next })); saveOpts('revoParts', next) }; toggle(v); setNewOptInput(prev => ({ ...prev, revoParts: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -3356,11 +3383,18 @@ function SettingsTab({
                                 <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
                               </label>
                               {items.map((item: string) => (
-                                <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                  <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
-                                  <span className="text-xs text-gray-800 font-play">{item}</span>
-                                </label>
+                                <div key={item} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
+                                    <span className="text-xs text-gray-800 font-play">{item}</span>
+                                  </label>
+                                  <button type="button" onClick={() => { const next = productOpts.carBrandOptions.filter((x: string) => x !== item); setProductOpts(prev => ({ ...prev, carBrandOptions: next })); saveOpts('brands', next); if (selected.includes(item)) toggleItem(item) }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                </div>
                               ))}
+                              <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                                <input type="text" value={newOptInput['sidewaysBrands'] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, sidewaysBrands: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput['sidewaysBrands'] || '').trim()) { e.preventDefault(); const v = (newOptInput['sidewaysBrands'] || '').trim(); if (!productOpts.carBrandOptions.includes(v)) { const next = [...productOpts.carBrandOptions, v]; setProductOpts(prev => ({ ...prev, carBrandOptions: next })); saveOpts('brands', next) }; toggleItem(v); setNewOptInput(prev => ({ ...prev, sidewaysBrands: '' })) } }} placeholder="+ Add brand..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                                <button type="button" onClick={() => { const v = (newOptInput['sidewaysBrands'] || '').trim(); if (!v) return; if (!productOpts.carBrandOptions.includes(v)) { const next = [...productOpts.carBrandOptions, v]; setProductOpts(prev => ({ ...prev, carBrandOptions: next })); saveOpts('brands', next) }; toggleItem(v); setNewOptInput(prev => ({ ...prev, sidewaysBrands: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3391,11 +3425,18 @@ function SettingsTab({
                                 <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
                               </label>
                               {items.map((item: string) => (
-                                <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                  <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
-                                  <span className="text-xs text-gray-800 font-play">{item}</span>
-                                </label>
+                                <div key={item} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
+                                    <span className="text-xs text-gray-800 font-play">{item}</span>
+                                  </label>
+                                  <button type="button" onClick={() => { const next = productOpts.carClassOptions.filter((x: string) => x !== item); setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next); if (selected.includes(item)) toggleItem(item) }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                </div>
                               ))}
+                              <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                                <input type="text" value={newOptInput['sidewaysCarClasses'] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, sidewaysCarClasses: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput['sidewaysCarClasses'] || '').trim()) { e.preventDefault(); const v = (newOptInput['sidewaysCarClasses'] || '').trim(); if (!productOpts.carClassOptions.includes(v)) { const next = [...productOpts.carClassOptions, v]; setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next) }; toggleItem(v); setNewOptInput(prev => ({ ...prev, sidewaysCarClasses: '' })) } }} placeholder="+ Add class..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                                <button type="button" onClick={() => { const v = (newOptInput['sidewaysCarClasses'] || '').trim(); if (!v) return; if (!productOpts.carClassOptions.includes(v)) { const next = [...productOpts.carClassOptions, v]; setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next) }; toggleItem(v); setNewOptInput(prev => ({ ...prev, sidewaysCarClasses: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3426,11 +3467,18 @@ function SettingsTab({
                                 <span className="text-xs text-gray-700 font-play font-semibold">— No Filter —</span>
                               </label>
                               {items.map((item: string) => (
-                                <label key={item} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                  <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
-                                  <span className="text-xs text-gray-800 font-play">{item}</span>
-                                </label>
+                                <div key={item} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={selected.includes(item)} onChange={() => toggleItem(item)} className="rounded" />
+                                    <span className="text-xs text-gray-800 font-play">{item}</span>
+                                  </label>
+                                  <button type="button" onClick={() => { const srcOpts = productOpts.sidewaysPartOptions.length ? productOpts.sidewaysPartOptions : productOpts.revoPartOptions; const next = srcOpts.filter((x: string) => x !== item); if (productOpts.sidewaysPartOptions.length) { setProductOpts(prev => ({ ...prev, sidewaysPartOptions: next })); saveOpts('sidewaysParts', next) } else { setProductOpts(prev => ({ ...prev, revoPartOptions: next })); saveOpts('revoParts', next) }; if (selected.includes(item)) toggleItem(item) }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                </div>
                               ))}
+                              <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                                <input type="text" value={newOptInput['sidewaysParts'] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, sidewaysParts: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput['sidewaysParts'] || '').trim()) { e.preventDefault(); const v = (newOptInput['sidewaysParts'] || '').trim(); const srcList = productOpts.sidewaysPartOptions.length ? productOpts.sidewaysPartOptions : productOpts.revoPartOptions; if (!srcList.includes(v)) { if (productOpts.sidewaysPartOptions.length) { const next = [...productOpts.sidewaysPartOptions, v]; setProductOpts(prev => ({ ...prev, sidewaysPartOptions: next })); saveOpts('sidewaysParts', next) } else { const next = [...productOpts.revoPartOptions, v]; setProductOpts(prev => ({ ...prev, revoPartOptions: next })); saveOpts('revoParts', next) } }; toggleItem(v); setNewOptInput(prev => ({ ...prev, sidewaysParts: '' })) } }} placeholder="+ Add part..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                                <button type="button" onClick={() => { const v = (newOptInput['sidewaysParts'] || '').trim(); if (!v) return; const srcList = productOpts.sidewaysPartOptions.length ? productOpts.sidewaysPartOptions : productOpts.revoPartOptions; if (!srcList.includes(v)) { if (productOpts.sidewaysPartOptions.length) { const next = [...productOpts.sidewaysPartOptions, v]; setProductOpts(prev => ({ ...prev, sidewaysPartOptions: next })); saveOpts('sidewaysParts', next) } else { const next = [...productOpts.revoPartOptions, v]; setProductOpts(prev => ({ ...prev, revoPartOptions: next })); saveOpts('revoParts', next) } }; toggleItem(v); setNewOptInput(prev => ({ ...prev, sidewaysParts: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3479,11 +3527,23 @@ function SettingsTab({
                                 <span className="text-xs font-play">— No Filter —</span>
                               </label>
                               {brandOptions.map((b: string) => (
-                                <label key={b} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                                  <input type="checkbox" checked={selectedBrands.includes(b)} onChange={() => updateSetting(brandKey, selectedBrands.includes(b) ? selectedBrands.filter(x => x !== b) : [...selectedBrands, b])} className="rounded" />
-                                  <span className="text-xs font-play">{b}</span>
-                                </label>
+                                <div key={b} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={selectedBrands.includes(b)} onChange={() => updateSetting(brandKey, selectedBrands.includes(b) ? selectedBrands.filter((x: string) => x !== b) : [...selectedBrands, b])} className="rounded" />
+                                    <span className="text-xs font-play">{b}</span>
+                                  </label>
+                                  <button type="button" onClick={() => {
+                                    const next = brandOptions.filter((x: string) => x !== b)
+                                    setProductOpts(prev => ({ ...prev, customOrgBrands: { ...prev.customOrgBrands, [card.id]: next } }))
+                                    saveOpts('customOrgBrands', { ...productOpts.customOrgBrands, [card.id]: next })
+                                    if (selectedBrands.includes(b)) updateSetting(brandKey, selectedBrands.filter((x: string) => x !== b))
+                                  }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                </div>
                               ))}
+                              <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                                <input type="text" value={newOptInput[`customBrand_${card.id}`] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, [`customBrand_${card.id}`]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput[`customBrand_${card.id}`] || '').trim()) { e.preventDefault(); const v = (newOptInput[`customBrand_${card.id}`] || '').trim(); if (!brandOptions.includes(v)) { const next = [...brandOptions, v]; setProductOpts(prev => ({ ...prev, customOrgBrands: { ...prev.customOrgBrands, [card.id]: next } })); saveOpts('customOrgBrands', { ...productOpts.customOrgBrands, [card.id]: next }) }; if (!selectedBrands.includes(v)) updateSetting(brandKey, [...selectedBrands, v]); setNewOptInput(prev => ({ ...prev, [`customBrand_${card.id}`]: '' })) } }} placeholder="+ Add brand..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                                <button type="button" onClick={() => { const v = (newOptInput[`customBrand_${card.id}`] || '').trim(); if (!v) return; if (!brandOptions.includes(v)) { const next = [...brandOptions, v]; setProductOpts(prev => ({ ...prev, customOrgBrands: { ...prev.customOrgBrands, [card.id]: next } })); saveOpts('customOrgBrands', { ...productOpts.customOrgBrands, [card.id]: next }) }; if (!selectedBrands.includes(v)) updateSetting(brandKey, [...selectedBrands, v]); setNewOptInput(prev => ({ ...prev, [`customBrand_${card.id}`]: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3491,14 +3551,34 @@ function SettingsTab({
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1 font-play">{card.name} Race Class Filter</label>
-                        <div className="flex flex-wrap gap-1">
-                          {productOpts.carClassOptions.map(cls => (
-                            <button key={cls} type="button" onClick={() => updateSetting(classKey, selectedClasses.includes(cls) ? selectedClasses.filter(c => c !== cls) : [...selectedClasses, cls])}
-                              className={`px-2 py-0.5 text-[10px] font-play rounded-full border transition-colors ${selectedClasses.includes(cls) ? 'bg-purple-600 text-white border-purple-600' : 'bg-white text-gray-600 border-gray-300 hover:border-purple-400'}`}>
-                              {cls}
-                            </button>
-                          ))}
+                        <div className="relative">
+                          <button type="button" onClick={() => setCustomOrgClassDropdowns(prev => ({ ...prev, [card.id]: !prev[card.id] }))} className={`w-full px-3 py-2 border rounded-lg text-sm font-play text-left flex items-center justify-between bg-white ${selectedClasses.length > 0 ? 'border-purple-300 bg-purple-50' : 'border-gray-200'}`}>
+                            <span className={selectedClasses.length === 0 ? 'text-gray-400' : 'text-gray-800'}>{selectedClasses.length === 0 ? '— No Filter —' : selectedClasses.length === 1 ? selectedClasses[0] : `${selectedClasses.length} selected`}</span>
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          </button>
+                          {customOrgClassDropdowns[card.id] && (
+                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                                <input type="checkbox" checked={selectedClasses.length === 0} onChange={() => updateSetting(classKey, [])} className="rounded" />
+                                <span className="text-xs font-play">— No Filter —</span>
+                              </label>
+                              {productOpts.carClassOptions.map(cls => (
+                                <div key={cls} className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50">
+                                  <label className="flex-1 flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={selectedClasses.includes(cls)} onChange={() => updateSetting(classKey, selectedClasses.includes(cls) ? selectedClasses.filter(c => c !== cls) : [...selectedClasses, cls])} className="rounded" />
+                                    <span className="text-xs font-play">{cls}</span>
+                                  </label>
+                                  <button type="button" onClick={() => { const next = productOpts.carClassOptions.filter(x => x !== cls); setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next); if (selectedClasses.includes(cls)) updateSetting(classKey, selectedClasses.filter(c => c !== cls)) }} className="p-0.5 text-gray-300 hover:text-red-500 flex-shrink-0"><svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                                </div>
+                              ))}
+                              <div className="border-t border-gray-100 px-2 py-1.5 flex gap-1">
+                                <input type="text" value={newOptInput[`customClass_${card.id}`] || ''} onChange={e => setNewOptInput(prev => ({ ...prev, [`customClass_${card.id}`]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter' && (newOptInput[`customClass_${card.id}`] || '').trim()) { e.preventDefault(); const v = (newOptInput[`customClass_${card.id}`] || '').trim(); if (!productOpts.carClassOptions.includes(v)) { const next = [...productOpts.carClassOptions, v]; setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next) }; if (!selectedClasses.includes(v)) updateSetting(classKey, [...selectedClasses, v]); setNewOptInput(prev => ({ ...prev, [`customClass_${card.id}`]: '' })) } }} placeholder="+ Add class..." className="flex-1 text-xs border border-gray-200 rounded px-2 py-0.5 focus:ring-1 focus:ring-gray-400 font-play" />
+                                <button type="button" onClick={() => { const v = (newOptInput[`customClass_${card.id}`] || '').trim(); if (!v) return; if (!productOpts.carClassOptions.includes(v)) { const next = [...productOpts.carClassOptions, v]; setProductOpts(prev => ({ ...prev, carClassOptions: next })); saveOpts('carClasses', next) }; if (!selectedClasses.includes(v)) updateSetting(classKey, [...selectedClasses, v]); setNewOptInput(prev => ({ ...prev, [`customClass_${card.id}`]: '' })) }} className="text-[10px] px-2 py-0.5 bg-gray-900 text-white rounded hover:bg-gray-700 font-play">+Add</button>
+                              </div>
+                            </div>
+                          )}
                         </div>
+                        {selectedClasses.length > 0 && <div className="flex flex-wrap gap-1 mt-1">{selectedClasses.map(v => <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-play font-semibold rounded-full">{v}<button onClick={() => updateSetting(classKey, selectedClasses.filter(c => c !== v))}>×</button></span>)}</div>}
                       </div>
                     </div>
                   )}
