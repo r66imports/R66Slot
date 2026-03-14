@@ -101,7 +101,15 @@ export default function AdminLayout({
           { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
         ]
       },
-      { name: 'Customers', href: '/admin/contacts', icon: '👥' },
+      {
+        name: 'Contacts',
+        href: '/admin/contacts',
+        icon: '👥',
+        submenu: [
+          { name: 'Customers', href: '/admin/contacts', icon: '👤' },
+          { name: 'Suppliers', href: '/admin/supplier-contacts', icon: '🏭' },
+        ]
+      },
       { name: 'Local Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Sage Accounting', href: '/admin/sage', icon: '📊' },
