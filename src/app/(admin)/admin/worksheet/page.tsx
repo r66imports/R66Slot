@@ -959,6 +959,7 @@ function WorksheetEditor({
                           value={it.sku || it.skuSearch}
                           onFocus={() => setActiveSkuRow(it.id)}
                           onChange={(e) => { updateItem(it.id, { sku: '', skuSearch: e.target.value }); setActiveSkuRow(it.id) }}
+                          onBlur={() => { if (!it.sku && it.skuSearch) updateItem(it.id, { sku: it.skuSearch, skuSearch: '' }) }}
                           placeholder="SKU or name"
                           className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
                         />
