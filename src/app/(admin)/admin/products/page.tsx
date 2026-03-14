@@ -974,7 +974,16 @@ export default function ProductsPage() {
                         {/* SKU */}
                         {visibleCols.sku && (
                           <td className="py-2 px-2">
-                            <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
+                            {product.sku ? (
+                              <Link
+                                href={`/admin/products/${product.id}?focus=sku`}
+                                className="font-mono text-xs text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                {product.sku}
+                              </Link>
+                            ) : (
+                              <span className="font-mono text-xs text-gray-400">—</span>
+                            )}
                           </td>
                         )}
 

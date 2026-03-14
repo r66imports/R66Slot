@@ -128,6 +128,8 @@ export default function EditProductPage({
   const [mediaCollapsed, setMediaCollapsed] = useState(false)
   const [pricingCollapsed, setPricingCollapsed] = useState(false)
   const [inventoryCollapsed, setInventoryCollapsed] = useState(false)
+  const [skuHighlighted, setSkuHighlighted] = useState(false)
+  const skuRef = useRef<HTMLInputElement>(null)
   const [shippingCollapsed, setShippingCollapsed] = useState(false)
   const [statusCollapsed, setStatusCollapsed] = useState(false)
   const [sageCollapsed, setSageCollapsed] = useState(false)
@@ -350,6 +352,17 @@ export default function EditProductPage({
       }
     } catch (err) {
       console.error('Error loading product:', err)
+      // Focus SKU field if ?focus=sku
+      if (new URLSearchParams(window.location.search).get('focus') === 'sku') {
+        setInventoryCollapsed(false)
+        setTimeout(() => {
+          skuRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          skuRef.current?.focus()
+          skuRef.current?.select()
+          setSkuHighlighted(true)
+          setTimeout(() => setSkuHighlighted(false), 3000)
+        }, 150)
+      }
     } finally {
       setLoading(false)
       isLoaded.current = true
@@ -967,10 +980,11 @@ export default function EditProductPage({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">SKU (Stock Keeping Unit)</label>
                     <input
+                      ref={skuRef}
                       type="text"
                       value={sku}
                       onChange={(e) => setSku(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent transition-all duration-300 ${skuHighlighted ? 'border-blue-500 ring-2 ring-blue-400 bg-blue-50' : 'border-gray-300 focus:ring-gray-900'}`}
                     />
                   </div>
                   <div>
