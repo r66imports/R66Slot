@@ -180,9 +180,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       productType: obj['unit'] || obj['category'] || obj['type'] || '',
       itemCategories: obj['unit'] || obj['type'] || '',
       // SRP: inclusive takes priority, fall back to exclusive / generic price columns
-      price: obj['srp – inclusive'] || obj['srp inclusive'] || obj['srp – exclusive'] || obj['srp exclusive'] || obj['retail price'] || obj['price'] || '0',
+      price: obj['srp - inclusive'] || obj['srp inclusive'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['retail price'] || obj['price'] || '0',
       // Cost: inclusive takes priority, fall back to exclusive / generic cost columns
-      costPerItem: obj['cost – inclusive'] || obj['cost inclusive'] || obj['cost – exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
+      costPerItem: obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
       // Average Cost → stored in compare_at_price (internal use, not shown to customers)
       compareAtPrice: obj['average cost'] || obj['avg cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || '0',
@@ -220,8 +220,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
-      price: obj['srp – exclusive'] || obj['srp exclusive'] || obj['srp – inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost – exclusive'] || obj['cost exclusive'] || obj['cost – inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -252,8 +252,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       productType: obj['unit'] || obj['type'] || 'Parts',
       itemCategories: obj['unit'] || obj['type'] || '',
       partType: obj['part_type'] || obj['parttype'] || '',
-      price: obj['srp – exclusive'] || obj['srp exclusive'] || obj['srp – inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost – exclusive'] || obj['cost exclusive'] || obj['cost – inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -285,8 +285,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/24',
-      price: obj['srp – exclusive'] || obj['srp exclusive'] || obj['srp – inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost – exclusive'] || obj['cost exclusive'] || obj['cost – inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -318,8 +318,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
-      price: obj['srp – exclusive'] || obj['srp exclusive'] || obj['srp – inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost – exclusive'] || obj['cost exclusive'] || obj['cost – inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -351,8 +351,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
-      price: obj['srp – exclusive'] || obj['srp exclusive'] || obj['srp – inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost – exclusive'] || obj['cost exclusive'] || obj['cost – inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -648,7 +648,9 @@ export default function ProductsPage() {
     const profile = IMPORT_PROFILES[importProfile]
     try {
       const lines = importText.trim().split('\n').map((l) => l.replace(/\r$/, ''))
-      const headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase())
+      // Normalize all dash variants (en-dash, em-dash, etc.) to regular hyphen
+      const normalizeHeader = (h: string) => h.toLowerCase().replace(/[\u2013\u2014\u2012\u2015]/g, '-').trim()
+      const headers = parseCSVLine(lines[0]).map(normalizeHeader)
       const rows = lines.slice(1).filter((l) => l.trim()).map((line) => {
         const values = parseCSVLine(line)
         const obj: Record<string, string> = {}
