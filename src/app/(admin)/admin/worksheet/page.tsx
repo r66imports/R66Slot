@@ -32,8 +32,10 @@ interface WsItem {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CURRENCY_DEFAULTS: Record<string, number> = {
-  USD: 18.5, EUR: 20.0, GBP: 23.5, ZAR: 1.0,
+  USD: 18.5, EUR: 20.0, GBP: 23.5, SGD: 13.5, CNY: 2.55, HKD: 2.4, ZAR: 1.0,
 }
+
+const DISPLAY_CURRENCIES = ['USD', 'EUR', 'GBP', 'SGD', 'CNY', 'HKD']
 
 function newWsItem(): WsItem {
   return {
@@ -135,6 +137,34 @@ function WorksheetEditor({
   const [finalMarkupPct, setFinalMarkupPct] = useState(40)
   const [finalVatPct, setFinalVatPct] = useState(15)
 
+  // Live FX rates (1 CURRENCY = R ?)
+  const [fxRates, setFxRates] = useState<Record<string, number>>(CURRENCY_DEFAULTS)
+  const [fxUpdated, setFxUpdated] = useState('')
+  const [fxLoading, setFxLoading] = useState(false)
+
+  const fetchRates = useCallback(async () => {
+    setFxLoading(true)
+    try {
+      const res = await fetch('https://api.exchangerate-api.com/v4/latest/ZAR')
+      const data = await res.json()
+      const raw = data.rates as Record<string, number>
+      const zarRates: Record<string, number> = { ZAR: 1 }
+      for (const [cur, r] of Object.entries(raw)) {
+        if (r > 0) zarRates[cur] = parseFloat((1 / r).toFixed(4))
+      }
+      setFxRates(zarRates)
+      setFxUpdated(new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }))
+    } catch { /* keep defaults */ } finally {
+      setFxLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchRates()
+    const t = setInterval(fetchRates, 5 * 60 * 1000)
+    return () => clearInterval(t)
+  }, [fetchRates])
+
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showAddClient, setShowAddClient] = useState(false)
   // track which row's dropdown is open
@@ -154,7 +184,7 @@ function WorksheetEditor({
 
   function handleCurrencyChange(c: string) {
     setCurrency(c)
-    setExchangeRate(CURRENCY_DEFAULTS[c] ?? 1)
+    setExchangeRate(fxRates[c] ?? CURRENCY_DEFAULTS[c] ?? 1)
   }
 
   function calcLanded(w: number) { return w * exchangeRate * (1 + shippingPct / 100) }
@@ -300,6 +330,35 @@ function WorksheetEditor({
 
   return (
     <div className="space-y-6">
+      {/* Live Exchange Rates */}
+      <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Live Exchange Rates → ZAR</p>
+          <div className="flex items-center gap-3">
+            {fxUpdated && <span className="text-xs text-gray-400">Updated {fxUpdated}</span>}
+            <button onClick={fetchRates} disabled={fxLoading}
+              className="text-xs text-blue-600 hover:text-blue-800 disabled:opacity-40 flex items-center gap-1">
+              {fxLoading ? '⏳' : '↻'} {fxLoading ? 'Fetching…' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {DISPLAY_CURRENCIES.map((cur) => {
+            const rate = fxRates[cur] ?? CURRENCY_DEFAULTS[cur]
+            const isActive = currency === cur
+            return (
+              <button key={cur} onClick={() => { setCurrency(cur); setExchangeRate(rate) }}
+                className={`rounded-xl p-3 text-center border transition-all ${isActive ? 'bg-blue-600 border-blue-600 text-white' : 'bg-gray-50 border-gray-200 hover:bg-blue-50 hover:border-blue-300'}`}>
+                <p className={`text-[11px] font-bold uppercase ${isActive ? 'text-blue-100' : 'text-gray-500'}`}>{cur}</p>
+                <p className={`text-lg font-bold leading-tight ${isActive ? 'text-white' : 'text-gray-900'}`}>R {rate.toFixed(2)}</p>
+                <p className={`text-[10px] ${isActive ? 'text-blue-200' : 'text-gray-400'}`}>per 1 {cur}</p>
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-[10px] text-gray-400 mt-2">Click a currency to apply it to the Costing Calculator · Rates via exchangerate-api.com · Auto-refresh every 5 min</p>
+      </div>
+
       {/* Compact Costing Calculator */}
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-4">
         <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3">Costing Calculator</p>
@@ -360,6 +419,41 @@ function WorksheetEditor({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Final Costing Calculator */}
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
+        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Final Costing Calculator</p>
+        <p className="text-xs text-emerald-600 mb-3">Drives the <span className="font-semibold">Final Landed</span> and <span className="font-semibold">Landed Retail</span> columns in the table below.</p>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Currency</label>
+            <select value={finalCurrency} onChange={(e) => { setFinalCurrency(e.target.value); setFinalExRate(fxRates[e.target.value] ?? CURRENCY_DEFAULTS[e.target.value] ?? 1) }}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+              {Object.keys(CURRENCY_DEFAULTS).map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">1 {finalCurrency} = R</label>
+            <input type="number" min={0} step={0.01} value={finalExRate} onChange={(e) => setFinalExRate(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Shipping &amp; Customs %</label>
+            <input type="number" min={0} step={1} value={finalShippingPct} onChange={(e) => setFinalShippingPct(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Markup %</label>
+            <input type="number" min={0} step={1} value={finalMarkupPct} onChange={(e) => setFinalMarkupPct(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">VAT %</label>
+            <input type="number" min={0} step={1} value={finalVatPct} onChange={(e) => setFinalVatPct(Number(e.target.value))}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
           </div>
         </div>
       </div>
@@ -582,41 +676,6 @@ function WorksheetEditor({
             className="mt-3 w-full border-2 border-dashed border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 rounded-xl py-2 text-sm transition-colors">
             + Add Row
           </button>
-        </div>
-      </div>
-
-      {/* Final Costing Calculator */}
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
-        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Final Costing Calculator</p>
-        <p className="text-xs text-emerald-600 mb-3">Drives the <span className="font-semibold">Final Landed</span> and <span className="font-semibold">Landed Retail</span> columns in the table above.</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Currency</label>
-            <select value={finalCurrency} onChange={(e) => { setFinalCurrency(e.target.value); setFinalExRate(CURRENCY_DEFAULTS[e.target.value] ?? 1) }}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
-              {Object.keys(CURRENCY_DEFAULTS).map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">1 {finalCurrency} = R</label>
-            <input type="number" min={0} step={0.01} value={finalExRate} onChange={(e) => setFinalExRate(Number(e.target.value))}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Shipping &amp; Customs %</label>
-            <input type="number" min={0} step={1} value={finalShippingPct} onChange={(e) => setFinalShippingPct(Number(e.target.value))}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Markup %</label>
-            <input type="number" min={0} step={1} value={finalMarkupPct} onChange={(e) => setFinalMarkupPct(Number(e.target.value))}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">VAT %</label>
-            <input type="number" min={0} step={1} value={finalVatPct} onChange={(e) => setFinalVatPct(Number(e.target.value))}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-          </div>
         </div>
       </div>
 
