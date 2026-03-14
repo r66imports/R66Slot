@@ -658,7 +658,7 @@ export default function ProductsPage() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
-  const allRevoParts = Array.from(new Set(products.flatMap((p) => p.revoParts || []))).sort()
+  const allRevoParts = Array.from(new Set(products.flatMap((p) => p.itemCategories || []))).sort()
 
   const COL_LABELS: Record<string, string> = {
     sku: 'SKU', brand: 'Brand', categories: 'Categories', price: 'Price',
@@ -675,7 +675,7 @@ export default function ProductsPage() {
     .filter((p) => {
       const matchBrand = !brandFilter || p.brand?.toLowerCase() === brandFilter.toLowerCase()
       const matchCat = categoryFilters.length === 0 || categoryFilters.some((f) => (p.collections || []).includes(f) || (p.categories || []).includes(f))
-      const matchRevo = !revoFilter || (p.revoParts || []).includes(revoFilter)
+      const matchRevo = !revoFilter || (p.itemCategories || []).includes(revoFilter)
       const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
       return matchBrand && matchCat && matchRevo && matchSearch
     })
@@ -784,7 +784,7 @@ export default function ProductsPage() {
             onClick={() => setShowCatDropdown((v) => !v)}
             className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 ${categoryFilters.length > 0 ? 'border-gray-900 font-semibold text-gray-900 bg-gray-50' : 'border-gray-300 text-gray-700'}`}
           >
-            {categoryFilters.length === 0 ? 'All Categories' : `${categoryFilters.length} selected`}
+            {categoryFilters.length === 0 ? 'Race Classes' : `${categoryFilters.length} selected`}
             <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
@@ -792,7 +792,7 @@ export default function ProductsPage() {
           {showCatDropdown && (
             <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[240px] py-2 max-h-72 overflow-y-auto">
               <div className="flex items-center justify-between px-3 pb-1.5 border-b border-gray-100 mb-1">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Filter by Category</p>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Filter by Race Class</p>
                 {categoryFilters.length > 0 && (
                   <button onClick={() => setCategoryFilters([])} className="text-[10px] text-red-500 hover:text-red-700 font-medium">Clear all</button>
                 )}
@@ -828,14 +828,14 @@ export default function ProductsPage() {
           )}
         </div>
 
-        {/* Revo Parts filter */}
+        {/* Item Categories (Unit) filter */}
         {allRevoParts.length > 0 && (
           <select
             value={revoFilter}
             onChange={(e) => setRevoFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900"
           >
-            <option value="">All Revo Parts</option>
+            <option value="">Item Categories (Unit)</option>
             {allRevoParts.map((part) => (
               <option key={part} value={part}>{part}</option>
             ))}
