@@ -938,7 +938,7 @@ export default function EditProductPage({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Compare at price</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Average Cost <span className="text-xs text-gray-400 font-normal">(internal)</span></label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-gray-500">R</span>
                     <input
