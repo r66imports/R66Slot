@@ -1169,6 +1169,8 @@ function WorksheetEditor({
         <AddProductModal
           onClose={() => setShowAddProduct(false)}
           onSaved={() => { onRefresh(); setShowAddProduct(false) }}
+          suppliers={suppliers}
+          brandOptions={[...new Set(products.map((p) => p.brand).filter(Boolean))].sort()}
         />
       )}
 
@@ -1185,7 +1187,14 @@ function WorksheetEditor({
 
 // ─── Add Product Modal ────────────────────────────────────────────────────────
 
-function AddProductModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function AddProductModal({
+  onClose, onSaved, suppliers: initSuppliers, brandOptions,
+}: {
+  onClose: () => void
+  onSaved: () => void
+  suppliers: SupplierContact[]
+  brandOptions: string[]
+}) {
   const [form, setForm] = useState({
     title: '', sku: '', brand: '', description: '', price: '', cost_per_item: '',
     quantity: '', status: 'active', supplier: '',
@@ -1193,7 +1202,38 @@ function AddProductModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Brand state: 'select' shows dropdown, 'custom' shows text input
+  const [brandMode, setBrandMode] = useState<'select' | 'custom'>('select')
+
+  // Supplier state
+  const [localSuppliers, setLocalSuppliers] = useState<SupplierContact[]>(initSuppliers)
+  const [showAddSupplier, setShowAddSupplier] = useState(false)
+  const [newSupplierName, setNewSupplierName] = useState('')
+  const [addingSupplier, setAddingSupplier] = useState(false)
+
   function set(field: string, value: string) { setForm((f) => ({ ...f, [field]: value })) }
+
+  async function addSupplier() {
+    if (!newSupplierName.trim()) return
+    setAddingSupplier(true)
+    try {
+      const res = await fetch('/api/admin/supplier-contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newSupplierName.trim(), code: newSupplierName.trim().toUpperCase().slice(0, 6) }),
+      })
+      if (res.ok) {
+        const saved = await res.json()
+        // Refresh local supplier list
+        const listRes = await fetch('/api/admin/supplier-contacts')
+        const updated = listRes.ok ? await listRes.json() : [...localSuppliers, saved]
+        setLocalSuppliers(updated)
+        set('supplier', saved.name)
+        setNewSupplierName('')
+        setShowAddSupplier(false)
+      }
+    } finally { setAddingSupplier(false) }
+  }
 
   async function save() {
     if (!form.title.trim()) { setError('Product name is required'); return }
@@ -1228,37 +1268,66 @@ function AddProductModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
           {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="grid grid-cols-2 gap-3">
+
+            {/* Product Name */}
             <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Product Name *</label>
               <input autoFocus value={form.title} onChange={(e) => set('title', e.target.value)}
                 placeholder="e.g. Revo Slot Car 1/32"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            {/* SKU */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">SKU</label>
               <input value={form.sku} onChange={(e) => set('sku', e.target.value)} placeholder="SKU-001"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            {/* Brand — dropdown + toggle to custom */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Brand</label>
-              <input value={form.brand} onChange={(e) => set('brand', e.target.value)} placeholder="e.g. Revo"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600">Brand</label>
+                <button type="button"
+                  onClick={() => { setBrandMode((m) => m === 'select' ? 'custom' : 'select'); set('brand', '') }}
+                  className="text-[10px] text-blue-500 hover:text-blue-700">
+                  {brandMode === 'select' ? '+ New brand' : '← Pick existing'}
+                </button>
+              </div>
+              {brandMode === 'select' ? (
+                <select value={form.brand} onChange={(e) => set('brand', e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="">Select brand…</option>
+                  {brandOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              ) : (
+                <input value={form.brand} onChange={(e) => set('brand', e.target.value)} placeholder="Type new brand name"
+                  className="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              )}
             </div>
+
+            {/* Retail Price */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Retail Price (ZAR)</label>
               <input type="number" min={0} step={0.01} value={form.price} onChange={(e) => set('price', e.target.value)} placeholder="0.00"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            {/* Cost Price */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Cost Price (ZAR)</label>
               <input type="number" min={0} step={0.01} value={form.cost_per_item} onChange={(e) => set('cost_per_item', e.target.value)} placeholder="0.00"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            {/* Qty */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Qty in Stock</label>
               <input type="number" min={0} value={form.quantity} onChange={(e) => set('quantity', e.target.value)} placeholder="0"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            {/* Status */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
               <select value={form.status} onChange={(e) => set('status', e.target.value)}
@@ -1267,16 +1336,51 @@ function AddProductModal({ onClose, onSaved }: { onClose: () => void; onSaved: (
                 <option value="draft">Draft</option>
               </select>
             </div>
+
+            {/* Description */}
             <div className="col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
               <textarea rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} placeholder="Short description..."
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+
+            {/* Supplier — dropdown + inline add */}
             <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Supplier</label>
-              <input value={form.supplier} onChange={(e) => set('supplier', e.target.value)} placeholder="Supplier name"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-gray-600">Supplier</label>
+                <button type="button"
+                  onClick={() => setShowAddSupplier((v) => !v)}
+                  className="flex items-center gap-0.5 text-[10px] text-blue-500 hover:text-blue-700">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add new supplier
+                </button>
+              </div>
+              <select value={form.supplier} onChange={(e) => set('supplier', e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Select supplier…</option>
+                {localSuppliers.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
+              </select>
+
+              {/* Inline add new supplier */}
+              {showAddSupplier && (
+                <div className="mt-2 flex gap-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                  <input
+                    value={newSupplierName}
+                    onChange={(e) => setNewSupplierName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSupplier() } }}
+                    placeholder="New supplier name"
+                    className="flex-1 border border-blue-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button type="button" onClick={addSupplier} disabled={addingSupplier || !newSupplierName.trim()}
+                    className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {addingSupplier ? '…' : 'Save'}
+                  </button>
+                  <button type="button" onClick={() => { setShowAddSupplier(false); setNewSupplierName('') }}
+                    className="px-2 py-1.5 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                </div>
+              )}
             </div>
+
           </div>
         </div>
         <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
