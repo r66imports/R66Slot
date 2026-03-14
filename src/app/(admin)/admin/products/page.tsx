@@ -226,12 +226,12 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'NSR',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
       (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
-      p.price, p.costPerItem ?? '',
+      p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
     ],
@@ -255,12 +255,12 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Revo',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
       (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
-      p.price, p.costPerItem ?? '',
+      p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
     ],
@@ -285,12 +285,12 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'BRM',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
       (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
-      p.price, p.costPerItem ?? '',
+      p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
     ],
@@ -315,12 +315,12 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Pioneer',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
       (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
-      p.price, p.costPerItem ?? '',
+      p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
     ],
@@ -345,12 +345,12 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Sideways',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
       (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
-      p.price, p.costPerItem ?? '',
+      p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
     ],
@@ -535,7 +535,7 @@ export default function ProductsPage() {
       ),
     ].join('\n')
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
     a.download = `${profileKey}-products-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
@@ -602,7 +602,7 @@ export default function ProductsPage() {
   const downloadTemplate = () => {
     const profile = IMPORT_PROFILES[importProfile]
     const csv = profile.template + '\n' + profile.placeholder
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
