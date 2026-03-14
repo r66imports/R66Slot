@@ -497,6 +497,8 @@ export default function ContactsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [syncing, setSyncing]         = useState(false)
   const [syncMsg, setSyncMsg]         = useState('')
+  const [sortBy, setSortBy]           = useState<string>('name')
+  const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('asc')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -595,19 +597,35 @@ export default function ContactsPage() {
     URL.revokeObjectURL(url)
   }
 
-  // ── Filtered ──────────────────────────────────────────────────────────────
-  const filtered = contacts.filter(c => {
-    if (!searchQuery.trim()) return true
-    const q = searchQuery.toLowerCase()
-    return (
-      fullName(c).toLowerCase().includes(q) ||
-      c.email.toLowerCase().includes(q) ||
-      c.phone.includes(q) ||
-      c.addressCity.toLowerCase().includes(q) ||
-      c.clubName.toLowerCase().includes(q) ||
-      c.companyName.toLowerCase().includes(q)
-    )
-  })
+  // ── Filtered + Sorted ─────────────────────────────────────────────────────
+  const filtered = contacts
+    .filter(c => {
+      if (!searchQuery.trim()) return true
+      const q = searchQuery.toLowerCase()
+      return (
+        fullName(c).toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        c.addressCity.toLowerCase().includes(q) ||
+        c.clubName.toLowerCase().includes(q) ||
+        c.companyName.toLowerCase().includes(q)
+      )
+    })
+    .sort((a, b) => {
+      let av: string | number = ''
+      let bv: string | number = ''
+      if      (sortBy === 'name')    { av = fullName(a); bv = fullName(b) }
+      else if (sortBy === 'email')   { av = a.email || ''; bv = b.email || '' }
+      else if (sortBy === 'club')    { av = a.clubName || ''; bv = b.clubName || '' }
+      else if (sortBy === 'company') { av = a.companyName || ''; bv = b.companyName || '' }
+      else if (sortBy === 'orders')  { av = a.totalOrders ?? 0; bv = b.totalOrders ?? 0 }
+      else if (sortBy === 'spent')   { av = a.totalSpent ?? 0; bv = b.totalSpent ?? 0 }
+      else if (sortBy === 'source')  { av = a.source || ''; bv = b.source || '' }
+      const cmp = typeof av === 'number' && typeof bv === 'number'
+        ? av - bv
+        : String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   // ── Stats ─────────────────────────────────────────────────────────────────
   const stats = {
@@ -745,16 +763,33 @@ export default function ContactsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Address</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Club</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Business</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[140px]">Delivery</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Orders</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Spent</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Source</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                  {(() => {
+                    const SortTh = ({ col, label, align = 'left', className = '' }: { col: string; label: string; align?: 'left'|'right'|'center'; className?: string }) => {
+                      const active = sortBy === col
+                      return (
+                        <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${className}`}
+                          onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}>
+                          <span className="inline-flex items-center gap-1">{label}
+                            <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && sortDir === 'desc' ? '↑' : '↓'}</span>
+                          </span>
+                        </th>
+                      )
+                    }
+                    return (
+                      <>
+                        <SortTh col="name" label="Name" />
+                        <SortTh col="email" label="Contact" />
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Address</th>
+                        <SortTh col="club" label="Club" />
+                        <SortTh col="company" label="Business" />
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[140px]">Delivery</th>
+                        <SortTh col="orders" label="Orders" align="center" />
+                        <SortTh col="spent" label="Spent" align="right" />
+                        <SortTh col="source" label="Source" align="center" />
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                      </>
+                    )
+                  })()}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

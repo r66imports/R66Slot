@@ -22,6 +22,8 @@ type SlotifyOrder = {
 export default function SlotifyOrdersPage() {
   const [orders, setOrders] = useState<SlotifyOrder[]>([])
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'shipped' | 'delivered'>('all')
+  const [sortBy, setSortBy] = useState<string>('bookedAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   // Load orders from localStorage
   useEffect(() => {
@@ -57,9 +59,24 @@ export default function SlotifyOrdersPage() {
     a.click()
   }
 
-  const filteredOrders = filter === 'all'
-    ? orders
-    : orders.filter(order => order.status === filter)
+  const filteredOrders = (filter === 'all' ? orders : orders.filter(order => order.status === filter))
+    .slice()
+    .sort((a, b) => {
+      let av: string | number = ''
+      let bv: string | number = ''
+      if      (sortBy === 'sku')        { av = a.sku || ''; bv = b.sku || '' }
+      else if (sortBy === 'description'){ av = a.description || ''; bv = b.description || '' }
+      else if (sortBy === 'customer')   { av = a.customerName || ''; bv = b.customerName || '' }
+      else if (sortBy === 'brand')      { av = a.brand || ''; bv = b.brand || '' }
+      else if (sortBy === 'price')      { av = Number(a.preOrderPrice) || 0; bv = Number(b.preOrderPrice) || 0 }
+      else if (sortBy === 'qty')        { av = a.qty ?? 0; bv = b.qty ?? 0 }
+      else if (sortBy === 'status')     { av = a.status || ''; bv = b.status || '' }
+      else if (sortBy === 'bookedAt')   { av = a.bookedAt || ''; bv = b.bookedAt || '' }
+      const cmp = typeof av === 'number' && typeof bv === 'number'
+        ? av - bv
+        : String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   const getStatusBadge = (status: string) => {
     const styles = {
@@ -130,17 +147,34 @@ export default function SlotifyOrdersPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-3 px-4">Order ID</th>
-                    <th className="text-left py-3 px-4">SKU</th>
-                    <th className="text-left py-3 px-4">Description</th>
-                    <th className="text-left py-3 px-4">Customer</th>
-                    <th className="text-left py-3 px-4">Brand</th>
-                    <th className="text-left py-3 px-4">Price (R)</th>
-                    <th className="text-left py-3 px-4">Qty</th>
-                    <th className="text-left py-3 px-4">Status</th>
-                    <th className="text-left py-3 px-4">Booked Date</th>
-                    <th className="text-left py-3 px-4">Actions</th>
+                  <tr className="border-b bg-gray-50 text-xs uppercase tracking-wide">
+                    {(() => {
+                      const SortTh = ({ col, label, align = 'left' }: { col: string; label: string; align?: 'left'|'right'|'center' }) => {
+                        const active = sortBy === col
+                        return (
+                          <th className={`py-3 px-4 cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                            onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}>
+                            <span className="inline-flex items-center gap-1">{label}
+                              <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && sortDir === 'desc' ? '↑' : '↓'}</span>
+                            </span>
+                          </th>
+                        )
+                      }
+                      return (
+                        <>
+                          <th className="text-left py-3 px-4 text-gray-500 text-xs uppercase">Order ID</th>
+                          <SortTh col="sku" label="SKU" />
+                          <SortTh col="description" label="Description" />
+                          <SortTh col="customer" label="Customer" />
+                          <SortTh col="brand" label="Brand" />
+                          <SortTh col="price" label="Price (R)" align="right" />
+                          <SortTh col="qty" label="Qty" align="right" />
+                          <SortTh col="status" label="Status" align="center" />
+                          <SortTh col="bookedAt" label="Booked Date" />
+                          <th className="text-left py-3 px-4 text-gray-500 text-xs uppercase">Actions</th>
+                        </>
+                      )
+                    })()}
                   </tr>
                 </thead>
                 <tbody>

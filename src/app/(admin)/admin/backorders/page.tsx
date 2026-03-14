@@ -1397,6 +1397,8 @@ export default function BackordersPage() {
   const [products, setProducts] = useState<ProductRef[]>([])
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<string>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1786,19 +1788,35 @@ export default function BackordersPage() {
   }
 
   // ── Filtered List ───────────────────────────────────────────────────────────
-  const filtered = backorders.filter((b) => {
-    const matchStatus = filterStatus === 'all' || b.status === filterStatus
-    const q = search.toLowerCase()
-    const matchSearch =
-      !q ||
-      b.clientName.toLowerCase().includes(q) ||
-      b.sku.toLowerCase().includes(q) ||
-      b.description.toLowerCase().includes(q) ||
-      b.brand.toLowerCase().includes(q) ||
-      (b.clubName || '').toLowerCase().includes(q) ||
-      (b.companyName || '').toLowerCase().includes(q)
-    return matchStatus && matchSearch
-  })
+  const filtered = backorders
+    .filter((b) => {
+      const matchStatus = filterStatus === 'all' || b.status === filterStatus
+      const q = search.toLowerCase()
+      const matchSearch =
+        !q ||
+        b.clientName.toLowerCase().includes(q) ||
+        b.sku.toLowerCase().includes(q) ||
+        b.description.toLowerCase().includes(q) ||
+        b.brand.toLowerCase().includes(q) ||
+        (b.clubName || '').toLowerCase().includes(q) ||
+        (b.companyName || '').toLowerCase().includes(q)
+      return matchStatus && matchSearch
+    })
+    .sort((a, b) => {
+      let av: string | number = ''
+      let bv: string | number = ''
+      if      (sortBy === 'date')     { av = a.createdAt || ''; bv = b.createdAt || '' }
+      else if (sortBy === 'client')   { av = a.clientName || ''; bv = b.clientName || '' }
+      else if (sortBy === 'sku')      { av = a.sku || ''; bv = b.sku || '' }
+      else if (sortBy === 'supplier') { av = a.supplier || ''; bv = b.supplier || '' }
+      else if (sortBy === 'qty')      { av = a.qty ?? 0; bv = b.qty ?? 0 }
+      else if (sortBy === 'price')    { av = a.price ?? 0; bv = b.price ?? 0 }
+      else if (sortBy === 'status')   { av = a.status || ''; bv = b.status || '' }
+      const cmp = typeof av === 'number' && typeof bv === 'number'
+        ? av - bv
+        : String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   const stats = {
     total: backorders.length,
@@ -2008,16 +2026,33 @@ export default function BackordersPage() {
                       className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     />
                   </th>
-                  <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Date</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU / Product</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Supplier</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Price</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[320px]">Order Status</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Found</th>
-                  <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                  {(() => {
+                    const SortTh = ({ col, label, align = 'left', className = '' }: { col: string; label: string; align?: 'left'|'right'|'center'; className?: string }) => {
+                      const active = sortBy === col
+                      return (
+                        <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${className}`}
+                          onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}>
+                          <span className="inline-flex items-center gap-1">{label}
+                            <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && sortDir === 'desc' ? '↑' : '↓'}</span>
+                          </span>
+                        </th>
+                      )
+                    }
+                    return (
+                      <>
+                        <SortTh col="date" label="Date" className="px-3" />
+                        <SortTh col="client" label="Client" />
+                        <SortTh col="sku" label="SKU / Product" />
+                        <SortTh col="supplier" label="Supplier" />
+                        <SortTh col="qty" label="Qty" align="right" />
+                        <SortTh col="price" label="Price" align="right" />
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[320px]">Order Status</th>
+                        <SortTh col="status" label="Status" align="center" />
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Found</th>
+                        <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                      </>
+                    )
+                  })()}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

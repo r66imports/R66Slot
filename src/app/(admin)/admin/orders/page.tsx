@@ -1282,6 +1282,8 @@ export default function OrdersPage() {
   const [clients, setClients] = useState<ClientContact[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<Tab>('backorders')
+  const [docSortBy, setDocSortBy] = useState<string>('date')
+  const [docSortDir, setDocSortDir] = useState<'asc' | 'desc'>('desc')
   const [showTemplate, setShowTemplate] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [compileDocType, setCompileDocType] = useState<DocType>('quote')
@@ -1337,7 +1339,26 @@ export default function OrdersPage() {
   const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders
 
   const boRows = tab !== 'backorders' ? backorders.filter(cfg.boPhase) : []
-  const docRows = tab !== 'backorders' ? documents.filter((d) => d.type === cfg.docType) : []
+  const docRows = tab !== 'backorders'
+    ? documents
+        .filter((d) => d.type === cfg.docType)
+        .sort((a, b) => {
+          let av: string | number = ''
+          let bv: string | number = ''
+          if      (docSortBy === 'docNumber') { av = a.docNumber || ''; bv = b.docNumber || '' }
+          else if (docSortBy === 'date')      { av = a.date || ''; bv = b.date || '' }
+          else if (docSortBy === 'client')    { av = a.clientName || ''; bv = b.clientName || '' }
+          else if (docSortBy === 'total')     {
+            av = a.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+            bv = b.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+          }
+          else if (docSortBy === 'status')    { av = a.status || ''; bv = b.status || '' }
+          const cmp = typeof av === 'number' && typeof bv === 'number'
+            ? av - bv
+            : String(av).localeCompare(String(bv))
+          return docSortDir === 'asc' ? cmp : -cmp
+        })
+    : []
   const totalCount = boRows.length + docRows.length
 
   const grandTotal =
@@ -1586,15 +1607,32 @@ export default function OrdersPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500">
-                    <th className="text-left py-3 px-4">Doc #</th>
-                    <th className="text-left py-3 px-4">Date</th>
-                    <th className="text-left py-3 px-4">Client</th>
-                    <th className="text-left py-3 px-4">Description</th>
-                    <th className="text-right py-3 px-4">Total</th>
-                    <th className="text-center py-3 px-4">Status</th>
-                    <th className="text-center py-3 px-4">Source</th>
-                    <th className="text-center py-3 px-4">Actions</th>
+                  <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider">
+                    {(() => {
+                      const SortTh = ({ col, label, align = 'left' }: { col: string; label: string; align?: 'left'|'right'|'center' }) => {
+                        const active = docSortBy === col
+                        return (
+                          <th className={`py-3 px-4 cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                            onClick={() => { if (active) setDocSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setDocSortBy(col); setDocSortDir('asc') } }}>
+                            <span className="inline-flex items-center gap-1">{label}
+                              <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && docSortDir === 'desc' ? '↑' : '↓'}</span>
+                            </span>
+                          </th>
+                        )
+                      }
+                      return (
+                        <>
+                          <SortTh col="docNumber" label="Doc #" />
+                          <SortTh col="date" label="Date" />
+                          <SortTh col="client" label="Client" />
+                          <th className="text-left py-3 px-4 text-gray-500">Description</th>
+                          <SortTh col="total" label="Total" align="right" />
+                          <SortTh col="status" label="Status" align="center" />
+                          <th className="text-center py-3 px-4 text-gray-500">Source</th>
+                          <th className="text-center py-3 px-4 text-gray-500">Actions</th>
+                        </>
+                      )
+                    })()}
                   </tr>
                 </thead>
                 <tbody>
