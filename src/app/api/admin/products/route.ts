@@ -367,6 +367,8 @@ export async function PUT(request: Request) {
               unit            = CASE WHEN $16 <> '' THEN $16 ELSE unit END,
               sales_account   = CASE WHEN $17 <> '' THEN $17 ELSE sales_account END,
               purchase_account = CASE WHEN $18 <> '' THEN $18 ELSE purchase_account END,
+              item_categories = CASE WHEN $19::jsonb <> '[]'::jsonb THEN $19::jsonb ELSE item_categories END,
+              category_brands = CASE WHEN $20::jsonb <> '[]'::jsonb THEN $20::jsonb ELSE category_brands END,
               updated_at      = $14
             WHERE id = $15
           `, [
@@ -388,6 +390,8 @@ export async function PUT(request: Request) {
             p.unit || '',
             p.salesAccount || '',
             p.purchaseAccount || '',
+            JSON.stringify(Array.isArray(p.itemCategories) ? p.itemCategories : (p.itemCategories ? [p.itemCategories] : [])),
+            JSON.stringify(Array.isArray(p.categoryBrands) ? p.categoryBrands : (p.categoryBrands ? [p.categoryBrands] : [])),
           ])
           updated++
           continue
@@ -404,11 +408,12 @@ export async function PUT(request: Request) {
           weight, weight_unit, box_size, dimensions, eta, status,
           image_url, images, page_id, page_ids, page_url, seo,
           unit, sales_account, purchase_account,
+          item_categories, category_brands,
           created_at, updated_at
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
           $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,
-          $32,$33,$34,$35,$36
+          $32,$33,$34,$35,$36,$37,$38
         )
       `, [
         id, p.title || p.name || '', p.description || '',
@@ -428,6 +433,8 @@ export async function PUT(request: Request) {
         p.pageId || '', JSON.stringify(Array.isArray(p.pageIds) ? p.pageIds : (p.pageId ? [p.pageId] : [])), p.pageUrl || '',
         JSON.stringify(p.seo || {}),
         p.unit || 'Each', p.salesAccount || '', p.purchaseAccount || '',
+        JSON.stringify(Array.isArray(p.itemCategories) ? p.itemCategories : (p.itemCategories ? [p.itemCategories] : [])),
+        JSON.stringify(Array.isArray(p.categoryBrands) ? p.categoryBrands : (p.categoryBrands ? [p.categoryBrands] : [])),
         now, now,
       ])
       imported++
