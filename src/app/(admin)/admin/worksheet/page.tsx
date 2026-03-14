@@ -406,23 +406,24 @@ function WorksheetEditor({
   function downloadCSV() {
     const headers = ['#', 'SKU', 'Description', 'Client', 'Qty',
       `Wholesale (${currency})`, 'Landed (ZAR)', 'Est Retail (ZAR)',
-      'Cost of Shipping (ZAR)', 'Cost of Customs (ZAR)',
-      'Final Landed (ZAR)', 'Landed Retail (ZAR)']
+      'Final Landed (ZAR)', 'Landed Retail (ZAR)', `Total (${currency})`]
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
       const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
-      const fShip = calcFinalShipping(it.wholesalePrice)
-      const fCust = calcFinalCustoms(it.wholesalePrice)
       const fLanded = calcFinalLanded(it.wholesalePrice)
       const fRetail = calcFinalRetail(it.wholesalePrice)
+      const totalCur = it.qty * it.wholesalePrice
       return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, `"${it.clientName}"`,
         it.qty, it.wholesalePrice.toFixed(2), landed.toFixed(2), retail.toFixed(2),
-        it.wholesalePrice > 0 ? fShip.toFixed(2) : '',
-        it.wholesalePrice > 0 ? fCust.toFixed(2) : '',
         it.wholesalePrice > 0 ? fLanded.toFixed(2) : '',
-        it.wholesalePrice > 0 ? fRetail.toFixed(2) : '']
+        it.wholesalePrice > 0 ? fRetail.toFixed(2) : '',
+        it.wholesalePrice > 0 ? totalCur.toFixed(2) : '']
     })
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const filledForTotal = items.filter((it) => it.wholesalePrice > 0)
+    const grandTotalCur = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
+    const grandTotalZAR = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
+    const totalRow = ['', '', '', '', 'TOTAL', '', '', '', '', '', `${grandTotalCur.toFixed(2)} (R ${grandTotalZAR.toFixed(2)})`]
+    const csv = [headers.join(','), ...rows.map((r) => r.join(',')), totalRow.join(',')].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url
@@ -433,13 +434,13 @@ function WorksheetEditor({
   // ── PDF ──
   function downloadPDF() {
     const date = formatDisplayDate(worksheetDate)
-    const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
+    const pdfFilledItems = items.filter((it) => it.sku || it.description)
+    const rows = pdfFilledItems.map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
       const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
-      const fShip = it.wholesalePrice > 0 ? fmtFC(calcFinalShipping(it.wholesalePrice)) : '—'
-      const fCust = it.wholesalePrice > 0 ? fmtFC(calcFinalCustoms(it.wholesalePrice)) : '—'
       const fLanded = it.wholesalePrice > 0 ? fmtFC(calcFinalLanded(it.wholesalePrice)) : '—'
       const fRetail = it.wholesalePrice > 0 ? fmtFC(calcFinalRetail(it.wholesalePrice)) : '—'
+      const totalCur = it.wholesalePrice > 0 ? fmtFC(it.qty * it.wholesalePrice) : '—'
       return `<tr>
         <td>${i + 1}</td><td style="font-family:monospace">${it.sku || '—'}</td>
         <td>${it.description || '—'}</td><td>${it.clientName || '—'}</td>
@@ -447,12 +448,18 @@ function WorksheetEditor({
         <td style="text-align:right">${currency} ${fmtFC(it.wholesalePrice)}</td>
         <td style="text-align:right">R ${fmtFC(landed)}</td>
         <td style="text-align:right;font-weight:700">R ${fmtFC(retail)}</td>
-        <td style="text-align:right;color:#065f46">R ${fShip}</td>
-        <td style="text-align:right;color:#065f46">R ${fCust}</td>
         <td style="text-align:right;color:#065f46">R ${fLanded}</td>
         <td style="text-align:right;font-weight:700;color:#065f46">R ${fRetail}</td>
+        <td style="text-align:right;font-weight:700;color:#1d4ed8">${currency} ${totalCur}</td>
       </tr>`
     }).join('')
+    const pdfFilledPriced = pdfFilledItems.filter((it) => it.wholesalePrice > 0)
+    const pdfTotalCur = pdfFilledPriced.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
+    const pdfTotalZAR = pdfFilledPriced.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
+    const totalsRow = pdfFilledPriced.length > 0 ? `<tr style="border-top:2px solid #111;background:#f9fafb;font-weight:700">
+      <td colspan="10" style="text-align:right;padding:6px 10px;font-size:11px;text-transform:uppercase;color:#6b7280">Total</td>
+      <td style="text-align:right;padding:6px 6px;color:#1d4ed8">${currency} ${fmtFC(pdfTotalCur)}<br/><span style="color:#374151;font-size:9px">R ${fmtFC(pdfTotalZAR)}</span></td>
+    </tr>` : ''
 
     const companyBlock = companyInfo.name
       ? `<p style="font-weight:700">${companyInfo.name}</p>
@@ -509,12 +516,12 @@ function WorksheetEditor({
       <th class="r">Wholesale (${currency})</th>
       <th class="r">Landed (ZAR)</th>
       <th class="r">Est Retail (ZAR)</th>
-      <th class="r" style="color:#065f46">Ship Cost</th>
-      <th class="r" style="color:#065f46">Customs Cost</th>
       <th class="r" style="color:#065f46">Final Landed</th>
       <th class="r" style="color:#065f46">Landed Retail</th>
+      <th class="r" style="color:#1d4ed8">Total (${currency})</th>
     </tr></thead>
     <tbody>${rows}</tbody>
+    ${totalsRow ? `<tfoot>${totalsRow}</tfoot>` : ''}
   </table>
 </body></html>`
     const win = window.open('', '_blank')
@@ -801,7 +808,7 @@ function WorksheetEditor({
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
         <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Final Costing Calculator</p>
         <p className="text-xs text-emerald-600 mb-3">
-          Drives the <span className="font-semibold">Cost of Shipping</span>, <span className="font-semibold">Cost of Customs</span>, <span className="font-semibold">Final Landed</span> and <span className="font-semibold">Landed Retail</span> columns.
+          Drives the <span className="font-semibold">Final Landed</span> and <span className="font-semibold">Landed Retail</span> columns.
           {totalWholesaleZAR > 0 && <span className="ml-2 text-emerald-700">Total wholesale: R {fmtFC(totalWholesaleZAR)}</span>}
         </p>
         <div className="flex flex-wrap items-end gap-4">
@@ -917,7 +924,7 @@ function WorksheetEditor({
 
         {/* Table */}
         <div className="overflow-x-auto p-5 pt-2">
-          <table className="w-full text-sm" style={{ minWidth: '1200px' }}>
+          <table className="w-full text-sm" style={{ minWidth: '1100px' }}>
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-wider text-gray-400">
                 <th className="text-left pb-2 w-6">#</th>
@@ -928,10 +935,9 @@ function WorksheetEditor({
                 <th className="text-right pb-2 px-2" style={{ minWidth: '120px' }}>Wholesale ({currency})</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Landed (ZAR)</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Est Retail (ZAR)</th>
-                <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Ship Cost</th>
-                <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Customs Cost</th>
                 <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Final Landed</th>
                 <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Landed Retail</th>
+                <th className="text-right pb-2 px-2 text-blue-500" style={{ minWidth: '120px' }}>Total ({currency})</th>
                 <th className="w-8" />
               </tr>
             </thead>
@@ -1063,26 +1069,6 @@ function WorksheetEditor({
                       </div>
                     </td>
 
-                    {/* Cost of Shipping */}
-                    <td className="py-2 px-2">
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-xs text-gray-400">R</span>
-                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg ${hasFinal ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-gray-300'}`}>
-                          {hasFinal ? fmtFC(calcFinalShipping(it.wholesalePrice)) : '—'}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Cost of Customs */}
-                    <td className="py-2 px-2">
-                      <div className="flex items-center justify-end gap-1">
-                        <span className="text-xs text-gray-400">R</span>
-                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg ${hasFinal ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-gray-300'}`}>
-                          {hasFinal ? fmtFC(calcFinalCustoms(it.wholesalePrice)) : '—'}
-                        </span>
-                      </div>
-                    </td>
-
                     {/* Final Landed */}
                     <td className="py-2 px-2">
                       <div className="flex items-center justify-end gap-1">
@@ -1103,6 +1089,16 @@ function WorksheetEditor({
                       </div>
                     </td>
 
+                    {/* Total Cost in currency */}
+                    <td className="py-2 px-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-gray-400">{currency}</span>
+                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold ${it.wholesalePrice > 0 ? 'text-blue-700 bg-blue-50 border border-blue-100' : 'text-gray-300'}`}>
+                          {it.wholesalePrice > 0 ? fmtFC(it.qty * it.wholesalePrice) : '—'}
+                        </span>
+                      </div>
+                    </td>
+
                     {/* Remove */}
                     <td className="py-2 w-8">
                       <button onClick={() => removeItem(it.id)} disabled={items.length === 1}
@@ -1114,6 +1110,37 @@ function WorksheetEditor({
                 )
               })}
             </tbody>
+            {/* ── Totals footer ── */}
+            {(() => {
+              const filledItems = items.filter((it) => it.wholesalePrice > 0)
+              if (filledItems.length === 0) return null
+              const totalCur = filledItems.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
+              const totalZAR = filledItems.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
+              return (
+                <tfoot>
+                  <tr className="border-t-2 border-gray-200 bg-gray-50">
+                    <td colSpan={10} className="py-3 px-2 text-xs font-semibold text-gray-500 text-right uppercase tracking-wider pr-4">
+                      Total
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs font-semibold text-gray-500">{currency}</span>
+                        <span className="w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-bold text-blue-800 bg-blue-100 border border-blue-200">
+                          {fmtFC(totalCur)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-end gap-1 mt-1">
+                        <span className="text-xs text-gray-400">R</span>
+                        <span className="w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold text-gray-700 bg-gray-100 border border-gray-200">
+                          {fmtFC(totalZAR)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3 w-8" />
+                  </tr>
+                </tfoot>
+              )
+            })()}
           </table>
           <button onClick={addItem}
             className="mt-3 w-full border-2 border-dashed border-gray-200 text-gray-400 hover:border-blue-400 hover:text-blue-500 rounded-xl py-2 text-sm transition-colors">
