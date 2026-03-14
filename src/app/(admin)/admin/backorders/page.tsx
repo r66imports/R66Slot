@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useColumnResize } from '@/hooks/use-column-resize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1399,6 +1400,10 @@ export default function BackordersPage() {
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<string>('date')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const { widths: colW, setWidth } = useColumnResize('backorders', {
+    date: 95, client: 130, sku: 150, supplier: 120,
+    qty: 65, price: 80, orderStatus: 220, status: 85, found: 65,
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -2015,7 +2020,20 @@ export default function BackordersPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col style={{ width: 40 }} />
+                <col style={{ width: colW.date }} />
+                <col style={{ width: colW.client }} />
+                <col style={{ width: colW.sku }} />
+                <col style={{ width: colW.supplier }} />
+                <col style={{ width: colW.qty }} />
+                <col style={{ width: colW.price }} />
+                <col style={{ width: colW.orderStatus }} />
+                <col style={{ width: colW.status }} />
+                <col style={{ width: colW.found }} />
+                <col style={{ width: 80 }} />
+              </colgroup>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="px-3 py-3 w-10">
@@ -2030,11 +2048,15 @@ export default function BackordersPage() {
                     const SortTh = ({ col, label, align = 'left', className = '' }: { col: string; label: string; align?: 'left'|'right'|'center'; className?: string }) => {
                       const active = sortBy === col
                       return (
-                        <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${className}`}
-                          onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}>
+                        <th
+                          style={{ position: 'relative' }}
+                          className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${className}`}
+                          onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}
+                        >
                           <span className="inline-flex items-center gap-1">{label}
                             <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && sortDir === 'desc' ? '↑' : '↓'}</span>
                           </span>
+                          <div onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? 100; const onMove = (ev: MouseEvent) => setWidth(col, Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} onClick={e => e.stopPropagation()} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                         </th>
                       )
                     }
@@ -2046,9 +2068,9 @@ export default function BackordersPage() {
                         <SortTh col="supplier" label="Supplier" />
                         <SortTh col="qty" label="Qty" align="right" />
                         <SortTh col="price" label="Price" align="right" />
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[320px]">Order Status</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ position: 'relative' }}>Order Status<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.orderStatus; const onMove = (ev: MouseEvent) => setWidth('orderStatus', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                         <SortTh col="status" label="Status" align="center" />
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Found</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ position: 'relative' }}>Found<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.found; const onMove = (ev: MouseEvent) => setWidth('found', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                         <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                       </>
                     )

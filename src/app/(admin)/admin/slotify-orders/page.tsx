@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useColumnResize } from '@/hooks/use-column-resize'
 
 type SlotifyOrder = {
   id: string
@@ -24,6 +25,10 @@ export default function SlotifyOrdersPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'shipped' | 'delivered'>('all')
   const [sortBy, setSortBy] = useState<string>('bookedAt')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const { widths: colW, setWidth } = useColumnResize('slotify-orders', {
+    orderId: 120, sku: 80, description: 160, customer: 130,
+    brand: 100, price: 85, qty: 60, status: 90, bookedAt: 120,
+  })
 
   // Load orders from localStorage
   useEffect(() => {
@@ -145,24 +150,37 @@ export default function SlotifyOrdersPage() {
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col style={{ width: colW.orderId }} />
+                  <col style={{ width: colW.sku }} />
+                  <col style={{ width: colW.description }} />
+                  <col style={{ width: colW.customer }} />
+                  <col style={{ width: colW.brand }} />
+                  <col style={{ width: colW.price }} />
+                  <col style={{ width: colW.qty }} />
+                  <col style={{ width: colW.status }} />
+                  <col style={{ width: colW.bookedAt }} />
+                  <col style={{ width: 80 }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b bg-gray-50 text-xs uppercase tracking-wide">
                     {(() => {
                       const SortTh = ({ col, label, align = 'left' }: { col: string; label: string; align?: 'left'|'right'|'center' }) => {
                         const active = sortBy === col
                         return (
-                          <th className={`py-3 px-4 cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                          <th style={{ position: 'relative' }} className={`py-3 px-4 cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
                             onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}>
                             <span className="inline-flex items-center gap-1">{label}
                               <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && sortDir === 'desc' ? '↑' : '↓'}</span>
                             </span>
+                            <div onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? 100; const onMove = (ev: MouseEvent) => setWidth(col, Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} onClick={e => e.stopPropagation()} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                           </th>
                         )
                       }
                       return (
                         <>
-                          <th className="text-left py-3 px-4 text-gray-500 text-xs uppercase">Order ID</th>
+                          <th className="text-left py-3 px-4 text-gray-500 text-xs uppercase" style={{ position: 'relative' }}>Order ID<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.orderId; const onMove = (ev: MouseEvent) => setWidth('orderId', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                           <SortTh col="sku" label="SKU" />
                           <SortTh col="description" label="Description" />
                           <SortTh col="customer" label="Customer" />

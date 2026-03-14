@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Backorder } from '@/app/api/admin/backorders/route'
+import { useColumnResize } from '@/hooks/use-column-resize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1284,6 +1285,9 @@ export default function OrdersPage() {
   const [tab, setTab] = useState<Tab>('backorders')
   const [docSortBy, setDocSortBy] = useState<string>('date')
   const [docSortDir, setDocSortDir] = useState<'asc' | 'desc'>('desc')
+  const { widths: docColW, setWidth: setDocWidth } = useColumnResize('orders-docs', {
+    docNumber: 100, date: 90, client: 150, description: 160, total: 90, status: 90, source: 90,
+  })
   const [showTemplate, setShowTemplate] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [compileDocType, setCompileDocType] = useState<DocType>('quote')
@@ -1605,18 +1609,29 @@ export default function OrdersPage() {
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-fixed">
+                <colgroup>
+                  <col style={{ width: docColW.docNumber }} />
+                  <col style={{ width: docColW.date }} />
+                  <col style={{ width: docColW.client }} />
+                  <col style={{ width: docColW.description }} />
+                  <col style={{ width: docColW.total }} />
+                  <col style={{ width: docColW.status }} />
+                  <col style={{ width: docColW.source }} />
+                  <col style={{ width: 80 }} />
+                </colgroup>
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider">
                     {(() => {
                       const SortTh = ({ col, label, align = 'left' }: { col: string; label: string; align?: 'left'|'right'|'center' }) => {
                         const active = docSortBy === col
                         return (
-                          <th className={`py-3 px-4 cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+                          <th style={{ position: 'relative' }} className={`py-3 px-4 cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
                             onClick={() => { if (active) setDocSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setDocSortBy(col); setDocSortDir('asc') } }}>
                             <span className="inline-flex items-center gap-1">{label}
                               <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && docSortDir === 'desc' ? '↑' : '↓'}</span>
                             </span>
+                            <div onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? 100; const onMove = (ev: MouseEvent) => setDocWidth(col, Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} onClick={e => e.stopPropagation()} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                           </th>
                         )
                       }
@@ -1625,10 +1640,10 @@ export default function OrdersPage() {
                           <SortTh col="docNumber" label="Doc #" />
                           <SortTh col="date" label="Date" />
                           <SortTh col="client" label="Client" />
-                          <th className="text-left py-3 px-4 text-gray-500">Description</th>
+                          <th className="text-left py-3 px-4 text-gray-500" style={{ position: 'relative' }}>Description<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? docColW.description; const onMove = (ev: MouseEvent) => setDocWidth('description', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                           <SortTh col="total" label="Total" align="right" />
                           <SortTh col="status" label="Status" align="center" />
-                          <th className="text-center py-3 px-4 text-gray-500">Source</th>
+                          <th className="text-center py-3 px-4 text-gray-500" style={{ position: 'relative' }}>Source<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? docColW.source; const onMove = (ev: MouseEvent) => setDocWidth('source', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                           <th className="text-center py-3 px-4 text-gray-500">Actions</th>
                         </>
                       )

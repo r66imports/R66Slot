@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { useColumnResize } from '@/hooks/use-column-resize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
@@ -400,6 +401,10 @@ export default function ProductsPage() {
   // Task 3/4: inline page URL edit
   const [editingPageId, setEditingPageId] = useState<string | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
+  const { widths: colW, setWidth } = useColumnResize('products', {
+    sku: 90, title: 170, brand: 110, categories: 120,
+    price: 80, eta: 70, qty: 65, pageUrl: 140, status: 80,
+  })
   const [editingPageUrl, setEditingPageUrl] = useState('')
 
   useEffect(() => {
@@ -892,7 +897,21 @@ export default function ProductsPage() {
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm table-fixed">
+                <colgroup>
+                  <col style={{ width: 32 }} />
+                  <col style={{ width: 20 }} />
+                  {visibleCols.sku && <col style={{ width: colW.sku }} />}
+                  <col style={{ width: colW.title }} />
+                  {visibleCols.brand && <col style={{ width: colW.brand }} />}
+                  {visibleCols.categories && <col style={{ width: colW.categories }} />}
+                  {visibleCols.price && <col style={{ width: colW.price }} />}
+                  {visibleCols.eta && <col style={{ width: colW.eta }} />}
+                  {visibleCols.qty && <col style={{ width: colW.qty }} />}
+                  {visibleCols.pageUrl && <col style={{ width: colW.pageUrl }} />}
+                  {visibleCols.status && <col style={{ width: colW.status }} />}
+                  <col style={{ width: 85 }} />
+                </colgroup>
                 <thead>
                   <tr className="border-b bg-gray-50">
                     <th className="py-2 px-2 w-8">
@@ -913,6 +932,7 @@ export default function ProductsPage() {
                         }
                         return (
                           <th
+                            style={{ position: 'relative' }}
                             className={`py-2 px-2 text-xs font-semibold uppercase cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                             onClick={handleClick}
                           >
@@ -922,6 +942,19 @@ export default function ProductsPage() {
                                 {active && sortDir === 'desc' ? '↑' : '↓'}
                               </span>
                             </span>
+                            <div
+                              onMouseDown={(e) => {
+                                e.preventDefault(); e.stopPropagation()
+                                const startX = e.clientX
+                                const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? 100
+                                const onMove = (ev: MouseEvent) => setWidth(col, Math.max(40, startW + ev.clientX - startX))
+                                const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+                                document.addEventListener('mousemove', onMove)
+                                document.addEventListener('mouseup', onUp)
+                              }}
+                              onClick={e => e.stopPropagation()}
+                              className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10"
+                            />
                           </th>
                         )
                       }
@@ -934,7 +967,12 @@ export default function ProductsPage() {
                           {visibleCols.price && <SortTh col="price" label="Price" align="right" />}
                           {visibleCols.eta && <SortTh col="eta" label="ETA" align="center" />}
                           {visibleCols.qty && <SortTh col="qty" label="Qty" align="center" />}
-                          {visibleCols.pageUrl && <th className="text-left py-2 px-2 text-xs font-semibold text-gray-500 uppercase">Page URL</th>}
+                          {visibleCols.pageUrl && (
+                            <th className="text-left py-2 px-2 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                              Page URL
+                              <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.pageUrl; const onMove = (ev: MouseEvent) => setWidth('pageUrl', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                            </th>
+                          )}
                           {visibleCols.status && <SortTh col="status" label="Status" align="center" />}
                           <th className="text-center py-2 px-2 text-xs font-semibold text-gray-500 uppercase sticky right-0 bg-gray-50 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)]">Actions</th>
                         </>

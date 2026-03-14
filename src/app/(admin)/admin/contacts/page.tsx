@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useColumnResize } from '@/hooks/use-column-resize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -499,6 +500,10 @@ export default function ContactsPage() {
   const [syncMsg, setSyncMsg]         = useState('')
   const [sortBy, setSortBy]           = useState<string>('name')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('asc')
+  const { widths: colW, setWidth } = useColumnResize('contacts', {
+    name: 160, email: 150, address: 140, club: 100,
+    company: 130, delivery: 140, orders: 70, spent: 90, source: 90,
+  })
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -760,18 +765,34 @@ export default function ContactsPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm table-fixed">
+              <colgroup>
+                <col style={{ width: colW.name }} />
+                <col style={{ width: colW.email }} />
+                <col style={{ width: colW.address }} />
+                <col style={{ width: colW.club }} />
+                <col style={{ width: colW.company }} />
+                <col style={{ width: colW.delivery }} />
+                <col style={{ width: colW.orders }} />
+                <col style={{ width: colW.spent }} />
+                <col style={{ width: colW.source }} />
+                <col style={{ width: 80 }} />
+              </colgroup>
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   {(() => {
                     const SortTh = ({ col, label, align = 'left', className = '' }: { col: string; label: string; align?: 'left'|'right'|'center'; className?: string }) => {
                       const active = sortBy === col
                       return (
-                        <th className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${className}`}
-                          onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}>
+                        <th
+                          style={{ position: 'relative' }}
+                          className={`px-4 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'} ${className}`}
+                          onClick={() => { if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortBy(col); setSortDir('asc') } }}
+                        >
                           <span className="inline-flex items-center gap-1">{label}
                             <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && sortDir === 'desc' ? '↑' : '↓'}</span>
                           </span>
+                          <div onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? 100; const onMove = (ev: MouseEvent) => setWidth(col, Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} onClick={e => e.stopPropagation()} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                         </th>
                       )
                     }
@@ -779,10 +800,10 @@ export default function ContactsPage() {
                       <>
                         <SortTh col="name" label="Name" />
                         <SortTh col="email" label="Contact" />
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Address</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ position: 'relative' }}>Address<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.address; const onMove = (ev: MouseEvent) => setWidth('address', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                         <SortTh col="club" label="Club" />
                         <SortTh col="company" label="Business" />
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[140px]">Delivery</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ position: 'relative' }}>Delivery<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.delivery; const onMove = (ev: MouseEvent) => setWidth('delivery', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                         <SortTh col="orders" label="Orders" align="center" />
                         <SortTh col="spent" label="Spent" align="right" />
                         <SortTh col="source" label="Source" align="center" />

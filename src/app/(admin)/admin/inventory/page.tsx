@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useColumnResize } from '@/hooks/use-column-resize'
 
 interface Product {
   id: string
@@ -21,6 +22,9 @@ export default function InventoryPage() {
   const [saved, setSaved] = useState<Record<string, boolean>>({})
   const [saveAllLoading, setSaveAllLoading] = useState(false)
   const [saveAllDone, setSaveAllDone] = useState(false)
+  const { widths: colW, setWidth } = useColumnResize('inventory', {
+    idx: 40, sku: 90, product: 220, brand: 120, dbQty: 80, count: 90, save: 70,
+  })
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   useEffect(() => {
@@ -147,16 +151,25 @@ export default function InventoryPage() {
         <div className="text-center py-16 text-gray-400">Loading inventory…</div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm table-fixed">
+            <colgroup>
+              <col style={{ width: colW.idx }} />
+              <col style={{ width: colW.sku }} />
+              <col style={{ width: colW.product }} />
+              <col style={{ width: colW.brand }} />
+              <col style={{ width: colW.dbQty }} />
+              <col style={{ width: colW.count }} />
+              <col style={{ width: colW.save }} />
+            </colgroup>
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-12">#</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-24">SKU</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-32">Brand</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-28">DB Qty</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-32">Count</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-20">Save</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>#<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.idx; const onMove = (ev: MouseEvent) => setWidth('idx', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>SKU<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.sku; const onMove = (ev: MouseEvent) => setWidth('sku', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>Product<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.product; const onMove = (ev: MouseEvent) => setWidth('product', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>Brand<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.brand; const onMove = (ev: MouseEvent) => setWidth('brand', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>DB Qty<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>Count<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.count; const onMove = (ev: MouseEvent) => setWidth('count', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Save</th>
               </tr>
             </thead>
             <tbody>
