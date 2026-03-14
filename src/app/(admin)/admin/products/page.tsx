@@ -6,6 +6,27 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useColumnResize } from '@/hooks/use-column-resize'
 
+// ─── CSV parser (handles quoted fields with commas) ───────────────────────────
+function parseCSVLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i]
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+      else inQuotes = !inQuotes
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += char
+    }
+  }
+  result.push(current.trim())
+  return result
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Product {
   id: string
@@ -611,10 +632,10 @@ export default function ProductsPage() {
     setImporting(true)
     const profile = IMPORT_PROFILES[importProfile]
     try {
-      const lines = importText.trim().split('\n')
-      const headers = lines[0].split(',').map((h) => h.trim().toLowerCase())
+      const lines = importText.trim().split('\n').map((l) => l.replace(/\r$/, ''))
+      const headers = parseCSVLine(lines[0]).map((h) => h.toLowerCase())
       const rows = lines.slice(1).filter((l) => l.trim()).map((line) => {
-        const values = line.split(',').map((v) => v.trim())
+        const values = parseCSVLine(line)
         const obj: Record<string, string> = {}
         headers.forEach((h, i) => { obj[h] = values[i] || '' })
         return profile.mapRow(obj)
@@ -624,8 +645,8 @@ export default function ProductsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ products: rows }),
       })
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
         try {
           await fetch('/api/admin/suppliers', {
             method: 'POST',
@@ -640,6 +661,8 @@ export default function ProductsPage() {
         setShowImportModal(false)
         setImportText('')
         fetchProducts(urlBrand)
+      } else {
+        alert(`Import failed: ${data.error || 'Unknown error'}`)
       }
     } catch (err) {
       console.error('Import error:', err)
