@@ -1566,7 +1566,7 @@ export default function OrdersPage() {
                           {items.map((b) => (
                             <tr key={b.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                               <td className="px-5 py-2.5 font-mono text-xs text-blue-700 font-semibold">{b.sku || '—'}</td>
-                              <td className="px-5 py-2.5 text-gray-700 max-w-[220px] truncate">{b.description}</td>
+                              <td className="px-5 py-2.5 text-gray-700 break-words">{b.description}</td>
                               <td className="px-5 py-2.5 text-gray-500 text-xs">{b.brand || '—'}</td>
                               <td className="px-5 py-2.5 text-center text-gray-700">{b.qty}</td>
                               <td className="px-5 py-2.5 text-right text-gray-700">{fmtPrice(b.price)}</td>
@@ -1657,7 +1657,7 @@ export default function OrdersPage() {
                       <td className="py-3 px-4 font-mono font-semibold text-blue-700">{cfg.boDocNum(b)}</td>
                       <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(cfg.boDate(b) ?? b.createdAt)}</td>
                       <td className="py-3 px-4 font-medium">{b.clientName}</td>
-                      <td className="py-3 px-4 text-gray-600 max-w-[180px] truncate">{b.description}</td>
+                      <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{b.description}</td>
                       <td className="py-3 px-4 text-right font-semibold">{fmtPrice(b.price * b.qty)}</td>
                       <td className="py-3 px-4 text-center">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
@@ -1686,7 +1686,7 @@ export default function OrdersPage() {
                         <td className="py-3 px-4 font-mono font-semibold text-blue-700">{doc.docNumber}</td>
                         <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(doc.date)}</td>
                         <td className="py-3 px-4 font-medium">{doc.clientName}</td>
-                        <td className="py-3 px-4 text-gray-600 max-w-[180px] truncate">{firstDesc}</td>
+                        <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{firstDesc}</td>
                         <td className="py-3 px-4 text-right font-semibold">{fmtPrice(subtotal)}</td>
                         <td className="py-3 px-4 text-center">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>

@@ -200,7 +200,7 @@ export default function SlotifyOrdersPage() {
                     <tr key={order.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 px-4 font-mono text-sm">{order.id}</td>
                       <td className="py-3 px-4 font-mono text-sm">{order.sku}</td>
-                      <td className="py-3 px-4">{order.description}</td>
+                      <td className={`py-3 px-4 break-words ${colW.description < 120 ? 'text-[10px]' : colW.description < 155 ? 'text-[11px]' : 'text-sm'}`}>{order.description}</td>
                       <td className="py-3 px-4">{order.customerName || 'N/A'}</td>
                       <td className="py-3 px-4">{order.brand}</td>
                       <td className="py-3 px-4">R{order.preOrderPrice}</td>

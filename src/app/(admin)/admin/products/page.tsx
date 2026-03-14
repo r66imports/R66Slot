@@ -1040,7 +1040,7 @@ export default function ProductsPage() {
                                 : <span className="text-gray-400 text-[9px]">IMG</span>}
                             </div>
                             <div>
-                              <span className="font-medium truncate max-w-[140px] block">{product.title}</span>
+                              <span className={`font-medium break-words block ${colW.title < 120 ? 'text-[10px]' : colW.title < 155 ? 'text-[11px]' : 'text-xs'}`}>{product.title}</span>
                               {product.carClass && (
                                 <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">{product.carClass}</span>
                               )}
