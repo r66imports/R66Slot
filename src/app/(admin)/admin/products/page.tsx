@@ -351,6 +351,8 @@ export default function ProductsPage() {
     eta: true, qty: true, pageUrl: true, status: true,
   })
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [sortBy, setSortBy] = useState<string>('sku')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [fixingDupes, setFixingDupes] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -657,7 +659,22 @@ export default function ProductsPage() {
       const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
       return matchBrand && matchCat && matchRevo && matchSearch
     })
-    .sort((a, b) => (a.sku || '').localeCompare(b.sku || ''))
+    .sort((a, b) => {
+      let av: string | number = ''
+      let bv: string | number = ''
+      if (sortBy === 'title')      { av = a.title || ''; bv = b.title || '' }
+      else if (sortBy === 'sku')   { av = a.sku || ''; bv = b.sku || '' }
+      else if (sortBy === 'brand') { av = a.brand || ''; bv = b.brand || '' }
+      else if (sortBy === 'categories') { av = (a.itemCategories?.[0] || a.categoryBrands?.[0] || ''); bv = (b.itemCategories?.[0] || b.categoryBrands?.[0] || '') }
+      else if (sortBy === 'price') { av = a.price ?? 0; bv = b.price ?? 0 }
+      else if (sortBy === 'eta')   { av = a.eta || ''; bv = b.eta || '' }
+      else if (sortBy === 'qty')   { av = a.quantity ?? 0; bv = b.quantity ?? 0 }
+      else if (sortBy === 'status'){ av = a.status || ''; bv = b.status || '' }
+      const cmp = typeof av === 'number' && typeof bv === 'number'
+        ? av - bv
+        : String(av).localeCompare(String(bv), undefined, { numeric: true })
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   // Helper: get page name from pageId
   const getPageTitle = (product: Product) => {
@@ -886,16 +903,42 @@ export default function ProductsPage() {
                       />
                     </th>
                     <th className="w-6"></th>
-                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Product</th>
-                    {visibleCols.sku && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">SKU</th>}
-                    {visibleCols.brand && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Category (Brand)</th>}
-                    {visibleCols.categories && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Item Categories (Unit)</th>}
-                    {visibleCols.price && <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Price</th>}
-                    {visibleCols.eta && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">ETA</th>}
-                    {visibleCols.qty && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Qty</th>}
-                    {visibleCols.pageUrl && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Page URL</th>}
-                    {visibleCols.status && <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Status</th>}
-                    <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                    {(() => {
+                      const SortTh = ({ col, label, align = 'left' }: { col: string; label: string; align?: 'left' | 'right' | 'center' }) => {
+                        const active = sortBy === col
+                        const handleClick = () => {
+                          if (active) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+                          else { setSortBy(col); setSortDir('asc') }
+                        }
+                        return (
+                          <th
+                            className={`py-3 px-4 text-xs font-semibold uppercase cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                            onClick={handleClick}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {label}
+                              <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>
+                                {active && sortDir === 'desc' ? '↑' : '↓'}
+                              </span>
+                            </span>
+                          </th>
+                        )
+                      }
+                      return (
+                        <>
+                          <SortTh col="title" label="Product" />
+                          {visibleCols.sku && <SortTh col="sku" label="SKU" />}
+                          {visibleCols.brand && <SortTh col="brand" label="Category (Brand)" />}
+                          {visibleCols.categories && <SortTh col="categories" label="Item Categories (Unit)" />}
+                          {visibleCols.price && <SortTh col="price" label="Price" align="right" />}
+                          {visibleCols.eta && <SortTh col="eta" label="ETA" align="center" />}
+                          {visibleCols.qty && <SortTh col="qty" label="Qty" align="center" />}
+                          {visibleCols.pageUrl && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Page URL</th>}
+                          {visibleCols.status && <SortTh col="status" label="Status" align="center" />}
+                          <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                        </>
+                      )
+                    })()}
                   </tr>
                 </thead>
                 <tbody>
