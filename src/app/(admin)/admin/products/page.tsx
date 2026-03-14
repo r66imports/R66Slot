@@ -894,7 +894,7 @@ export default function ProductsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-gray-50">
-                    <th className="py-3 px-3 w-10">
+                    <th className="py-2 px-2 w-8">
                       <input
                         type="checkbox"
                         checked={filtered.length > 0 && selectedIds.size === filtered.length}
@@ -902,7 +902,7 @@ export default function ProductsPage() {
                         className="h-4 w-4 accent-gray-900 cursor-pointer"
                       />
                     </th>
-                    <th className="w-6"></th>
+                    <th className="w-5"></th>
                     {(() => {
                       const SortTh = ({ col, label, align = 'left' }: { col: string; label: string; align?: 'left' | 'right' | 'center' }) => {
                         const active = sortBy === col
@@ -912,7 +912,7 @@ export default function ProductsPage() {
                         }
                         return (
                           <th
-                            className={`py-3 px-4 text-xs font-semibold uppercase cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`py-2 px-2 text-xs font-semibold uppercase cursor-pointer select-none group whitespace-nowrap text-${align} ${active ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                             onClick={handleClick}
                           >
                             <span className="inline-flex items-center gap-1">
@@ -933,9 +933,9 @@ export default function ProductsPage() {
                           {visibleCols.price && <SortTh col="price" label="Price" align="right" />}
                           {visibleCols.eta && <SortTh col="eta" label="ETA" align="center" />}
                           {visibleCols.qty && <SortTh col="qty" label="Qty" align="center" />}
-                          {visibleCols.pageUrl && <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Page URL</th>}
+                          {visibleCols.pageUrl && <th className="text-left py-2 px-2 text-xs font-semibold text-gray-500 uppercase">Page URL</th>}
                           {visibleCols.status && <SortTh col="status" label="Status" align="center" />}
-                          <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                          <th className="text-center py-2 px-2 text-xs font-semibold text-gray-500 uppercase sticky right-0 bg-gray-50 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)]">Actions</th>
                         </>
                       )
                     })()}
@@ -953,12 +953,12 @@ export default function ProductsPage() {
                       <tr className={`border-b hover:bg-gray-50 ${selectedIds.has(product.id) ? 'bg-blue-50' : ''}`}>
 
                         {/* Checkbox */}
-                        <td className="py-3 px-3">
+                        <td className="py-2 px-2">
                           <input type="checkbox" checked={selectedIds.has(product.id)} onChange={() => toggleSelect(product.id)} className="h-4 w-4 accent-gray-900 cursor-pointer" />
                         </td>
 
                         {/* Expand toggle */}
-                        <td className="py-3 px-1">
+                        <td className="py-2 px-1">
                           <button
                             onClick={() => toggleExpand(product.id)}
                             className="text-gray-400 hover:text-gray-700 transition-transform"
@@ -971,15 +971,15 @@ export default function ProductsPage() {
                         </td>
 
                         {/* Product */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        <td className="py-2 px-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center overflow-hidden">
                               {product.imageUrl
                                 ? <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
-                                : <span className="text-gray-400 text-[10px]">IMG</span>}
+                                : <span className="text-gray-400 text-[9px]">IMG</span>}
                             </div>
                             <div>
-                              <span className="font-medium truncate max-w-[160px] block">{product.title}</span>
+                              <span className="font-medium truncate max-w-[140px] block">{product.title}</span>
                               {product.carClass && (
                                 <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded">{product.carClass}</span>
                               )}
@@ -989,23 +989,23 @@ export default function ProductsPage() {
 
                         {/* SKU */}
                         {visibleCols.sku && (
-                          <td className="py-3 px-4">
+                          <td className="py-2 px-2">
                             <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
                           </td>
                         )}
 
                         {/* Category (Brand) */}
                         {visibleCols.brand && (
-                          <td className="py-3 px-4">
-                            <span>{(product.categoryBrands && product.categoryBrands.length > 0) ? product.categoryBrands.join(', ') : (product.brand || '—')}</span>
+                          <td className="py-2 px-2">
+                            <span className="text-xs">{(product.categoryBrands && product.categoryBrands.length > 0) ? product.categoryBrands.join(', ') : (product.brand || '—')}</span>
                           </td>
                         )}
 
                         {/* Categories */}
                         {visibleCols.categories && (
-                          <td className="py-3 px-4">
+                          <td className="py-2 px-2">
                             {allCats.length > 0 ? (
-                              <div className="flex flex-wrap gap-1 max-w-[150px]">
+                              <div className="flex flex-wrap gap-1 max-w-[130px]">
                                 {allCats.slice(0, 3).map((c) => {
                                   const cat = categories.find((cat) => cat.slug === c || cat.name === c)
                                   return cat?.pageUrl ? (
@@ -1031,19 +1031,19 @@ export default function ProductsPage() {
 
                         {/* Price */}
                         {visibleCols.price && (
-                          <td className="py-3 px-4 text-right">
-                            <span className="font-semibold">{product.price > 0 ? `R${product.price.toFixed(2)}` : 'POA'}</span>
+                          <td className="py-2 px-2 text-right">
+                            <span className="font-semibold text-xs">{product.price > 0 ? `R${product.price.toFixed(2)}` : 'POA'}</span>
                           </td>
                         )}
 
                         {/* ETA — inline edit */}
                         {visibleCols.eta && (
-                          <td className="py-3 px-4 text-center">
+                          <td className="py-2 px-2 text-center">
                             <input
                               type="text"
                               defaultValue={product.eta || ''}
                               placeholder="TBC"
-                              className="w-24 text-center text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                              className="w-16 text-center text-xs px-1 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
                               onBlur={(e) => { if (e.target.value !== (product.eta || '')) handleInlineUpdate(product.id, 'eta', e.target.value) }}
                             />
                           </td>
@@ -1051,19 +1051,19 @@ export default function ProductsPage() {
 
                         {/* Qty — inline edit */}
                         {visibleCols.qty && (
-                          <td className="py-3 px-4 text-center">
+                          <td className="py-2 px-2 text-center">
                             <input
                               type="number"
                               defaultValue={product.quantity}
                               min={0}
-                              className="w-16 text-center text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
+                              className="w-12 text-center text-xs px-1 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-gray-400"
                               onBlur={(e) => { const v = parseInt(e.target.value) || 0; if (v !== product.quantity) handleInlineUpdate(product.id, 'quantity', v) }}
                             />
                           </td>
                         )}
 
                         {/* Page URL */}
-                        {visibleCols.pageUrl && <td className="py-3 px-4 min-w-[180px]">
+                        {visibleCols.pageUrl && <td className="py-2 px-2 min-w-[140px]">
                           {isEditingPage ? (
                             <div className="flex items-center gap-1">
                               <input
@@ -1111,16 +1111,16 @@ export default function ProductsPage() {
 
                         {/* Status */}
                         {visibleCols.status && (
-                          <td className="py-3 px-4 text-center">
-                            <span className={`px-2 py-1 text-xs rounded font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                          <td className="py-2 px-2 text-center">
+                            <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${product.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
                               {product.status}
                             </span>
                           </td>
                         )}
 
                         {/* Actions */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        <td className={`py-2 px-2 sticky right-0 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)] ${selectedIds.has(product.id) ? 'bg-blue-50' : 'bg-white'}`}>
+                          <div className="flex items-center justify-center gap-1 flex-nowrap">
                             <Link
                               href={`/admin/products/${product.id}`}
                               className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
