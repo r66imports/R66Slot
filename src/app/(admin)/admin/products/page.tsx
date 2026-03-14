@@ -401,6 +401,12 @@ export default function ProductsPage() {
   // Task 3/4: inline page URL edit
   const [editingPageId, setEditingPageId] = useState<string | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!openActionId) return
+    const close = () => setOpenActionId(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [openActionId])
   const { widths: colW, setWidth } = useColumnResize('products', {
     sku: 90, title: 170, brand: 110, categories: 120,
     price: 80, eta: 70, qty: 65, pageUrl: 140, status: 80,
@@ -1167,7 +1173,7 @@ export default function ProductsPage() {
                         )}
 
                         {/* Actions */}
-                        <td className={`py-2 px-2 sticky right-0 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)] ${selectedIds.has(product.id) ? 'bg-blue-50' : 'bg-white'}`}>
+                        <td className={`py-2 px-2 sticky right-0 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)] ${selectedIds.has(product.id) ? 'bg-blue-50' : 'bg-white'}`} style={{ zIndex: openActionId === product.id ? 9999 : undefined }}>
                           <div className="relative flex items-center justify-center">
                             <button
                               onClick={() => setOpenActionId(openActionId === product.id ? null : product.id)}
@@ -1179,7 +1185,7 @@ export default function ProductsPage() {
                               </svg>
                             </button>
                             {openActionId === product.id && (
-                              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
+                              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1">
                                 <Link
                                   href={`/admin/products/${product.id}`}
                                   className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
