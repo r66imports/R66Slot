@@ -56,12 +56,8 @@ export default function AdminLayout({
         href: '/admin/products',
         icon: '📦',
         submenu: [
-          { name: 'All Products', href: '/admin/products', icon: '🛍️' },
-          { name: 'NSR', href: '/admin/products?brand=NSR', icon: '🏎️' },
-          { name: 'Revo', href: '/admin/products?brand=Revo', icon: '🔧' },
-          { name: 'BRM', href: '/admin/products?brand=BRM', icon: '🏁' },
-          { name: 'Pioneer', href: '/admin/products?brand=Pioneer', icon: '🚗' },
-          { name: 'Sideways', href: '/admin/products?brand=Sideways', icon: '🔄' },
+          { name: 'Products', href: '/admin/products', icon: '🛍️' },
+          { name: 'Inventory', href: '/admin/inventory', icon: '📋' },
           { name: 'POS / Scanner', href: '/admin/pos', icon: '🔍' },
         ]
       },
