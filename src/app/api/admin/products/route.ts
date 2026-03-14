@@ -346,30 +346,56 @@ export async function PUT(request: Request) {
 
       // If SKU provided, check for an existing product — update instead of inserting duplicate
       if (sku) {
-        const existing = await db.query('SELECT id FROM products WHERE sku = $1 LIMIT 1', [sku])
+        const existing = await db.query('SELECT id, quantity, cost_per_item FROM products WHERE sku = $1 LIMIT 1', [sku])
         if (existing.rows.length > 0) {
           const existingId = existing.rows[0].id
+
+          // ── Average cost calculation (Task 3) ──────────────────────────────
+          const existingQty = parseInt(existing.rows[0].quantity) || 0
+          const existingCost = parseFloat(existing.rows[0].cost_per_item) || 0
+          const importQty = parseInt(p.quantity) || 0
+          const importCost = parseFloat(p.costPerItem) || 0
+          let avgCostValue: number | null = null
+          if (p.compareAtPrice && parseFloat(p.compareAtPrice) > 0) {
+            // Explicit Average Cost column from CSV takes priority
+            avgCostValue = parseFloat(p.compareAtPrice)
+          } else if (importQty > 0 && importCost > 0 && existingCost > 0) {
+            // Weighted average: (old_qty × old_cost + new_qty × new_cost) / total_qty
+            avgCostValue = parseFloat(
+              ((existingQty * existingCost + importQty * importCost) / (existingQty + importQty)).toFixed(2)
+            )
+          } else if (importQty > 0 && importCost > 0) {
+            // First restock — initialise avg cost to import cost
+            avgCostValue = importCost
+          }
+
+          // ── salesAccount / purchaseAccount as JSON arrays ─────────────────
+          const salesArr = Array.isArray(p.salesAccount) ? p.salesAccount : (p.salesAccount ? [p.salesAccount] : [])
+          const purchaseArr = Array.isArray(p.purchaseAccount) ? p.purchaseAccount : (p.purchaseAccount ? [p.purchaseAccount] : [])
+
           await db.query(`
             UPDATE products SET
-              title       = CASE WHEN $1 <> '' THEN $1 ELSE title END,
-              description = CASE WHEN $2 <> '' THEN $2 ELSE description END,
-              price       = CASE WHEN $3::numeric > 0 THEN $3::numeric ELSE price END,
-              brand       = CASE WHEN $4 <> '' THEN $4 ELSE brand END,
-              product_type = CASE WHEN $5 <> '' THEN $5 ELSE product_type END,
-              car_class   = CASE WHEN $6 <> '' THEN $6 ELSE car_class END,
-              car_type    = CASE WHEN $7 <> '' THEN $7 ELSE car_type END,
-              part_type   = CASE WHEN $8 <> '' THEN $8 ELSE part_type END,
-              scale       = CASE WHEN $9 <> '' THEN $9 ELSE scale END,
-              supplier    = CASE WHEN $10 <> '' THEN $10 ELSE supplier END,
-              quantity        = $11::integer,
-              eta             = CASE WHEN $12 <> '' THEN $12 ELSE eta END,
-              status          = CASE WHEN $13 <> '' THEN $13 ELSE status END,
-              unit            = CASE WHEN $16 <> '' THEN $16 ELSE unit END,
-              sales_account   = CASE WHEN $17 <> '' THEN $17 ELSE sales_account END,
-              purchase_account = CASE WHEN $18 <> '' THEN $18 ELSE purchase_account END,
-              item_categories = CASE WHEN $19::jsonb <> '[]'::jsonb THEN $19::jsonb ELSE item_categories END,
-              category_brands = CASE WHEN $20::jsonb <> '[]'::jsonb THEN $20::jsonb ELSE category_brands END,
-              updated_at      = $14
+              title            = CASE WHEN $1 <> '' THEN $1 ELSE title END,
+              description      = CASE WHEN $2 <> '' THEN $2 ELSE description END,
+              price            = CASE WHEN $3::numeric > 0 THEN $3::numeric ELSE price END,
+              brand            = CASE WHEN $4 <> '' THEN $4 ELSE brand END,
+              product_type     = CASE WHEN $5 <> '' THEN $5 ELSE product_type END,
+              car_class        = CASE WHEN $6 <> '' THEN $6 ELSE car_class END,
+              car_type         = CASE WHEN $7 <> '' THEN $7 ELSE car_type END,
+              part_type        = CASE WHEN $8 <> '' THEN $8 ELSE part_type END,
+              scale            = CASE WHEN $9 <> '' THEN $9 ELSE scale END,
+              supplier         = CASE WHEN $10 <> '' THEN $10 ELSE supplier END,
+              quantity         = $11::integer,
+              eta              = CASE WHEN $12 <> '' THEN $12 ELSE eta END,
+              status           = CASE WHEN $13 <> '' THEN $13 ELSE status END,
+              unit             = CASE WHEN $16 <> '' THEN $16 ELSE unit END,
+              sales_account    = CASE WHEN $17 <> '[]' THEN $17 ELSE sales_account END,
+              purchase_account = CASE WHEN $18 <> '[]' THEN $18 ELSE purchase_account END,
+              item_categories  = CASE WHEN $19::jsonb <> '[]'::jsonb THEN $19::jsonb ELSE item_categories END,
+              category_brands  = CASE WHEN $20::jsonb <> '[]'::jsonb THEN $20::jsonb ELSE category_brands END,
+              cost_per_item    = CASE WHEN $21::numeric > 0 THEN $21::numeric ELSE cost_per_item END,
+              compare_at_price = CASE WHEN $22 IS NOT NULL THEN $22::numeric ELSE compare_at_price END,
+              updated_at       = $14
             WHERE id = $15
           `, [
             p.title || p.name || '',
@@ -388,10 +414,12 @@ export async function PUT(request: Request) {
             now,
             existingId,
             p.unit || '',
-            p.salesAccount || '',
-            p.purchaseAccount || '',
+            JSON.stringify(salesArr),
+            JSON.stringify(purchaseArr),
             JSON.stringify(Array.isArray(p.itemCategories) ? p.itemCategories : (p.itemCategories ? [p.itemCategories] : [])),
             JSON.stringify(Array.isArray(p.categoryBrands) ? p.categoryBrands : (p.categoryBrands ? [p.categoryBrands] : [])),
+            importCost || null,
+            avgCostValue,
           ])
           updated++
           continue
@@ -432,7 +460,9 @@ export async function PUT(request: Request) {
         p.imageUrl || '', JSON.stringify(Array.isArray(p.images) ? p.images : []),
         p.pageId || '', JSON.stringify(Array.isArray(p.pageIds) ? p.pageIds : (p.pageId ? [p.pageId] : [])), p.pageUrl || '',
         JSON.stringify(p.seo || {}),
-        p.unit || 'Each', p.salesAccount || '', p.purchaseAccount || '',
+        p.unit || 'Each',
+        JSON.stringify(Array.isArray(p.salesAccount) ? p.salesAccount : (p.salesAccount ? [p.salesAccount] : [])),
+        JSON.stringify(Array.isArray(p.purchaseAccount) ? p.purchaseAccount : (p.purchaseAccount ? [p.purchaseAccount] : [])),
         JSON.stringify(Array.isArray(p.itemCategories) ? p.itemCategories : (p.itemCategories ? [p.itemCategories] : [])),
         JSON.stringify(Array.isArray(p.categoryBrands) ? p.categoryBrands : (p.categoryBrands ? [p.categoryBrands] : [])),
         now, now,

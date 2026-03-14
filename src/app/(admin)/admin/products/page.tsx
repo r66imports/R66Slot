@@ -148,9 +148,9 @@ type ImportProfile = {
 const IMPORT_PROFILES: Record<string, ImportProfile> = {
   generic: {
     label: 'Generic',
-    hint: 'Columns: Code, Description, Category, Unit, SRP – Exclusive, Cost – Exclusive, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP – Exclusive,Cost – Exclusive,Sales Account,Purchases Account',
-    placeholder: 'NSR-0001,NSR Slot Car,NSR,Slot Car,450,280,Retail Sales,Retail Purchases',
+    hint: 'Columns: Code, Description, Category, Unit, SRP – Inclusive, Cost – Inclusive, Average Cost, Qty, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,SRP – Inclusive,Cost – Inclusive,Average Cost,Qty,Sales Account,Purchases Account',
+    placeholder: 'NSR-0001,NSR Slot Car,NSR,Slot Car,517.50,322.00,322.00,5,Retail Sales,Retail Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || '',
       title: obj['description'] || obj['title'] || obj['name'] || '',
@@ -158,16 +158,20 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       categoryBrands: obj['category'] || obj['brand'] || '',
       productType: obj['unit'] || obj['category'] || obj['type'] || '',
       itemCategories: obj['unit'] || obj['type'] || '',
-      price: obj['srp exclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
+      // SRP: inclusive takes priority, fall back to exclusive / generic price columns
+      price: obj['srp – inclusive'] || obj['srp inclusive'] || obj['srp – exclusive'] || obj['srp exclusive'] || obj['retail price'] || obj['price'] || '0',
+      // Cost: inclusive takes priority, fall back to exclusive / generic cost columns
+      costPerItem: obj['cost – inclusive'] || obj['cost inclusive'] || obj['cost – exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
+      // Average Cost → stored in compare_at_price (internal use, not shown to customers)
+      compareAtPrice: obj['average cost'] || obj['avg cost'] || '',
+      quantity: obj['qty'] || obj['quantity'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
-      quantity: obj['quantity'] || obj['qty'] || '0',
       eta: obj['eta'] || obj['delivery'] || '',
       status: obj['status'] || 'active',
     }),
     brandKey: '',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Inclusive', 'Cost – Inclusive', 'Average Cost', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku,
       p.title,
@@ -175,6 +179,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
       p.price,
       p.costPerItem ?? '',
+      p.compareAtPrice ?? '',
+      p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
     ],
