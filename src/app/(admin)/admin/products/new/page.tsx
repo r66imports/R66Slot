@@ -108,9 +108,9 @@ export default function NewProductPage() {
   const [showNewOrgInput, setShowNewOrgInput] = useState(false)
   const [newOrgName, setNewOrgName] = useState('')
   // Collapse states
-  const [productOrgCollapsed, setProductOrgCollapsed] = useState(false)
-  const [revoOrgCollapsed, setRevoOrgCollapsed] = useState(false)
-  const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(false)
+  const [productOrgCollapsed, setProductOrgCollapsed] = useState(true)
+  const [revoOrgCollapsed, setRevoOrgCollapsed] = useState(true)
+  const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(true)
 
   // Load available pages and categories on mount
   useEffect(() => {
@@ -1335,7 +1335,7 @@ export default function NewProductPage() {
             {customOrgCards.map((card) => {
               const cardData = customOrgData[card.id] || { brands: [], carClasses: [], parts: [], carTypes: [] }
               const cardBrandOptions = customOrgBrands[card.id] || []
-              const collapsed = customOrgCollapsed[card.id] ?? false
+              const collapsed = customOrgCollapsed[card.id] ?? true
               const openDropdown = customOrgDropdowns[card.id] ?? null
               const getInput = (field: string) => customOrgNewInput[`${card.id}_${field}`] || ''
               const setInput = (field: string, val: string) => setCustomOrgNewInput(prev => ({ ...prev, [`${card.id}_${field}`]: val }))

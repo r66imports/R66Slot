@@ -132,12 +132,12 @@ export default function EditProductPage({
   const skuRef = useRef<HTMLInputElement>(null)
   const [shippingCollapsed, setShippingCollapsed] = useState(false)
   const [statusCollapsed, setStatusCollapsed] = useState(false)
-  const [sageCollapsed, setSageCollapsed] = useState(false)
+  const [sageCollapsed, setSageCollapsed] = useState(true)
   const [seoCollapsed, setSeoCollapsed] = useState(false)
   const [infoCollapsed, setInfoCollapsed] = useState(false)
-  const [generalOrgCollapsed, setGeneralOrgCollapsed] = useState(false)
-  const [productOrgCollapsed, setProductOrgCollapsed] = useState(false)
-  const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(false)
+  const [generalOrgCollapsed, setGeneralOrgCollapsed] = useState(true)
+  const [productOrgCollapsed, setProductOrgCollapsed] = useState(true)
+  const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(true)
   const [carClassPillsHidden, setCarClassPillsHidden] = useState(false)
   const [carBrandPillsHidden, setCarBrandPillsHidden] = useState(false)
   const [sidewaysBrandPillsHidden, setSidewaysBrandPillsHidden] = useState(false)
@@ -1812,7 +1812,7 @@ export default function EditProductPage({
             {customOrgCards.map((card) => {
               const cardData = customOrgData[card.id] || { brands: [], carClasses: [], parts: [], carTypes: [] }
               const cardBrandOptions = customOrgBrands[card.id] || []
-              const collapsed = customOrgCollapsed[card.id] ?? false
+              const collapsed = customOrgCollapsed[card.id] ?? true
               const openDropdown = customOrgDropdowns[card.id] ?? null
               const getInput = (field: string) => customOrgNewInput[`${card.id}_${field}`] || ''
               const setInput = (field: string, val: string) => setCustomOrgNewInput(prev => ({ ...prev, [`${card.id}_${field}`]: val }))

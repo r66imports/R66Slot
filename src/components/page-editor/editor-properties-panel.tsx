@@ -2913,7 +2913,7 @@ function SettingsTab({
   const [sidewaysClassDropdownOpen, setSidewaysClassDropdownOpen] = useState(false)
   const [sidewaysPartDropdownOpen, setSidewaysPartDropdownOpen] = useState(false)
   const [customOrgDropdowns, setCustomOrgDropdowns] = useState<Record<string, boolean>>({})
-  const [revoOrgCollapsed, setRevoOrgCollapsed] = useState(false)
+  const [revoOrgCollapsed, setRevoOrgCollapsed] = useState(true)
   const [sidewaysOrgCollapsed, setSidewaysOrgCollapsed] = useState(true)
   const [customOrgCollapsed, setCustomOrgCollapsed] = useState<Record<string, boolean>>({})
   const [newOptInput, setNewOptInput] = useState<Record<string, string>>({})
