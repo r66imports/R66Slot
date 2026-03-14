@@ -647,10 +647,24 @@ export default function ProductsPage() {
     setImporting(true)
     const profile = IMPORT_PROFILES[importProfile]
     try {
-      const lines = importText.trim().split('\n').map((l) => l.replace(/\r$/, ''))
-      // Normalize all dash variants (en-dash, em-dash, etc.) to regular hyphen
-      const normalizeHeader = (h: string) => h.toLowerCase().replace(/[\u2013\u2014\u2012\u2015]/g, '-').trim()
+      // Strip BOM, normalize line endings
+      const cleanText = importText.trim().replace(/^\uFEFF/, '')
+      const lines = cleanText.split('\n').map((l) => l.replace(/\r$/, ''))
+      // Normalize headers: lowercase, strip BOM, replace all dash variants with hyphen
+      const normalizeHeader = (h: string) => h
+        .replace(/^\uFEFF/, '')
+        .toLowerCase()
+        .replace(/[\u2013\u2014\u2012\u2015\u2010\u2011]/g, '-')
+        .trim()
       const headers = parseCSVLine(lines[0]).map(normalizeHeader)
+      // Debug: show parsed headers + first row so we can verify mapping
+      if (process.env.NODE_ENV === 'development' || true) {
+        const firstVals = parseCSVLine(lines[1] || '')
+        const debugObj: Record<string, string> = {}
+        headers.forEach((h, i) => { debugObj[h] = firstVals[i] || '' })
+        console.log('CSV headers:', headers)
+        console.log('First row mapped:', profile.mapRow(debugObj))
+      }
       const rows = lines.slice(1).filter((l) => l.trim()).map((line) => {
         const values = parseCSVLine(line)
         const obj: Record<string, string> = {}
