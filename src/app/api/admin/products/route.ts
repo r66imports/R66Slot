@@ -394,7 +394,7 @@ export async function PUT(request: Request) {
               item_categories  = CASE WHEN $19::jsonb <> '[]'::jsonb THEN $19::jsonb ELSE item_categories END,
               category_brands  = CASE WHEN $20::jsonb <> '[]'::jsonb THEN $20::jsonb ELSE category_brands END,
               cost_per_item    = CASE WHEN $21::numeric > 0 THEN $21::numeric ELSE cost_per_item END,
-              compare_at_price = CASE WHEN $22 IS NOT NULL THEN $22::numeric ELSE compare_at_price END,
+              compare_at_price = COALESCE($22::numeric, compare_at_price),
               updated_at       = $14
             WHERE id = $15
           `, [
