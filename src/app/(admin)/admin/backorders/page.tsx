@@ -2093,7 +2093,7 @@ export default function BackordersPage() {
                       </td>
 
                       {/* Date */}
-                      <td className="px-3 py-4 whitespace-nowrap">
+                      <td className="px-3 py-4">
                         <span className="text-xs font-semibold text-gray-600 bg-gray-100 px-2 py-1 rounded-md">
                           {formatDate(bo.createdAt)}
                         </span>
@@ -2103,12 +2103,12 @@ export default function BackordersPage() {
                       <td className="px-4 py-4 max-w-[200px]">
                         <button
                           onClick={() => { setEditItem(bo); setShowModal(true) }}
-                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline truncate block text-left w-full transition-colors"
+                          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline break-words block text-left w-full transition-colors"
                         >
                           {bo.clientName}
                         </button>
                         {bo.clientEmail && (
-                          <p className="text-xs text-gray-400 truncate">{bo.clientEmail}</p>
+                          <p className="text-xs text-gray-400 break-words">{bo.clientEmail}</p>
                         )}
                         {bo.clientPhone && (
                           <p className="text-xs text-gray-400">{bo.clientPhone}</p>

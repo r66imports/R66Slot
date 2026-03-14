@@ -658,16 +658,16 @@ export default function PreOrderListPage() {
                           <p className="text-xs text-gray-400 font-play">{order.customerPhone}</p>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-sm font-play whitespace-nowrap">
+                      <td className="py-3 px-3 text-sm font-play">
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-3 text-sm font-play">{order.brand}</td>
                       <td className="py-3 px-3 text-sm font-play font-mono text-xs">{order.sku}</td>
                       <td className="py-3 px-3 text-sm font-play">{order.itemDescription}</td>
-                      <td className="py-3 px-3 text-sm font-play whitespace-nowrap">
+                      <td className="py-3 px-3 text-sm font-play">
                         {order.estimatedDeliveryDate || '—'}
                       </td>
-                      <td className="py-3 px-3 text-sm font-bold font-play whitespace-nowrap">
+                      <td className="py-3 px-3 text-sm font-bold font-play">
                         R{order.price}
                       </td>
                       <td className="py-3 px-3 text-sm font-play text-center">{order.quantity}</td>

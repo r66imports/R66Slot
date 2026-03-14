@@ -826,7 +826,7 @@ export default function ContactsPage() {
                         <div>
                           <p className="font-semibold text-gray-900">{fullName(c)}</p>
                           {c.notes && (
-                            <p className="text-xs text-gray-400 truncate max-w-[120px]">{c.notes}</p>
+                            <p className="text-xs text-gray-400 break-words">{c.notes}</p>
                           )}
                         </div>
                       </div>
@@ -846,7 +846,7 @@ export default function ContactsPage() {
                     <td className="px-4 py-3">
                       {c.addressCity || c.addressProvince ? (
                         <div>
-                          {c.addressStreet && <p className="text-xs text-gray-500 truncate max-w-[120px]">{c.addressStreet}</p>}
+                          {c.addressStreet && <p className="text-xs text-gray-500 break-words">{c.addressStreet}</p>}
                           <p className="text-xs text-gray-700 font-medium">
                             {[c.addressCity, c.addressProvince].filter(Boolean).join(', ')}
                           </p>

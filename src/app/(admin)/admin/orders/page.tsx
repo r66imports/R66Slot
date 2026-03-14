@@ -1655,7 +1655,7 @@ export default function OrdersPage() {
                   {boRows.map((b) => (
                     <tr key={`bo-${b.id}`} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-blue-700">{cfg.boDocNum(b)}</td>
-                      <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(cfg.boDate(b) ?? b.createdAt)}</td>
+                      <td className="py-3 px-4 text-gray-500">{fmtDate(cfg.boDate(b) ?? b.createdAt)}</td>
                       <td className="py-3 px-4 font-medium">{b.clientName}</td>
                       <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{b.description}</td>
                       <td className="py-3 px-4 text-right font-semibold">{fmtPrice(b.price * b.qty)}</td>
@@ -1684,7 +1684,7 @@ export default function OrdersPage() {
                     return (
                       <tr key={`doc-${doc.id}`} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td className="py-3 px-4 font-mono font-semibold text-blue-700">{doc.docNumber}</td>
-                        <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(doc.date)}</td>
+                        <td className="py-3 px-4 text-gray-500">{fmtDate(doc.date)}</td>
                         <td className="py-3 px-4 font-medium">{doc.clientName}</td>
                         <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{firstDesc}</td>
                         <td className="py-3 px-4 text-right font-semibold">{fmtPrice(subtotal)}</td>

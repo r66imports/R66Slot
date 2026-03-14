@@ -190,7 +190,7 @@ export default function InventoryPage() {
                         {product.imageUrl && (
                           <img src={product.imageUrl} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />
                         )}
-                        <span className="font-medium text-gray-800 truncate max-w-[220px]">{product.title}</span>
+                        <span className="font-medium text-gray-800 break-words">{product.title}</span>
                         {product.status === 'draft' && (
                           <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">draft</span>
                         )}
