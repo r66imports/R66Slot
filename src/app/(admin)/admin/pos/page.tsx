@@ -166,7 +166,7 @@ function ClientAutofill({
 
 // ── PDF Generation (matches orders page) ─────────────────────────────────────
 
-async function generateAndDownloadPDF(
+async function buildPDFDoc(
   invoiceNumber: string,
   clientName: string,
   clientEmail: string,
@@ -301,6 +301,19 @@ async function generateAndDownloadPDF(
     doc.text(template.footerText, pageW / 2, pageH - 10, { align: 'center' })
   }
 
+  return doc
+}
+
+async function generateAndDownloadPDF(
+  invoiceNumber: string,
+  clientName: string,
+  clientEmail: string,
+  clientPhone: string,
+  clientAddress: string,
+  lineItems: { description: string; qty: number; unitPrice: number }[],
+  template: OrderTemplate
+) {
+  const doc = await buildPDFDoc(invoiceNumber, clientName, clientEmail, clientPhone, clientAddress, lineItems, template)
   doc.save(`${invoiceNumber}.pdf`)
 }
 
@@ -482,55 +495,77 @@ export default function POSPage() {
     }
   }
 
-  // WhatsApp plain-text summary
+  // WhatsApp — generate PDF and share via Web Share API (or download + open chat as fallback)
   const handleWhatsApp = async () => {
     if (!hasSaleItems) return
-    const invNum = savedInvoiceNum || genInvoiceNumber()
+    setSaving(true)
+    try {
+      const invNum = savedInvoiceNum || genInvoiceNumber()
 
-    // Save first if not yet saved
-    if (!savedInvoiceNum) {
-      const res = await fetch('/api/admin/orders/documents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'invoice',
-          docNumber: invNum,
-          date: new Date().toISOString().slice(0, 10),
-          clientName: invoiceClient.name || 'Walk-in Customer',
-          clientEmail: invoiceClient.email,
-          clientPhone: invoiceClient.phone,
-          clientAddress: invoiceClient.address,
-          lineItems: saleItems.map((li, i) => ({
-            id: `li_${i}`,
-            description: li.description,
-            qty: li.qty,
-            unitPrice: li.unitPrice,
-          })),
-          notes: 'Created via POS scanner',
-          terms: template.invoiceTerms || '',
-          status: 'sent',
-        }),
-      })
-      if (res.ok) setSavedInvoiceNum(invNum)
+      // Save to orders if not yet saved
+      if (!savedInvoiceNum) {
+        const res = await fetch('/api/admin/orders/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'invoice',
+            docNumber: invNum,
+            date: new Date().toISOString().slice(0, 10),
+            clientName: invoiceClient.name || 'Walk-in Customer',
+            clientEmail: invoiceClient.email,
+            clientPhone: invoiceClient.phone,
+            clientAddress: invoiceClient.address,
+            lineItems: saleItems.map((li, i) => ({
+              id: `li_${i}`,
+              description: li.description,
+              qty: li.qty,
+              unitPrice: li.unitPrice,
+            })),
+            notes: 'Created via POS scanner',
+            terms: template.invoiceTerms || '',
+            status: 'sent',
+          }),
+        })
+        if (res.ok) setSavedInvoiceNum(invNum)
+      }
+
+      // Generate PDF blob
+      const doc = await buildPDFDoc(
+        invNum,
+        invoiceClient.name,
+        invoiceClient.email,
+        invoiceClient.phone,
+        invoiceClient.address,
+        saleItems,
+        template
+      )
+      const pdfBlob = doc.output('blob')
+      const fileName = `${invNum}.pdf`
+      const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' })
+
+      // Try Web Share API with file (works on mobile + some desktop browsers)
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          files: [pdfFile],
+          title: `Invoice ${invNum}`,
+          text: `Invoice ${invNum} from ${template.companyName || 'R66 Slot'}`,
+        })
+      } else {
+        // Fallback: download the PDF, then open WhatsApp chat
+        const url = URL.createObjectURL(pdfBlob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        a.click()
+        URL.revokeObjectURL(url)
+        // Open WhatsApp (user attaches the downloaded PDF manually)
+        const phone = invoiceClient.phone.replace(/\D/g, '').replace(/^0/, '27')
+        const msg = `Hi, please find your invoice ${invNum} attached (just downloaded).`
+        window.open(`https://wa.me/${phone || ''}?text=${encodeURIComponent(msg)}`, '_blank')
+      }
+    } finally {
+      setSaving(false)
     }
-
-    const lines = saleItems.map((li, i) =>
-      `${i + 1}. ${li.description} ×${li.qty} @ ${fmtPrice(li.unitPrice)} = ${fmtPrice(li.qty * li.unitPrice)}`
-    ).join('\n')
-    const msg = [
-      `*Invoice ${invNum}*`,
-      `Date: ${fmtDateLong(new Date().toISOString())}`,
-      '',
-      lines,
-      '',
-      `Subtotal: ${fmtPrice(subtotal)}`,
-      `VAT (15%): ${fmtPrice(vat)}`,
-      `*TOTAL: ${fmtPrice(total)}*`,
-      template.bankName ? `\nBanking: ${template.bankName} – ${template.bankAccount}` : '',
-    ].filter(Boolean).join('\n')
-
-    const phone = invoiceClient.phone.replace(/\D/g, '').replace(/^0/, '27')
-    window.open(`https://wa.me/${phone || ''}?text=${encodeURIComponent(msg)}`, '_blank')
   }
 
   const modeColor: Record<Mode, string> = {
@@ -878,10 +913,11 @@ export default function POSPage() {
                 </button>
                 <button
                   onClick={handleWhatsApp}
-                  className="flex flex-col items-center gap-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                  disabled={saving}
+                  className="flex flex-col items-center gap-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50"
                 >
                   <span className="text-xl">💬</span>
-                  WhatsApp
+                  {saving ? 'Preparing…' : 'WhatsApp PDF'}
                 </button>
               </div>
               <button
