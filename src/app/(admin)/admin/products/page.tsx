@@ -166,6 +166,24 @@ type ImportProfile = {
   exportRow: (p: Product) => (string | number)[]
 }
 
+// Fuzzy qty finder — handles any Sage column name variant
+// e.g. "Qty", "Quantity", "Qty On Hand", "On Hand", "Physical Qty", "Closing Qty"
+function findQtyValue(obj: Record<string, string>): string {
+  const direct = obj['qty'] || obj['quantity'] || obj['stock'] ||
+    obj['qty on hand'] || obj['quantity on hand'] || obj['on hand'] ||
+    obj['physical qty'] || obj['closing qty'] || obj['opening qty'] ||
+    obj['available qty'] || obj['in stock'] || obj['units on hand']
+  if (direct) return direct
+  // Fallback fuzzy scan — catches any remaining Sage variants
+  for (const key of Object.keys(obj)) {
+    if (key.includes('qty') || key.includes('quantity') || key.includes('on hand') ||
+        key.includes('physical') || key.includes('in stock') || key.includes('closing')) {
+      if (obj[key] && obj[key].trim() !== '') return obj[key]
+    }
+  }
+  return '0'
+}
+
 const IMPORT_PROFILES: Record<string, ImportProfile> = {
   generic: {
     label: 'Generic',
@@ -182,7 +200,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       price: obj['price incl.'] || obj['price incl'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
       compareAtPrice: obj['average cost'] || obj['avg cost'] || '',
-      quantity: obj['qty'] || obj['quantity'] || '0',
+      quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
       eta: obj['eta'] || obj['delivery'] || '',
@@ -219,7 +237,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
-      quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
+      quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
       eta: obj['eta'] || obj['delivery'] || obj['lead time'] || '',
@@ -251,7 +269,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       partType: obj['part_type'] || obj['parttype'] || '',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
-      quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
+      quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
       eta: obj['eta'] || obj['delivery'] || obj['lead time'] || '',
@@ -284,7 +302,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/24',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
-      quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
+      quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
       eta: obj['eta'] || obj['delivery'] || '',
@@ -317,7 +335,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
-      quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
+      quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
       eta: obj['eta'] || obj['delivery'] || '',
@@ -350,7 +368,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
-      quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
+      quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
       eta: obj['eta'] || obj['delivery'] || '',
