@@ -76,6 +76,9 @@ export default function AdminLayout({
         ]
       },
     ],
+    shippingNetwork: [
+      { name: 'Shipping Network', href: '/admin/shipping-network', icon: '🚚' },
+    ],
     orderNetwork: [
       {
         name: 'Order Network',
@@ -471,6 +474,31 @@ export default function AdminLayout({
                         isActive
                           ? 'bg-gray-100 text-gray-900'
                           : 'text-gray-700 hover:bg-gray-50'
+                      )}
+                    >
+                      <span className="text-base">{item.icon}</span>
+                      {item.name}
+                    </Link>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Shipping Network Section */}
+            <div>
+              <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">
+                Shipping Network
+              </p>
+              <div className="space-y-1">
+                {navigation.shippingNetwork.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors font-play',
+                        isActive ? 'bg-gray-100 text-gray-900' : 'text-gray-700 hover:bg-gray-50'
                       )}
                     >
                       <span className="text-base">{item.icon}</span>
