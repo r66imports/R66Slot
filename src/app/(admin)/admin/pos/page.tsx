@@ -369,7 +369,6 @@ export default function POSPage() {
       }
       const data: Product = await res.json()
       setProduct(data)
-      await applyStock(data, mode, qty)
     } finally {
       setLoading(false)
       refocus()
@@ -700,9 +699,10 @@ export default function POSPage() {
                   <button
                     onClick={handleManualApply}
                     disabled={updating}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 ${modeColor[mode]} text-white`}
+                    className={`flex flex-col items-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${modeColor[mode]} text-white shadow-lg`}
                   >
-                    {mode === 'add' ? `+ ${qty}` : mode === 'subtract' ? `− ${qty}` : `= ${qty}`}
+                    <span className="text-lg leading-none">{mode === 'add' ? `+${qty}` : mode === 'subtract' ? `−${qty}` : `=${qty}`}</span>
+                    <span className="text-[10px] font-semibold opacity-90 mt-0.5">{updating ? 'Saving…' : 'Save to Inventory'}</span>
                   </button>
                 </div>
                 <div className="border-t border-gray-800 px-4 py-2 flex items-center gap-2">
