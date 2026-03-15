@@ -390,7 +390,7 @@ export async function PUT(request: Request) {
               part_type        = CASE WHEN $8 <> '' THEN $8 ELSE part_type END,
               scale            = CASE WHEN $9 <> '' THEN $9 ELSE scale END,
               supplier         = CASE WHEN $10 <> '' THEN $10 ELSE supplier END,
-              quantity         = $11::integer,
+              quantity         = CASE WHEN $11::integer > 0 THEN $11::integer ELSE quantity END,
               eta              = CASE WHEN $12 <> '' THEN $12 ELSE eta END,
               status           = CASE WHEN $13 <> '' THEN $13 ELSE status END,
               unit             = CASE WHEN $16 <> '' THEN $16 ELSE unit END,
