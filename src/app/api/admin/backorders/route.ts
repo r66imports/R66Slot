@@ -11,6 +11,11 @@ export interface Backorder {
   clientName: string
   clientEmail: string
   clientPhone: string
+  // Home Address
+  address: string
+  suburb: string
+  city: string
+  postalCode: string
   // Club Info
   clubName: string
   clubMemberId: string
@@ -92,6 +97,10 @@ export async function POST(request: Request) {
       clientName: body.clientName?.trim() || '',
       clientEmail: body.clientEmail?.trim() || '',
       clientPhone: body.clientPhone?.trim() || '',
+      address: body.address?.trim() || '',
+      suburb: body.suburb?.trim() || '',
+      city: body.city?.trim() || '',
+      postalCode: body.postalCode?.trim() || '',
       clubName: body.clubName?.trim() || '',
       clubMemberId: body.clubMemberId?.trim() || '',
       companyName: body.companyName?.trim() || '',

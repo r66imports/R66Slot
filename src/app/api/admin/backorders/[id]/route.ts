@@ -31,6 +31,7 @@ export async function PATCH(
     const allowedFields = [
       'clientId',
       'clientName', 'clientEmail', 'clientPhone',
+      'address', 'suburb', 'city', 'postalCode',
       'clubName', 'clubMemberId',
       'companyName', 'companyVAT', 'companyAddress',
       'sku', 'description', 'brand', 'supplierLink', 'qty', 'price',
