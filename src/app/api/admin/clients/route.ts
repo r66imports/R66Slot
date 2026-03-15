@@ -10,6 +10,11 @@ export interface Client {
   lastName: string
   email: string
   phone: string
+  // Delivery Address
+  address: string
+  suburb: string
+  city: string
+  postalCode: string
   // Club Info
   clubName: string
   clubMemberId: string
@@ -74,6 +79,10 @@ export async function POST(request: Request) {
       lastName: body.lastName?.trim() || '',
       email: body.email?.trim() || '',
       phone: body.phone?.trim() || '',
+      address: body.address?.trim() || '',
+      suburb: body.suburb?.trim() || '',
+      city: body.city?.trim() || '',
+      postalCode: body.postalCode?.trim() || '',
       clubName: body.clubName?.trim() || '',
       clubMemberId: body.clubMemberId?.trim() || '',
       companyName: body.companyName?.trim() || '',

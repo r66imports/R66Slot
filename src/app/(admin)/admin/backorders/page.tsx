@@ -22,6 +22,10 @@ interface Client {
   lastName: string
   email: string
   phone: string
+  address: string
+  suburb: string
+  city: string
+  postalCode: string
   clubName: string
   clubMemberId: string
   companyName: string
@@ -38,6 +42,10 @@ interface Backorder {
   clientName: string
   clientEmail: string
   clientPhone: string
+  address: string
+  suburb: string
+  city: string
+  postalCode: string
   clubName: string
   clubMemberId: string
   companyName: string
@@ -84,6 +92,10 @@ const EMPTY_CLIENT_FIELDS = {
   clientName: '',
   clientEmail: '',
   clientPhone: '',
+  address: '',
+  suburb: '',
+  city: '',
+  postalCode: '',
   clubName: '',
   clubMemberId: '',
   companyName: '',
@@ -888,6 +900,10 @@ function BackorderModal({
       clientName: `${client.firstName} ${client.lastName}`,
       clientEmail: client.email,
       clientPhone: client.phone,
+      address: (client as any).address || '',
+      suburb: (client as any).suburb || '',
+      city: (client as any).city || '',
+      postalCode: (client as any).postalCode || '',
       clubName: client.clubName,
       clubMemberId: client.clubMemberId,
       companyName: client.companyName,
@@ -905,6 +921,10 @@ function BackorderModal({
       clientName: '',
       clientEmail: '',
       clientPhone: '',
+      address: '',
+      suburb: '',
+      city: '',
+      postalCode: '',
       clubName: '',
       clubMemberId: '',
       companyName: '',
@@ -938,6 +958,10 @@ function BackorderModal({
           clientName: form.clientName,
           clientEmail: form.clientEmail,
           clientPhone: form.clientPhone,
+          address: form.address,
+          suburb: form.suburb,
+          city: form.city,
+          postalCode: form.postalCode,
           clubName: form.clubName,
           clubMemberId: form.clubMemberId,
           companyName: form.companyName,
@@ -1048,6 +1072,55 @@ function BackorderModal({
                   placeholder="082 000 0000"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Delivery Address ──────────────────────────────────── */}
+          <div>
+            <SectionHeader
+              icon="📍"
+              title="Home Address"
+              subtitle="Delivery address for this client"
+            />
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Street Address</label>
+                <input
+                  value={form.address}
+                  onChange={(e) => str('address', e.target.value)}
+                  placeholder="e.g. 12 Main Street"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Suburb</label>
+                  <input
+                    value={form.suburb}
+                    onChange={(e) => str('suburb', e.target.value)}
+                    placeholder="e.g. Sandton"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">City</label>
+                  <input
+                    value={form.city}
+                    onChange={(e) => str('city', e.target.value)}
+                    placeholder="e.g. Johannesburg"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Postal Code</label>
+                  <input
+                    value={form.postalCode}
+                    onChange={(e) => str('postalCode', e.target.value)}
+                    placeholder="e.g. 2196"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1506,6 +1579,10 @@ export default function BackordersPage() {
         lastName,
         email: data.clientEmail,
         phone: data.clientPhone,
+        address: data.address,
+        suburb: data.suburb,
+        city: data.city,
+        postalCode: data.postalCode,
         clubName: data.clubName,
         clubMemberId: data.clubMemberId,
         companyName: data.companyName,
@@ -1537,7 +1614,15 @@ export default function BackordersPage() {
       fetch('/api/admin/contacts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...clientPayload, source: 'manual', addressCountry: 'South Africa' }),
+        body: JSON.stringify({
+          ...clientPayload,
+          source: 'manual',
+          addressStreet: clientPayload.address,
+          addressCity: clientPayload.city,
+          addressProvince: clientPayload.suburb,
+          addressPostalCode: clientPayload.postalCode,
+          addressCountry: 'South Africa',
+        }),
       }).catch(() => {}) // Non-fatal — ignore duplicate (409) silently
     }
 
@@ -1647,6 +1732,10 @@ export default function BackordersPage() {
           clientName: bo.clientName,
           clientEmail: bo.clientEmail,
           clientPhone: bo.clientPhone,
+          address: bo.address || '',
+          suburb: bo.suburb || '',
+          city: bo.city || '',
+          postalCode: bo.postalCode || '',
           clubName: bo.clubName || '',
           clubMemberId: bo.clubMemberId || '',
           companyName: bo.companyName || '',
@@ -1838,6 +1927,10 @@ export default function BackordersPage() {
         clientName: editItem.clientName,
         clientEmail: editItem.clientEmail,
         clientPhone: editItem.clientPhone,
+        address: editItem.address || '',
+        suburb: editItem.suburb || '',
+        city: editItem.city || '',
+        postalCode: editItem.postalCode || '',
         clubName: editItem.clubName || '',
         clubMemberId: editItem.clubMemberId || '',
         companyName: editItem.companyName || '',

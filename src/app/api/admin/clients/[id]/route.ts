@@ -49,6 +49,7 @@ export async function PATCH(
 
     const allowedFields: (keyof Client)[] = [
       'firstName', 'lastName', 'email', 'phone',
+      'address', 'suburb', 'city', 'postalCode',
       'clubName', 'clubMemberId',
       'companyName', 'companyVAT', 'companyAddress',
       'notes',

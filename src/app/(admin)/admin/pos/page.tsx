@@ -554,22 +554,19 @@ export default function POSPage() {
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold">Point of Sale</h1>
           <div className="flex items-center gap-2">
-            {hasSaleItems && (
-              <>
-                <button
-                  onClick={() => setShowInvoice(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow"
-                >
-                  📄 Send Invoice
-                </button>
-                <button
-                  onClick={handleNewSale}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold rounded-lg transition-colors"
-                >
-                  🆕 New Sale
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => setShowInvoice(true)}
+              disabled={!hasSaleItems}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors shadow disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              📄 Send Invoice
+            </button>
+            <button
+              onClick={handleNewSale}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              🆕 New Sale
+            </button>
             <a
               href="/admin/products"
               className="text-sm text-gray-400 hover:text-white border border-gray-700 rounded px-3 py-1.5 transition-colors"
