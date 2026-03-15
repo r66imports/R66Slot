@@ -338,6 +338,11 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: 'Expected { products: [] }' }, { status: 400 })
     }
 
+    // Strip thousands-separator commas before parsing (e.g. "1,450.00" → 1450)
+    const parseNum = (v: any) => parseFloat(String(v || '').replace(/,/g, '')) || 0
+    const parseNumOrNull = (v: any) => { const n = parseFloat(String(v || '').replace(/,/g, '')); return isNaN(n) || n === 0 ? null : n }
+    const parseQty = (v: any) => parseInt(String(v || '').replace(/,/g, '')) || 0
+
     let imported = 0
     let updated = 0
     for (const p of body.products) {
@@ -353,12 +358,12 @@ export async function PUT(request: Request) {
           // ── Average cost calculation (Task 3) ──────────────────────────────
           const existingQty = parseInt(existing.rows[0].quantity) || 0
           const existingCost = parseFloat(existing.rows[0].cost_per_item) || 0
-          const importQty = parseInt(p.quantity) || 0
-          const importCost = parseFloat(p.costPerItem) || 0
+          const importQty = parseQty(p.quantity)
+          const importCost = parseNum(p.costPerItem)
           let avgCostValue: number | null = null
-          if (p.compareAtPrice && parseFloat(p.compareAtPrice) > 0) {
+          if (p.compareAtPrice && parseNum(p.compareAtPrice) > 0) {
             // Explicit Average Cost column from CSV takes priority
-            avgCostValue = parseFloat(p.compareAtPrice)
+            avgCostValue = parseNum(p.compareAtPrice)
           } else if (importQty > 0 && importCost > 0 && existingCost > 0) {
             // Weighted average: (old_qty × old_cost + new_qty × new_cost) / total_qty
             avgCostValue = parseFloat(
@@ -400,7 +405,7 @@ export async function PUT(request: Request) {
           `, [
             p.title || p.name || '',
             p.description || '',
-            parseFloat(p.price) || 0,
+            parseNum(p.price),
             p.brand || '',
             p.productType || '',
             p.carClass || '',
@@ -408,7 +413,7 @@ export async function PUT(request: Request) {
             p.partType || '',
             p.scale || '',
             p.supplier || '',
-            parseInt(p.quantity) ?? 0,
+            parseQty(p.quantity),
             p.eta || '',
             p.status || '',
             now,
@@ -445,15 +450,15 @@ export async function PUT(request: Request) {
         )
       `, [
         id, p.title || p.name || '', p.description || '',
-        parseFloat(p.price) || 0,
-        p.compareAtPrice ? parseFloat(p.compareAtPrice) : null,
-        p.costPerItem ? parseFloat(p.costPerItem) : null,
+        parseNum(p.price),
+        parseNumOrNull(p.compareAtPrice),
+        parseNumOrNull(p.costPerItem),
         sku, p.barcode || '', p.brand || '', p.productType || '',
         p.carClass || '', p.carType || '', p.partType || '', p.scale || '',
         p.supplier || '',
         JSON.stringify(Array.isArray(p.collections) ? p.collections : []),
         JSON.stringify(Array.isArray(p.tags) ? p.tags : []),
-        parseInt(p.quantity) || 0, p.trackQuantity !== false,
+        parseQty(p.quantity), p.trackQuantity !== false,
         p.weight ? parseFloat(p.weight) : null, p.weightUnit || 'kg',
         p.boxSize || '', JSON.stringify(p.dimensions || {}),
         p.eta || '', p.status || 'active',
