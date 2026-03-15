@@ -78,6 +78,7 @@ export default function AdminLayout({
     ],
     shippingNetwork: [
       { name: 'Shipping Network', href: '/admin/shipping-network', icon: '🚚' },
+      { name: 'Local Shipping', href: '/admin/shipping', icon: '📦' },
     ],
     orderNetwork: [
       {
@@ -113,7 +114,6 @@ export default function AdminLayout({
           { name: 'Suppliers', href: '/admin/supplier-contacts', icon: '🏭' },
         ]
       },
-      { name: 'Local Shipping', href: '/admin/shipping', icon: '🚚' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Sage Accounting', href: '/admin/sage', icon: '📊' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
