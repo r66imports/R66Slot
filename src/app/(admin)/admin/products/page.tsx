@@ -169,8 +169,8 @@ type ImportProfile = {
 const IMPORT_PROFILES: Record<string, ImportProfile> = {
   generic: {
     label: 'Generic',
-    hint: 'Columns: Code, Description, Category, Unit, SRP – Inclusive, Cost – Inclusive, Average Cost, Qty, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP – Inclusive,Cost – Inclusive,Average Cost,Qty,Sales Account,Purchases Account',
+    hint: 'Columns: Code, Description, Category, Unit, Price Incl., Last Cost, Average Cost, Qty, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,Price Incl.,Last Cost,Average Cost,Qty,Sales Account,Purchases Account',
     placeholder: 'NSR-0001,NSR Slot Car,NSR,Slot Car,517.50,322.00,322.00,5,Retail Sales,Retail Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || '',
@@ -179,11 +179,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       categoryBrands: obj['category'] || obj['brand'] || '',
       productType: obj['unit'] || obj['category'] || obj['type'] || '',
       itemCategories: obj['unit'] || obj['type'] || '',
-      // SRP: inclusive takes priority, fall back to exclusive / generic price columns
-      price: obj['srp - inclusive'] || obj['srp inclusive'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['retail price'] || obj['price'] || '0',
-      // Cost: inclusive takes priority, fall back to exclusive / generic cost columns
-      costPerItem: obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
-      // Average Cost → stored in compare_at_price (internal use, not shown to customers)
+      price: obj['price incl.'] || obj['price incl'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['last cost'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
       compareAtPrice: obj['average cost'] || obj['avg cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || '0',
       salesAccount: obj['sales account'] || '',
@@ -192,7 +189,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: obj['status'] || 'active',
     }),
     brandKey: '',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Inclusive', 'Cost – Inclusive', 'Average Cost', 'Qty', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Price Incl.', 'Last Cost', 'Average Cost', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku,
       p.title,
@@ -208,8 +205,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
   },
   nsr: {
     label: 'NSR',
-    hint: 'Columns: Code, Description, Category, Unit, SRP – Exclusive, Cost – Exclusive, Qty, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP – Exclusive,Cost – Exclusive,Qty,Sales Account,Purchases Account',
+    hint: 'Columns: Code, Description, Category, Unit, Price Incl., Last Cost, Qty, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,Price Incl.,Last Cost,Qty,Sales Account,Purchases Account',
     placeholder: 'NSR-0001,NSR Audi R8 GT3,NSR,Slot Car,450,280,5,NSR Sales,NSR Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
@@ -220,8 +217,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
-      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -229,7 +226,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'NSR',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Price Incl.', 'Last Cost', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -241,8 +238,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
   },
   revo: {
     label: 'Revo',
-    hint: 'Columns: Code, Description, Category, Unit, SRP – Exclusive, Cost – Exclusive, Qty, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP – Exclusive,Cost – Exclusive,Qty,Sales Account,Purchases Account',
+    hint: 'Columns: Code, Description, Category, Unit, Price Incl., Last Cost, Qty, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,Price Incl.,Last Cost,Qty,Sales Account,Purchases Account',
     placeholder: 'RV-001,Revo Slick Tyres,Revo,Parts,120,75,10,Revo Sales,Revo Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item'] || obj['item code'] || '',
@@ -252,8 +249,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       productType: obj['unit'] || obj['type'] || 'Parts',
       itemCategories: obj['unit'] || obj['type'] || '',
       partType: obj['part_type'] || obj['parttype'] || '',
-      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -261,7 +258,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Revo',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Price Incl.', 'Last Cost', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -273,8 +270,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
   },
   brm: {
     label: 'BRM',
-    hint: 'Columns: Code, Description, Category, Unit, SRP – Exclusive, Cost – Exclusive, Qty, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP – Exclusive,Cost – Exclusive,Qty,Sales Account,Purchases Account',
+    hint: 'Columns: Code, Description, Category, Unit, Price Incl., Last Cost, Qty, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,Price Incl.,Last Cost,Qty,Sales Account,Purchases Account',
     placeholder: 'BRM-001,BRM Alfa Romeo GTA,BRM,Slot Car,650,400,3,BRM Sales,BRM Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
@@ -285,8 +282,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/24',
-      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -294,7 +291,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'BRM',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Price Incl.', 'Last Cost', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -306,8 +303,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
   },
   pioneer: {
     label: 'Pioneer',
-    hint: 'Columns: Code, Description, Category, Unit, SRP – Exclusive, Cost – Exclusive, Qty, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP – Exclusive,Cost – Exclusive,Qty,Sales Account,Purchases Account',
+    hint: 'Columns: Code, Description, Category, Unit, Price Incl., Last Cost, Qty, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,Price Incl.,Last Cost,Qty,Sales Account,Purchases Account',
     placeholder: 'P-001,Pioneer Camaro Z28,Pioneer,Slot Car,550,340,4,Pioneer Sales,Pioneer Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
@@ -318,8 +315,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
-      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -327,7 +324,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Pioneer',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Price Incl.', 'Last Cost', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -339,8 +336,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
   },
   sideways: {
     label: 'Sideways',
-    hint: 'Columns: Code, Description, Category, Unit, SRP – Exclusive, Cost – Exclusive, Qty, Sales Account, Purchases Account',
-    template: 'Code,Description,Category,Unit,SRP – Exclusive,Cost – Exclusive,Qty,Sales Account,Purchases Account',
+    hint: 'Columns: Code, Description, Category, Unit, Price Incl., Last Cost, Qty, Sales Account, Purchases Account',
+    template: 'Code,Description,Category,Unit,Price Incl.,Last Cost,Qty,Sales Account,Purchases Account',
     placeholder: 'SW-001,Sideways Porsche 935,Sideways,Livery Car,480,295,6,Sideways Sales,Sideways Purchases',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
@@ -351,8 +348,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       itemCategories: obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
-      price: obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price'] || obj['price'] || '0',
+      costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
       quantity: obj['qty'] || obj['quantity'] || obj['stock'] || '0',
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -360,7 +357,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       status: 'active',
     }),
     brandKey: 'Sideways',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'SRP – Exclusive', 'Cost – Exclusive', 'Qty', 'Sales Account', 'Purchases Account'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Price Incl.', 'Last Cost', 'Qty', 'Sales Account', 'Purchases Account'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
