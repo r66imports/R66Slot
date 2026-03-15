@@ -654,7 +654,7 @@ export default function ProductsPage() {
       const normalizeHeader = (h: string) => h
         .replace(/^\uFEFF/, '')
         .toLowerCase()
-        .replace(/[\u2013\u2014\u2012\u2015\u2010\u2011]/g, '-')
+        .replace(/[\u2013\u2014\u2012\u2015\u2010\u2011\uFFFD]/g, '-')
         .trim()
       const headers = parseCSVLine(lines[0]).map(normalizeHeader)
       // Debug: show parsed headers + first row so we can verify mapping
