@@ -338,6 +338,7 @@ export default function POSPage() {
   // Invoice modal
   const [showInvoice, setShowInvoice] = useState(false)
   const [invoiceClient, setInvoiceClient] = useState({ name: '', email: '', phone: '', address: '' })
+  const [selectedContact, setSelectedContact] = useState<ClientContact | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedInvoiceNum, setSavedInvoiceNum] = useState<string | null>(null)
 
@@ -434,6 +435,7 @@ export default function POSPage() {
     setError(null)
     setScanValue('')
     setInvoiceClient({ name: '', email: '', phone: '', address: '' })
+    setSelectedContact(null)
     setShowInvoice(false)
     setSavedInvoiceNum(null)
     setTimeout(() => inputRef.current?.focus(), 50)
@@ -602,6 +604,12 @@ export default function POSPage() {
               🆕 New Sale
             </button>
             <a
+              href="/admin/orders"
+              className="text-sm text-gray-400 hover:text-white border border-gray-700 rounded px-3 py-1.5 transition-colors"
+            >
+              📋 Invoices
+            </a>
+            <a
               href="/admin/products"
               className="text-sm text-gray-400 hover:text-white border border-gray-700 rounded px-3 py-1.5 transition-colors"
             >
@@ -731,14 +739,25 @@ export default function POSPage() {
                       {product.trackQuantity ? (product.quantity ?? '—') : 'Untracked'}
                     </p>
                   </div>
-                  <button
-                    onClick={handleManualApply}
-                    disabled={updating}
-                    className={`flex flex-col items-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${modeColor[mode]} text-white shadow-lg`}
-                  >
-                    <span className="text-lg leading-none">{mode === 'add' ? `+${qty}` : mode === 'subtract' ? `−${qty}` : `=${qty}`}</span>
-                    <span className="text-[10px] font-semibold opacity-90 mt-0.5">{updating ? 'Saving…' : 'Save to Inventory'}</span>
-                  </button>
+                  {mode === 'subtract' ? (
+                    <button
+                      onClick={handleManualApply}
+                      disabled={updating}
+                      className="flex flex-col items-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
+                    >
+                      <span className="text-lg leading-none">−{qty}</span>
+                      <span className="text-[10px] font-semibold opacity-90 mt-0.5">{updating ? 'Adding…' : 'Add to Invoice'}</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleManualApply}
+                      disabled={updating}
+                      className={`flex flex-col items-center px-5 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-50 ${modeColor[mode]} text-white shadow-lg`}
+                    >
+                      <span className="text-lg leading-none">{mode === 'add' ? `+${qty}` : `=${qty}`}</span>
+                      <span className="text-[10px] font-semibold opacity-90 mt-0.5">{updating ? 'Saving…' : mode === 'add' ? 'Save to Inventory' : 'Set Stock'}</span>
+                    </button>
+                  )}
                 </div>
                 <div className="border-t border-gray-800 px-4 py-2 flex items-center gap-2">
                   <span className={`inline-block w-2 h-2 rounded-full ${product.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
@@ -839,40 +858,60 @@ export default function POSPage() {
                   <div className="mb-3">
                     <ClientAutofill
                       clients={clients}
-                      onSelect={c => setInvoiceClient({
-                        name: `${c.firstName} ${c.lastName}`.trim(),
-                        email: c.email,
-                        phone: c.phone,
-                        address: c.companyAddress || '',
-                      })}
+                      onSelect={c => {
+                        setSelectedContact(c)
+                        setInvoiceClient({
+                          name: `${c.firstName} ${c.lastName}`.trim(),
+                          email: c.email,
+                          phone: c.phone,
+                          address: c.companyAddress || '',
+                        })
+                      }}
                     />
                   </div>
                 )}
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    placeholder="Name (or leave blank for Walk-in Customer)"
-                    value={invoiceClient.name}
-                    onChange={e => setInvoiceClient(prev => ({ ...prev, name: e.target.value }))}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      value={invoiceClient.email}
-                      onChange={e => setInvoiceClient(prev => ({ ...prev, email: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="WhatsApp / phone"
-                      value={invoiceClient.phone}
-                      onChange={e => setInvoiceClient(prev => ({ ...prev, phone: e.target.value }))}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
-                    />
+                {selectedContact && (
+                  <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {selectedContact.firstName.charAt(0)}{selectedContact.lastName.charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-indigo-900 truncate">{selectedContact.firstName} {selectedContact.lastName}</p>
+                      <p className="text-xs text-indigo-600 truncate">{selectedContact.email}{selectedContact.phone ? ` · ${selectedContact.phone}` : ''}</p>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedContact(null); setInvoiceClient({ name: '', email: '', phone: '', address: '' }) }}
+                      className="text-indigo-400 hover:text-indigo-600 text-lg leading-none flex-shrink-0"
+                    >×</button>
                   </div>
-                </div>
+                )}
+                {!selectedContact && (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      placeholder="Name (or leave blank for Walk-in Customer)"
+                      value={invoiceClient.name}
+                      onChange={e => setInvoiceClient(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={invoiceClient.email}
+                        onChange={e => setInvoiceClient(prev => ({ ...prev, email: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="WhatsApp / phone"
+                        value={invoiceClient.phone}
+                        onChange={e => setInvoiceClient(prev => ({ ...prev, phone: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Line Items Summary */}
