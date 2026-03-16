@@ -27,6 +27,7 @@ interface WsItem {
   skuSearch: string
   description: string
   inStock: number
+  retailPrice: number
   qty: number
   wholesalePrice: number
   retailOverride: string
@@ -64,7 +65,7 @@ function newWsItem(): WsItem {
   return {
     id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     sku: '', skuSearch: '', description: '',
-    inStock: 0,
+    inStock: 0, retailPrice: 0,
     qty: 1, wholesalePrice: 0, retailOverride: '',
   }
 }
@@ -324,7 +325,7 @@ function WorksheetEditor({
     setFinalCustomsCost(sheet.finalCustomsCost ?? 0)
     setFinalMarkupPct(sheet.finalMarkupPct)
     setFinalVatPct(sheet.finalVatPct)
-    setItems(sheet.items.length > 0 ? sheet.items.map((it) => ({ ...it, skuSearch: '', inStock: it.inStock ?? 0 })) : [newWsItem()])
+    setItems(sheet.items.length > 0 ? sheet.items.map((it) => ({ ...it, skuSearch: '', inStock: it.inStock ?? 0, retailPrice: it.retailPrice ?? 0 })) : [newWsItem()])
     setShowArchive(false)
   }
 
@@ -388,7 +389,7 @@ function WorksheetEditor({
 
   // ── CSV ──
   function downloadCSV() {
-    const headers = ['#', 'SKU', 'Description', 'In Stock', 'Qty',
+    const headers = ['#', 'SKU', 'Description', 'Retail (ZAR)', 'In Stock', 'Qty',
       `Wholesale (${currency})`, 'Landed (ZAR)', 'Est Retail (ZAR)',
       'Final Landed (ZAR)', 'Landed Retail (ZAR)', `Total (${currency})`]
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
@@ -397,7 +398,7 @@ function WorksheetEditor({
       const fLanded = calcFinalLanded(it.wholesalePrice)
       const fRetail = calcFinalRetail(it.wholesalePrice)
       const totalCur = it.qty * it.wholesalePrice
-      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, it.inStock,
+      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, it.retailPrice > 0 ? it.retailPrice.toFixed(2) : '', it.inStock,
         it.qty, it.wholesalePrice.toFixed(2), landed.toFixed(2), retail.toFixed(2),
         it.wholesalePrice > 0 ? fLanded.toFixed(2) : '',
         it.wholesalePrice > 0 ? fRetail.toFixed(2) : '',
@@ -406,7 +407,7 @@ function WorksheetEditor({
     const filledForTotal = items.filter((it) => it.wholesalePrice > 0)
     const grandTotalCur = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
     const grandTotalZAR = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
-    const totalRow = ['', '', '', '', 'TOTAL', '', '', '', '', '', `${grandTotalCur.toFixed(2)} (R ${grandTotalZAR.toFixed(2)})`]
+    const totalRow = ['', '', '', '', '', 'TOTAL', '', '', '', '', '', `${grandTotalCur.toFixed(2)} (R ${grandTotalZAR.toFixed(2)})`]
     const csv = [headers.join(','), ...rows.map((r) => r.join(',')), totalRow.join(',')].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -427,7 +428,9 @@ function WorksheetEditor({
       const totalCur = it.wholesalePrice > 0 ? fmtFC(it.qty * it.wholesalePrice) : '—'
       return `<tr>
         <td>${i + 1}</td><td style="font-family:monospace">${it.sku || '—'}</td>
-        <td>${it.description || '—'}</td><td style="text-align:center">${it.inStock ?? 0}</td>
+        <td>${it.description || '—'}</td>
+        <td style="text-align:right">${it.retailPrice > 0 ? 'R ' + it.retailPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+        <td style="text-align:center">${it.inStock ?? 0}</td>
         <td style="text-align:center">${it.qty}</td>
         <td style="text-align:right">${currency} ${fmtFC(it.wholesalePrice)}</td>
         <td style="text-align:right">R ${fmtFC(landed)}</td>
@@ -441,7 +444,7 @@ function WorksheetEditor({
     const pdfTotalCur = pdfFilledPriced.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
     const pdfTotalZAR = pdfFilledPriced.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
     const totalsRow = pdfFilledPriced.length > 0 ? `<tr style="border-top:2px solid #111;background:#f9fafb;font-weight:700">
-      <td colspan="10" style="text-align:right;padding:6px 10px;font-size:11px;text-transform:uppercase;color:#6b7280">Total</td>
+      <td colspan="11" style="text-align:right;padding:6px 10px;font-size:11px;text-transform:uppercase;color:#6b7280">Total</td>
       <td style="text-align:right;padding:6px 6px;color:#1d4ed8">${currency} ${fmtFC(pdfTotalCur)}<br/><span style="color:#374151;font-size:9px">R ${fmtFC(pdfTotalZAR)}</span></td>
     </tr>` : ''
 
@@ -495,7 +498,7 @@ function WorksheetEditor({
   </div>
   <table>
     <thead><tr>
-      <th style="width:28px">#</th><th>SKU</th><th>Description</th><th class="c" style="width:50px">In Stock</th>
+      <th style="width:28px">#</th><th>SKU</th><th>Description</th><th class="r">Retail (ZAR)</th><th class="c" style="width:50px">In Stock</th>
       <th class="c" style="width:36px">Qty</th>
       <th class="r">Wholesale (${currency})</th>
       <th class="r">Landed (ZAR)</th>
@@ -909,6 +912,7 @@ function WorksheetEditor({
                 <th className="text-left pb-2 w-6">#</th>
                 <th className="text-left pb-2 px-2" style={{ minWidth: '110px' }}>SKU</th>
                 <th className="text-left pb-2 px-2" style={{ minWidth: '150px' }}>Description</th>
+                <th className="text-right pb-2 px-2 w-24">Retail (ZAR)</th>
                 <th className="text-center pb-2 px-2 w-20">In Stock</th>
                 <th className="text-center pb-2 px-2 w-14">Qty</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '120px' }}>Wholesale ({currency})</th>
@@ -950,7 +954,7 @@ function WorksheetEditor({
                                 const plEntry = pricelist.find((e) => e.sku === p.sku)
                                 updateItem(it.id, {
                                   sku: p.sku, skuSearch: '', description: p.title,
-                                  inStock: p.quantity,
+                                  inStock: p.quantity, retailPrice: p.price,
                                   ...(plEntry ? { wholesalePrice: plEntry.wholesalePrice } : {}),
                                 })
                                 setActiveSkuRow(null)
@@ -975,6 +979,13 @@ function WorksheetEditor({
                         placeholder="Description"
                         className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
                       />
+                    </td>
+
+                    {/* Retail Price */}
+                    <td className="py-2 px-2 text-right">
+                      <span className={`text-xs font-medium ${it.retailPrice > 0 ? 'text-gray-700' : 'text-gray-300'}`}>
+                        {it.retailPrice > 0 ? `R ${it.retailPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                      </span>
                     </td>
 
                     {/* In Stock */}
@@ -1086,7 +1097,7 @@ function WorksheetEditor({
               return (
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50">
-                    <td colSpan={10} className="py-3 px-2 text-xs font-semibold text-gray-500 text-right uppercase tracking-wider pr-4">
+                    <td colSpan={11} className="py-3 px-2 text-xs font-semibold text-gray-500 text-right uppercase tracking-wider pr-4">
                       Total
                     </td>
                     <td className="py-3 px-2">
