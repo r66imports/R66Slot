@@ -14,6 +14,7 @@ interface SupplierContact {
   website: string
   notes: string
   isActive?: boolean
+  preferredCurrency?: string
 }
 
 const EMPTY_FORM: Omit<SupplierContact, 'id'> = {
@@ -25,6 +26,7 @@ const EMPTY_FORM: Omit<SupplierContact, 'id'> = {
   website: '',
   notes: '',
   isActive: true,
+  preferredCurrency: '',
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -81,6 +83,7 @@ export default function SupplierContactsPage() {
       website: s.website,
       notes: s.notes,
       isActive: s.isActive !== false,
+      preferredCurrency: s.preferredCurrency || '',
     })
     setShowModal(true)
     setOpenActionId(null)
@@ -311,6 +314,24 @@ export default function SupplierContactsPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Preferred Currency</label>
+                <select
+                  value={form.preferredCurrency || ''}
+                  onChange={(e) => setForm((f) => ({ ...f, preferredCurrency: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                >
+                  <option value="">— Select currency —</option>
+                  <option value="EUR">EUR — Euro</option>
+                  <option value="USD">USD — US Dollar</option>
+                  <option value="GBP">GBP — British Pound</option>
+                  <option value="SGD">SGD — Singapore Dollar</option>
+                  <option value="CNY">CNY — Chinese Yuan</option>
+                  <option value="HKD">HKD — Hong Kong Dollar</option>
+                  <option value="ZAR">ZAR — South African Rand</option>
+                </select>
               </div>
 
               <div>

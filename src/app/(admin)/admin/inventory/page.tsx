@@ -2,6 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useColumnResize } from '@/hooks/use-column-resize'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Product {
   id: string
@@ -13,7 +17,32 @@ interface Product {
   imageUrl: string
 }
 
+interface SupplierContact {
+  id: string
+  name: string
+  code: string
+  preferredCurrency?: string
+}
+
+interface PricelistEntry {
+  supplierId: string
+  sku: string
+  wholesalePrice: number
+  shopQty: number
+}
+
+interface CompanyInfo {
+  name?: string
+  address?: string
+  email?: string
+  phone?: string
+  vatNumber?: string
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function InventoryPage() {
+  // Base product state
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -22,10 +51,31 @@ export default function InventoryPage() {
   const [saved, setSaved] = useState<Record<string, boolean>>({})
   const [saveAllLoading, setSaveAllLoading] = useState(false)
   const [saveAllDone, setSaveAllDone] = useState(false)
+
+  // Supplier + pricelist state
+  const [suppliers, setSuppliers] = useState<SupplierContact[]>([])
+  const [selectedSupplierId, setSelectedSupplierId] = useState('')
+  const [pricelist, setPricelist] = useState<PricelistEntry[]>([])
+  const [localPrices, setLocalPrices] = useState<Record<string, string>>({})
+  const [localShopQtys, setLocalShopQtys] = useState<Record<string, string>>({})
+
+  // CSV import modal
+  const [showImport, setShowImport] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importingCSV, setImportingCSV] = useState(false)
+
+  // Supplier order modal
+  const [showOrderModal, setShowOrderModal] = useState(false)
+  const [sendingOrders, setSendingOrders] = useState(false)
+  const [orderSentDone, setOrderSentDone] = useState(false)
+
+  // Column resize (base mode only)
   const { widths: colW, setWidth } = useColumnResize('inventory', {
     idx: 40, sku: 90, product: 220, brand: 120, dbQty: 80, count: 90, save: 70,
   })
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  // ─── Load products ─────────────────────────────────────────────────────────
 
   useEffect(() => {
     fetch('/api/admin/products')
@@ -40,7 +90,6 @@ export default function InventoryPage() {
           status: p.status || 'draft',
           imageUrl: p.imageUrl || p.image_url || '',
         }))
-        // Sort by SKU numerically
         list.sort((a, b) => {
           const na = parseFloat(a.sku) || 0
           const nb = parseFloat(b.sku) || 0
@@ -48,7 +97,6 @@ export default function InventoryPage() {
           return a.sku.localeCompare(b.sku)
         })
         setProducts(list)
-        // Init counts from DB
         const init: Record<string, string> = {}
         list.forEach((p) => { init[p.id] = String(p.quantity) })
         setCounts(init)
@@ -56,13 +104,70 @@ export default function InventoryPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // ─── Load suppliers ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetch('/api/admin/supplier-contacts')
+      .then((r) => r.json())
+      .then((data) => setSuppliers(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
+  // ─── Load pricelist when supplier changes ──────────────────────────────────
+
+  useEffect(() => {
+    if (!selectedSupplierId) {
+      setPricelist([])
+      setLocalPrices({})
+      setLocalShopQtys({})
+      return
+    }
+    fetch(`/api/admin/inventory-pricelists?supplierId=${selectedSupplierId}`)
+      .then((r) => r.json())
+      .then((data: PricelistEntry[]) => {
+        const entries = Array.isArray(data) ? data : []
+        setPricelist(entries)
+        const prices: Record<string, string> = {}
+        const qtys: Record<string, string> = {}
+        entries.forEach((e) => {
+          prices[e.sku] = String(e.wholesalePrice)
+          qtys[e.sku] = String(e.shopQty)
+        })
+        setLocalPrices(prices)
+        setLocalShopQtys(qtys)
+      })
+      .catch(() => {})
+  }, [selectedSupplierId])
+
+  // ─── Derived data ──────────────────────────────────────────────────────────
+
+  const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId) || null
+  const currency = selectedSupplier?.preferredCurrency || 'EUR'
+
   const filtered = products.filter((p) => {
     if (!search.trim()) return true
     const q = search.toLowerCase()
-    return p.sku.toLowerCase().includes(q) || p.title.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q)
+    return (
+      p.sku.toLowerCase().includes(q) ||
+      p.title.toLowerCase().includes(q) ||
+      p.brand.toLowerCase().includes(q)
+    )
   })
 
-  async function saveOne(id: string) {
+  const changedCount = filtered.filter((p) => String(p.quantity) !== counts[p.id]).length
+
+  function getRestockQty(product: Product): number {
+    const shopQtyNum = parseInt(localShopQtys[product.sku] ?? '0', 10) || 0
+    return Math.max(0, shopQtyNum - product.quantity)
+  }
+
+  const restockItems = selectedSupplierId
+    ? filtered.filter((p) => getRestockQty(p) > 0)
+    : []
+
+  // ─── Save stock quantity ────────────────────────────────────────────────────
+
+  async function saveOne(id: string, skipPricelist = false) {
     const val = parseInt(counts[id] ?? '0', 10)
     if (isNaN(val)) return
     setSaving((s) => ({ ...s, [id]: true }))
@@ -73,6 +178,28 @@ export default function InventoryPage() {
         body: JSON.stringify({ id, mode: 'set', qty: val }),
       })
       setProducts((prev) => prev.map((p) => p.id === id ? { ...p, quantity: val } : p))
+
+      // Also save pricelist entry if supplier selected
+      if (!skipPricelist && selectedSupplierId) {
+        const product = products.find((p) => p.id === id)
+        if (product && product.sku) {
+          const priceVal = parseFloat(localPrices[product.sku] ?? '0') || 0
+          const shopQtyVal = parseInt(localShopQtys[product.sku] ?? '0', 10) || 0
+          await fetch('/api/admin/inventory-pricelists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              entries: [{
+                supplierId: selectedSupplierId,
+                sku: product.sku,
+                wholesalePrice: priceVal,
+                shopQty: shopQtyVal,
+              }],
+            }),
+          })
+        }
+      }
+
       setSaved((s) => ({ ...s, [id]: true }))
       setTimeout(() => setSaved((s) => ({ ...s, [id]: false })), 2000)
     } finally {
@@ -82,20 +209,56 @@ export default function InventoryPage() {
 
   async function saveAll() {
     const changed = filtered.filter((p) => String(p.quantity) !== counts[p.id])
-    if (!changed.length) return
-    setSaveAllLoading(true)
-    for (const p of changed) {
-      await saveOne(p.id)
+
+    // Collect all dirty pricelist entries if supplier is selected
+    const dirtyPricelist: PricelistEntry[] = []
+    if (selectedSupplierId) {
+      filtered.forEach((p) => {
+        if (!p.sku) return
+        const existing = pricelist.find((e) => e.sku === p.sku)
+        const currentPrice = parseFloat(localPrices[p.sku] ?? '0') || 0
+        const currentShopQty = parseInt(localShopQtys[p.sku] ?? '0', 10) || 0
+        const existingPrice = existing?.wholesalePrice ?? 0
+        const existingShopQty = existing?.shopQty ?? 0
+        if (currentPrice !== existingPrice || currentShopQty !== existingShopQty) {
+          dirtyPricelist.push({
+            supplierId: selectedSupplierId,
+            sku: p.sku,
+            wholesalePrice: currentPrice,
+            shopQty: currentShopQty,
+          })
+        }
+      })
     }
-    setSaveAllLoading(false)
-    setSaveAllDone(true)
-    setTimeout(() => setSaveAllDone(false), 2500)
+
+    if (!changed.length && !dirtyPricelist.length) return
+
+    setSaveAllLoading(true)
+    try {
+      for (const p of changed) {
+        await saveOne(p.id, true)
+      }
+      if (dirtyPricelist.length > 0) {
+        await fetch('/api/admin/inventory-pricelists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entries: dirtyPricelist }),
+        })
+        // Refresh pricelist
+        const res = await fetch(`/api/admin/inventory-pricelists?supplierId=${selectedSupplierId}`)
+        const updated: PricelistEntry[] = await res.json()
+        setPricelist(Array.isArray(updated) ? updated : [])
+      }
+      setSaveAllDone(true)
+      setTimeout(() => setSaveAllDone(false), 2500)
+    } finally {
+      setSaveAllLoading(false)
+    }
   }
 
   function handleKey(e: React.KeyboardEvent, id: string, idx: number) {
     if (e.key === 'Enter') {
       saveOne(id)
-      // Move focus to next row
       const nextId = filtered[idx + 1]?.id
       if (nextId && inputRefs.current[nextId]) {
         inputRefs.current[nextId]!.focus()
@@ -104,29 +267,274 @@ export default function InventoryPage() {
     }
   }
 
-  const changedCount = filtered.filter((p) => String(p.quantity) !== counts[p.id]).length
+  // ─── CSV Import ─────────────────────────────────────────────────────────────
+
+  function parseCSV(text: string): PricelistEntry[] {
+    const lines = text.trim().split('\n').filter((l) => l.trim())
+    if (lines.length < 2) return []
+
+    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/['"]/g, ''))
+
+    function findCol(candidates: string[]): number {
+      for (const c of candidates) {
+        const idx = headers.findIndex((h) => h.includes(c))
+        if (idx >= 0) return idx
+      }
+      return -1
+    }
+
+    const skuCol = findCol(['sku', 'code', 'item'])
+    const priceCol = findCol(['wholesale price', 'price', 'cost', 'wholesale'])
+    const shopQtyCol = findCol(['shop qty', 'shop', 'qty', 'quantity'])
+
+    if (skuCol < 0) return []
+
+    const entries: PricelistEntry[] = []
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map((c) => c.trim().replace(/['"]/g, ''))
+      const sku = cols[skuCol]?.trim()
+      if (!sku) continue
+      const wholesalePrice = priceCol >= 0 ? parseFloat(cols[priceCol]) || 0 : 0
+      const shopQty = shopQtyCol >= 0 ? parseInt(cols[shopQtyCol], 10) || 0 : 0
+      entries.push({ supplierId: selectedSupplierId, sku, wholesalePrice, shopQty })
+    }
+    return entries
+  }
+
+  async function handleImportCSV() {
+    if (!importText.trim() || !selectedSupplierId) return
+    setImportingCSV(true)
+    try {
+      const entries = parseCSV(importText)
+      if (entries.length === 0) {
+        alert('No valid rows found. Make sure the CSV has a "sku" (or "code") column.')
+        return
+      }
+      const res = await fetch('/api/admin/inventory-pricelists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entries }),
+      })
+      const updated: PricelistEntry[] = await res.json()
+      const arr = Array.isArray(updated) ? updated : []
+      setPricelist(arr)
+      const prices: Record<string, string> = {}
+      const qtys: Record<string, string> = {}
+      arr.forEach((e) => {
+        prices[e.sku] = String(e.wholesalePrice)
+        qtys[e.sku] = String(e.shopQty)
+      })
+      setLocalPrices(prices)
+      setLocalShopQtys(qtys)
+      setShowImport(false)
+      setImportText('')
+    } finally {
+      setImportingCSV(false)
+    }
+  }
+
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => setImportText(ev.target?.result as string || '')
+    reader.readAsText(file)
+  }
+
+  // ─── Generate PDF ───────────────────────────────────────────────────────────
+
+  async function generateOrderPDF(): Promise<jsPDF> {
+    let companyInfo: CompanyInfo = {}
+    try {
+      const res = await fetch('/api/admin/company-info')
+      companyInfo = await res.json()
+    } catch {}
+
+    const doc = new jsPDF() as any
+    const supplierName = selectedSupplier?.name || 'Supplier'
+    const dateStr = new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
+
+    // Header
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text(companyInfo.name || 'Route 66 Slot Cars', 14, 20)
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100)
+    if (companyInfo.address) doc.text(companyInfo.address, 14, 27)
+    if (companyInfo.email) doc.text(companyInfo.email, 14, 32)
+    if (companyInfo.phone) doc.text(companyInfo.phone, 14, 37)
+    doc.setTextColor(0)
+
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.text(`Purchase Order`, 14, 50)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(100)
+    doc.text(`Date: ${dateStr}`, 14, 57)
+    doc.text(`Order to: ${supplierName}`, 14, 62)
+    doc.setTextColor(0)
+
+    // Table rows
+    const rows = restockItems.map((p) => {
+      const restock = getRestockQty(p)
+      const price = parseFloat(localPrices[p.sku] ?? '0') || 0
+      const total = restock * price
+      return [
+        p.sku || '—',
+        p.title,
+        String(restock),
+        `${currency} ${price.toFixed(2)}`,
+        `${currency} ${total.toFixed(2)}`,
+      ]
+    })
+
+    const grandTotal = restockItems.reduce((sum, p) => {
+      const restock = getRestockQty(p)
+      const price = parseFloat(localPrices[p.sku] ?? '0') || 0
+      return sum + restock * price
+    }, 0)
+
+    doc.autoTable({
+      startY: 70,
+      head: [['SKU', 'Description', 'Qty', `Unit Price (${currency})`, `Total (${currency})`]],
+      body: rows,
+      foot: [['', '', '', 'Grand Total', `${currency} ${grandTotal.toFixed(2)}`]],
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [30, 30, 30], textColor: 255, fontStyle: 'bold' },
+      footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
+      columnStyles: {
+        0: { cellWidth: 22 },
+        1: { cellWidth: 80 },
+        2: { cellWidth: 15, halign: 'center' },
+        3: { cellWidth: 32, halign: 'right' },
+        4: { cellWidth: 32, halign: 'right' },
+      },
+    })
+
+    return doc
+  }
+
+  async function handleDownloadPDF() {
+    const doc = await generateOrderPDF()
+    const supplierName = selectedSupplier?.name || 'Supplier'
+    doc.save(`Purchase-Order-${supplierName}-${new Date().toISOString().slice(0, 10)}.pdf`)
+  }
+
+  // ─── Send to Supplier Orders ────────────────────────────────────────────────
+
+  async function handleSendToOrders() {
+    if (!restockItems.length) return
+    setSendingOrders(true)
+    try {
+      const supplierName = selectedSupplier?.name || ''
+      for (const p of restockItems) {
+        const restock = getRestockQty(p)
+        const price = parseFloat(localPrices[p.sku] ?? '0') || 0
+        await fetch('/api/admin/backorders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName: 'INVENTORY RESTOCK',
+            clientEmail: '',
+            clientPhone: '',
+            sku: p.sku,
+            description: p.title,
+            brand: p.brand,
+            qty: restock,
+            price,
+            supplierId: selectedSupplierId,
+            supplierName,
+            notes: 'Auto-created from Inventory restock',
+            status: 'active',
+          }),
+        })
+      }
+      setOrderSentDone(true)
+      setTimeout(() => {
+        setOrderSentDone(false)
+        setShowOrderModal(false)
+      }, 2000)
+    } finally {
+      setSendingOrders(false)
+    }
+  }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
+
+  const hasSupplier = !!selectedSupplierId
+
+  // Compute Save All button dirty state
+  const hasDirtyPricelist = hasSupplier && filtered.some((p) => {
+    if (!p.sku) return false
+    const existing = pricelist.find((e) => e.sku === p.sku)
+    const currentPrice = parseFloat(localPrices[p.sku] ?? '0') || 0
+    const currentShopQty = parseInt(localShopQtys[p.sku] ?? '0', 10) || 0
+    return currentPrice !== (existing?.wholesalePrice ?? 0) || currentShopQty !== (existing?.shopQty ?? 0)
+  })
+  const saveAllDirty = changedCount > 0 || hasDirtyPricelist
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-6xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Inventory Count</h1>
-          <p className="text-sm text-gray-500 mt-1">Update stock quantities — press Enter to save each row</p>
+          <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {hasSupplier
+              ? 'Update stock counts, wholesale prices and shop quantities'
+              : 'Update stock quantities — press Enter to save each row'}
+          </p>
         </div>
-        <button
-          onClick={saveAll}
-          disabled={saveAllLoading || changedCount === 0}
-          className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {saveAllLoading ? (
-            <><span className="animate-spin">⏳</span> Saving…</>
-          ) : saveAllDone ? (
-            '✅ Saved!'
-          ) : (
-            `Save All${changedCount > 0 ? ` (${changedCount} changed)` : ''}`
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Supplier dropdown */}
+          <select
+            value={selectedSupplierId}
+            onChange={(e) => setSelectedSupplierId(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          >
+            <option value="">— Select Supplier —</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+
+          {/* Import CSV */}
+          {hasSupplier && (
+            <button
+              onClick={() => setShowImport(true)}
+              className="px-3 py-2 text-sm font-medium bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-1"
+            >
+              Import CSV
+            </button>
           )}
-        </button>
+
+          {/* Create Order */}
+          {hasSupplier && restockItems.length > 0 && (
+            <button
+              onClick={() => setShowOrderModal(true)}
+              className="px-3 py-2 text-sm font-medium bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center gap-1"
+            >
+              Create Order ({restockItems.length})
+            </button>
+          )}
+
+          {/* Save All */}
+          <button
+            onClick={saveAll}
+            disabled={saveAllLoading || !saveAllDirty}
+            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {saveAllLoading ? (
+              <><span className="animate-spin inline-block">⏳</span> Saving…</>
+            ) : saveAllDone ? (
+              '✅ Saved!'
+            ) : (
+              `Save All${changedCount > 0 ? ` (${changedCount})` : ''}`
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Search */}
@@ -144,12 +552,130 @@ export default function InventoryPage() {
       <div className="flex gap-4 mb-4 text-sm text-gray-500">
         <span>{filtered.length} products</span>
         {changedCount > 0 && <span className="text-orange-600 font-medium">{changedCount} unsaved changes</span>}
+        {hasSupplier && restockItems.length > 0 && (
+          <span className="text-red-600 font-medium">{restockItems.length} items need restocking</span>
+        )}
       </div>
 
       {/* Table */}
       {loading ? (
         <div className="text-center py-16 text-gray-400">Loading inventory…</div>
+      ) : hasSupplier ? (
+        /* ── Supplier mode table ── */
+        <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-8">#</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-20">SKU</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Brand</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-16">DB Qty</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Count</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
+                  Wholesale ({currency})
+                </th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Shop Qty</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-20">Restock</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-16">Save</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((product, idx) => {
+                const countVal = counts[product.id] ?? String(product.quantity)
+                const isDirty = countVal !== String(product.quantity)
+                const priceVal = localPrices[product.sku] ?? '0'
+                const shopQtyVal = localShopQtys[product.sku] ?? '0'
+                const restockQty = getRestockQty(product)
+                return (
+                  <tr key={product.id} className={`border-b last:border-0 ${isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                    <td className="px-3 py-2 text-xs text-gray-400">{idx + 1}</td>
+                    <td className="px-3 py-2">
+                      <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        {product.imageUrl && (
+                          <img src={product.imageUrl} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />
+                        )}
+                        <span className="font-medium text-gray-800 break-words">{product.title}</span>
+                        {product.status === 'draft' && (
+                          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">draft</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
+                    <td className="px-3 py-2 text-center">
+                      <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        ref={(el) => { inputRefs.current[product.id] = el }}
+                        type="number"
+                        min="0"
+                        value={countVal}
+                        onChange={(e) => setCounts((c) => ({ ...c, [product.id]: e.target.value }))}
+                        onKeyDown={(e) => handleKey(e, product.id, idx)}
+                        className={`w-16 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                          isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'
+                        }`}
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <div className="flex items-center gap-1 justify-center">
+                        <span className="text-xs text-gray-400">{currency}</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={priceVal}
+                          onChange={(e) => setLocalPrices((p) => ({ ...p, [product.sku]: e.target.value }))}
+                          className="w-20 text-center text-sm px-2 py-1 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        value={shopQtyVal}
+                        onChange={(e) => setLocalShopQtys((q) => ({ ...q, [product.sku]: e.target.value }))}
+                        className="w-16 text-center text-sm px-2 py-1 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        restockQty > 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {restockQty}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-center">
+                      {saved[product.id] ? (
+                        <span className="text-xs text-green-600 font-medium">✓</span>
+                      ) : (
+                        <button
+                          onClick={() => saveOne(product.id)}
+                          disabled={saving[product.id]}
+                          className="px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          {saving[product.id] ? '…' : 'Save'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="text-center py-12 text-gray-400">No products found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       ) : (
+        /* ── Base mode table (no supplier) ── */
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm table-fixed">
             <colgroup>
@@ -163,12 +689,30 @@ export default function InventoryPage() {
             </colgroup>
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>#<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.idx; const onMove = (ev: MouseEvent) => setWidth('idx', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>SKU<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.sku; const onMove = (ev: MouseEvent) => setWidth('sku', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>Product<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.product; const onMove = (ev: MouseEvent) => setWidth('product', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>Brand<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.brand; const onMove = (ev: MouseEvent) => setWidth('brand', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>DB Qty<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>Count<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.count; const onMove = (ev: MouseEvent) => setWidth('count', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                  #
+                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.idx; const onMove = (ev: MouseEvent) => setWidth('idx', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                  SKU
+                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.sku; const onMove = (ev: MouseEvent) => setWidth('sku', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                  Product
+                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.product; const onMove = (ev: MouseEvent) => setWidth('product', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                  Brand
+                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.brand; const onMove = (ev: MouseEvent) => setWidth('brand', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                </th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                  DB Qty
+                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                </th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                  Count
+                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.count; const onMove = (ev: MouseEvent) => setWidth('count', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Save</th>
               </tr>
             </thead>
@@ -177,10 +721,7 @@ export default function InventoryPage() {
                 const countVal = counts[product.id] ?? String(product.quantity)
                 const isDirty = countVal !== String(product.quantity)
                 return (
-                  <tr
-                    key={product.id}
-                    className={`border-b last:border-0 ${isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}
-                  >
+                  <tr key={product.id} className={`border-b last:border-0 ${isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>
                     <td className="px-4 py-2">
                       <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
@@ -236,6 +777,140 @@ export default function InventoryPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── CSV Import Modal ── */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="text-base font-semibold text-gray-900">
+                Import Pricelist CSV — {selectedSupplier?.name}
+              </h2>
+              <button onClick={() => { setShowImport(false); setImportText('') }} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <p className="text-xs text-gray-500">
+                CSV must have a <strong>sku</strong> (or <strong>code</strong>) column. Optional: <strong>wholesale price</strong> (or <strong>price</strong>/<strong>cost</strong>), <strong>shop qty</strong> (or <strong>qty</strong>/<strong>quantity</strong>).
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Upload CSV file</label>
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleFileUpload}
+                  className="block w-full text-sm text-gray-700 file:mr-3 file:px-3 file:py-1.5 file:rounded file:border-0 file:text-xs file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Or paste CSV text</label>
+                <textarea
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  rows={8}
+                  placeholder={'sku,wholesale price,shop qty\nNSR-001,18.50,5\nNSR-002,24.00,3'}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => { setShowImport(false); setImportText('') }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportCSV}
+                disabled={importingCSV || !importText.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {importingCSV ? 'Importing…' : 'Import'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Supplier Order Modal ── */}
+      {showOrderModal && selectedSupplier && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">
+                  Purchase Order — {selectedSupplier.name}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">{restockItems.length} items to restock</p>
+              </div>
+              <button onClick={() => setShowOrderModal(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                <thead>
+                  <tr className="bg-gray-50 border-b">
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">SKU</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Description</th>
+                    <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Restock Qty</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Unit Price ({currency})</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Total ({currency})</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {restockItems.map((p) => {
+                    const restock = getRestockQty(p)
+                    const price = parseFloat(localPrices[p.sku] ?? '0') || 0
+                    const total = restock * price
+                    return (
+                      <tr key={p.id} className="border-b hover:bg-gray-50">
+                        <td className="px-3 py-2 font-mono text-xs text-gray-600">{p.sku || '—'}</td>
+                        <td className="px-3 py-2 text-gray-800">{p.title}</td>
+                        <td className="px-3 py-2 text-center font-semibold text-orange-700">{restock}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{price.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right font-medium text-gray-800">{total.toFixed(2)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-gray-50 border-t-2 border-gray-300">
+                    <td colSpan={4} className="px-3 py-2 text-right font-bold text-gray-800">Grand Total</td>
+                    <td className="px-3 py-2 text-right font-bold text-gray-900">
+                      {currency} {restockItems.reduce((sum, p) => {
+                        const restock = getRestockQty(p)
+                        const price = parseFloat(localPrices[p.sku] ?? '0') || 0
+                        return sum + restock * price
+                      }, 0).toFixed(2)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
+              <button
+                onClick={() => setShowOrderModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-1"
+              >
+                Download PDF
+              </button>
+              <button
+                onClick={handleSendToOrders}
+                disabled={sendingOrders || orderSentDone}
+                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-700 disabled:opacity-50 flex items-center gap-1"
+              >
+                {sendingOrders ? 'Sending…' : orderSentDone ? '✓ Sent!' : 'Send to Supplier Orders'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

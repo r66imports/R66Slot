@@ -12,6 +12,7 @@ export interface SupplierContact {
   country: string
   website: string
   notes: string
+  preferredCurrency?: string
 }
 
 const DEFAULTS: SupplierContact[] = [
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
       country: body.country?.trim() || '',
       website: body.website?.trim() || '',
       notes: body.notes?.trim() || '',
+      preferredCurrency: body.preferredCurrency?.trim() || '',
     }
     current.push(newSupplier)
     await blobWrite(KEY, current)
