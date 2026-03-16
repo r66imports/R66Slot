@@ -9,12 +9,12 @@ interface CompanyInfo {
   country: string; phone: string; email: string; vatNumber: string
 }
 
-interface Customer {
-  id: string; name: string; email: string; phone: string
+interface ProductRef {
+  id: string; sku: string; title: string; brand: string; price: number; quantity: number
 }
 
-interface ProductRef {
-  id: string; sku: string; title: string; brand: string; price: number
+interface PricelistEntry {
+  supplierId: string; sku: string; wholesalePrice: number; shopQty: number
 }
 
 interface SupplierContact {
@@ -26,8 +26,7 @@ interface WsItem {
   sku: string
   skuSearch: string
   description: string
-  clientName: string
-  clientSearch: string
+  inStock: number
   qty: number
   wholesalePrice: number
   retailOverride: string
@@ -65,7 +64,7 @@ function newWsItem(): WsItem {
   return {
     id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     sku: '', skuSearch: '', description: '',
-    clientName: '', clientSearch: '',
+    inStock: 0,
     qty: 1, wholesalePrice: 0, retailOverride: '',
   }
 }
@@ -87,40 +86,24 @@ export default function WorksheetPage() {
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
     name: '', address: '', city: '', postalCode: '', country: '', phone: '', email: '', vatNumber: '',
   })
-  const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<ProductRef[]>([])
   const [suppliers, setSuppliers] = useState<SupplierContact[]>([])
 
   const load = useCallback(async () => {
     try {
-      const [tmplRes, clRes, ctRes, prodRes, supRes] = await Promise.all([
+      const [tmplRes, prodRes, supRes] = await Promise.all([
         fetch('/api/admin/company-info'),
-        fetch('/api/admin/clients'),
-        fetch('/api/admin/contacts'),
         fetch('/api/admin/products'),
         fetch('/api/admin/supplier-contacts'),
       ])
       if (tmplRes.ok) setCompanyInfo(await tmplRes.json())
-
-      const clList: any[] = clRes.ok ? await clRes.json() : []
-      const ctList: any[] = ctRes.ok ? await ctRes.json() : []
-      const seen = new Set<string>()
-      const merged: Customer[] = []
-      for (const c of [...clList, ...ctList]) {
-        const name = `${c.firstName || ''} ${c.lastName || ''}`.trim() || c.companyName || c.email || ''
-        const key = (c.email || c.id || name).toLowerCase()
-        if (!key || seen.has(key)) continue
-        seen.add(key)
-        merged.push({ id: c.id, name, email: c.email || '', phone: c.phone || '' })
-      }
-      merged.sort((a, b) => a.name.localeCompare(b.name))
-      setCustomers(merged)
 
       if (prodRes.ok) {
         const raw: any[] = await prodRes.json()
         setProducts(raw.map((p) => ({
           id: p.id, sku: p.sku || '', title: p.title || '',
           brand: p.brand || '', price: Number(p.price) || 0,
+          quantity: Number(p.quantity) || 0,
         })).filter((p) => p.sku || p.title))
       }
 
@@ -136,7 +119,6 @@ export default function WorksheetPage() {
     <div className="p-6 max-w-[1600px] mx-auto">
       <WorksheetEditor
         companyInfo={companyInfo}
-        customers={customers}
         products={products}
         suppliers={suppliers}
         onRefresh={load}
@@ -148,10 +130,9 @@ export default function WorksheetPage() {
 // ─── Worksheet Editor ─────────────────────────────────────────────────────────
 
 function WorksheetEditor({
-  companyInfo, customers, products, suppliers, onRefresh,
+  companyInfo, products, suppliers, onRefresh,
 }: {
   companyInfo: CompanyInfo
-  customers: Customer[]
   products: ProductRef[]
   suppliers: SupplierContact[]
   onRefresh: () => void
@@ -195,11 +176,21 @@ function WorksheetEditor({
   // ── Save status ──
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
 
+  // ── Pricelist ──
+  const [pricelist, setPricelist] = useState<PricelistEntry[]>([])
+
+  useEffect(() => {
+    const sup = suppliers.find((s) => s.name === supplier)
+    if (!sup) { setPricelist([]); return }
+    fetch(`/api/admin/inventory-pricelists?supplierId=${sup.id}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setPricelist)
+      .catch(() => setPricelist([]))
+  }, [supplier, suppliers])
+
   // ── Dropdown row states ──
   const [showAddProduct, setShowAddProduct] = useState(false)
-  const [showAddClient, setShowAddClient] = useState(false)
   const [activeSkuRow, setActiveSkuRow] = useState<string | null>(null)
-  const [activeClientRow, setActiveClientRow] = useState<string | null>(null)
   const [showNewMenu, setShowNewMenu] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
 
@@ -290,13 +281,6 @@ function WorksheetEditor({
       p.sku.toLowerCase().includes(q) || p.title.toLowerCase().includes(q) || p.brand.toLowerCase().includes(q)
     ).slice(0, 12)
   }
-  function filteredCustomers(search: string) {
-    const q = search.toLowerCase()
-    return customers.filter((c) =>
-      c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
-    ).slice(0, 12)
-  }
-
   // ── Worksheet persistence ──
   function currentSheetData(): WsSheet {
     return {
@@ -307,7 +291,7 @@ function WorksheetEditor({
       archived: false,
       currency, exchangeRate, markupPct, shippingPct, vatPct,
       finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct,
-      items: items.map((it) => ({ ...it, skuSearch: '', clientSearch: '' })),
+      items: items.map((it) => ({ ...it, skuSearch: '' })),
     }
   }
 
@@ -340,7 +324,7 @@ function WorksheetEditor({
     setFinalCustomsCost(sheet.finalCustomsCost ?? 0)
     setFinalMarkupPct(sheet.finalMarkupPct)
     setFinalVatPct(sheet.finalVatPct)
-    setItems(sheet.items.length > 0 ? sheet.items.map((it) => ({ ...it, skuSearch: '', clientSearch: '' })) : [newWsItem()])
+    setItems(sheet.items.length > 0 ? sheet.items.map((it) => ({ ...it, skuSearch: '', inStock: it.inStock ?? 0 })) : [newWsItem()])
     setShowArchive(false)
   }
 
@@ -404,7 +388,7 @@ function WorksheetEditor({
 
   // ── CSV ──
   function downloadCSV() {
-    const headers = ['#', 'SKU', 'Description', 'Client', 'Qty',
+    const headers = ['#', 'SKU', 'Description', 'In Stock', 'Qty',
       `Wholesale (${currency})`, 'Landed (ZAR)', 'Est Retail (ZAR)',
       'Final Landed (ZAR)', 'Landed Retail (ZAR)', `Total (${currency})`]
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
@@ -413,7 +397,7 @@ function WorksheetEditor({
       const fLanded = calcFinalLanded(it.wholesalePrice)
       const fRetail = calcFinalRetail(it.wholesalePrice)
       const totalCur = it.qty * it.wholesalePrice
-      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, `"${it.clientName}"`,
+      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, it.inStock,
         it.qty, it.wholesalePrice.toFixed(2), landed.toFixed(2), retail.toFixed(2),
         it.wholesalePrice > 0 ? fLanded.toFixed(2) : '',
         it.wholesalePrice > 0 ? fRetail.toFixed(2) : '',
@@ -443,7 +427,7 @@ function WorksheetEditor({
       const totalCur = it.wholesalePrice > 0 ? fmtFC(it.qty * it.wholesalePrice) : '—'
       return `<tr>
         <td>${i + 1}</td><td style="font-family:monospace">${it.sku || '—'}</td>
-        <td>${it.description || '—'}</td><td>${it.clientName || '—'}</td>
+        <td>${it.description || '—'}</td><td style="text-align:center">${it.inStock ?? 0}</td>
         <td style="text-align:center">${it.qty}</td>
         <td style="text-align:right">${currency} ${fmtFC(it.wholesalePrice)}</td>
         <td style="text-align:right">R ${fmtFC(landed)}</td>
@@ -511,7 +495,7 @@ function WorksheetEditor({
   </div>
   <table>
     <thead><tr>
-      <th style="width:28px">#</th><th>SKU</th><th>Description</th><th>Client</th>
+      <th style="width:28px">#</th><th>SKU</th><th>Description</th><th class="c" style="width:50px">In Stock</th>
       <th class="c" style="width:36px">Qty</th>
       <th class="r">Wholesale (${currency})</th>
       <th class="r">Landed (ZAR)</th>
@@ -881,11 +865,6 @@ function WorksheetEditor({
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               Add Product
             </button>
-            <button onClick={() => setShowAddClient(true)}
-              className="flex items-center gap-1 text-xs text-green-600 hover:text-green-700 border border-green-200 rounded-lg px-2.5 py-1 hover:bg-green-50 transition-colors">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Add Client
-            </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
             {/* Supplier dropdown */}
@@ -930,7 +909,7 @@ function WorksheetEditor({
                 <th className="text-left pb-2 w-6">#</th>
                 <th className="text-left pb-2 px-2" style={{ minWidth: '110px' }}>SKU</th>
                 <th className="text-left pb-2 px-2" style={{ minWidth: '150px' }}>Description</th>
-                <th className="text-left pb-2 px-2" style={{ minWidth: '130px' }}>Client</th>
+                <th className="text-center pb-2 px-2 w-20">In Stock</th>
                 <th className="text-center pb-2 px-2 w-14">Qty</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '120px' }}>Wholesale ({currency})</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Landed (ZAR)</th>
@@ -946,7 +925,6 @@ function WorksheetEditor({
                 const landedCost = calcLanded(it.wholesalePrice)
                 const autoRetail = calcRetail(it.wholesalePrice)
                 const skuMatches = filteredProducts(it.skuSearch || it.sku)
-                const clientMatches = filteredCustomers(it.clientSearch || it.clientName)
                 const hasFinal = it.wholesalePrice > 0
                 return (
                   <tr key={it.id} className="border-b border-gray-50">
@@ -968,7 +946,15 @@ function WorksheetEditor({
                             {skuMatches.map((p) => (
                               <button key={p.id} type="button"
                                 onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => { updateItem(it.id, { sku: p.sku, skuSearch: '', description: p.title }); setActiveSkuRow(null) }}
+                                onClick={() => {
+                                const plEntry = pricelist.find((e) => e.sku === p.sku)
+                                updateItem(it.id, {
+                                  sku: p.sku, skuSearch: '', description: p.title,
+                                  inStock: p.quantity,
+                                  ...(plEntry ? { wholesalePrice: plEntry.wholesalePrice } : {}),
+                                })
+                                setActiveSkuRow(null)
+                              }}
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50">
                                 <span className="font-mono font-semibold text-blue-700">{p.sku}</span>
                                 <span className="ml-2 text-gray-600">{p.title}</span>
@@ -985,44 +971,24 @@ function WorksheetEditor({
                       <input
                         value={it.description}
                         onChange={(e) => updateItem(it.id, { description: e.target.value })}
-                        onFocus={() => { setActiveSkuRow(null); setActiveClientRow(null) }}
+                        onFocus={() => setActiveSkuRow(null)}
                         placeholder="Description"
                         className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
                       />
                     </td>
 
-                    {/* Client */}
-                    <td className="py-2 px-2">
-                      <div className="relative">
-                        <input
-                          value={it.clientName || it.clientSearch}
-                          onFocus={() => { setActiveClientRow(it.id); setActiveSkuRow(null) }}
-                          onChange={(e) => { updateItem(it.id, { clientName: '', clientSearch: e.target.value }); setActiveClientRow(it.id) }}
-                          onBlur={() => { if (!it.clientName && it.clientSearch) updateItem(it.id, { clientName: it.clientSearch, clientSearch: '' }) }}
-                          placeholder="Client name"
-                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                        {activeClientRow === it.id && clientMatches.length > 0 && (
-                          <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-56 max-h-48 overflow-y-auto py-1">
-                            {clientMatches.map((c) => (
-                              <button key={c.id} type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => { updateItem(it.id, { clientName: c.name, clientSearch: '' }); setActiveClientRow(null) }}
-                                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50">
-                                <span className="font-medium text-gray-900">{c.name}</span>
-                                {c.email && <span className="ml-1 text-gray-400 text-[10px]">{c.email}</span>}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                    {/* In Stock */}
+                    <td className="py-2 px-2 text-center">
+                      <span className={`inline-block px-2 py-1 rounded-lg text-xs font-semibold ${it.inStock > 0 ? 'bg-green-50 text-green-700 border border-green-100' : 'text-gray-300'}`}>
+                        {it.inStock > 0 ? it.inStock : '—'}
+                      </span>
                     </td>
 
                     {/* Qty */}
                     <td className="py-2 px-2">
                       <input type="number" min={1} step={1} value={it.qty}
                         onChange={(e) => updateItem(it.id, { qty: Math.max(1, Number(e.target.value)) })}
-                        onFocus={() => { setActiveSkuRow(null); setActiveClientRow(null) }}
+                        onFocus={() => setActiveSkuRow(null)}
                         className="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
                       />
                     </td>
@@ -1033,7 +999,7 @@ function WorksheetEditor({
                         <span className="text-xs text-gray-400 mr-1">{currency}</span>
                         <input type="number" min={0} step={0.01} value={it.wholesalePrice || ''} placeholder="0.00"
                           onChange={(e) => updateItem(it.id, { wholesalePrice: Number(e.target.value) })}
-                          onFocus={() => { setActiveSkuRow(null); setActiveClientRow(null) }}
+                          onFocus={() => setActiveSkuRow(null)}
                           className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
                         />
                       </div>
@@ -1057,7 +1023,7 @@ function WorksheetEditor({
                           value={it.retailOverride !== '' ? it.retailOverride : (it.wholesalePrice > 0 ? autoRetail.toFixed(2) : '')}
                           onChange={(e) => updateItem(it.id, { retailOverride: e.target.value })}
                           onBlur={(e) => { if (!e.target.value) updateItem(it.id, { retailOverride: '' }) }}
-                          onFocus={() => { setActiveSkuRow(null); setActiveClientRow(null) }}
+                          onFocus={() => setActiveSkuRow(null)}
                           placeholder={it.wholesalePrice > 0 ? autoRetail.toFixed(2) : '0.00'}
                           className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
                         />
@@ -1174,13 +1140,6 @@ function WorksheetEditor({
         />
       )}
 
-      {/* ── Add Client Modal ── */}
-      {showAddClient && (
-        <AddClientModal
-          onClose={() => setShowAddClient(false)}
-          onSaved={() => { onRefresh(); setShowAddClient(false) }}
-        />
-      )}
     </div>
   )
 }
@@ -1395,93 +1354,3 @@ function AddProductModal({
   )
 }
 
-// ─── Add Client Modal ─────────────────────────────────────────────────────────
-
-function AddClientModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({
-    firstName: '', lastName: '', email: '', phone: '',
-    companyName: '', companyAddress: '', notes: '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-
-  function set(field: string, value: string) { setForm((f) => ({ ...f, [field]: value })) }
-
-  async function save() {
-    if (!form.firstName.trim() && !form.lastName.trim() && !form.email.trim()) {
-      setError('At least a name or email is required'); return
-    }
-    setSaving(true); setError('')
-    try {
-      const body = { ...form, id: `client_${Date.now()}` }
-      const [clRes, ctRes] = await Promise.all([
-        fetch('/api/admin/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-        fetch('/api/admin/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-      ])
-      if (!clRes.ok && !ctRes.ok) { setError('Failed to save client'); return }
-      onSaved()
-    } catch (e: any) {
-      setError(e.message)
-    } finally { setSaving(false) }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-gray-900">Add New Client</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">First Name</label>
-              <input autoFocus value={form.firstName} onChange={(e) => set('firstName', e.target.value)} placeholder="John"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
-              <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} placeholder="Smith"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="john@example.com"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
-              <input value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+27 ..."
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Company</label>
-              <input value={form.companyName} onChange={(e) => set('companyName', e.target.value)} placeholder="Company name (optional)"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
-              <input value={form.companyAddress} onChange={(e) => set('companyAddress', e.target.value)} placeholder="Delivery / billing address"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
-              <textarea rows={2} value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Any notes..."
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-600 py-2 rounded-xl text-sm font-medium hover:bg-gray-50">Cancel</button>
-          <button onClick={save} disabled={saving}
-            className="flex-1 bg-green-600 text-white py-2 rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
-            {saving ? 'Saving...' : 'Add Client'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
