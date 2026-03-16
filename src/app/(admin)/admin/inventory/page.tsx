@@ -12,6 +12,7 @@ interface Product {
   sku: string
   title: string
   brand: string
+  price: number
   quantity: number
   status: 'draft' | 'active'
   imageUrl: string
@@ -71,7 +72,7 @@ export default function InventoryPage() {
 
   // Column resize (base mode only)
   const { widths: colW, setWidth } = useColumnResize('inventory', {
-    idx: 40, sku: 90, product: 220, brand: 120, dbQty: 80, count: 90, save: 70,
+    idx: 40, sku: 90, product: 220, retail: 90, brand: 120, dbQty: 80, count: 90, save: 70,
   })
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
@@ -86,6 +87,7 @@ export default function InventoryPage() {
           sku: p.sku || '',
           title: p.title || '',
           brand: p.brand || '',
+          price: Number(p.price) || 0,
           quantity: p.quantity ?? 0,
           status: p.status || 'draft',
           imageUrl: p.imageUrl || p.image_url || '',
@@ -577,6 +579,7 @@ export default function InventoryPage() {
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-8">#</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-20">SKU</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
+                <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Retail</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Brand</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-16">DB Qty</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Count</th>
@@ -611,6 +614,11 @@ export default function InventoryPage() {
                           <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">draft</span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {product.price > 0
+                        ? <span className="text-xs font-medium text-gray-700">R {product.price.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        : <span className="text-xs text-gray-300">—</span>}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
                     <td className="px-3 py-2 text-center">
@@ -690,6 +698,7 @@ export default function InventoryPage() {
               <col style={{ width: colW.idx }} />
               <col style={{ width: colW.sku }} />
               <col style={{ width: colW.product }} />
+              <col style={{ width: colW.retail }} />
               <col style={{ width: colW.brand }} />
               <col style={{ width: colW.dbQty }} />
               <col style={{ width: colW.count }} />
@@ -708,6 +717,10 @@ export default function InventoryPage() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
                   Product
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.product; const onMove = (ev: MouseEvent) => setWidth('product', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                </th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
+                  Retail
+                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.retail; const onMove = (ev: MouseEvent) => setWidth('retail', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
                   Brand
@@ -744,6 +757,11 @@ export default function InventoryPage() {
                           <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">draft</span>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {product.price > 0
+                        ? <span className="text-xs font-medium text-gray-700">R {product.price.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        : <span className="text-xs text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
                     <td className="px-4 py-2 text-center">
