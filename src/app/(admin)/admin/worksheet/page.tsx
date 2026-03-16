@@ -272,6 +272,15 @@ function WorksheetEditor({
     setItems((prev) => prev.map((it) => it.id === id ? { ...it, ...patch } : it))
   }
   function addItem() { setItems((prev) => [...prev, newWsItem()]) }
+  function insertAfter(id: string) {
+    setItems((prev) => {
+      const idx = prev.findIndex((it) => it.id === id)
+      if (idx < 0) return [...prev, newWsItem()]
+      const next = [...prev]
+      next.splice(idx + 1, 0, newWsItem())
+      return next
+    })
+  }
   function removeItem(id: string) { setItems((prev) => prev.filter((it) => it.id !== id)) }
   const hasItems = items.some((it) => it.sku || it.description)
 
@@ -1077,12 +1086,21 @@ function WorksheetEditor({
                       </div>
                     </td>
 
-                    {/* Remove */}
-                    <td className="py-2 w-8">
-                      <button onClick={() => removeItem(it.id)} disabled={items.length === 1}
-                        className="text-gray-300 hover:text-red-400 disabled:opacity-20 transition-colors">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
+                    {/* Row actions */}
+                    <td className="py-2 w-10">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <button
+                          onClick={() => insertAfter(it.id)}
+                          title="Insert row below"
+                          className="text-gray-300 hover:text-blue-500 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                        </button>
+                        <button onClick={() => removeItem(it.id)} disabled={items.length === 1}
+                          title="Remove row"
+                          className="text-gray-300 hover:text-red-400 disabled:opacity-20 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
