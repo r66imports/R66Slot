@@ -189,6 +189,21 @@ function WorksheetEditor({
       .catch(() => setPricelist([]))
   }, [supplier, suppliers])
 
+  // ── Backfill retailPrice/inStock when products load ──
+  useEffect(() => {
+    if (products.length === 0) return
+    setItems((prev) => prev.map((it) => {
+      if (it.retailPrice > 0 && it.inStock > 0) return it
+      const prod = products.find((p) => p.sku === it.sku)
+      if (!prod) return it
+      return {
+        ...it,
+        retailPrice: it.retailPrice || prod.price,
+        inStock: it.inStock || prod.quantity,
+      }
+    }))
+  }, [products])
+
   // ── Dropdown row states ──
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [activeSkuRow, setActiveSkuRow] = useState<string | null>(null)
@@ -334,7 +349,15 @@ function WorksheetEditor({
     setFinalCustomsCost(sheet.finalCustomsCost ?? 0)
     setFinalMarkupPct(sheet.finalMarkupPct)
     setFinalVatPct(sheet.finalVatPct)
-    setItems(sheet.items.length > 0 ? sheet.items.map((it) => ({ ...it, skuSearch: '', inStock: it.inStock ?? 0, retailPrice: it.retailPrice ?? 0 })) : [newWsItem()])
+    setItems(sheet.items.length > 0 ? sheet.items.map((it) => {
+      const prod = products.find((p) => p.sku === it.sku)
+      return {
+        ...it,
+        skuSearch: '',
+        inStock: it.inStock ?? prod?.quantity ?? 0,
+        retailPrice: it.retailPrice || prod?.price || 0,
+      }
+    }) : [newWsItem()])
     setShowArchive(false)
   }
 
