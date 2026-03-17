@@ -277,8 +277,8 @@ function WorksheetEditor({
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
 
   function calcFinalLanded(w: number) { return w * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100) }
-  // Markup applied to wholesale ZAR only: costZAR + shipping% + customs% + markup%
-  function calcFinalRetail(w: number) { return w * finalExRate * (1 + (shippingPctCalc + customsPctCalc + finalMarkupPct) / 100) * (1 + finalVatPct / 100) }
+  // Markup applied on top of Final Landed: (wholesale + shipping + customs) × (1 + markup%)
+  function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
   function fmtFC(n: number) { return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
   // ── Items ──
