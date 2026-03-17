@@ -155,7 +155,7 @@ function WorksheetEditor({
   const [finalExRate, setFinalExRate] = useState(18.5)
   const [finalShippingCost, setFinalShippingCost] = useState(0)
   const [finalCustomsCost, setFinalCustomsCost] = useState(0)
-  const [finalMarkupPct, setFinalMarkupPct] = useState(0)
+  const [finalMarkupPct, setFinalMarkupPct] = useState(30)
   const [finalVatPct, setFinalVatPct] = useState(0)
 
   // ── Items ──
@@ -276,10 +276,9 @@ function WorksheetEditor({
   const shippingPctCalc = totalWholesaleZAR > 0 ? (finalShippingCost / totalWholesaleZAR) * 100 : 0
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
 
-  function calcFinalShipping(w: number) { return w * finalExRate * shippingPctCalc / 100 }
-  function calcFinalCustoms(w: number) { return w * finalExRate * customsPctCalc / 100 }
   function calcFinalLanded(w: number) { return w * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100) }
-  function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
+  // Markup applied to wholesale ZAR only: costZAR + shipping% + customs% + markup%
+  function calcFinalRetail(w: number) { return w * finalExRate * (1 + (shippingPctCalc + customsPctCalc + finalMarkupPct) / 100) * (1 + finalVatPct / 100) }
   function fmtFC(n: number) { return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
   // ── Items ──
@@ -374,7 +373,7 @@ function WorksheetEditor({
     setFinalExRate(fxRates['USD'] ?? CURRENCY_DEFAULTS['USD'])
     setFinalShippingCost(0)
     setFinalCustomsCost(0)
-    setFinalMarkupPct(0)
+    setFinalMarkupPct(30)
     setFinalVatPct(0)
     setItems([newWsItem()])
   }
