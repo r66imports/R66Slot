@@ -1170,7 +1170,24 @@ export default function EditProductPage({
                   </label>
                 ))}
               </div>
-              <a href="/admin/categories" className="text-xs text-blue-500 hover:text-blue-700 mt-2 inline-block">+ Create Category</a>
+              <div className="mt-2 flex items-center gap-1">
+                <input
+                  type="text"
+                  placeholder="+ Add category..."
+                  className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                      const name = e.currentTarget.value.trim()
+                      e.currentTarget.value = ''
+                      const res = await fetch('/api/admin/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+                      const cat = await res.json()
+                      setAllCategories(prev => [...prev, cat])
+                      setCategoryIds(prev => [...prev, cat.id])
+                    }
+                  }}
+                />
+              </div>
+              <a href="/admin/categories" className="text-xs text-blue-500 hover:text-blue-700 mt-1 inline-block">Manage Categories →</a>
             </div>
             {/* Sage Accounts */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

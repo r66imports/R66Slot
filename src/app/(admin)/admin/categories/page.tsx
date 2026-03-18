@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -13,7 +13,6 @@ interface Category {
   isActive: boolean
 }
 
-// Pastel gradient backgrounds for cards (like Wix)
 const CARD_GRADIENTS = [
   'from-blue-200 to-cyan-100',
   'from-rose-200 to-pink-100',
@@ -33,6 +32,10 @@ export default function CategoriesPage() {
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [creating, setCreating] = useState(false)
+  // Image editing state: which card is open + input value
+  const [editingImageId, setEditingImageId] = useState<string | null>(null)
+  const [imageInput, setImageInput] = useState('')
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/admin/categories')
@@ -65,6 +68,26 @@ export default function CategoriesPage() {
     setCategories(prev => prev.filter(c => c.id !== id))
   }
 
+  const openImageEdit = (cat: Category, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setEditingImageId(cat.id)
+    setImageInput(cat.imageUrl || '')
+    setTimeout(() => imageInputRef.current?.focus(), 50)
+  }
+
+  const saveImage = async (id: string, url: string) => {
+    const cat = categories.find(c => c.id === id)
+    if (!cat) return
+    await fetch('/api/admin/categories', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...cat, imageUrl: url }),
+    })
+    setCategories(prev => prev.map(c => c.id === id ? { ...c, imageUrl: url } : c))
+    setEditingImageId(null)
+  }
+
   const filtered = categories.filter(c =>
     !search || c.name.toLowerCase().includes(search.toLowerCase())
   )
@@ -78,8 +101,7 @@ export default function CategoriesPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold text-gray-900 font-play">
-            Categories{' '}
-            <span className="text-blue-500">{categories.length}</span>
+            Categories <span className="text-blue-500">{categories.length}</span>
           </h1>
           {showSearch && (
             <input
@@ -127,33 +149,83 @@ export default function CategoriesPage() {
       ) : (
         <div className="grid grid-cols-3 gap-4">
           {filtered.map((cat, i) => (
-            <Link
-              key={cat.id}
-              href={`/admin/categories/${cat.id}`}
-              className="group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-            >
-              {/* Card background */}
-              <div className={`h-48 bg-gradient-to-br ${CARD_GRADIENTS[i % CARD_GRADIENTS.length]} relative`}>
+            <div key={cat.id} className="group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              {/* Card image area — click to change image */}
+              <div
+                className={`h-48 bg-gradient-to-br ${CARD_GRADIENTS[i % CARD_GRADIENTS.length]} relative cursor-pointer`}
+                onClick={(e) => openImageEdit(cat, e)}
+                title="Click to change image"
+              >
                 {cat.imageUrl && (
                   <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover absolute inset-0" />
                 )}
-                {/* Options menu */}
-                <button
-                  onClick={(e) => handleDelete(cat.id, e)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 bg-white/80 rounded-lg hover:bg-white text-gray-500 hover:text-red-500"
-                  title="Delete category"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+                {/* Image change overlay on hover */}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                  <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 text-gray-700 text-xs font-semibold px-3 py-1.5 rounded-lg font-play shadow">
+                    Change Image
+                  </span>
+                </div>
+
+                {/* Top-right action buttons */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => handleDelete(cat.id, e)}
+                    className="p-1.5 bg-white/80 rounded-lg hover:bg-white text-gray-500 hover:text-red-500"
+                    title="Delete category"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Inline image URL editor */}
+                {editingImageId === cat.id && (
+                  <div
+                    className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4 gap-2"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <p className="text-white text-xs font-semibold font-play">Paste image URL</p>
+                    <input
+                      ref={imageInputRef}
+                      type="text"
+                      value={imageInput}
+                      onChange={e => setImageInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') saveImage(cat.id, imageInput)
+                        if (e.key === 'Escape') setEditingImageId(null)
+                      }}
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 text-xs rounded-lg border-0 focus:outline-none focus:ring-2 focus:ring-blue-400 font-play"
+                    />
+                    <div className="flex gap-2 w-full">
+                      <button
+                        onClick={() => saveImage(cat.id, imageInput)}
+                        className="flex-1 py-1.5 bg-blue-500 text-white text-xs rounded-lg font-semibold hover:bg-blue-600 font-play"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingImageId(null)}
+                        className="flex-1 py-1.5 bg-white/20 text-white text-xs rounded-lg hover:bg-white/30 font-play"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {/* Card label */}
-              <div className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between">
+
+              {/* Card label — click name to go to edit page */}
+              <Link
+                href={`/admin/categories/${cat.id}`}
+                className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between hover:bg-white transition-colors"
+                onClick={e => e.stopPropagation()}
+              >
                 <span className="font-semibold text-gray-900 text-sm font-play truncate">{cat.name}</span>
                 <span className="text-gray-500 text-sm font-play ml-2 flex-shrink-0">{getProductCount(cat)}</span>
-              </div>
-            </Link>
+              </Link>
+            </div>
           ))}
         </div>
       )}
