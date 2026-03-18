@@ -52,6 +52,7 @@ function rowToProduct(row: any): Product {
     salesAccount: (() => { try { const v = JSON.parse(row.sales_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.sales_account ? [row.sales_account] : [] } })(),
     purchaseAccount: (() => { try { const v = JSON.parse(row.purchase_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.purchase_account ? [row.purchase_account] : [] } })(),
     createdAt: row.created_at,
+    categoryIds: Array.isArray(row.category_ids) ? row.category_ids : [],
     updatedAt: row.updated_at,
   }
 }
@@ -130,6 +131,7 @@ export async function PUT(
         sideways_car_type = COALESCE($43, sideways_car_type),
         sideways_car_classes = COALESCE($44, sideways_car_classes),
         custom_orgs = COALESCE($45, custom_orgs),
+        category_ids = COALESCE($46, category_ids),
         updated_at = $36
       WHERE id = $1
       RETURNING *
@@ -179,6 +181,7 @@ export async function PUT(
       Array.isArray(body.sidewaysCarTypes) ? JSON.stringify(body.sidewaysCarTypes) : null,
       Array.isArray(body.sidewaysCarClasses) ? JSON.stringify(body.sidewaysCarClasses) : null,
       (typeof body.customOrgs === 'object' && body.customOrgs !== null) ? JSON.stringify(body.customOrgs) : null,
+      Array.isArray(body.categoryIds) ? JSON.stringify(body.categoryIds) : null,
     ])
 
     if (result.rowCount === 0) {

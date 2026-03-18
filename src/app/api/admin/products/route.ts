@@ -49,6 +49,7 @@ export interface Product {
   itemCategories: string[]
   salesAccount: string[]
   purchaseAccount: string[]
+  categoryIds: string[]
   createdAt: string
   updatedAt: string
 }
@@ -102,6 +103,7 @@ function rowToProduct(row: any): Product {
     itemCategories: Array.isArray(row.item_categories) ? row.item_categories : [],
     salesAccount: (() => { try { const v = JSON.parse(row.sales_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.sales_account ? [row.sales_account] : [] } })(),
     purchaseAccount: (() => { try { const v = JSON.parse(row.purchase_account || '[]'); return Array.isArray(v) ? v : [] } catch { return row.purchase_account ? [row.purchase_account] : [] } })(),
+    categoryIds: Array.isArray(row.category_ids) ? row.category_ids : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -127,7 +129,8 @@ async function ensureProductColumns() {
         ADD COLUMN IF NOT EXISTS sideways_parts JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS sideways_car_type JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS sideways_car_classes JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS custom_orgs JSONB DEFAULT '{}'::jsonb
+        ADD COLUMN IF NOT EXISTS custom_orgs JSONB DEFAULT '{}'::jsonb,
+        ADD COLUMN IF NOT EXISTS category_ids JSONB DEFAULT '[]'::jsonb
     `)
   } catch { /* ignore */ }
   _productColumnsMigrated = true
@@ -178,11 +181,11 @@ export async function POST(request: Request) {
         weight, weight_unit, box_size, dimensions, eta, status,
         image_url, images, page_id, page_ids, page_url, car_brands, revo_parts, is_pre_order,
         seo, created_at, updated_at,
-        sales_account, purchase_account, category_brands, item_categories, sideways_brands, sideways_parts, sideways_car_classes, custom_orgs
+        sales_account, purchase_account, category_brands, item_categories, sideways_brands, sideways_parts, sideways_car_classes, custom_orgs, category_ids
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
         $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
-        $34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44
+        $34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45
       )
     `, [
       id, body.title, body.description || '',
@@ -205,6 +208,7 @@ export async function POST(request: Request) {
       JSON.stringify(Array.isArray(body.sidewaysParts) ? body.sidewaysParts : []),
       JSON.stringify(Array.isArray(body.sidewaysCarClasses) ? body.sidewaysCarClasses : []),
       JSON.stringify(typeof body.customOrgs === 'object' && body.customOrgs !== null ? body.customOrgs : {}),
+      JSON.stringify(Array.isArray(body.categoryIds) ? body.categoryIds : []),
     ])
 
     const result = await db.query(`SELECT * FROM products WHERE id = $1`, [id])
