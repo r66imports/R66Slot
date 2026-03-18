@@ -3202,6 +3202,13 @@ function SettingsTab({
               )}
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={component.settings.showPrice as boolean}
+              onChange={(e) => updateSetting('showPrice', e.target.checked)}
+              className="rounded"
+            />
             <label className="text-xs text-gray-600 font-play">Show Price</label>
           </div>
           <div className="flex items-center gap-2">
