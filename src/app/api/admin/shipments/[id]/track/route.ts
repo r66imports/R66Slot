@@ -4,12 +4,17 @@ import type { Shipment } from '../../route'
 
 const KEY = 'data/shipments.json'
 
-// ─── FedEx token cache ────────────────────────────────────────────────────────
-let fedexToken: { value: string; expiresAt: number } | null = null
+// Set FEDEX_ENV=sandbox in Railway to use sandbox credentials, omit for production
+const FEDEX_BASE = process.env.FEDEX_ENV === 'sandbox'
+  ? 'https://apis-sandbox.fedex.com'
+  : 'https://apis.fedex.com'
+
+// ─── FedEx token cache (scoped to current FEDEX_BASE) ────────────────────────
+let fedexToken: { value: string; expiresAt: number; base: string } | null = null
 
 async function getFedexToken(): Promise<string> {
-  if (fedexToken && Date.now() < fedexToken.expiresAt - 60_000) return fedexToken.value
-  const res = await fetch('https://apis.fedex.com/oauth/token', {
+  if (fedexToken && fedexToken.base === FEDEX_BASE && Date.now() < fedexToken.expiresAt - 60_000) return fedexToken.value
+  const res = await fetch(`${FEDEX_BASE}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -23,7 +28,7 @@ async function getFedexToken(): Promise<string> {
     throw new Error(`FedEx auth failed (${res.status}): ${err}`)
   }
   const data = await res.json()
-  fedexToken = { value: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 }
+  fedexToken = { value: data.access_token, expiresAt: Date.now() + data.expires_in * 1000, base: FEDEX_BASE }
   return fedexToken.value
 }
 
@@ -43,7 +48,7 @@ function fedexCodeToStatus(code: string): Shipment['status'] {
 // ─── FedEx live tracking ──────────────────────────────────────────────────────
 async function trackFedex(trackingNumber: string) {
   const token = await getFedexToken()
-  const res = await fetch('https://apis.fedex.com/track/v1/trackingnumbers', {
+  const res = await fetch(`${FEDEX_BASE}/track/v1/trackingnumbers`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
