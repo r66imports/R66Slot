@@ -58,6 +58,7 @@ export default function AdminLayout({
         submenu: [
           { name: 'Products', href: '/admin/products', icon: '🛍️' },
           { name: 'Inventory', href: '/admin/inventory', icon: '📋' },
+          { name: 'Price Lists', href: '/admin/price-lists', icon: '💰' },
           { name: 'Categories', href: '/admin/categories', icon: '🏷️' },
           { name: 'POS / Scanner', href: '/admin/pos', icon: '🔍' },
         ]
