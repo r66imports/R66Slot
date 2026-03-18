@@ -171,6 +171,8 @@ export default function PreOrderPosterPage() {
   const searchParams = useSearchParams()
   const editId = searchParams.get('edit')
   const posterRef = useRef<HTMLDivElement>(null)
+  const posterWrapperRef = useRef<HTMLDivElement>(null)
+  const [posterScale, setPosterScale] = useState(1)
 
   // UI state
   const [saving, setSaving] = useState(false)
@@ -245,6 +247,20 @@ export default function PreOrderPosterPage() {
   useEffect(() => {
     if (editId) loadPoster(editId)
   }, [editId])
+
+  // Scale poster to fit its wrapper container
+  useEffect(() => {
+    const updateScale = () => {
+      if (posterWrapperRef.current) {
+        const w = posterWrapperRef.current.offsetWidth
+        setPosterScale(Math.min(1, w / 1200))
+      }
+    }
+    updateScale()
+    const ro = new ResizeObserver(updateScale)
+    if (posterWrapperRef.current) ro.observe(posterWrapperRef.current)
+    return () => ro.disconnect()
+  }, [])
 
   const loadPoster = async (id: string) => {
     try {
@@ -740,10 +756,10 @@ export default function PreOrderPosterPage() {
 
       {/* ── Main Grid ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="flex gap-6 items-start">
 
-          {/* ════ LEFT COLUMN: Forms ════ */}
-          <div className="space-y-4">
+          {/* ════ MAIN COLUMN: Forms + Poster ════ */}
+          <div className="flex-1 min-w-0 space-y-4">
 
             {/* ─ Task 1: All sections have checkbox toggle ─ */}
 
@@ -880,102 +896,8 @@ export default function PreOrderPosterPage() {
               </a>
             </SectionCard>
 
-            {/* ─ Task 3: Product Organization – Full Selection ─ */}
-            <SectionCard title="Product Organization" open={open.productOrg} onToggle={() => toggle('productOrg')}>
 
-              {/* Class */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Racing Class</label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCarClass('')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors font-play ${!carClass ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500'}`}
-                  >
-                    None
-                  </button>
-                  {RACING_CLASSES.map((cls) => (
-                    <button
-                      key={cls}
-                      type="button"
-                      onClick={() => setCarClass(carClass === cls ? '' : cls)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors font-play ${carClass === cls ? 'bg-red-600 text-white border-red-600' : 'bg-white text-gray-600 border-gray-300 hover:border-red-400'}`}
-                    >
-                      {cls}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Product Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Product Type</label>
-                <select value={productType} onChange={(e) => setProductType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play">
-                  <option value="">Select type…</option>
-                  {PRODUCT_TYPES.map((t) => <option key={t} value={t.toLowerCase().replace(/ /g, '-')}>{t}</option>)}
-                </select>
-              </div>
-
-              {/* Car Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Car Type</label>
-                <select value={carType} onChange={(e) => setCarType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play">
-                  <option value="">Select car type…</option>
-                  {CAR_TYPES.map((t) => <option key={t} value={t.toLowerCase().replace(/ /g, '-')}>{t}</option>)}
-                </select>
-              </div>
-
-              {/* Scale */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Scale</label>
-                <select value={scale} onChange={(e) => setScale(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play">
-                  <option value="">Select scale…</option>
-                  {SCALES.map((s) => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-
-              {/* Part Type */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Part Type</label>
-                <select value={partType} onChange={(e) => setPartType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play">
-                  <option value="">Select part type…</option>
-                  {PART_TYPES.map((t) => <option key={t} value={t.toLowerCase().replace(/ /g, '-')}>{t}</option>)}
-                </select>
-              </div>
-
-              {/* Supplier */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Supplier</label>
-                <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play">
-                  <option value="">Select supplier…</option>
-                  {SUPPLIERS.map((s) => <option key={s} value={s.toLowerCase()}>{s}</option>)}
-                </select>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Tags</label>
-                <input type="text" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="gt3, limited, 2025, livery (comma-separated)" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play" />
-              </div>
-
-              {/* Assign to Page */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Assign to Page</label>
-                <select value={pageId} onChange={(e) => setPageId(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 font-play">
-                  <option value="">No page assigned</option>
-                  {availablePages.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
-                </select>
-                {pageId && (
-                  <div className="flex gap-3 mt-2">
-                    <a href={`/admin/pages/editor/${pageId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline font-play">View Page →</a>
-                    <span className="text-gray-300">|</span>
-                    <a href={`/admin/pages/frontend/${pageId}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-600 hover:underline font-play">Preview Live →</a>
-                  </div>
-                )}
-              </div>
-            </SectionCard>
-
-            {/* ─ Task 4: SEO Options ─ */}
+                        {/* ─ Task 4: SEO Options ─ */}
             <SectionCard title="SEO Options" open={open.seo} onToggle={() => toggle('seo')}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1 font-play">Meta Title</label>
@@ -1012,12 +934,7 @@ export default function PreOrderPosterPage() {
               </div>
             </SectionCard>
 
-          </div>{/* end left column */}
-
-          {/* ════ RIGHT COLUMN: Preview + actions ════ */}
-          <div className="space-y-4">
-
-            {/* Poster Preview */}
+          {/* Poster Preview — below Product Details */}
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-3">
@@ -1026,20 +943,16 @@ export default function PreOrderPosterPage() {
                     📄 Print / PDF
                   </button>
                 </div>
-
-                {/* 16:9 label */}
                 <div className="flex items-center gap-2 mb-3">
                   <span className="px-3 py-1 text-xs font-bold rounded-lg bg-gray-900 text-white font-play">1200 × 630 (OG)</span>
-                  <span className="text-xs text-gray-400 font-play ml-1">
-                    WhatsApp / Facebook card format
-                  </span>
+                  <span className="text-xs text-gray-400 font-play ml-1">WhatsApp / Facebook card format</span>
                 </div>
-
-                {/* 16:9 Landscape Poster */}
+                {/* Scale wrapper — fits poster to container width */}
+                <div ref={posterWrapperRef} style={{ width: '100%', overflow: 'hidden', height: `${Math.round(630 * posterScale)}px` }}>
                 <div
                   ref={posterRef}
                   className="bg-white overflow-hidden"
-                  style={{ width: '1200px', height: '630px', display: 'flex', flexDirection: 'column', border: '2px solid #e5e7eb', borderRadius: '12px' }}
+                  style={{ width: '1200px', height: '630px', display: 'flex', flexDirection: 'column', border: '2px solid #e5e7eb', borderRadius: '12px', transform: `scale(${posterScale})`, transformOrigin: 'top left' }}
                 >
                   {/* Top banner */}
                   <div className={`flex-shrink-0 py-3 px-6 text-center font-bold text-white font-play text-lg tracking-widest ${orderType === 'pre-order' ? 'bg-orange-500' : 'bg-green-500'}`}>
@@ -1108,8 +1021,14 @@ export default function PreOrderPosterPage() {
                   </div>
                 </div>
 
+                </div>{/* end scale wrapper */}
               </CardContent>
             </Card>
+
+          </div>{/* end main column */}
+
+          {/* ════ SIDEBAR ════ */}
+          <div className="w-64 flex-shrink-0 space-y-4">
 
             {/* Summary Card */}
             <Card>
@@ -1121,8 +1040,8 @@ export default function PreOrderPosterPage() {
                   {scale && <div className="flex justify-between"><span className="text-gray-500">Scale:</span><span>{scale}</span></div>}
                   {supplier && <div className="flex justify-between"><span className="text-gray-500">Supplier:</span><span>{supplier}</span></div>}
                   {selectedCategories.length > 0 && <div className="flex justify-between"><span className="text-gray-500">Categories:</span><span>{selectedCategories.length} selected</span></div>}
-                  {selectedPage && <div className="flex justify-between"><span className="text-gray-500">Page:</span><span className="truncate max-w-[120px]">{selectedPage.title}</span></div>}
-                  {seoTitle && <div className="flex justify-between"><span className="text-gray-500">SEO Title:</span><span className="truncate max-w-[120px]">{seoTitle}</span></div>}
+                  {selectedPage && <div className="flex justify-between"><span className="text-gray-500">Page:</span><span className="truncate max-w-[100px]">{selectedPage.title}</span></div>}
+                  {seoTitle && <div className="flex justify-between"><span className="text-gray-500">SEO:</span><span className="truncate max-w-[100px]">{seoTitle}</span></div>}
                 </div>
               </CardContent>
             </Card>
@@ -1134,13 +1053,13 @@ export default function PreOrderPosterPage() {
                 <div className="space-y-2">
                   <Link href="/admin/slotcar-orders" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-play">🎨 Slotcar Orders</Link>
                   <Link href="/admin/products/new" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-play">➕ New Product</Link>
-                  <Link href="/admin/catalogue/categories" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-play">🏷️ Product Categories</Link>
+                  <Link href="/admin/categories" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-play">🏷️ Categories</Link>
                   <Link href="/products" target="_blank" className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-play">🛒 View Products →</Link>
                 </div>
               </CardContent>
             </Card>
 
-          </div>{/* end right column */}
+          </div>{/* end sidebar */}
         </div>
       </div>
 
