@@ -32,10 +32,10 @@ function ProductGridLive({
       .then((r) => r.json())
       .then((data) => {
         let list = Array.isArray(data) ? data.filter((p: any) => p.status === 'active') : []
-        // Filter by assigned page — matches products whose assignedPages array includes the selected page
-        const pageFilter = (settings.assignedPage as string) || ''
-        if (pageFilter) {
-          list = list.filter((p: any) => Array.isArray(p.pageIds) && p.pageIds.includes(pageFilter))
+        // Filter by assigned category — matches products whose categoryIds array includes the selected category id
+        const categoryFilter = (settings.assignedCategory as string) || ''
+        if (categoryFilter) {
+          list = list.filter((p: any) => Array.isArray(p.categoryIds) && p.categoryIds.includes(categoryFilter))
         }
         // Sort by SKU — numeric where possible, else alphabetical
         list.sort((a: any, b: any) => {
@@ -51,7 +51,7 @@ function ProductGridLive({
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.assignedPage, settings.productRows, settings.gridColumns])
+  }, [settings.assignedCategory, settings.productRows, settings.gridColumns])
 
   const handleAddToCart = (p: any) => {
     addItem({

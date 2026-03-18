@@ -2952,10 +2952,10 @@ function SettingsTab({
     }).catch(() => {})
   }, [])
 
-  const [pagesList, setPagesList] = useState<{ id: string; title: string }[]>([])
+  const [categoriesList, setCategoriesList] = useState<{ id: string; name: string }[]>([])
   useEffect(() => {
     if (component.type !== 'product-grid') return
-    fetch('/api/admin/pages').then(r => r.json()).then(d => setPagesList(Array.isArray(d) ? d : d.pages || [])).catch(() => {})
+    fetch('/api/admin/categories').then(r => r.json()).then(d => setCategoriesList(Array.isArray(d) ? d : [])).catch(() => {})
   }, [component.type])
 
   const selectedCarBrands: string[] = Array.isArray(component.settings.carBrands)
@@ -3182,23 +3182,25 @@ function SettingsTab({
       {/* Product Grid settings */}
       {component.type === 'product-grid' && (
         <>
-          {/* ── Product Organization Filter ── */}
+          {/* ── Category Filter ── */}
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider font-play">Product Filter</p>
+            <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider font-play">Category Filter</p>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Show products assigned to page</label>
+              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Choose Category</label>
               <select
-                value={(component.settings.assignedPage as string) || ''}
-                onChange={(e) => updateSetting('assignedPage', e.target.value)}
+                value={(component.settings.assignedCategory as string) || ''}
+                onChange={(e) => updateSetting('assignedCategory', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
               >
                 <option value="">— Show all active products —</option>
-                {pagesList.map((pg) => (
-                  <option key={pg.id} value={pg.title}>{pg.title}</option>
+                {categoriesList.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
-              {(component.settings.assignedPage as string) && (
-                <p className="text-[10px] text-red-600 font-play mt-1">Showing: {component.settings.assignedPage as string}</p>
+              {(component.settings.assignedCategory as string) && (
+                <p className="text-[10px] text-red-600 font-play mt-1">
+                  Showing: {categoriesList.find(c => c.id === (component.settings.assignedCategory as string))?.name || component.settings.assignedCategory as string}
+                </p>
               )}
             </div>
           </div>
