@@ -27,6 +27,22 @@ interface Shipment {
   status: 'pending' | 'in-transit' | 'out-for-delivery' | 'delivered' | 'returned' | 'failed'
   notes: string
   createdAt: string
+  liveDescription?: string
+  liveLocation?: string
+  liveLastUpdated?: string
+}
+
+interface TrackingResult {
+  loading: boolean
+  status?: string
+  statusCode?: string
+  description?: string
+  location?: string
+  lastUpdated?: string
+  events?: Array<{ timestamp: string; description: string; location?: string }>
+  error?: string
+  notConfigured?: boolean
+  unsupported?: boolean
 }
 
 const EMPTY_COURIER: Omit<Courier, 'id'> = {
@@ -57,7 +73,6 @@ const STATUS_LABELS: Record<string, string> = {
   'failed':           'Failed',
 }
 
-// Build tracking URL per courier code
 function buildTrackUrl(courierCode: string, trackingNumber: string, baseUrl: string): string {
   const n = encodeURIComponent(trackingNumber)
   switch (courierCode?.toUpperCase()) {
@@ -67,6 +82,42 @@ function buildTrackUrl(courierCode: string, trackingNumber: string, baseUrl: str
     case 'TCG':     return `https://www.thecourierguy.co.za/tracking`
     default:        return baseUrl || '#'
   }
+}
+
+function formatRelativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+function TruckIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 .001M13 16H9m4 0h2m0 0h.01M5 16H3m10-10h3.586a1 1 0 01.707.293l2.914 2.914A1 1 0 0121 9.914V15a1 1 0 01-1 1h-1" />
+    </svg>
+  )
+}
+
+function SpinIcon({ className = 'w-3.5 h-3.5' }: { className?: string }) {
+  return (
+    <svg className={`${className} animate-spin`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  )
+}
+
+function RefreshIcon({ className = 'w-4 h-4', spinning = false }: { className?: string; spinning?: boolean }) {
+  return (
+    <svg className={`${className} ${spinning ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+  )
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -86,13 +137,17 @@ export default function ShippingNetworkPage() {
   // Shipments
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [shipmentsLoading, setShipmentsLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
+  const [refreshingAll, setRefreshingAll] = useState(false)
   const [shipmentSearch, setShipmentSearch] = useState('')
   const [showShipmentModal, setShowShipmentModal] = useState(false)
   const [editingShipmentId, setEditingShipmentId] = useState<string | null>(null)
   const [shipmentForm, setShipmentForm] = useState<Omit<Shipment, 'id' | 'createdAt'>>(EMPTY_SHIPMENT)
   const [savingShipment, setSavingShipment] = useState(false)
   const [openShipmentActionId, setOpenShipmentActionId] = useState<string | null>(null)
+
+  // Live tracking
+  const [trackingData, setTrackingData] = useState<Record<string, TrackingResult>>({})
+  const [expandedEvents, setExpandedEvents] = useState<string | null>(null)
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -118,15 +173,53 @@ export default function ShippingNetworkPage() {
 
   async function loadShipments(silent = false) {
     if (!silent) setShipmentsLoading(true)
-    else setRefreshing(true)
     try {
       const res = await fetch('/api/admin/shipments')
-      const data = await res.json()
-      setShipments(Array.isArray(data) ? data : [])
+      const data: Shipment[] = await res.json()
+      const list = Array.isArray(data) ? data : []
+      setShipments(list)
+      // Auto-fetch live tracking for active FedEx shipments
+      const toTrack = list.filter(
+        (s) => s.courierCode?.toUpperCase() === 'FEDEX' && s.status !== 'delivered'
+      )
+      toTrack.forEach((s) => fetchTracking(s.id))
     } finally {
       setShipmentsLoading(false)
-      setRefreshing(false)
     }
+  }
+
+  async function fetchTracking(id: string) {
+    setTrackingData((prev) => ({ ...prev, [id]: { ...prev[id], loading: true } }))
+    try {
+      const res = await fetch(`/api/admin/shipments/${id}/track`)
+      const data = await res.json()
+      if (res.ok) {
+        setTrackingData((prev) => ({ ...prev, [id]: { loading: false, ...data } }))
+        // Update in-memory shipment status too
+        setShipments((prev) =>
+          prev.map((s) =>
+            s.id === id
+              ? { ...s, status: data.status, liveDescription: data.description, liveLocation: data.location, liveLastUpdated: data.lastUpdated }
+              : s
+          )
+        )
+      } else if (data.error === 'not_configured') {
+        setTrackingData((prev) => ({ ...prev, [id]: { loading: false, notConfigured: true } }))
+      } else if (data.error === 'unsupported') {
+        setTrackingData((prev) => ({ ...prev, [id]: { loading: false, unsupported: true } }))
+      } else {
+        setTrackingData((prev) => ({ ...prev, [id]: { loading: false, error: data.error || 'Unknown error' } }))
+      }
+    } catch {
+      setTrackingData((prev) => ({ ...prev, [id]: { loading: false, error: 'Network error' } }))
+    }
+  }
+
+  async function refreshAllFedex() {
+    setRefreshingAll(true)
+    const fedex = shipments.filter((s) => s.courierCode?.toUpperCase() === 'FEDEX' && s.status !== 'delivered')
+    await Promise.all(fedex.map((s) => fetchTracking(s.id)))
+    setRefreshingAll(false)
   }
 
   useEffect(() => { loadCouriers(); loadShipments() }, [])
@@ -186,21 +279,23 @@ export default function ShippingNetworkPage() {
       if (editingShipmentId) {
         await fetch(`/api/admin/shipments/${editingShipmentId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shipmentForm) })
       } else {
-        await fetch('/api/admin/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shipmentForm) })
+        const res = await fetch('/api/admin/shipments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(shipmentForm) })
+        const created = await res.json()
+        // Auto-track new FedEx shipment immediately
+        if (shipmentForm.courierCode?.toUpperCase() === 'FEDEX' && created.id) {
+          setTimeout(() => fetchTracking(created.id), 500)
+        }
       }
       setShowShipmentModal(false)
-      await loadShipments()
+      await loadShipments(true)
     } finally { setSavingShipment(false) }
   }
   async function handleDeleteShipment(id: string) {
     if (!confirm('Remove this shipment?')) return
     setOpenShipmentActionId(null)
     await fetch(`/api/admin/shipments/${id}`, { method: 'DELETE' })
-    await loadShipments()
-  }
-  async function updateShipmentStatus(id: string, status: string) {
-    await fetch(`/api/admin/shipments/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
-    setShipments((prev) => prev.map((s) => s.id === id ? { ...s, status: status as Shipment['status'] } : s))
+    setShipments((prev) => prev.filter((s) => s.id !== id))
+    setTrackingData((prev) => { const n = { ...prev }; delete n[id]; return n })
   }
 
   const filteredCouriers = couriers.filter((c) => {
@@ -303,16 +398,13 @@ export default function ShippingNetworkPage() {
               <h2 className="text-xl font-bold text-gray-900">Live Shipment Tracking</h2>
               <p className="text-sm text-gray-500 mt-0.5">{shipments.length} shipment{shipments.length !== 1 ? 's' : ''} logged</p>
             </div>
-            {/* Refresh button */}
             <button
-              onClick={() => loadShipments(true)}
-              disabled={refreshing}
-              title="Refresh shipments"
+              onClick={refreshAllFedex}
+              disabled={refreshingAll}
+              title="Refresh all FedEx shipments"
               className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40"
             >
-              <svg className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+              <RefreshIcon spinning={refreshingAll} />
             </button>
           </div>
           <button onClick={openAddShipment} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
@@ -339,41 +431,127 @@ export default function ShippingNetworkPage() {
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Courier</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reference</th>
                   <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date Shipped</th>
-                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Live Status</th>
                   <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Track</th>
                   <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide sticky right-0 bg-gray-50 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)]">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredShipments.map((s) => {
+                  const td = trackingData[s.id]
                   const courier = couriers.find((c) => c.id === s.courierId)
                   const trackUrl = buildTrackUrl(s.courierCode, s.trackingNumber, courier?.trackingUrl || '')
+                  const isFedex = s.courierCode?.toUpperCase() === 'FEDEX'
+
+                  // Use live status if available, fall back to stored status
+                  const displayStatus = td?.status || s.status
+                  const displayDescription = td?.description || s.liveDescription
+                  const displayLocation = td?.location || s.liveLocation
+                  const displayLastUpdated = td?.lastUpdated || s.liveLastUpdated
+
                   return (
                     <tr key={s.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-4 font-mono text-xs font-semibold text-gray-800">{s.trackingNumber}</td>
-                      <td className="py-3 px-4 text-gray-700">{s.courierName || '—'}</td>
-                      <td className="py-3 px-4 text-gray-700">{s.reference || '—'}</td>
-                      <td className="py-3 px-4 text-gray-500 text-xs">{s.dateShipped ? new Date(s.dateShipped + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</td>
+                      {/* Tracking # */}
                       <td className="py-3 px-4">
-                        <select
-                          value={s.status}
-                          onChange={(e) => updateShipmentStatus(s.id, e.target.value)}
-                          className={`text-xs font-semibold px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-400 ${STATUS_STYLES[s.status] || 'bg-gray-100 text-gray-600'}`}
-                        >
-                          {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                        </select>
+                        <span className="font-mono text-xs font-semibold text-gray-800">{s.trackingNumber}</span>
+                        {/* Last event description */}
+                        {displayDescription && (
+                          <p className="text-[11px] text-gray-500 mt-0.5 max-w-[200px]">{displayDescription}</p>
+                        )}
+                        {/* Location */}
+                        {displayLocation && (
+                          <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-0.5">
+                            <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            {displayLocation}
+                          </p>
+                        )}
+                        {/* Error */}
+                        {td?.error && !td.loading && (
+                          <p className="text-[11px] text-red-500 mt-0.5">⚠️ {td.error}</p>
+                        )}
+                        {td?.notConfigured && (
+                          <p className="text-[11px] text-amber-600 mt-0.5">⚙️ Add FEDEX_CLIENT_ID + FEDEX_CLIENT_SECRET to enable live tracking</p>
+                        )}
                       </td>
+
+                      {/* Courier */}
+                      <td className="py-3 px-4 text-gray-700">{s.courierName || '—'}</td>
+
+                      {/* Reference */}
+                      <td className="py-3 px-4 text-gray-700">{s.reference || '—'}</td>
+
+                      {/* Date */}
+                      <td className="py-3 px-4 text-gray-500 text-xs whitespace-nowrap">
+                        {s.dateShipped ? new Date(s.dateShipped + 'T00:00:00').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                      </td>
+
+                      {/* Live Status */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5">
+                          {/* Truck icon */}
+                          <TruckIcon className={`w-4 h-4 flex-shrink-0 ${displayStatus === 'delivered' ? 'text-green-600' : displayStatus === 'out-for-delivery' ? 'text-purple-600' : 'text-blue-500'}`} />
+                          {/* Status badge */}
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold whitespace-nowrap ${STATUS_STYLES[displayStatus] || 'bg-gray-100 text-gray-600'}`}>
+                            {STATUS_LABELS[displayStatus] || displayStatus}
+                          </span>
+                          {/* Spinning while fetching */}
+                          {td?.loading && <SpinIcon className="w-3 h-3 text-gray-400" />}
+                        </div>
+                        {/* Last updated timestamp */}
+                        {displayLastUpdated && !td?.loading && (
+                          <p className="text-[10px] text-gray-400 mt-1 ml-0.5">↻ {formatRelativeTime(displayLastUpdated)}</p>
+                        )}
+                        {/* Show event history toggle for FedEx with data */}
+                        {isFedex && td?.events && td.events.length > 0 && (
+                          <button
+                            onClick={() => setExpandedEvents(expandedEvents === s.id ? null : s.id)}
+                            className="text-[10px] text-blue-500 hover:text-blue-700 mt-0.5 ml-0.5"
+                          >
+                            {expandedEvents === s.id ? '▲ hide history' : `▼ ${td.events.length} events`}
+                          </button>
+                        )}
+                        {/* Event history dropdown */}
+                        {expandedEvents === s.id && td?.events && (
+                          <div className="mt-2 space-y-1 max-h-48 overflow-y-auto border border-gray-100 rounded-lg p-2 bg-gray-50">
+                            {td.events.map((ev, i) => (
+                              <div key={i} className="text-[10px] leading-tight">
+                                <span className="text-gray-400">{ev.timestamp ? new Date(ev.timestamp).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                <span className="text-gray-700 ml-1">{ev.description}</span>
+                                {ev.location && <span className="text-gray-400 ml-1">· {ev.location}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Track + Refresh */}
                       <td className="py-3 px-4 text-center">
-                        <a
-                          href={trackUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                          Track
-                        </a>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* Refresh live tracking */}
+                          {(isFedex) && (
+                            <button
+                              onClick={() => fetchTracking(s.id)}
+                              disabled={td?.loading}
+                              title="Refresh live tracking"
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-40"
+                            >
+                              <RefreshIcon className="w-3.5 h-3.5" spinning={!!td?.loading} />
+                            </button>
+                          )}
+                          {/* External track link */}
+                          <a
+                            href={trackUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                            Track
+                          </a>
+                        </div>
                       </td>
+
+                      {/* Actions */}
                       <td className="py-3 px-4 text-center sticky right-0 bg-white shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)]" style={{ zIndex: openShipmentActionId === s.id ? 9999 : undefined }}>
                         <div className="relative inline-block">
                           <button onClick={() => setOpenShipmentActionId(openShipmentActionId === s.id ? null : s.id)} className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1">
@@ -482,12 +660,6 @@ export default function ShippingNetworkPage() {
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Reference (customer / order)</label>
                 <input type="text" value={shipmentForm.reference} onChange={(e) => setShipmentForm((f) => ({ ...f, reference: e.target.value }))} placeholder="e.g. John Smith – RS0303" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                <select value={shipmentForm.status} onChange={(e) => setShipmentForm((f) => ({ ...f, status: e.target.value as Shipment['status'] }))} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                  {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>

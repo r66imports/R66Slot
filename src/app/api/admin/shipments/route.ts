@@ -14,6 +14,10 @@ export interface Shipment {
   status: 'pending' | 'in-transit' | 'out-for-delivery' | 'delivered' | 'returned' | 'failed'
   notes: string
   createdAt: string
+  // Live tracking (auto-populated by /track endpoint)
+  liveDescription?: string
+  liveLocation?: string
+  liveLastUpdated?: string
 }
 
 export async function GET() {
