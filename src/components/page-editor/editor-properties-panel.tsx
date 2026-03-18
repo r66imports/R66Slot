@@ -3186,20 +3186,31 @@ function SettingsTab({
           <div className="space-y-2">
             <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider font-play">Category Filter</p>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Choose Category</label>
-              <select
-                value={(component.settings.assignedCategory as string) || ''}
-                onChange={(e) => updateSetting('assignedCategory', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-              >
-                <option value="">— Show all active products —</option>
-                {categoriesList.map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
-              {(component.settings.assignedCategory as string) && (
-                <p className="text-[10px] text-red-600 font-play mt-1">
-                  Showing: {categoriesList.find(c => c.id === (component.settings.assignedCategory as string))?.name || component.settings.assignedCategory as string}
+              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Choose Categories</label>
+              <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                {categoriesList.map((cat) => {
+                  const selected: string[] = Array.isArray(component.settings.assignedCategories) ? (component.settings.assignedCategories as string[]) : []
+                  const checked = selected.includes(cat.id)
+                  return (
+                    <label key={cat.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const next = checked ? selected.filter(id => id !== cat.id) : [...selected, cat.id]
+                          updateSetting('assignedCategories', next)
+                        }}
+                        className="rounded accent-blue-500"
+                      />
+                      <span className="text-xs font-play text-gray-700">{cat.name}</span>
+                    </label>
+                  )
+                })}
+                {categoriesList.length === 0 && <p className="text-xs text-gray-400 font-play p-3">No categories yet</p>}
+              </div>
+              {Array.isArray(component.settings.assignedCategories) && (component.settings.assignedCategories as string[]).length > 0 && (
+                <p className="text-[10px] text-blue-600 font-play mt-1">
+                  {(component.settings.assignedCategories as string[]).length} categor{(component.settings.assignedCategories as string[]).length === 1 ? 'y' : 'ies'} selected
                 </p>
               )}
             </div>
