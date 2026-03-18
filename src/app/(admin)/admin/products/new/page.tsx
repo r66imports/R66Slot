@@ -25,6 +25,8 @@ export default function NewProductPage() {
   const [brand, setBrand] = useState('')
   const [productType, setProductType] = useState('')
   const [itemCategories, setItemCategories] = useState<string[]>([])
+  const [categoryIds, setCategoryIds] = useState<string[]>([])
+  const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([])
   const [itemCategoryDropdownOpen, setItemCategoryDropdownOpen] = useState(false)
   const [carType, setCarType] = useState('')
   const [partType, setPartType] = useState('')
@@ -147,6 +149,10 @@ export default function NewProductPage() {
         if (opts.customOrgBrands) setCustomOrgBrands(opts.customOrgBrands)
       })
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/admin/categories').then(r => r.json()).then(d => setAllCategories(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
 
   // Load data from poster page if passed via URL params
@@ -346,6 +352,7 @@ export default function NewProductPage() {
         imageUrl: imageUrls.length > 0 ? imageUrls[0] : '',
         pageIds,
         pageId: pageIds[0] || '',
+        categoryIds,
         carBrands,
         carClass: selectedCarClasses[0] || '',
         revoParts: selectedRevoParts,
@@ -369,6 +376,14 @@ export default function NewProductPage() {
       })
 
       if (res.ok) {
+        const created = await res.json().catch(() => null)
+        if (created?.id && categoryIds.length > 0) {
+          fetch('/api/admin/categories/sync-product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productId: created.id, categoryIds }),
+          }).catch(() => {})
+        }
         router.push('/admin/products')
       } else {
         let errMsg = `Server error (${res.status})`
@@ -861,133 +876,28 @@ export default function NewProductPage() {
               </select>
             </div>
 
-            {/* Product Organization */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <button type="button" onClick={() => setProductOrgCollapsed(!productOrgCollapsed)} className="w-full flex items-center justify-between mb-4 text-left group">
-                <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Product Organization</h3>
-                <svg className={`w-4 h-4 text-gray-400 transition-transform ${productOrgCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </button>
-              {!productOrgCollapsed && <div className="space-y-4">
-
-                {/* Pre Order Toggle */}
-                <div className="flex items-center justify-between p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Pre Order</p>
-                    <p className="text-xs text-gray-500">Changes &quot;Add to Cart&quot; to &quot;Pre Order&quot; and shows product on /book</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsPreOrder(!isPreOrder)}
-                    className={`relative w-12 h-6 rounded-full transition-colors ${isPreOrder ? 'bg-orange-500' : 'bg-gray-300'}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isPreOrder ? 'translate-x-6' : 'translate-x-0'}`} />
-                  </button>
-                </div>
-
-                {/* Scale */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Scale</label>
-                  <select
-                    value={scale}
-                    onChange={(e) => setScale(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select scale...</option>
-                    {scales.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <button type="button" onClick={() => setShowAddScale(true)} className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Scale</button>
-                </div>
-
-                {/* Tags */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tags</label>
-                  <input
-                    type="text"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    placeholder="Separate with commas"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
-                </div>
-
-                {/* Page Assignment */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Assign to Page</label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setPageDropdownOpen(!pageDropdownOpen)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 focus:border-transparent bg-white"
-                    >
-                      <span className={pageIds.length === 0 ? 'text-gray-400' : 'text-gray-900'}>
-                        {pageIds.length === 0 ? 'No page assigned' : pageIds.length === 1 ? (availablePages.find(p => p.id === pageIds[0])?.title || pageIds[0]) : `${pageIds.length} pages selected`}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${pageDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                    </button>
-                    {pageDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                        <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-                          <input type="checkbox" checked={pageIds.length === 0} onChange={() => setPageIds([])} className="rounded" />
-                          <span className="text-sm text-gray-500 italic">No page assigned</span>
-                        </label>
-                        {availablePages.map((p) => (
-                          <label key={p.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                            <input type="checkbox" checked={pageIds.includes(p.id)} onChange={(e) => setPageIds(e.target.checked ? [...pageIds, p.id] : pageIds.filter(id => id !== p.id))} className="rounded" />
-                            <span className="text-sm text-gray-900">{p.title}</span>
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {pageIds.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {pageIds.map(pid => (
-                        <span key={pid} className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
-                          <a href={`/admin/pages/editor/${pid}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                            {availablePages.find(p => p.id === pid)?.title || pid}
-                          </a>
-                          <button type="button" onClick={() => setPageIds(pageIds.filter(id => id !== pid))} className="ml-0.5 text-gray-400 hover:text-red-500" title="Remove page">×</button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-1 text-xs text-gray-500">Select pages where this product will appear</p>
-                  )}
-                </div>
-
-                {/* Page Categories */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Page Categories <span className="text-xs text-gray-400">(select multiple)</span></label>
-                  <div className="border border-gray-300 rounded-lg p-2 max-h-40 overflow-y-auto space-y-1">
-                    {categories.length === 0 ? (
-                      <p className="text-xs text-gray-400 px-2 py-1">Loading categories...</p>
-                    ) : (
-                      categories.map((cat) => (
-                        <label key={cat.id} className="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedCategories.includes(cat.slug)}
-                            onChange={(e) => { if (e.target.checked) { setSelectedCategories(prev => [...prev, cat.slug]) } else { setSelectedCategories(prev => prev.filter(s => s !== cat.slug)) } }}
-                            className="h-3.5 w-3.5 text-gray-900 border-gray-300 rounded"
-                          />
-                          <span className="text-sm text-gray-700">{cat.name}</span>
-                          {cat.class && <span className="text-xs text-red-600 font-medium">({cat.class})</span>}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                  {selectedCategories.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">{selectedCategories.length} selected: {selectedCategories.join(', ')}</p>
-                  )}
-                  <div className="flex gap-2 mt-2">
-                    <a href="/admin/catalogue/categories" target="_blank" className="text-xs text-blue-600 hover:text-blue-800">Manage Categories →</a>
-                  </div>
-                </div>
-              </div>}
+            {/* Categories */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Categories</h3>
+              <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
+                {allCategories.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-4 text-center">No categories yet</p>
+                ) : allCategories.map((cat) => (
+                  <label key={cat.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={categoryIds.includes(cat.id)}
+                      onChange={(e) => setCategoryIds(prev =>
+                        e.target.checked ? [...prev, cat.id] : prev.filter(id => id !== cat.id)
+                      )}
+                      className="rounded accent-blue-500"
+                    />
+                    <span className="text-sm text-gray-700">{cat.name}</span>
+                  </label>
+                ))}
+              </div>
+              <a href="/admin/categories" className="text-xs text-blue-500 hover:text-blue-700 mt-2 inline-block">+ Create Category</a>
             </div>
-
 
             {/* Sage Accounts */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
