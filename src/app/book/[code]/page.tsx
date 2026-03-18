@@ -47,9 +47,9 @@ export async function generateMetadata({
     title: `${poster.itemDescription} - R66SLOT`,
     description: `${poster.orderType === 'pre-order' ? 'Pre-Order' : 'Order'} ${poster.itemDescription} - R${poster.preOrderPrice} - ${poster.brand}`,
     openGraph: {
-      title: `${poster.orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW'} ${poster.itemDescription}`,
-      description: `${poster.brand} - R${poster.preOrderPrice}\n${poster.description || ''}`,
-      images: imageUrl ? [{ url: imageUrl, width: 800, height: 800 }] : [],
+      title: `Book Now: ${poster.itemDescription}`,
+      description: `Click here to reserve yours today. R${poster.preOrderPrice} — ${poster.brand}`,
+      images: imageUrl ? [{ url: imageUrl, width: 1200, height: 630 }] : [],
       type: 'website',
     },
     twitter: {

@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import html2canvas from 'html2canvas'
-import { flushSync } from 'react-dom'
 import { MediaLibraryPicker } from '@/components/page-editor/media-library-picker'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -331,9 +330,7 @@ export default function PreOrderPosterPage() {
     setWhatsappStatus(null)
     const code = shortCode || editId || ''
     const bookUrl = code ? `${BOOK_NOW_URL}/${code}` : BOOK_NOW_URL
-    const waText = `🎯 ${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}\nBrand: ${brand}\nPrice: R${preOrderPrice}\nEst. Delivery: ${estimatedDeliveryDate}\nBook Here: ${bookUrl}`
-    const prevViewMode = viewMode
-
+    const waText = `🎯 ${orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'} - ${itemDescription}\nBrand: ${brand}\nPrice: R${preOrderPrice}\nEst. Delivery: ${estimatedDeliveryDate}\n\n${bookUrl}`
     try {
       if (!posterRef.current) throw new Error('No poster')
 
@@ -342,7 +339,6 @@ export default function PreOrderPosterPage() {
       let prefetchedDataUrl: string | null = null
       if (imageUrl && !imageUrl.startsWith('data:')) {
         try {
-          // Use server-side proxy so the browser fetch isn't blocked by R2 CORS
           const proxyUrl = `/api/image-proxy?url=${encodeURIComponent(imageUrl)}`
           const resp = await fetch(proxyUrl)
           const blob = await resp.blob()
@@ -356,9 +352,6 @@ export default function PreOrderPosterPage() {
         }
       }
 
-      // Always capture in mobile view for WhatsApp (portrait fits phone screens)
-      flushSync(() => setViewMode('mobile'))
-
       // Temporarily swap img src to the local data URL so html2canvas sees it
       const imgEl = posterRef.current.querySelector<HTMLImageElement>('img[alt="Product"]')
       const origSrc = imgEl?.getAttribute('src') ?? null
@@ -370,12 +363,11 @@ export default function PreOrderPosterPage() {
       }
 
       const canvas = await html2canvas(posterRef.current, {
-        backgroundColor: '#ffffff', scale: 2, useCORS: true,
+        backgroundColor: '#ffffff', scale: 2, useCORS: true, width: 1200, height: 630,
       })
 
-      // Restore img src and view mode
+      // Restore img src
       if (imgEl && origSrc !== null) imgEl.src = origSrc
-      setViewMode(prevViewMode)
       const jpegBlob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed to create image')), 'image/jpeg', 0.92)
       )
@@ -473,7 +465,7 @@ export default function PreOrderPosterPage() {
     // 2. Fallback: html2canvas download + copy caption + open Facebook share dialog
     if (!posterRef.current) return
     try {
-      const canvas = await html2canvas(posterRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true })
+      const canvas = await html2canvas(posterRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true, width: 1200, height: 630 })
       canvas.toBlob(async (blob) => {
         if (!blob) return
 
@@ -1035,112 +1027,85 @@ export default function PreOrderPosterPage() {
                   </button>
                 </div>
 
-                {/* Mobile / Desktop toggle */}
+                {/* 16:9 label */}
                 <div className="flex items-center gap-2 mb-3">
-                  <button
-                    onClick={() => setViewMode('mobile')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors font-play ${viewMode === 'mobile' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >📱 Mobile</button>
-                  <button
-                    onClick={() => setViewMode('desktop')}
-                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors font-play ${viewMode === 'desktop' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                  >🖥️ Desktop</button>
+                  <span className="px-3 py-1 text-xs font-bold rounded-lg bg-gray-900 text-white font-play">1200 × 630 (OG)</span>
                   <span className="text-xs text-gray-400 font-play ml-1">
-                    {viewMode === 'mobile' ? '375px wide' : '500px wide'}
+                    WhatsApp / Facebook card format
                   </span>
                 </div>
 
-                <div ref={posterRef} className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden transition-all" style={{ width: viewMode === 'mobile' ? '375px' : '500px', margin: '0 auto' }}>
-                  <div className={`py-2 px-4 text-center font-bold text-white font-play ${orderType === 'pre-order' ? 'bg-orange-500' : 'bg-green-500'}`}>
+                {/* 16:9 Landscape Poster */}
+                <div
+                  ref={posterRef}
+                  className="bg-white overflow-hidden"
+                  style={{ width: '1200px', height: '630px', display: 'flex', flexDirection: 'column', border: '2px solid #e5e7eb', borderRadius: '12px' }}
+                >
+                  {/* Top banner */}
+                  <div className={`flex-shrink-0 py-3 px-6 text-center font-bold text-white font-play text-lg tracking-widest ${orderType === 'pre-order' ? 'bg-orange-500' : 'bg-green-500'}`}>
                     {orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'}
                   </div>
-                  <div className="bg-gray-100 flex items-center justify-center" style={{ height: `${viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}px`, overflow: 'hidden' }}>
-                    {imageUrl ? (
-                      <img src={imageUrl} alt="Product" className="max-w-full object-contain" style={{ maxHeight: `${viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}px` }} />
-                    ) : (
-                      <div className="text-gray-400 text-center p-8">
-                        <svg className="mx-auto h-14 w-14 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <p className="font-play text-sm">Product Image</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4 space-y-3">
-                    <div className="flex justify-between items-start gap-2">
-                      <div>
-                        <p className="text-xs text-gray-500 font-play">SKU: {sku || '---'}</p>
-                        <h4 className="text-lg font-bold font-play leading-tight">{itemDescription || 'Product Name'}</h4>
-                      </div>
-                      {brand && <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded font-play shrink-0">{brand}</span>}
-                    </div>
-                    {/* Org chips in preview */}
-                    {(carClass || scale || productType) && (
-                      <div className="flex flex-wrap gap-1">
-                        {carClass && <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full font-play font-bold">{carClass}</span>}
-                        {scale && <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full font-play">{scale}</span>}
-                        {productType && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-play">{productType}</span>}
-                      </div>
-                    )}
-                    {description && <p className="text-sm text-gray-600 font-play line-clamp-3">{description}</p>}
-                    {/* Categories in preview */}
-                    {selectedCategories.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {selectedCategories.slice(0, 4).map((slug) => (
-                          <span key={slug} className="bg-gray-900 text-white text-xs px-2 py-0.5 rounded-full font-play">{slug}</span>
-                        ))}
-                        {selectedCategories.length > 4 && <span className="text-xs text-gray-400 font-play">+{selectedCategories.length - 4}</span>}
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center pt-2 border-t gap-2">
-                      <div>
-                        <p className="text-xs text-gray-500 font-play">Est. Delivery</p>
-                        <p className="font-semibold font-play text-sm">
-                          {estimatedDeliveryDate
-                            ? new Date(estimatedDeliveryDate + 'T00:00:00').toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-                            : '---'}
-                        </p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-xs text-gray-500 font-play">Qty Available</p>
-                        <p className="font-semibold font-play text-sm">{availableQty}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500 font-play">Price</p>
-                        <p className="text-2xl font-bold text-red-500 font-play">R{preOrderPrice || '0.00'}</p>
-                      </div>
-                    </div>
-                    {shortCode && (
-                      <div className="pt-2 border-t text-center">
-                        <p className="text-sm font-bold text-blue-600 font-play">📋 Book Here</p>
-                        <p className="text-xs text-blue-500 font-play">r66slot.co.za/book/{shortCode}</p>
-                      </div>
-                    )}
-                    <p className="text-xs text-center text-gray-400 font-play">R66SLOT – Premium Slot Cars</p>
-                  </div>
-                </div>
 
-                {/* Image height slider — outside posterRef so it's not captured */}
-                <div className="mt-4 px-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-500 font-play">
-                      {viewMode === 'mobile' ? '📱 Mobile' : '🖥️ Desktop'} image height: <strong>{viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}px</strong>
-                    </span>
-                    <span className="text-xs text-gray-400 font-play">150 – 500px</span>
+                  {/* Main body — image left, details right */}
+                  <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+                    {/* Left: product image */}
+                    <div style={{ width: '55%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      {imageUrl ? (
+                        <img src={imageUrl} alt="Product" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                      ) : (
+                        <div style={{ textAlign: 'center', color: '#9ca3af' }}>
+                          <svg style={{ width: 56, height: 56, margin: '0 auto 8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          <p style={{ fontFamily: 'Arial', fontSize: 14 }}>Product Image</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Right: product details */}
+                    <div style={{ width: '45%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '28px 32px' }}>
+                      {/* Brand + SKU */}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <span style={{ fontSize: 12, color: '#6b7280', fontFamily: 'Arial' }}>SKU: {sku || '---'}</span>
+                          {brand && <span style={{ padding: '2px 10px', background: '#f3f4f6', color: '#374151', fontSize: 12, borderRadius: 6, fontFamily: 'Arial', fontWeight: 700 }}>{brand}</span>}
+                        </div>
+                        <h4 style={{ fontSize: 22, fontWeight: 800, color: '#111', fontFamily: 'Arial', lineHeight: 1.25, marginBottom: 12 }}>{itemDescription || 'Product Name'}</h4>
+
+                        {/* Chips */}
+                        {(carClass || scale || productType) && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                            {carClass && <span style={{ background: '#fee2e2', color: '#b91c1c', fontSize: 12, padding: '2px 10px', borderRadius: 999, fontFamily: 'Arial', fontWeight: 700 }}>{carClass}</span>}
+                            {scale && <span style={{ background: '#f3f4f6', color: '#4b5563', fontSize: 12, padding: '2px 10px', borderRadius: 999, fontFamily: 'Arial' }}>{scale}</span>}
+                            {productType && <span style={{ background: '#dbeafe', color: '#1d4ed8', fontSize: 12, padding: '2px 10px', borderRadius: 999, fontFamily: 'Arial' }}>{productType}</span>}
+                          </div>
+                        )}
+
+                        {description && <p style={{ fontSize: 13, color: '#4b5563', fontFamily: 'Arial', lineHeight: 1.5, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{description}</p>}
+                      </div>
+
+                      {/* Stats row */}
+                      <div>
+                        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                          <div>
+                            <p style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'Arial', marginBottom: 2 }}>Est. Delivery</p>
+                            <p style={{ fontSize: 15, fontWeight: 700, color: '#111', fontFamily: 'Arial' }}>
+                              {estimatedDeliveryDate ? new Date(estimatedDeliveryDate + 'T00:00:00').toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' }) : '---'}
+                            </p>
+                          </div>
+                          <div style={{ textAlign: 'center' }}>
+                            <p style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'Arial', marginBottom: 2 }}>Qty Available</p>
+                            <p style={{ fontSize: 15, fontWeight: 700, color: '#111', fontFamily: 'Arial' }}>{availableQty}</p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'Arial', marginBottom: 2 }}>Price</p>
+                            <p style={{ fontSize: 32, fontWeight: 800, color: '#ef4444', fontFamily: 'Arial', lineHeight: 1 }}>R{preOrderPrice || '0.00'}</p>
+                          </div>
+                        </div>
+                        <p style={{ fontSize: 11, color: '#d1d5db', fontFamily: 'Arial', textAlign: 'right', marginTop: 12 }}>R66SLOT – Premium Slot Cars</p>
+                      </div>
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min="150"
-                    max="500"
-                    step="10"
-                    value={viewMode === 'mobile' ? mobileImageHeight : desktopImageHeight}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value)
-                      if (viewMode === 'mobile') setMobileImageHeight(val)
-                      else setDesktopImageHeight(val)
-                    }}
-                    className="w-full accent-gray-900"
-                  />
                 </div>
 
               </CardContent>
