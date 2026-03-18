@@ -19,6 +19,7 @@ const DEFAULTS: Courier[] = [
   { id: 'cn-1', name: 'The Courier Guy', code: 'TCG', contactName: '', email: 'support@thecourierguy.co.za', phone: '087 357 0916', trackingUrl: 'https://www.thecourierguy.co.za/tracking', notes: '', isActive: true },
   { id: 'cn-2', name: 'Aramex', code: 'ARAMEX', contactName: '', email: 'customercare@aramex.com', phone: '011 574 8000', trackingUrl: 'https://www.aramex.com/track', notes: '', isActive: true },
   { id: 'cn-3', name: 'PostNet', code: 'POSTNET', contactName: '', email: '', phone: '011 445 9000', trackingUrl: 'https://www.postnet.co.za', notes: '', isActive: true },
+  { id: 'cn-4', name: 'FedEx', code: 'FEDEX', contactName: '', email: 'customer.support@fedex.com', phone: '0800 033 339', trackingUrl: 'https://www.fedex.com/fedextrack/', notes: '', isActive: true },
 ]
 
 export async function GET() {
