@@ -107,7 +107,7 @@ export default function PriceListsPage() {
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(107, 114, 128)
-      doc.text(`${filteredProducts.length} item${filteredProducts.length !== 1 ? 's' : ''} · Prices exclude VAT`, pageW - 14, 37, { align: 'right' })
+      doc.text(`${filteredProducts.length} item${filteredProducts.length !== 1 ? 's' : ''}`, pageW - 14, 37, { align: 'right' })
 
       // ── Table ──
       autoTable(doc, {
@@ -154,13 +154,6 @@ export default function PriceListsPage() {
         },
       })
 
-      // ── Footer note ──
-      const finalY = (doc as any).lastAutoTable.finalY + 6
-      if (finalY < doc.internal.pageSize.getHeight() - 20) {
-        doc.setFontSize(7)
-        doc.setTextColor(156, 163, 175)
-        doc.text('Prices are subject to change without notice. All prices exclude VAT.', 14, finalY)
-      }
 
       doc.save(`R66SLOT-PriceList-${selectedSupplier.name.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`)
     } catch (err) {
