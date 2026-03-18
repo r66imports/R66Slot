@@ -24,8 +24,8 @@ async function getFedexToken(): Promise<string> {
     }),
   })
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`FedEx auth failed (${res.status}): ${err}`)
+    if (res.status === 401) throw new Error('FedEx credentials invalid or not yet active (can take up to 24h for new keys)')
+    throw new Error(`FedEx auth failed (${res.status})`)
   }
   const data = await res.json()
   fedexToken = { value: data.access_token, expiresAt: Date.now() + data.expires_in * 1000, base: FEDEX_BASE }
