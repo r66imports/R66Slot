@@ -31,79 +31,12 @@ function ProductGridLive({
     fetch('/api/admin/products')
       .then((r) => r.json())
       .then((data) => {
-        const KEEP_EMPTY = '__EMPTY__'
         let list = Array.isArray(data) ? data.filter((p: any) => p.status === 'active') : []
-        // Racing class filter — supports multi-select (carClasses[]) and legacy single (carClass)
-        const activeClasses: string[] = Array.isArray(settings.carClasses) && (settings.carClasses as string[]).length > 0
-          ? (settings.carClasses as string[])
-          : (settings.carClass ? [settings.carClass as string] : [])
-        if (activeClasses.includes(KEEP_EMPTY)) {
-          list = list.filter((p: any) => !p.carClass || p.carClass === '')
-        } else if (activeClasses.length > 0) {
-          list = list.filter((p: any) =>
-            activeClasses.some((cls) => p.carClass === cls || p.tags?.includes(cls))
-          )
+        // Filter by assigned page — matches products whose assignedPages array includes the selected page
+        const pageFilter = (settings.assignedPage as string) || ''
+        if (pageFilter) {
+          list = list.filter((p: any) => Array.isArray(p.assignedPages) && p.assignedPages.includes(pageFilter))
         }
-        // Revo parts filter — supports multi-select (revoParts[]) and legacy single (revoPart)
-        const activeParts: string[] = Array.isArray(settings.revoParts) && (settings.revoParts as string[]).length > 0
-          ? (settings.revoParts as string[])
-          : (settings.revoPart ? [settings.revoPart as string] : [])
-        if (activeParts.includes(KEEP_EMPTY)) {
-          list = list.filter((p: any) =>
-            (!p.revoPart || p.revoPart === '') &&
-            (!Array.isArray(p.revoParts) || p.revoParts.length === 0)
-          )
-        } else if (activeParts.length > 0) {
-          list = list.filter((p: any) =>
-            activeParts.some((part) =>
-              p.revoPart === part ||
-              (Array.isArray(p.revoParts) && p.revoParts.includes(part)) ||
-              p.tags?.includes(part)
-            )
-          )
-        }
-        const activeBrands = Array.isArray(settings.carBrands) ? (settings.carBrands as string[]) : []
-        if (activeBrands.includes(KEEP_EMPTY)) {
-          list = list.filter((p: any) => !p.carBrands || (Array.isArray(p.carBrands) && p.carBrands.length === 0))
-        } else if (activeBrands.length > 0) {
-          list = list.filter(
-            (p: any) =>
-              (Array.isArray(p.carBrands) && p.carBrands.some((b: string) => activeBrands.includes(b))) ||
-              activeBrands.some((b) => p.tags?.includes(b))
-          )
-        }
-        // Sideways brand filter
-        const activeSidewaysBrands = Array.isArray(settings.sidewaysBrands) ? (settings.sidewaysBrands as string[]) : []
-        if (activeSidewaysBrands.length > 0) {
-          list = list.filter((p: any) => Array.isArray(p.sidewaysBrands) && p.sidewaysBrands.some((b: string) => activeSidewaysBrands.includes(b)))
-        }
-        // Sideways race class filter
-        const activeSidewaysClasses = Array.isArray(settings.sidewaysCarClasses) ? (settings.sidewaysCarClasses as string[]) : []
-        if (activeSidewaysClasses.length > 0) {
-          list = list.filter((p: any) => Array.isArray(p.sidewaysCarClasses) && p.sidewaysCarClasses.some((c: string) => activeSidewaysClasses.includes(c)))
-        }
-        // Sideways parts filter
-        const activeSidewaysParts = Array.isArray(settings.sidewaysParts) ? (settings.sidewaysParts as string[]) : []
-        if (activeSidewaysParts.length > 0) {
-          list = list.filter((p: any) => Array.isArray(p.sidewaysParts) && p.sidewaysParts.some((pt: string) => activeSidewaysParts.includes(pt)))
-        }
-        // Custom org card filters (keys: customOrg_{id}_brands, customOrg_{id}_carClasses)
-        Object.entries(settings).forEach(([key, val]) => {
-          if (!key.startsWith('customOrg_') || !Array.isArray(val) || (val as string[]).length === 0) return
-          const parts = key.split('_')
-          if (parts.length < 3) return
-          const field = parts[parts.length - 1] // 'brands' or 'carClasses'
-          const cardId = parts.slice(1, parts.length - 1).join('_')
-          const activeVals = val as string[]
-          list = list.filter((p: any) => {
-            const customOrgs = p.customOrgs || {}
-            const cardData = customOrgs[cardId]
-            if (!cardData) return false
-            if (field === 'brands') return Array.isArray(cardData.brands) && cardData.brands.some((b: string) => activeVals.includes(b))
-            if (field === 'carClasses') return Array.isArray(cardData.carClasses) && cardData.carClasses.some((c: string) => activeVals.includes(c))
-            return false
-          })
-        })
         // Sort by SKU — numeric where possible, else alphabetical
         list.sort((a: any, b: any) => {
           const aNum = parseFloat(a.sku)
@@ -118,7 +51,7 @@ function ProductGridLive({
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.carClasses, settings.carClass, settings.revoParts, settings.revoPart, settings.carBrands, settings.sidewaysBrands, settings.sidewaysCarClasses, settings.sidewaysParts, settings.productCount, settings.productRows, settings.gridColumns, settings])
+  }, [settings.assignedPage, settings.productRows, settings.gridColumns])
 
   const handleAddToCart = (p: any) => {
     addItem({
