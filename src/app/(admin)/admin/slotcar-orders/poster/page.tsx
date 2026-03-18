@@ -388,32 +388,29 @@ export default function PreOrderPosterPage() {
         canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed to create image')), 'image/jpeg', 0.92)
       )
       const filename = `R66SLOT-${sku || 'poster'}.jpg`
-      const file = new File([jpegBlob], filename, { type: 'image/jpeg' })
 
-      // Upload the generated poster JPEG to R2 and save as posterImageUrl (fire-and-forget)
-      // This lets the list page quick-share button reuse the same branded poster image
-      if (editId && !posterImageUrl) {
-        ;(async () => {
-          try {
-            const uploadForm = new FormData()
-            uploadForm.append('file', new File([jpegBlob], filename, { type: 'image/jpeg' }))
-            const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: uploadForm })
-            if (uploadRes.ok) {
-              const { url } = await uploadRes.json()
-              setPosterImageUrl(url)
-              await fetch('/api/admin/slotcar-orders', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: editId, posterImageUrl: url }),
-              })
-            }
-          } catch (e) {
-            console.warn('Failed to save poster image URL:', e)
+      // Upload poster to R2 FIRST (await) so og:image is set before WhatsApp crawls the booking URL.
+      // This guarantees WhatsApp sees the 1200×630 branded poster and shows the large card format.
+      if (editId) {
+        try {
+          const uploadForm = new FormData()
+          uploadForm.append('file', new File([jpegBlob], filename, { type: 'image/jpeg' }))
+          const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: uploadForm })
+          if (uploadRes.ok) {
+            const { url } = await uploadRes.json()
+            setPosterImageUrl(url)
+            await fetch('/api/admin/slotcar-orders', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: editId, posterImageUrl: url }),
+            })
           }
-        })()
+        } catch (e) {
+          console.warn('Failed to upload poster image:', e)
+        }
       }
 
-      // Open WhatsApp with only the URL — WhatsApp crawler will scrape og:image from the booking page
+      // Now open WhatsApp — og:image is ready for the crawler
       window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank')
       setWhatsappStatus({ bookUrl })
     } catch (err: any) {
