@@ -35,7 +35,7 @@ function ProductGridLive({
         // Filter by assigned page — matches products whose assignedPages array includes the selected page
         const pageFilter = (settings.assignedPage as string) || ''
         if (pageFilter) {
-          list = list.filter((p: any) => Array.isArray(p.assignedPages) && p.assignedPages.includes(pageFilter))
+          list = list.filter((p: any) => Array.isArray(p.pageIds) && p.pageIds.includes(pageFilter))
         }
         // Sort by SKU — numeric where possible, else alphabetical
         list.sort((a: any, b: any) => {
