@@ -47,6 +47,7 @@ export async function POST(request: Request) {
       slug: body.slug || body.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
       description: body.description || '',
       parentId: body.parentId || null,
+      productIds: body.productIds || [],
       productCount: 0,
       imageUrl: body.imageUrl || '',
       isActive: body.isActive !== false,
