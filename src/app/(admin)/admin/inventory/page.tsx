@@ -544,7 +544,7 @@ export default function InventoryPage() {
             ) : saveAllDone ? (
               '✅ Saved!'
             ) : (
-              `Save All${changedCount > 0 ? ` (${changedCount})` : ''}`
+              'Save'
             )}
           </button>
         </div>
@@ -584,14 +584,28 @@ export default function InventoryPage() {
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
                 <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Retail</th>
                 <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Brand</th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-16">Shop Volume</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">
+                  <div className="flex items-center justify-center gap-1.5">
+                    Shop Volume
+                    <button
+                      onClick={() => setShopVolumeUnlocked(u => !u)}
+                      title={shopVolumeUnlocked ? 'Lock editing' : 'Unlock editing'}
+                      className={`p-0.5 rounded transition-colors ${shopVolumeUnlocked ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {shopVolumeUnlocked ? (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
+                      )}
+                    </button>
+                  </div>
+                </th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Shop Inventory</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
                   Wholesale ({currency})
                 </th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Inventory Count</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-20">Restock</th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-16">Save</th>
               </tr>
             </thead>
             <tbody>
@@ -625,7 +639,17 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
                     <td className="px-3 py-2 text-center">
-                      <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
+                      {shopVolumeUnlocked ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={shopQtyVal}
+                          onChange={(e) => setLocalShopQtys((q) => ({ ...q, [product.sku]: e.target.value }))}
+                          className="w-16 text-center text-sm px-2 py-1 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
+                        />
+                      ) : (
+                        <span className="text-sm font-semibold text-gray-700">{shopQtyVal}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
@@ -645,11 +669,15 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-3 py-2 text-center">
                       <input
+                        ref={(el) => { inputRefs.current[product.id] = el }}
                         type="number"
                         min="0"
-                        value={shopQtyVal}
-                        onChange={(e) => setLocalShopQtys((q) => ({ ...q, [product.sku]: e.target.value }))}
-                        className="w-16 text-center text-sm px-2 py-1 border border-gray-200 rounded bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
+                        value={countVal}
+                        onChange={(e) => setCounts((c) => ({ ...c, [product.id]: e.target.value }))}
+                        onKeyDown={(e) => handleKey(e, product.id, idx)}
+                        className={`w-16 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                          isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'
+                        }`}
                       />
                     </td>
                     <td className="px-3 py-2 text-center">
@@ -659,25 +687,12 @@ export default function InventoryPage() {
                         {restockQty}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-center">
-                      {saved[product.id] ? (
-                        <span className="text-xs text-green-600 font-medium">✓</span>
-                      ) : (
-                        <button
-                          onClick={() => saveOne(product.id)}
-                          disabled={saving[product.id]}
-                          className="px-2 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          {saving[product.id] ? '…' : 'Save'}
-                        </button>
-                      )}
-                    </td>
                   </tr>
                 )
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-gray-400">No products found</td>
+                  <td colSpan={9} className="text-center py-12 text-gray-400">No products found</td>
                 </tr>
               )}
             </tbody>
@@ -695,7 +710,6 @@ export default function InventoryPage() {
               <col style={{ width: colW.brand }} />
               <col style={{ width: colW.dbQty }} />
               <col style={{ width: colW.count }} />
-              <col style={{ width: colW.save }} />
             </colgroup>
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -720,27 +734,13 @@ export default function InventoryPage() {
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.brand; const onMove = (ev: MouseEvent) => setWidth('brand', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  <div className="flex items-center justify-center gap-1.5">
-                    Shop Volume
-                    <button
-                      onClick={() => setShopVolumeUnlocked(u => !u)}
-                      title={shopVolumeUnlocked ? 'Lock editing' : 'Unlock editing'}
-                      className={`p-0.5 rounded transition-colors ${shopVolumeUnlocked ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      {shopVolumeUnlocked ? (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
-                      )}
-                    </button>
-                  </div>
+                  Shop Inventory
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  Shop Inventory
+                  Inventory Count
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.count; const onMove = (ev: MouseEvent) => setWidth('count', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Save</th>
               </tr>
             </thead>
             <tbody>
@@ -771,44 +771,27 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
                     <td className="px-4 py-2 text-center">
-                      {shopVolumeUnlocked ? (
-                        <input
-                          ref={(el) => { inputRefs.current[product.id] = el }}
-                          type="number"
-                          min="0"
-                          value={countVal}
-                          onChange={(e) => setCounts((c) => ({ ...c, [product.id]: e.target.value }))}
-                          onKeyDown={(e) => handleKey(e, product.id, idx)}
-                          className={`w-20 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                            isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'
-                          }`}
-                        />
-                      ) : (
-                        <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-center">
                       <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
                     </td>
                     <td className="px-4 py-2 text-center">
-                      {saved[product.id] ? (
-                        <span className="text-xs text-green-600 font-medium">✓ Saved</span>
-                      ) : (
-                        <button
-                          onClick={() => saveOne(product.id)}
-                          disabled={!isDirty || saving[product.id]}
-                          className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          {saving[product.id] ? '…' : 'Save'}
-                        </button>
-                      )}
+                      <input
+                        ref={(el) => { inputRefs.current[product.id] = el }}
+                        type="number"
+                        min="0"
+                        value={countVal}
+                        onChange={(e) => setCounts((c) => ({ ...c, [product.id]: e.target.value }))}
+                        onKeyDown={(e) => handleKey(e, product.id, idx)}
+                        className={`w-20 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                          isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'
+                        }`}
+                      />
                     </td>
                   </tr>
                 )
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400">No products found</td>
+                  <td colSpan={6} className="text-center py-12 text-gray-400">No products found</td>
                 </tr>
               )}
             </tbody>
