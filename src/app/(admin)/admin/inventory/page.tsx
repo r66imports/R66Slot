@@ -589,7 +589,7 @@ export default function InventoryPage() {
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
                   Wholesale ({currency})
                 </th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Shop Qty</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Inventory Count</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-20">Restock</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-16">Save</th>
               </tr>
