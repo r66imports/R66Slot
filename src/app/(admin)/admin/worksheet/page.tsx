@@ -220,19 +220,23 @@ function WorksheetEditor({
     setUpdatingCosts(true)
     try {
       for (const it of toUpdate) {
-        const prod = products.find((p) => p.sku === it.sku)
+        const skuLower = it.sku.trim().toLowerCase()
+        const prod = products.find((p) => p.sku.trim().toLowerCase() === skuLower)
         if (!prod) continue
         const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
+        const patch: Record<string, number> = {}
+        if (finalLanded > 0) patch.costPerItem = finalLanded
+        if (retailZAR > 0) patch.price = retailZAR
+        if (Object.keys(patch).length === 0) continue
         await fetch(`/api/admin/products/${prod.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...(finalLanded > 0 ? { costPerItem: finalLanded } : {}),
-            ...(retailZAR > 0 ? { price: retailZAR } : {}),
-          }),
+          body: JSON.stringify(patch),
         })
       }
+      // Auto-save the worksheet
+      await saveWorksheet()
       setCostsUpdated(true)
       setTimeout(() => setCostsUpdated(false), 3000)
     } finally {
