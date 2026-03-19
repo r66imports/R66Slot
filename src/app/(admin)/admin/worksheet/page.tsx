@@ -210,6 +210,36 @@ function WorksheetEditor({
   const [showNewMenu, setShowNewMenu] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
 
+  // ── Update Final Costing ──
+  const [updatingCosts, setUpdatingCosts] = useState(false)
+  const [costsUpdated, setCostsUpdated] = useState(false)
+
+  async function updateFinalCosting() {
+    const toUpdate = items.filter((it) => it.sku && it.wholesalePrice > 0)
+    if (!toUpdate.length) return
+    setUpdatingCosts(true)
+    try {
+      for (const it of toUpdate) {
+        const prod = products.find((p) => p.sku === it.sku)
+        if (!prod) continue
+        const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+        const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
+        await fetch(`/api/admin/products/${prod.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...(finalLanded > 0 ? { costPerItem: finalLanded } : {}),
+            ...(retailZAR > 0 ? { price: retailZAR } : {}),
+          }),
+        })
+      }
+      setCostsUpdated(true)
+      setTimeout(() => setCostsUpdated(false), 3000)
+    } finally {
+      setUpdatingCosts(false)
+    }
+  }
+
   // ── Stock verification & send to inventory ──
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
   const [sendingInventory, setSendingInventory] = useState(false)
@@ -973,6 +1003,18 @@ function WorksheetEditor({
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               Download PDF
             </button>
+            <button
+              onClick={updateFinalCosting}
+              disabled={updatingCosts || !items.some((it) => it.sku && it.wholesalePrice > 0)}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                costsUpdated ? 'bg-green-600 text-white' :
+                updatingCosts ? 'bg-gray-400 text-white' :
+                'bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              {costsUpdated ? '✓ Updated!' : updatingCosts ? 'Updating…' : 'Update Final Costing'}
+            </button>
           </div>
         </div>
 
@@ -1061,11 +1103,19 @@ function WorksheetEditor({
                       />
                     </td>
 
-                    {/* Retail Price */}
-                    <td className="py-2 px-2 text-right">
-                      <span className={`text-xs font-medium ${it.retailPrice > 0 ? 'text-gray-700' : 'text-gray-300'}`}>
-                        {it.retailPrice > 0 ? `R ${it.retailPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
-                      </span>
+                    {/* Retail Price — editable */}
+                    <td className="py-2 px-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <span className="text-xs text-gray-400">R</span>
+                        <input
+                          type="number" min={0} step={0.01}
+                          value={it.retailPrice || ''}
+                          placeholder="0.00"
+                          onChange={(e) => updateItem(it.id, { retailPrice: Number(e.target.value) })}
+                          onFocus={() => setActiveSkuRow(null)}
+                          className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                      </div>
                     </td>
 
                     {/* In Stock */}
