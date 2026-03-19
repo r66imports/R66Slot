@@ -1296,6 +1296,8 @@ export default function OrdersPage() {
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [viewData, setViewData] = useState<DocViewData | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [checkedBoIds, setCheckedBoIds] = useState<Set<string>>(new Set())
+  const [pendingInvoiceBoIds, setPendingInvoiceBoIds] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -1399,6 +1401,28 @@ export default function OrdersPage() {
       phone: group.phone,
       address: group.items[0]?.companyAddress || '',
       items: group.items.map((b) => ({
+        id: `li_${b.id}`,
+        description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`,
+        qty: b.qty,
+        unitPrice: b.price,
+      })),
+    })
+    setShowCreate(true)
+  }
+
+  const handleSendToInvoice = (groupKey: string) => {
+    const group = backordersByClient[groupKey]
+    if (!group) return
+    const checked = group.items.filter((b) => checkedBoIds.has(b.id))
+    if (checked.length === 0) return
+    setPendingInvoiceBoIds(checked.map((b) => b.id))
+    setCompileDocType('invoice')
+    setCompileClient({
+      name: group.displayName,
+      email: group.email,
+      phone: group.phone,
+      address: group.items[0]?.companyAddress || '',
+      items: checked.map((b) => ({
         id: `li_${b.id}`,
         description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`,
         qty: b.qty,
@@ -1513,6 +1537,7 @@ export default function OrdersPage() {
                 const { displayName, email, items } = group
                 const total = items.reduce((s, b) => s + b.price * b.qty, 0)
                 const isOpen = openGroups.has(key)
+                const groupCheckedCount = items.filter((b) => checkedBoIds.has(b.id)).length
                 return (
                   <div key={key} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                     {/* Client header — click anywhere to toggle */}
@@ -1533,6 +1558,17 @@ export default function OrdersPage() {
                         {email && <span className="text-xs text-gray-400 hidden sm:inline">{email}</span>}
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleSendToInvoice(key)}
+                          disabled={groupCheckedCount === 0}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                            groupCheckedCount > 0
+                              ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
+                              : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                          }`}
+                        >
+                          {groupCheckedCount > 0 ? `Send to Invoice (${groupCheckedCount})` : 'Send to Invoice'}
+                        </button>
                         <span className="text-xs text-gray-400 mr-1">Compile →</span>
                         <button
                           onClick={() => handleCompile(key, 'quote')}
@@ -1559,6 +1595,7 @@ export default function OrdersPage() {
                             <th className="text-center px-5 py-2">Qty</th>
                             <th className="text-right px-5 py-2">Price</th>
                             <th className="text-right px-5 py-2">Total</th>
+                            <th className="text-center px-2 py-2 w-8">☑</th>
                             <th className="text-center px-5 py-2">Status</th>
                           </tr>
                         </thead>
@@ -1571,6 +1608,18 @@ export default function OrdersPage() {
                               <td className="px-5 py-2.5 text-center text-gray-700">{b.qty}</td>
                               <td className="px-5 py-2.5 text-right text-gray-700">{fmtPrice(b.price)}</td>
                               <td className="px-5 py-2.5 text-right font-semibold">{fmtPrice(b.price * b.qty)}</td>
+                              <td className="px-2 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={checkedBoIds.has(b.id)}
+                                  onChange={() => setCheckedBoIds((prev) => {
+                                    const next = new Set(prev)
+                                    if (next.has(b.id)) next.delete(b.id); else next.add(b.id)
+                                    return next
+                                  })}
+                                  className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                                />
+                              </td>
                               <td className="px-5 py-2.5 text-center">
                                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
                               </td>
@@ -1748,7 +1797,25 @@ export default function OrdersPage() {
           clients={clients}
           prefilledClient={compileClient ?? undefined}
           prefilledItems={compileClient?.items}
-          onCreated={(doc) => { setDocuments((prev) => [doc, ...prev]); setCompileClient(null) }}
+          onCreated={async (doc) => {
+            setDocuments((prev) => [doc, ...prev])
+            setCompileClient(null)
+            if (pendingInvoiceBoIds.length > 0) {
+              await Promise.all(
+                pendingInvoiceBoIds.map((id) =>
+                  fetch(`/api/admin/backorders/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'complete' }),
+                  })
+                )
+              )
+              const completed = new Set(pendingInvoiceBoIds)
+              setBackorders((prev) => prev.filter((b) => !completed.has(b.id)))
+              setCheckedBoIds((prev) => { const next = new Set(prev); completed.forEach((id) => next.delete(id)); return next })
+              setPendingInvoiceBoIds([])
+            }
+          }}
           onClose={() => { setShowCreate(false); setCompileClient(null) }}
         />
       )}
