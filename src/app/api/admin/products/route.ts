@@ -404,6 +404,7 @@ export async function PUT(request: Request) {
               category_brands  = CASE WHEN $20::jsonb <> '[]'::jsonb THEN $20::jsonb ELSE category_brands END,
               cost_per_item    = CASE WHEN $21::numeric > 0 THEN $21::numeric ELSE cost_per_item END,
               compare_at_price = COALESCE($22::numeric, compare_at_price),
+              barcode          = CASE WHEN $23 <> '' THEN $23 WHEN barcode IS NULL OR barcode = '' THEN $24 ELSE barcode END,
               updated_at       = $14
             WHERE id = $15
           `, [
@@ -429,6 +430,8 @@ export async function PUT(request: Request) {
             JSON.stringify(Array.isArray(p.categoryBrands) ? p.categoryBrands : (p.categoryBrands ? [p.categoryBrands] : [])),
             importCost || null,
             avgCostValue,
+            p.barcode || '',
+            sku,
           ])
           updated++
           continue
@@ -457,7 +460,7 @@ export async function PUT(request: Request) {
         parseNum(p.price),
         parseNumOrNull(p.compareAtPrice),
         parseNumOrNull(p.costPerItem),
-        sku, p.barcode || '', p.brand || '', p.productType || '',
+        sku, p.barcode || sku, p.brand || '', p.productType || '',
         p.carClass || '', p.carType || '', p.partType || '', p.scale || '',
         p.supplier || '',
         JSON.stringify(Array.isArray(p.collections) ? p.collections : []),
