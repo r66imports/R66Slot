@@ -210,6 +210,41 @@ function WorksheetEditor({
   const [showNewMenu, setShowNewMenu] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
 
+  // ── Stock verification & send to inventory ──
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
+  const [sendingInventory, setSendingInventory] = useState(false)
+  const [inventorySent, setInventorySent] = useState(false)
+
+  function toggleCheck(id: string) {
+    setCheckedItems((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  async function sendToInventory() {
+    const toSend = items.filter((it) => checkedItems.has(it.id) && it.sku && it.qty > 0)
+    if (!toSend.length) return
+    setSendingInventory(true)
+    try {
+      for (const it of toSend) {
+        const prod = products.find((p) => p.sku === it.sku)
+        if (!prod) continue
+        await fetch('/api/admin/pos/stock', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: prod.id, mode: 'add', qty: it.qty }),
+        })
+      }
+      setInventorySent(true)
+      setCheckedItems(new Set())
+      setTimeout(() => setInventorySent(false), 2500)
+    } finally {
+      setSendingInventory(false)
+    }
+  }
+
   // ── FX fetch ──
   const fetchRates = useCallback(async () => {
     setFxLoading(true)
@@ -358,6 +393,7 @@ function WorksheetEditor({
       }
     }) : [newWsItem()])
     setShowArchive(false)
+    setCheckedItems(new Set())
   }
 
   function startNewWorksheet() {
@@ -915,6 +951,18 @@ function WorksheetEditor({
                 ))}
               </select>
             </div>
+            <button
+              onClick={sendToInventory}
+              disabled={checkedItems.size === 0 || sendingInventory}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                inventorySent ? 'bg-green-600 text-white' :
+                checkedItems.size > 0 ? 'bg-indigo-600 text-white hover:bg-indigo-700' :
+                'bg-indigo-100 text-indigo-400 cursor-not-allowed'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+              {inventorySent ? '✓ Sent!' : sendingInventory ? 'Sending…' : `Send to Inventory${checkedItems.size > 0 ? ` (${checkedItems.size})` : ''}`}
+            </button>
             <button onClick={downloadCSV} disabled={!hasItems}
               className="flex items-center gap-1.5 border border-gray-300 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M4 6h16" /></svg>
@@ -945,6 +993,7 @@ function WorksheetEditor({
                 <th className="text-left pb-2 px-2" style={{ minWidth: '150px' }}>Description</th>
                 <th className="text-right pb-2 px-2 w-24">Retail (ZAR)</th>
                 <th className="text-center pb-2 px-2 w-20">In Stock</th>
+                <th className="text-center pb-2 px-1 w-8" title="Check to confirm stock received">✓</th>
                 <th className="text-center pb-2 px-2 w-14">Qty</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '120px' }}>Wholesale ({currency})</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Landed (ZAR)</th>
@@ -1024,6 +1073,18 @@ function WorksheetEditor({
                       <span className={`inline-block px-2 py-1 rounded-lg text-xs font-semibold ${it.inStock > 0 ? 'bg-green-50 text-green-700 border border-green-100' : 'text-gray-300'}`}>
                         {it.inStock > 0 ? it.inStock : '—'}
                       </span>
+                    </td>
+
+                    {/* Stock verified checkbox */}
+                    <td className="py-2 px-1 text-center">
+                      <input
+                        type="checkbox"
+                        checked={checkedItems.has(it.id)}
+                        onChange={() => toggleCheck(it.id)}
+                        disabled={!it.sku}
+                        title="Check to confirm stock is correct"
+                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                      />
                     </td>
 
                     {/* Qty */}
@@ -1137,7 +1198,7 @@ function WorksheetEditor({
               return (
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50">
-                    <td colSpan={11} className="py-3 px-2 text-xs font-semibold text-gray-500 text-right uppercase tracking-wider pr-4">
+                    <td colSpan={12} className="py-3 px-2 text-xs font-semibold text-gray-500 text-right uppercase tracking-wider pr-4">
                       Total
                     </td>
                     <td className="py-3 px-2">
