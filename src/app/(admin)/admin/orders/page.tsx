@@ -226,8 +226,6 @@ function DocumentBody({
   template: OrderTemplate
 }) {
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
-  const vat = subtotal * 0.15
-  const total = subtotal + vat
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const activeImages = template.imageBlock?.filter(Boolean) ?? []
 
@@ -308,17 +306,9 @@ function DocumentBody({
       {/* Totals */}
       <div className="flex justify-end mb-5">
         <div className="w-64">
-          <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
-            <span className="text-gray-500">Subtotal (excl. VAT)</span>
-            <span className="font-medium">{fmtPrice(subtotal)}</span>
-          </div>
-          <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
-            <span className="text-gray-500">VAT (15%)</span>
-            <span className="font-medium">{fmtPrice(vat)}</span>
-          </div>
           <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
             <span>TOTAL</span>
-            <span>{fmtPrice(total)}</span>
+            <span>{fmtPrice(subtotal)}</span>
           </div>
         </div>
       </div>
@@ -716,6 +706,52 @@ function ClientAutofill({
   )
 }
 
+// ─── SKU Line Input ────────────────────────────────────────────────────────────
+
+function SkuLineInput({ value, onChange, products, onSelectProduct }: {
+  value: string
+  onChange: (v: string) => void
+  products: Array<{ id: string; sku: string; title: string; price: number }>
+  onSelectProduct: (sku: string, title: string, price: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const q = value.toLowerCase()
+  const filtered = q.length >= 1
+    ? products.filter((p) =>
+        p.sku.toLowerCase().includes(q) || p.title.toLowerCase().includes(q)
+      ).slice(0, 8)
+    : []
+  return (
+    <div className="relative">
+      <input
+        className="w-full px-2 py-1.5 text-sm rounded focus:outline-none focus:bg-blue-50"
+        placeholder="SKU or description"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && filtered.length > 0 && (
+        <div className="absolute left-0 top-full z-50 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg w-80 max-h-48 overflow-y-auto">
+          {filtered.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { onSelectProduct(p.sku, p.title, p.price); setOpen(false) }}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 border-b border-gray-50 last:border-0"
+            >
+              <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
+              <span className="text-gray-800">{p.title}</span>
+              <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Create Document Modal ─────────────────────────────────────────────────────
 
 function CreateDocumentModal({
@@ -751,6 +787,16 @@ function CreateDocumentModal({
   const [lineItems, setLineItems] = useState<LineItem[]>(prefilledItems?.length ? prefilledItems : [newLine()])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number }>>([])
+
+  useEffect(() => {
+    fetch('/api/admin/products')
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) => setModalProducts(
+        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0 }))
+      ))
+      .catch(() => {})
+  }, [])
 
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
   const addLine = () => setLineItems((p) => [...p, newLine()])
@@ -759,7 +805,6 @@ function CreateDocumentModal({
     setLineItems((p) => p.map((l) => (l.id === id ? { ...l, [k]: v } : l)))
 
   const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
-  const vat = subtotal * 0.15
 
   const handleSave = async () => {
     if (!form.clientName.trim()) { setError('Client name is required'); return }
@@ -791,8 +836,6 @@ function CreateDocumentModal({
               <span>Compiled from <strong>{prefilledItems?.length} back order{prefilledItems?.length !== 1 ? 's' : ''}</strong> for <strong>{prefilledClient.name}</strong> — review and add a document number to save.</span>
             </div>
           )}
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>}
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">{cfg.singularLabel} Number *</label>
@@ -846,7 +889,7 @@ function CreateDocumentModal({
                 <tbody>
                   {lineItems.map((li) => (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="px-2 py-1"><input className="w-full px-2 py-1.5 text-sm rounded focus:outline-none focus:bg-blue-50" placeholder="Item description" value={li.description} onChange={(e) => updateLine(li.id, 'description', e.target.value)} /></td>
+                      <td className="px-2 py-1"><SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); updateLine(li.id, 'unitPrice', price) }} /></td>
                       <td className="px-2 py-1"><input type="number" min={1} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.qty} onChange={(e) => updateLine(li.id, 'qty', Number(e.target.value))} /></td>
                       <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
                       <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>
@@ -855,9 +898,7 @@ function CreateDocumentModal({
                   ))}
                 </tbody>
                 <tfoot className="text-sm">
-                  <tr className="border-t bg-gray-50"><td colSpan={3} className="px-3 py-2 text-right text-gray-500">Subtotal (excl. VAT)</td><td className="px-3 py-2 text-right font-medium">{fmtPrice(subtotal)}</td><td /></tr>
-                  <tr className="bg-gray-50"><td colSpan={3} className="px-3 py-2 text-right text-gray-500">VAT (15%)</td><td className="px-3 py-2 text-right font-medium">{fmtPrice(vat)}</td><td /></tr>
-                  <tr className="border-t bg-blue-50"><td colSpan={3} className="px-3 py-2.5 text-right font-bold text-blue-800">Total (incl. VAT)</td><td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(subtotal + vat)}</td><td /></tr>
+                  <tr className="border-t bg-blue-50"><td colSpan={3} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td><td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(subtotal)}</td><td /></tr>
                 </tfoot>
               </table>
             </div>
@@ -875,14 +916,18 @@ function CreateDocumentModal({
               <option value="sent">Sent</option>
               <option value="accepted">Accepted</option>
               <option value="rejected">Rejected</option>
+              <option value="complete">Complete</option>
             </select>
           </div>
         </div>
-        <div className="flex justify-end gap-3 px-6 py-4 border-t">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
-            {saving ? 'Saving...' : `Save ${cfg.singularLabel}`}
-          </button>
+        <div className="px-6 py-4 border-t space-y-3">
+          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">{error}</div>}
+          <div className="flex justify-end gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
+              {saving ? 'Saving...' : `Save ${cfg.singularLabel}`}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -894,8 +939,6 @@ function CreateDocumentModal({
 function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
-  const vat = subtotal * 0.15
-  const total = subtotal + vat
   const activeImages = (template.imageBlock ?? []).filter(Boolean)
 
   const imagesHTML = activeImages.length > 0
@@ -968,9 +1011,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   </table>
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
     <div style="width:260px">
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal (excl. VAT)</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">VAT (15%)</span><span style="font-weight:500">${fmtPrice(vat)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(subtotal)}</span></div>
     </div>
   </div>
   ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
@@ -992,7 +1033,6 @@ function doPrint(data: DocViewData, template: OrderTemplate) {
 function doEmail(data: DocViewData, template: OrderTemplate) {
   const docLabel = data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
-  const vat = subtotal * 0.15
   const subject = `${docLabel} ${data.docNumber} – ${template.companyName || 'R66 Slot'}`
   const lines = data.lineItems.map((li, i) =>
     `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}  =  ${fmtPrice(li.qty * li.unitPrice)}`
@@ -1012,9 +1052,7 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
     '─'.repeat(52),
     lines,
     '─'.repeat(52),
-    `Subtotal (excl. VAT):  ${fmtPrice(subtotal)}`,
-    `VAT (15%):             ${fmtPrice(vat)}`,
-    `TOTAL (incl. VAT):     ${fmtPrice(subtotal + vat)}`,
+    `TOTAL:  ${fmtPrice(subtotal)}`,
     banking,
     data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
     '',
@@ -1040,8 +1078,6 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
 
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
-  const vat = subtotal * 0.15
-  const total = subtotal + vat
 
   // ── Logo (top left) ──────────────────────────────────────────────────────────
   if (template.logoUrl) {
@@ -1131,9 +1167,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
       fmtPrice(li.qty * li.unitPrice),
     ]),
     foot: [
-      ['', '', '', 'Subtotal (excl. VAT)', fmtPrice(subtotal)],
-      ['', '', '', 'VAT (15%)', fmtPrice(vat)],
-      ['', '', '', 'TOTAL (incl. VAT)', fmtPrice(total)],
+      ['', '', '', 'TOTAL', fmtPrice(subtotal)],
     ],
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
     bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
