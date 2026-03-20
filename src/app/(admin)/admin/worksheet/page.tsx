@@ -230,7 +230,7 @@ function WorksheetEditor({
         if (retailZAR > 0) patch.price = retailZAR
         if (Object.keys(patch).length === 0) continue
         await fetch(`/api/admin/products/${prod.id}`, {
-          method: 'PATCH',
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
         })
