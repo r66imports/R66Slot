@@ -760,6 +760,7 @@ function CreateDocumentModal({
   clients,
   prefilledClient,
   prefilledItems,
+  editDoc,
   onCreated,
   onClose,
 }: {
@@ -768,23 +769,26 @@ function CreateDocumentModal({
   clients: ClientContact[]
   prefilledClient?: { name: string; email: string; phone: string; address: string }
   prefilledItems?: LineItem[]
+  editDoc?: OrderDocument
   onCreated: (doc: OrderDocument) => void
   onClose: () => void
 }) {
   const cfg = TAB_CFG[docType === 'quote' ? 'quotes' : docType === 'salesorder' ? 'salesorders' : 'invoices']
 
   const [form, setForm] = useState({
-    docNumber: '',
-    date: new Date().toISOString().slice(0, 10),
-    clientName: prefilledClient?.name || '',
-    clientEmail: prefilledClient?.email || '',
-    clientPhone: prefilledClient?.phone || '',
-    clientAddress: prefilledClient?.address || '',
-    notes: '',
-    terms: template[cfg.termsKey] as string,
-    status: 'draft' as const,
+    docNumber: editDoc?.docNumber || '',
+    date: editDoc?.date || new Date().toISOString().slice(0, 10),
+    clientName: editDoc?.clientName || prefilledClient?.name || '',
+    clientEmail: editDoc?.clientEmail || prefilledClient?.email || '',
+    clientPhone: editDoc?.clientPhone || prefilledClient?.phone || '',
+    clientAddress: editDoc?.clientAddress || prefilledClient?.address || '',
+    notes: editDoc?.notes || '',
+    terms: editDoc?.terms || template[cfg.termsKey] as string,
+    status: (editDoc?.status || 'draft') as 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete',
   })
-  const [lineItems, setLineItems] = useState<LineItem[]>(prefilledItems?.length ? prefilledItems : [newLine()])
+  const [lineItems, setLineItems] = useState<LineItem[]>(
+    editDoc?.lineItems?.length ? editDoc.lineItems : prefilledItems?.length ? prefilledItems : [newLine()]
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number }>>([])
@@ -812,8 +816,12 @@ function CreateDocumentModal({
     setSaving(true)
     setError('')
     try {
-      const res = await fetch('/api/admin/orders/documents', {
-        method: 'POST',
+      const url = editDoc
+        ? `/api/admin/orders/documents/${editDoc.id}`
+        : '/api/admin/orders/documents'
+      const method = editDoc ? 'PATCH' : 'POST'
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, type: docType, lineItems }),
       })
@@ -826,7 +834,7 @@ function CreateDocumentModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-bold">Create {cfg.singularLabel}</h2>
+          <h2 className="text-lg font-bold">{editDoc ? `Edit ${cfg.singularLabel}` : `Create ${cfg.singularLabel}`}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
         </div>
         <div className="overflow-y-auto flex-1 p-6 space-y-5">
@@ -925,7 +933,7 @@ function CreateDocumentModal({
           <div className="flex justify-end gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
             <button onClick={handleSave} disabled={saving} className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
-              {saving ? 'Saving...' : `Save ${cfg.singularLabel}`}
+              {saving ? 'Saving...' : editDoc ? `Update ${cfg.singularLabel}` : `Save ${cfg.singularLabel}`}
             </button>
           </div>
         </div>
@@ -1329,6 +1337,7 @@ export default function OrdersPage() {
   // Groups the user has explicitly opened — starts empty (all collapsed). Never reset on focus reload.
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [viewData, setViewData] = useState<DocViewData | null>(null)
+  const [editDocState, setEditDocState] = useState<OrderDocument | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [checkedBoIds, setCheckedBoIds] = useState<Set<string>>(new Set())
   const [pendingInvoiceBoIds, setPendingInvoiceBoIds] = useState<string[]>([])
@@ -1765,7 +1774,7 @@ export default function OrdersPage() {
                     const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
-                      <tr key={`doc-${doc.id}`} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
                         <td className="py-3 px-4 font-mono font-semibold text-blue-700">{doc.docNumber}</td>
                         <td className="py-3 px-4 text-gray-500">{fmtDate(doc.date)}</td>
                         <td className="py-3 px-4 font-medium">{doc.clientName}</td>
@@ -1779,6 +1788,9 @@ export default function OrdersPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => setEditDocState(doc)} className={ICON_BTN} title="Edit">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
                             <button onClick={() => viewDocument(doc)} className={ICON_BTN} title="View"><IconView /></button>
                             <button onClick={() => doPrint(docToViewData(doc), template)} className={ICON_BTN} title="Print"><IconPrint /></button>
                             <button onClick={() => doEmail(docToViewData(doc), template)} className={ICON_BTN} title="Email"><IconEmail /></button>
@@ -1855,6 +1867,19 @@ export default function OrdersPage() {
       )}
       {viewData && (
         <ViewDocumentModal data={viewData} template={template} onClose={() => setViewData(null)} />
+      )}
+      {editDocState && (
+        <CreateDocumentModal
+          docType={editDocState.type}
+          template={template}
+          clients={clients}
+          editDoc={editDocState}
+          onCreated={(updated) => {
+            setDocuments((prev) => prev.map((d) => d.id === updated.id ? updated : d))
+            setEditDocState(null)
+          }}
+          onClose={() => setEditDocState(null)}
+        />
       )}
     </div>
   )
