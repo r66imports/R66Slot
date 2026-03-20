@@ -396,6 +396,17 @@ function WorksheetEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentSheetData()),
       })
+      // Sync retail prices back to products
+      const toSync = items.filter((it) => it.sku && it.retailPrice > 0)
+      for (const it of toSync) {
+        const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
+        if (!prod) continue
+        await fetch(`/api/admin/products/${prod.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ price: Math.round(it.retailPrice * 100) / 100 }),
+        })
+      }
       await refreshSheets()
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2500)
