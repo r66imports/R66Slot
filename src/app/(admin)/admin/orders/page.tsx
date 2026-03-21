@@ -752,8 +752,8 @@ function ClientAutofill({
 function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   value: string
   onChange: (v: string) => void
-  products: Array<{ id: string; sku: string; title: string; price: number; quantity: number }>
-  onSelectProduct: (sku: string, title: string, price: number) => void
+  products: Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; quantity: number }>
+  onSelectProduct: (sku: string, title: string, price: number, costPerItem: number) => void
 }) {
   const [open, setOpen] = useState(false)
   const [outOfStockMsg, setOutOfStockMsg] = useState('')
@@ -764,13 +764,13 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
       ).slice(0, 8)
     : []
 
-  function handleSelect(p: { sku: string; title: string; price: number; quantity: number }) {
+  function handleSelect(p: { sku: string; title: string; price: number; costPerItem: number; quantity: number }) {
     if (p.quantity <= 0) {
       setOutOfStockMsg(`"${p.title}" is out of stock`)
       setTimeout(() => setOutOfStockMsg(''), 3000)
       return
     }
-    onSelectProduct(p.sku, p.title, p.price)
+    onSelectProduct(p.sku, p.title, p.price, p.costPerItem)
     setOpen(false)
   }
 
@@ -856,13 +856,13 @@ function CreateDocumentModal({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; quantity: number }>>([])
+  const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; quantity: number }>>([])
 
   useEffect(() => {
     fetch('/api/admin/products')
       .then((r) => r.ok ? r.json() : [])
       .then((data: any[]) => setModalProducts(
-        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0, quantity: Number(p.quantity) || 0 }))
+        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0, costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0, quantity: Number(p.quantity) || 0 }))
       ))
       .catch(() => {})
   }, [])
@@ -984,7 +984,7 @@ function CreateDocumentModal({
                 <tbody>
                   {lineItems.map((li) => (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="px-2 py-1"><SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); updateLine(li.id, 'unitPrice', price) }} /></td>
+                      <td className="px-2 py-1"><SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); updateLine(li.id, 'unitPrice', docType === 'invoice' ? (costPerItem || price) : price) }} /></td>
                       <td className="px-2 py-1"><input type="number" min={1} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.qty} onChange={(e) => updateLine(li.id, 'qty', Number(e.target.value))} /></td>
                       <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
                       <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>

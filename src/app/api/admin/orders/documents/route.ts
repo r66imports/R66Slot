@@ -22,9 +22,12 @@ export interface OrderDocument {
   lineItems: LineItem[]
   notes: string
   terms: string
-  status: 'draft' | 'sent' | 'accepted' | 'rejected'
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete' | 'paid' | 'archived'
   pushedToSage: boolean
   sageRef?: string
+  discountPct?: number
+  depositPaid?: number
+  paymentMethod?: string
   createdAt: string
   updatedAt: string
   backorderId?: string
@@ -73,6 +76,9 @@ export async function POST(request: Request) {
       terms: body.terms || '',
       status: body.status || 'draft',
       pushedToSage: false,
+      discountPct: body.discountPct || 0,
+      depositPaid: body.depositPaid || 0,
+      paymentMethod: body.paymentMethod || '',
       createdAt: now,
       updatedAt: now,
       backorderId: body.backorderId,
