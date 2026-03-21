@@ -1492,15 +1492,18 @@ export default function OrdersPage() {
   const [checkedBoIds, setCheckedBoIds] = useState<Set<string>>(new Set())
   const [pendingInvoiceBoIds, setPendingInvoiceBoIds] = useState<string[]>([])
 
+  const [plProducts, setPlProducts] = useState<Array<{ sku: string; costPerItem: number }>>([])
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, docRes, tmplRes, clRes, contactRes] = await Promise.all([
+      const [boRes, docRes, tmplRes, clRes, contactRes, prodRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/orders/documents'),
         fetch('/api/admin/orders/template'),
         fetch('/api/admin/clients'),
         fetch('/api/admin/contacts'),
+        fetch('/api/admin/products'),
       ])
       if (boRes.ok) {
         const bos: Backorder[] = await boRes.json()
@@ -1524,6 +1527,10 @@ export default function OrdersPage() {
       }
       clList.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
       setClients(clList)
+      if (prodRes.ok) {
+        const prods: any[] = await prodRes.json()
+        setPlProducts(prods.filter((p) => p.sku).map((p) => ({ sku: p.sku || '', costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0 })))
+      }
     } finally {
       setLoading(false)
     }
@@ -1583,6 +1590,30 @@ export default function OrdersPage() {
     salesorders: backorders.filter(TAB_CFG.salesorders.boPhase).length + documents.filter((d) => d.type === 'salesorder').length,
     invoices: backorders.filter(TAB_CFG.invoices.boPhase).length + documents.filter((d) => d.type === 'invoice').length,
   }
+
+  // ── Profit & Loss (Invoices only) ──────────────────────────────────────────
+  const invoiceDocs = documents.filter((d) => d.type === 'invoice')
+  const paidInvoices = invoiceDocs.filter((d) => d.status === 'paid' || d.status === 'complete')
+  const docRevenue = (doc: OrderDocument) => {
+    const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+    const disc = sub * ((doc as any).discountPct || 0) / 100
+    const dep = (doc as any).depositPaid || 0
+    return sub - disc - dep
+  }
+  const plRevenue = paidInvoices.reduce((s, d) => s + docRevenue(d), 0)
+  const plOutstanding = invoiceDocs
+    .filter((d) => d.status === 'draft' || d.status === 'sent')
+    .reduce((s, d) => s + docRevenue(d), 0)
+  const plCogs = paidInvoices.reduce((s, doc) =>
+    s + doc.lineItems.reduce((ls, li) => {
+      const sku = li.description.split(' – ')[0].trim()
+      const prod = plProducts.find((p) => p.sku.trim().toLowerCase() === sku.toLowerCase())
+      return ls + li.qty * (prod?.costPerItem || 0)
+    }, 0)
+  , 0)
+  const plGrossProfit = plRevenue - plCogs
+  const plMargin = plRevenue > 0 ? (plGrossProfit / plRevenue) * 100 : 0
+  const plTotalRevenue = invoiceDocs.reduce((s, d) => s + docRevenue(d), 0)
 
   const handleCompile = (groupKey: string, docType: DocType) => {
     const group = backordersByClient[groupKey]
@@ -1875,6 +1906,42 @@ export default function OrdersPage() {
         </div>
       ) : (
         <>
+          {/* ── P&L Summary Cards (Invoices tab only) ── */}
+          {tab === 'invoices' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Invoiced</p>
+                <p className="text-lg font-bold text-gray-800">{fmtPrice(plTotalRevenue)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{invoiceDocs.length} invoice{invoiceDocs.length !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Collected</p>
+                <p className="text-lg font-bold text-green-700">{fmtPrice(plRevenue)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{paidInvoices.length} paid / complete</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Outstanding</p>
+                <p className="text-lg font-bold text-orange-600">{fmtPrice(plOutstanding)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">Draft &amp; sent invoices</p>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cost of Goods</p>
+                <p className="text-lg font-bold text-gray-700">{fmtPrice(plCogs)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">From paid invoices</p>
+              </div>
+              <div className={`border rounded-xl p-4 ${plGrossProfit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Gross Profit</p>
+                <p className={`text-lg font-bold ${plGrossProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtPrice(plGrossProfit)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{plGrossProfit >= 0 ? 'Profit' : 'Loss'}</p>
+              </div>
+              <div className={`border rounded-xl p-4 ${plMargin >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Margin</p>
+                <p className={`text-lg font-bold ${plMargin >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{plMargin.toFixed(1)}%</p>
+                <p className="text-xs text-gray-400 mt-0.5">Gross margin</p>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm text-gray-500">{totalCount} {cfg.label}</p>
             <p className="text-sm font-semibold text-gray-700">Total (excl. VAT): {fmtPrice(grandTotal)}</p>
