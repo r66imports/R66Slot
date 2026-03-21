@@ -818,6 +818,22 @@ function CreateDocumentModal({
       .catch(() => {})
   }, [])
 
+  // Auto-generate next invoice number (INV000001 format) for new invoices only
+  useEffect(() => {
+    if (editDoc || docType !== 'invoice') return
+    fetch('/api/admin/orders/documents?type=invoice')
+      .then((r) => r.ok ? r.json() : [])
+      .then((docs: any[]) => {
+        const nums = docs
+          .map((d: any) => { const m = /^INV(\d{6})$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
+          .filter((n) => n > 0)
+        const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
+        setForm((f) => ({ ...f, docNumber: `INV${String(next).padStart(6, '0')}` }))
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
   const addLine = () => setLineItems((p) => [...p, newLine()])
   const removeLine = (id: string) => setLineItems((p) => p.filter((l) => l.id !== id))
