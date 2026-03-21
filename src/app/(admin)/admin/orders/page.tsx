@@ -1482,6 +1482,7 @@ export default function OrdersPage() {
   })
   const [showTemplate, setShowTemplate] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [showPL, setShowPL] = useState(true)
   const [compileDocType, setCompileDocType] = useState<DocType>('quote')
   const [compileClient, setCompileClient] = useState<{ name: string; email: string; phone: string; address: string; items: LineItem[] } | null>(null)
   // Groups the user has explicitly opened — starts empty (all collapsed). Never reset on focus reload.
@@ -1908,37 +1909,50 @@ export default function OrdersPage() {
         <>
           {/* ── P&L Summary Cards (Invoices tab only) ── */}
           {tab === 'invoices' && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Invoiced</p>
-                <p className="text-lg font-bold text-gray-800">{fmtPrice(plTotalRevenue)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{invoiceDocs.length} invoice{invoiceDocs.length !== 1 ? 's' : ''}</p>
+            <div className="mb-5">
+              <div className="flex items-center gap-2 mb-2">
+                <button
+                  onClick={() => setShowPL((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 border border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                >
+                  <svg className={`w-3 h-3 transition-transform ${showPL ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  {showPL ? 'Hide' : 'Show'} P&amp;L
+                </button>
               </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Collected</p>
-                <p className="text-lg font-bold text-green-700">{fmtPrice(plRevenue)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{paidInvoices.length} paid / complete</p>
+            {showPL && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Invoiced</p>
+                  <p className="text-lg font-bold text-gray-800">{fmtPrice(plTotalRevenue)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{invoiceDocs.length} invoice{invoiceDocs.length !== 1 ? 's' : ''}</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Collected</p>
+                  <p className="text-lg font-bold text-green-700">{fmtPrice(plRevenue)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{paidInvoices.length} paid / complete</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Outstanding</p>
+                  <p className="text-lg font-bold text-orange-600">{fmtPrice(plOutstanding)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Draft &amp; sent invoices</p>
+                </div>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cost of Goods</p>
+                  <p className="text-lg font-bold text-gray-700">{fmtPrice(plCogs)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">From paid invoices</p>
+                </div>
+                <div className={`border rounded-xl p-4 ${plGrossProfit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Gross Profit</p>
+                  <p className={`text-lg font-bold ${plGrossProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtPrice(plGrossProfit)}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{plGrossProfit >= 0 ? 'Profit' : 'Loss'}</p>
+                </div>
+                <div className={`border rounded-xl p-4 ${plMargin >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Margin</p>
+                  <p className={`text-lg font-bold ${plMargin >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{plMargin.toFixed(1)}%</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Gross margin</p>
+                </div>
               </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Outstanding</p>
-                <p className="text-lg font-bold text-orange-600">{fmtPrice(plOutstanding)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">Draft &amp; sent invoices</p>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl p-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cost of Goods</p>
-                <p className="text-lg font-bold text-gray-700">{fmtPrice(plCogs)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">From paid invoices</p>
-              </div>
-              <div className={`border rounded-xl p-4 ${plGrossProfit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Gross Profit</p>
-                <p className={`text-lg font-bold ${plGrossProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmtPrice(plGrossProfit)}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{plGrossProfit >= 0 ? 'Profit' : 'Loss'}</p>
-              </div>
-              <div className={`border rounded-xl p-4 ${plMargin >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-red-50 border-red-200'}`}>
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Margin</p>
-                <p className={`text-lg font-bold ${plMargin >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{plMargin.toFixed(1)}%</p>
-                <p className="text-xs text-gray-400 mt-0.5">Gross margin</p>
-              </div>
+            )}
             </div>
           )}
 
