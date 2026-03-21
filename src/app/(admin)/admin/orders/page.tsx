@@ -76,6 +76,7 @@ interface DocViewData {
   terms: string
   status: string
   discountPct: number
+  depositPaid: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -231,6 +232,8 @@ function DocumentBody({
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const total = subtotal - discountAmt
+  const deposit = data.depositPaid || 0
+  const balanceDuePreview = total - deposit
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const activeImages = template.imageBlock?.filter(Boolean) ?? []
 
@@ -325,6 +328,16 @@ function DocumentBody({
             <span>TOTAL</span>
             <span>{fmtPrice(total)}</span>
           </div>
+          {deposit > 0 && (<>
+            <div className="flex justify-between py-1 border-b border-gray-100 text-sm mt-1">
+              <span className="text-gray-500">Deposit Paid</span>
+              <span className="font-medium text-green-600">-{fmtPrice(deposit)}</span>
+            </div>
+            <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
+              <span>BALANCE DUE</span>
+              <span>{fmtPrice(balanceDuePreview)}</span>
+            </div>
+          </>)}
         </div>
       </div>
 
@@ -441,6 +454,7 @@ function TemplatePreviewModal({
     terms: template.invoiceTerms,
     status: 'sent',
     discountPct: 0,
+    depositPaid: 0,
   }
 
   return (
@@ -864,9 +878,11 @@ function CreateDocumentModal({
     setLineItems((p) => p.map((l) => (l.id === id ? { ...l, [k]: v } : l)))
 
   const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.discountPct || 0)
+  const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
   const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * discountPct / 100
   const total = subtotal - discountAmt
+  const balanceDue = total - depositPaid
 
   const handleSave = async () => {
     if (!form.clientName.trim()) { setError('Client name is required'); return }
@@ -881,7 +897,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct }),
+        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, depositPaid }),
       })
       if (res.ok) { onCreated(await res.json()); onClose() }
       else setError('Failed to save — please try again')
@@ -987,6 +1003,26 @@ function CreateDocumentModal({
                     <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
                     <td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(total)}</td><td />
                   </tr>
+                  <tr className="bg-gray-50">
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
+                    <td className="px-2 py-1">
+                      <input type="number" min={0} step={0.01}
+                        className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        value={depositPaid}
+                        onChange={(e) => setDepositPaid(Math.max(0, Number(e.target.value)))}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-green-600 font-medium">
+                      {depositPaid > 0 ? `-${fmtPrice(depositPaid)}` : '—'}
+                    </td>
+                    <td />
+                  </tr>
+                  {depositPaid > 0 && (
+                    <tr className="border-t bg-orange-50">
+                      <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-orange-700">Balance Due</td>
+                      <td className="px-3 py-2.5 text-right font-bold text-orange-700">{fmtPrice(balanceDue)}</td><td />
+                    </tr>
+                  )}
                 </tfoot>
               </table>
             </div>
@@ -1029,6 +1065,8 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const total = subtotal - discountAmt
+  const depositHTML = data.depositPaid || 0
+  const balanceDueHTML = total - depositHTML
   const activeImages = (template.imageBlock ?? []).filter(Boolean)
 
   const imagesHTML = activeImages.length > 0
@@ -1106,6 +1144,10 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
       <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#ef4444">Discount (${data.discountPct}%)</span><span style="font-weight:500;color:#ef4444">-${fmtPrice(discountAmt)}</span></div>
       ` : ''}
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
+      ${depositHTML > 0 ? `
+      <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Deposit Paid</span><span style="font-weight:500;color:#16a34a">-${fmtPrice(depositHTML)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>BALANCE DUE</span><span>${fmtPrice(balanceDueHTML)}</span></div>
+      ` : ''}
     </div>
   </div>
   ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
@@ -1150,6 +1192,7 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
     '─'.repeat(52),
     ...(( data.discountPct || 0) > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`, `Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
     `TOTAL:  ${fmtPrice(total)}`,
+    ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : []),
     banking,
     data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
     '',
@@ -1271,6 +1314,10 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
         ['', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`],
       ] : []),
       ['', '', '', 'TOTAL', fmtPrice(total)],
+      ...((data.depositPaid || 0) > 0 ? [
+        ['', '', '', 'Deposit Paid', `-${fmtPrice(data.depositPaid || 0)}`],
+        ['', '', '', 'BALANCE DUE', fmtPrice(total - (data.depositPaid || 0))],
+      ] : []),
     ],
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
     bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
@@ -1284,8 +1331,16 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     },
     margin: { left: margin, right: margin },
     didParseCell(hookData) {
-      if (hookData.section === 'foot' && hookData.row.index === 2) {
+      const footLen = ((data.discountPct || 0) > 0 ? 2 : 0) + 1 + ((data.depositPaid || 0) > 0 ? 2 : 0)
+      const totalIdx = (data.discountPct || 0) > 0 ? 2 : 0
+      const balanceIdx = (data.depositPaid || 0) > 0 ? footLen - 1 : -1
+      if (hookData.section === 'foot' && hookData.row.index === totalIdx) {
         hookData.cell.styles.fillColor = [31, 41, 55]
+        hookData.cell.styles.textColor = [255, 255, 255]
+        hookData.cell.styles.fontStyle = 'bold'
+      }
+      if (hookData.section === 'foot' && hookData.row.index === balanceIdx) {
+        hookData.cell.styles.fillColor = [234, 88, 12]
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
       }
@@ -1595,6 +1650,7 @@ export default function OrdersPage() {
       terms: template[c.termsKey] as string,
       status: b.status,
       discountPct: 0,
+      depositPaid: 0,
     }
   }, [tab, template])
 
@@ -1605,6 +1661,7 @@ export default function OrdersPage() {
     clientPhone: doc.clientPhone, clientAddress: doc.clientAddress,
     lineItems: doc.lineItems, notes: doc.notes, terms: doc.terms, status: doc.status,
     discountPct: (doc as any).discountPct || 0,
+    depositPaid: (doc as any).depositPaid || 0,
   })
 
   const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
