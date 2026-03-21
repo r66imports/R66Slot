@@ -38,7 +38,7 @@ interface OrderDocument {
   lineItems: LineItem[]
   notes: string
   terms: string
-  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete' | 'paid'
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete' | 'paid' | 'archived'
   pushedToSage: boolean
   createdAt: string
   updatedAt: string
@@ -107,6 +107,7 @@ const DOC_STATUS_COLORS: Record<string, string> = {
   rejected: 'bg-red-100 text-red-700',
   complete: 'bg-green-100 text-green-700',
   paid: 'bg-green-600 text-white',
+  archived: 'bg-gray-200 text-gray-500',
 }
 const BO_STATUS_COLORS: Record<string, string> = {
   active: 'bg-blue-100 text-blue-700',
@@ -1494,6 +1495,64 @@ function PushToSageBtn() {
   )
 }
 
+// ─── Actions Dropdown ──────────────────────────────────────────────────────────
+
+type ActionItem =
+  | { label: string; icon?: React.ReactNode; onClick: () => void; className?: string; disabled?: boolean }
+  | 'separator'
+
+function ActionsDropdown({ items }: { items: ActionItem[] }) {
+  const [open, setOpen] = useState(false)
+  const [dropUp, setDropUp] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node) && !btnRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+  function handleToggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setDropUp(window.innerHeight - rect.bottom < 200)
+    }
+    setOpen((v) => !v)
+  }
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button ref={btnRef} onClick={handleToggle} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 shadow-sm whitespace-nowrap">
+        Actions <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      </button>
+      {open && (
+        <div ref={menuRef} className={`fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px]`}
+          style={(() => {
+            if (!btnRef.current) return {}
+            const r = btnRef.current.getBoundingClientRect()
+            return dropUp
+              ? { bottom: window.innerHeight - r.top + 4, right: window.innerWidth - r.right }
+              : { top: r.bottom + 4, right: window.innerWidth - r.right }
+          })()}
+        >
+          {items.map((item, i) =>
+            item === 'separator' ? (
+              <div key={i} className="border-t border-gray-100 my-1" />
+            ) : (
+              <button key={i} onClick={() => { item.onClick(); setOpen(false) }} disabled={item.disabled}
+                className={`w-full text-left flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-40 ${item.className || 'text-gray-700'}`}>
+                {item.icon && <span className="flex-shrink-0 w-4">{item.icon}</span>}
+                {item.label}
+              </button>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OrdersPage() {
@@ -1576,7 +1635,7 @@ export default function OrdersPage() {
   const boRows = tab !== 'backorders' ? backorders.filter(cfg.boPhase) : []
   const docRows = tab !== 'backorders'
     ? documents
-        .filter((d) => d.type === cfg.docType)
+        .filter((d) => d.type === cfg.docType && d.status !== 'archived')
         .sort((a, b) => {
           let av: string | number = ''
           let bv: string | number = ''
@@ -2049,14 +2108,15 @@ export default function OrdersPage() {
                       <td className="py-3 px-4 text-center">
                         <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Back Order</span>
                       </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => viewBackorder(b)} className={ICON_BTN} title="View"><IconView /></button>
-                          <button onClick={() => doPrint(boToViewData(b), template)} className={ICON_BTN} title="Print"><IconPrint /></button>
-                          <button onClick={() => doEmail(boToViewData(b), template)} className={ICON_BTN} title="Email"><IconEmail /></button>
-                          <button onClick={() => doDownload(boToViewData(b), template)} className={ICON_BTN} title="Download"><IconDownload /></button>
-                          <PushToSageBtn />
-                        </div>
+                      <td className="py-3 px-4 text-center">
+                        <ActionsDropdown items={[
+                          { label: 'View', icon: <IconView />, onClick: () => viewBackorder(b) },
+                          { label: 'Print', icon: <IconPrint />, onClick: () => doPrint(boToViewData(b), template) },
+                          { label: 'Email', icon: <IconEmail />, onClick: () => doEmail(boToViewData(b), template) },
+                          { label: 'Download', icon: <IconDownload />, onClick: () => doDownload(boToViewData(b), template) },
+                          'separator',
+                          { label: 'Push to Sage', onClick: () => {}, disabled: true, className: 'text-gray-400' },
+                        ]} />
                       </td>
                     </tr>
                   ))}
@@ -2083,60 +2143,51 @@ export default function OrdersPage() {
                             )}
                           </div>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center justify-center gap-1">
-                            {doc.type === 'invoice' && doc.status !== 'paid' && (
-                              <button
-                                onClick={async () => {
-                                  const res = await fetch(`/api/admin/orders/documents/${doc.id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ status: 'paid' }),
-                                  })
-                                  if (res.ok) setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'paid' } : d))
-                                }}
-                                className="p-1.5 border border-green-400 rounded-lg bg-white text-green-600 hover:bg-green-50 hover:border-green-600 shadow-sm transition-colors"
-                                title="Mark as Paid"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                              </button>
-                            )}
-                            {doc.status === 'paid' && (
-                              <span className="text-xs font-semibold text-green-600 px-2 py-1 bg-green-100 rounded-lg border border-green-200">PAID</span>
-                            )}
-                            <button onClick={() => setEditDocState(doc)} className={ICON_BTN} title="Edit">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                            </button>
-                            <button onClick={() => viewDocument(doc)} className={ICON_BTN} title="View"><IconView /></button>
-                            <button onClick={() => doPrint(docToViewData(doc), template)} className={ICON_BTN} title="Print"><IconPrint /></button>
-                            <button onClick={() => doEmail(docToViewData(doc), template)} className={ICON_BTN} title="Email"><IconEmail /></button>
-                            <button onClick={() => doDownload(docToViewData(doc), template)} className={ICON_BTN} title="Download"><IconDownload /></button>
-                            <PushToSageBtn />
-                            {deleteConfirm === doc.id ? (
-                              <>
-                                <button
-                                  onClick={() => deleteDocument(doc.id)}
-                                  className="text-xs px-2.5 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  onClick={() => setDeleteConfirm(null)}
-                                  className="text-xs px-2 py-1.5 text-gray-400 hover:text-gray-600"
-                                >
-                                  Cancel
-                                </button>
-                              </>
-                            ) : (
-                              <button
-                                onClick={() => setDeleteConfirm(doc.id)}
-                                className="p-1.5 border border-red-300 rounded-lg bg-white text-red-500 hover:bg-red-50 hover:border-red-500 shadow-sm transition-colors"
-                                title="Delete"
-                              >
-                                <IconTrash />
-                              </button>
-                            )}
-                          </div>
+                        <td className="py-3 px-4 text-center">
+                          <ActionsDropdown items={[
+                            ...(doc.type === 'invoice' && doc.status !== 'paid' ? [{
+                              label: 'Mark as Paid',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+                              className: 'text-green-600',
+                              onClick: async () => {
+                                const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'paid' }) })
+                                if (res.ok) setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'paid' } : d))
+                              },
+                            }] : []),
+                            {
+                              label: 'Edit',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
+                              onClick: () => setEditDocState(doc),
+                            },
+                            { label: 'View', icon: <IconView />, onClick: () => viewDocument(doc) },
+                            { label: 'Print', icon: <IconPrint />, onClick: () => doPrint(docToViewData(doc), template) },
+                            { label: 'Email', icon: <IconEmail />, onClick: () => doEmail(docToViewData(doc), template) },
+                            { label: 'Download', icon: <IconDownload />, onClick: () => doDownload(docToViewData(doc), template) },
+                            'separator' as const,
+                            {
+                              label: 'Send to Archive',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8" /></svg>,
+                              className: 'text-gray-500',
+                              onClick: async () => {
+                                const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
+                                if (res.ok) setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'archived' } : d))
+                              },
+                            },
+                            { label: 'Push to Sage', onClick: () => {}, disabled: true, className: 'text-gray-400' },
+                            'separator' as const,
+                            {
+                              label: deleteConfirm === doc.id ? 'Confirm Delete' : 'Delete',
+                              icon: <IconTrash />,
+                              className: 'text-red-500',
+                              onClick: () => {
+                                if (deleteConfirm === doc.id) {
+                                  deleteDocument(doc.id)
+                                } else {
+                                  setDeleteConfirm(doc.id)
+                                }
+                              },
+                            },
+                          ]} />
                         </td>
                       </tr>
                     )
