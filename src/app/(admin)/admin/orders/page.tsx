@@ -984,7 +984,7 @@ function CreateDocumentModal({
                 <tbody>
                   {lineItems.map((li) => (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
-                      <td className="px-2 py-1"><SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); updateLine(li.id, 'unitPrice', docType === 'invoice' ? (costPerItem || price) : price) }} /></td>
+                      <td className="px-2 py-1"><SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const isR66Slot = form.clientName.trim().toLowerCase() === 'r66slot'; updateLine(li.id, 'unitPrice', isR66Slot ? (costPerItem || price) : price) }} /></td>
                       <td className="px-2 py-1"><input type="number" min={1} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.qty} onChange={(e) => updateLine(li.id, 'qty', Number(e.target.value))} /></td>
                       <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
                       <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>
