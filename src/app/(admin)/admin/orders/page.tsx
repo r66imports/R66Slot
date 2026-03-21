@@ -825,10 +825,10 @@ function CreateDocumentModal({
       .then((r) => r.ok ? r.json() : [])
       .then((docs: any[]) => {
         const nums = docs
-          .map((d: any) => { const m = /^INV(\d{6})$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
+          .map((d: any) => { const m = /^INV(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
           .filter((n) => n > 0)
-        const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
-        setForm((f) => ({ ...f, docNumber: `INV${String(next).padStart(6, '0')}` }))
+        const next = Math.max(25, ...(nums.length ? nums : [0])) + 1
+        setForm((f) => ({ ...f, docNumber: `INV${String(next).padStart(7, '0')}` }))
       })
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
