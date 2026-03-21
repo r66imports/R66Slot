@@ -248,6 +248,7 @@ function WorksheetEditor({
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
   const [sendingInventory, setSendingInventory] = useState(false)
   const [inventorySent, setInventorySent] = useState(false)
+  const [inventoryMissed, setInventoryMissed] = useState<string[]>([])
 
   function toggleCheck(id: string) {
     setCheckedItems((prev) => {
@@ -261,19 +262,26 @@ function WorksheetEditor({
     const toSend = items.filter((it) => checkedItems.has(it.id) && it.sku && it.qty > 0)
     if (!toSend.length) return
     setSendingInventory(true)
+    setInventoryMissed([])
+    const missed: string[] = []
     try {
       for (const it of toSend) {
         const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-        if (!prod) continue
-        await fetch('/api/admin/pos/stock', {
+        if (!prod) {
+          missed.push(it.sku)
+          continue
+        }
+        const res = await fetch('/api/admin/pos/stock', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: prod.id, mode: 'add', qty: it.qty }),
         })
+        if (!res.ok) missed.push(it.sku)
       }
       setInventorySent(true)
       setCheckedItems(new Set())
-      setTimeout(() => setInventorySent(false), 2500)
+      if (missed.length > 0) setInventoryMissed(missed)
+      setTimeout(() => { setInventorySent(false); setInventoryMissed([]) }, 8000)
     } finally {
       setSendingInventory(false)
     }
@@ -1008,6 +1016,11 @@ function WorksheetEditor({
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
               {inventorySent ? '✓ Sent!' : sendingInventory ? 'Sending…' : `Send to Inventory${checkedItems.size > 0 ? ` (${checkedItems.size})` : ''}`}
             </button>
+            {inventoryMissed.length > 0 && (
+              <span className="text-xs text-red-600 font-medium">
+                ⚠ Not found in Products: {inventoryMissed.join(', ')}
+              </span>
+            )}
             <button onClick={downloadCSV} disabled={!hasItems}
               className="flex items-center gap-1.5 border border-gray-300 text-gray-700 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-50 disabled:opacity-40 transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M4 6h16" /></svg>
