@@ -116,6 +116,8 @@ export async function POST(request: Request) {
       phaseSalesOrder: false,
       phaseInvoice: false,
       phaseDepositPaid: false,
+      supplierId: body.supplierId?.trim() || undefined,
+      supplierName: body.supplierName?.trim() || undefined,
       notes: body.notes?.trim() || '',
       status: 'active',
       createdAt: now,
