@@ -397,6 +397,9 @@ export default function ProductsPage() {
   const [showBrandDropdown, setShowBrandDropdown] = useState(false)
   const [showCatDropdown, setShowCatDropdown] = useState(false)
   const [revoFilter, setRevoFilter] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('')
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+  const [supplierSkus, setSupplierSkus] = useState<Record<string, Set<string>>>({}) // supplierId → Set<sku>
   const [searchQuery, setSearchQuery] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
   const [importText, setImportText] = useState('')
@@ -485,6 +488,20 @@ export default function ProductsPage() {
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setPages(data.map((p: any) => ({ id: p.id, title: p.title }))) })
       .catch(() => {})
+    Promise.all([
+      fetch('/api/admin/supplier-contacts').then((r) => r.ok ? r.json() : []),
+      fetch('/api/admin/inventory-pricelists').then((r) => r.ok ? r.json() : []),
+    ]).then(([sups, pricelist]: [any[], any[]]) => {
+      if (Array.isArray(sups)) setSuppliers(sups.map((s) => ({ id: s.id, name: s.name })))
+      if (Array.isArray(pricelist)) {
+        const map: Record<string, Set<string>> = {}
+        for (const entry of pricelist) {
+          if (!map[entry.supplierId]) map[entry.supplierId] = new Set()
+          map[entry.supplierId].add((entry.sku || '').trim().toLowerCase())
+        }
+        setSupplierSkus(map)
+      }
+    }).catch(() => {})
   }, [])
 
   const fetchProducts = async (brand = '') => {
@@ -746,7 +763,8 @@ export default function ProductsPage() {
       const matchCat = categoryFilters.length === 0 || categoryFilters.some((f) => (p.collections || []).includes(f) || (p.categories || []).includes(f))
       const matchRevo = !revoFilter || (p.itemCategories || []).includes(revoFilter)
       const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
-      return matchBrand && matchCat && matchRevo && matchSearch
+      const matchSupplier = !supplierFilter || (supplierSkus[supplierFilter]?.has((p.sku || '').trim().toLowerCase()) ?? false)
+      return matchBrand && matchCat && matchRevo && matchSearch && matchSupplier
     })
     .sort((a, b) => {
       let av: string | number = ''
@@ -911,9 +929,23 @@ export default function ProductsPage() {
           </select>
         )}
 
-        {(searchQuery || brandFilter || categoryFilters.length > 0 || revoFilter) && (
+        {/* Supplier filter */}
+        {suppliers.length > 0 && (
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            className={`px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-gray-900 ${supplierFilter ? 'border-gray-900 font-semibold' : 'border-gray-300'}`}
+          >
+            <option value="">All Suppliers</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
+
+        {(searchQuery || brandFilter || categoryFilters.length > 0 || revoFilter || supplierFilter) && (
           <button
-            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilters([]); setRevoFilter('') }}
+            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilters([]); setRevoFilter(''); setSupplierFilter('') }}
             className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-lg"
           >
             Clear ✕
