@@ -727,41 +727,64 @@ function ClientAutofill({
 function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   value: string
   onChange: (v: string) => void
-  products: Array<{ id: string; sku: string; title: string; price: number }>
+  products: Array<{ id: string; sku: string; title: string; price: number; quantity: number }>
   onSelectProduct: (sku: string, title: string, price: number) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [outOfStockMsg, setOutOfStockMsg] = useState('')
   const q = value.toLowerCase()
   const filtered = q.length >= 1
     ? products.filter((p) =>
         p.sku.toLowerCase().includes(q) || p.title.toLowerCase().includes(q)
       ).slice(0, 8)
     : []
+
+  function handleSelect(p: { sku: string; title: string; price: number; quantity: number }) {
+    if (p.quantity <= 0) {
+      setOutOfStockMsg(`"${p.title}" is out of stock`)
+      setTimeout(() => setOutOfStockMsg(''), 3000)
+      return
+    }
+    onSelectProduct(p.sku, p.title, p.price)
+    setOpen(false)
+  }
+
   return (
     <div className="relative">
       <input
         className="w-full px-2 py-1.5 text-sm rounded focus:outline-none focus:bg-blue-50"
         placeholder="SKU or description"
         value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setOutOfStockMsg('') }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
-      {open && filtered.length > 0 && (
+      {outOfStockMsg && (
+        <div className="absolute left-0 top-full z-50 mt-0.5 bg-red-600 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap">
+          ⚠ {outOfStockMsg}
+        </div>
+      )}
+      {!outOfStockMsg && open && filtered.length > 0 && (
         <div className="absolute left-0 top-full z-50 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg w-80 max-h-48 overflow-y-auto">
-          {filtered.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onSelectProduct(p.sku, p.title, p.price); setOpen(false) }}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 border-b border-gray-50 last:border-0"
-            >
-              <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
-              <span className="text-gray-800">{p.title}</span>
-              <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
-            </button>
-          ))}
+          {filtered.map((p) => {
+            const oos = p.quantity <= 0
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleSelect(p)}
+                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-50 last:border-0 ${oos ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'hover:bg-blue-50'}`}
+              >
+                <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
+                <span className={oos ? 'text-gray-400' : 'text-gray-800'}>{p.title}</span>
+                {oos
+                  ? <span className="float-right text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
+                  : <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
+                }
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -807,13 +830,13 @@ function CreateDocumentModal({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number }>>([])
+  const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; quantity: number }>>([])
 
   useEffect(() => {
     fetch('/api/admin/products')
       .then((r) => r.ok ? r.json() : [])
       .then((data: any[]) => setModalProducts(
-        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0 }))
+        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0, quantity: Number(p.quantity) || 0 }))
       ))
       .catch(() => {})
   }, [])
