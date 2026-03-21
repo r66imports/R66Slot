@@ -263,7 +263,7 @@ function WorksheetEditor({
     setSendingInventory(true)
     try {
       for (const it of toSend) {
-        const prod = products.find((p) => p.sku === it.sku)
+        const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
         if (!prod) continue
         await fetch('/api/admin/pos/stock', {
           method: 'PATCH',
