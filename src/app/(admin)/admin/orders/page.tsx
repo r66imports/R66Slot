@@ -77,6 +77,7 @@ interface DocViewData {
   status: string
   discountPct: number
   depositPaid: number
+  paymentMethod: string
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -341,6 +342,14 @@ function DocumentBody({
         </div>
       </div>
 
+      {/* Payment Method */}
+      {data.paymentMethod && (
+        <div className="mb-4 flex items-center gap-2">
+          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Payment:</span>
+          <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{data.paymentMethod}</span>
+        </div>
+      )}
+
       {/* Notes */}
       {data.notes && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
@@ -455,6 +464,7 @@ function TemplatePreviewModal({
     status: 'sent',
     discountPct: 0,
     depositPaid: 0,
+    paymentMethod: '',
   }
 
   return (
@@ -838,6 +848,7 @@ function CreateDocumentModal({
     notes: editDoc?.notes || '',
     terms: editDoc?.terms || template[cfg.termsKey] as string,
     status: (editDoc?.status || 'draft') as 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete',
+    paymentMethod: (editDoc as any)?.paymentMethod || '',
   })
   const [lineItems, setLineItems] = useState<LineItem[]>(
     editDoc?.lineItems?.length ? editDoc.lineItems : prefilledItems?.length ? prefilledItems : [newLine()]
@@ -897,7 +908,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, depositPaid }),
+        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, depositPaid, paymentMethod: form.paymentMethod }),
       })
       if (res.ok) { onCreated(await res.json()); onClose() }
       else setError('Failed to save — please try again')
@@ -1033,15 +1044,30 @@ function CreateDocumentModal({
             <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Terms &amp; Conditions</label><textarea className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none" rows={3} value={form.terms} onChange={(e) => setField('terms', e.target.value)} /></div>
           </div>
 
-          <div className="w-44">
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Status</label>
-            <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.status} onChange={(e) => setField('status', e.target.value)}>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="accepted">Accepted</option>
-              <option value="rejected">Rejected</option>
-              <option value="complete">Complete</option>
-            </select>
+          <div className="flex gap-4">
+            <div className="w-44">
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">Status</label>
+              <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.status} onChange={(e) => setField('status', e.target.value)}>
+                <option value="draft">Draft</option>
+                <option value="sent">Sent</option>
+                <option value="accepted">Accepted</option>
+                <option value="rejected">Rejected</option>
+                <option value="complete">Complete</option>
+              </select>
+            </div>
+            {docType === 'invoice' && (
+              <div className="w-44">
+                <label className="text-xs font-semibold text-gray-500 mb-1 block">Payment Method</label>
+                <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod} onChange={(e) => setField('paymentMethod', e.target.value)}>
+                  <option value="">— Select —</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="EFT">EFT</option>
+                  <option value="Snapscan">Snapscan</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            )}
           </div>
         </div>
         <div className="px-6 py-4 border-t space-y-3">
@@ -1150,6 +1176,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
       ` : ''}
     </div>
   </div>
+  ${data.paymentMethod ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Payment Method:</span><span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod}</span></div>` : ''}
   ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
   ${bankHTML}
   ${data.terms ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Terms &amp; Conditions</div><div style="font-size:12px;color:#6b7280;white-space:pre-line">${data.terms}</div></div>` : ''}
@@ -1193,6 +1220,7 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
     ...(( data.discountPct || 0) > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`, `Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
     `TOTAL:  ${fmtPrice(total)}`,
     ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : []),
+    ...(data.paymentMethod ? [`Payment Method:  ${data.paymentMethod}`] : []),
     banking,
     data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
     '',
@@ -1683,6 +1711,7 @@ export default function OrdersPage() {
       status: b.status,
       discountPct: 0,
       depositPaid: 0,
+      paymentMethod: '',
     }
   }, [tab, template])
 
@@ -1694,6 +1723,7 @@ export default function OrdersPage() {
     lineItems: doc.lineItems, notes: doc.notes, terms: doc.terms, status: doc.status,
     discountPct: (doc as any).discountPct || 0,
     depositPaid: (doc as any).depositPaid || 0,
+    paymentMethod: (doc as any).paymentMethod || '',
   })
 
   const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
@@ -2046,7 +2076,12 @@ export default function OrdersPage() {
                           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          <span className="text-xs bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full">Standalone</span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-xs bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full">Standalone</span>
+                            {(doc as any).paymentMethod && (
+                              <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod}</span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-center gap-1">
