@@ -83,6 +83,7 @@ export default function EditProductPage({
   const [partType, setPartType] = useState('')
   const [scale, setScale] = useState('')
   const [supplier, setSupplier] = useState('')
+  const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([])
   const [collections, setCollections] = useState<string[]>([])
   const [tags, setTags] = useState('')
   const [status, setStatus] = useState('draft')
@@ -231,6 +232,7 @@ export default function EditProductPage({
   // Load categories list
   useEffect(() => {
     fetch('/api/admin/categories').then(r => r.json()).then(d => setAllCategories(Array.isArray(d) ? d : [])).catch(() => {})
+    fetch('/api/admin/supplier-contacts').then(r => r.json()).then(d => setSupplierOptions(Array.isArray(d) ? d.map((s: any) => ({ id: s.id, name: s.name })) : [])).catch(() => {})
   }, [])
 
   // Save options to persistent store
@@ -1011,6 +1013,19 @@ export default function EditProductPage({
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Supplier</label>
+                  <select
+                    value={supplier}
+                    onChange={(e) => setSupplier(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  >
+                    <option value="">— No supplier —</option>
+                    {supplierOptions.map((s) => (
+                      <option key={s.id} value={s.name}>{s.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="flex items-center">
                   <input
