@@ -1698,6 +1698,7 @@ export default function OrdersPage() {
                             <th className="text-right px-5 py-2">Total</th>
                             <th className="text-center px-2 py-2 w-8">☑</th>
                             <th className="text-center px-5 py-2">Status</th>
+                            <th className="w-8"></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1723,6 +1724,32 @@ export default function OrdersPage() {
                               </td>
                               <td className="px-5 py-2.5 text-center">
                                 <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
+                              </td>
+                              <td className="px-2 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                                {deleteConfirm === `bo-${b.id}` ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={async () => {
+                                        const res = await fetch(`/api/admin/backorders/${b.id}`, { method: 'DELETE' })
+                                        if (res.ok) {
+                                          setBackorders((prev) => prev.filter((x) => x.id !== b.id))
+                                          setCheckedBoIds((prev) => { const next = new Set(prev); next.delete(b.id); return next })
+                                        }
+                                        setDeleteConfirm(null)
+                                      }}
+                                      className="text-xs px-2 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                    >Yes</button>
+                                    <button onClick={() => setDeleteConfirm(null)} className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600">No</button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setDeleteConfirm(`bo-${b.id}`)}
+                                    className="text-gray-300 hover:text-red-500 transition-colors"
+                                    title="Delete item"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}
