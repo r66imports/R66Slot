@@ -38,7 +38,7 @@ interface OrderDocument {
   lineItems: LineItem[]
   notes: string
   terms: string
-  status: 'draft' | 'sent' | 'accepted' | 'rejected'
+  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete' | 'paid'
   pushedToSage: boolean
   createdAt: string
   updatedAt: string
@@ -75,6 +75,7 @@ interface DocViewData {
   notes: string
   terms: string
   status: string
+  discountPct: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -102,6 +103,8 @@ const DOC_STATUS_COLORS: Record<string, string> = {
   sent: 'bg-blue-100 text-blue-700',
   accepted: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
+  complete: 'bg-green-100 text-green-700',
+  paid: 'bg-green-600 text-white',
 }
 const BO_STATUS_COLORS: Record<string, string> = {
   active: 'bg-blue-100 text-blue-700',
@@ -226,6 +229,8 @@ function DocumentBody({
   template: OrderTemplate
 }) {
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const discountAmt = subtotal * (data.discountPct || 0) / 100
+  const total = subtotal - discountAmt
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const activeImages = template.imageBlock?.filter(Boolean) ?? []
 
@@ -306,9 +311,19 @@ function DocumentBody({
       {/* Totals */}
       <div className="flex justify-end mb-5">
         <div className="w-64">
+          {(data.discountPct || 0) > 0 && (<>
+            <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
+              <span className="text-gray-500">Subtotal</span>
+              <span className="font-medium">{fmtPrice(subtotal)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
+              <span className="text-gray-500">Discount ({data.discountPct}%)</span>
+              <span className="font-medium text-red-500">-{fmtPrice(discountAmt)}</span>
+            </div>
+          </>)}
           <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
             <span>TOTAL</span>
-            <span>{fmtPrice(subtotal)}</span>
+            <span>{fmtPrice(total)}</span>
           </div>
         </div>
       </div>
@@ -425,6 +440,7 @@ function TemplatePreviewModal({
     notes: 'Thank you for your order.',
     terms: template.invoiceTerms,
     status: 'sent',
+    discountPct: 0,
   }
 
   return (
@@ -808,7 +824,10 @@ function CreateDocumentModal({
   const updateLine = (id: string, k: keyof LineItem, v: string | number) =>
     setLineItems((p) => p.map((l) => (l.id === id ? { ...l, [k]: v } : l)))
 
+  const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.discountPct || 0)
   const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const discountAmt = subtotal * discountPct / 100
+  const total = subtotal - discountAmt
 
   const handleSave = async () => {
     if (!form.clientName.trim()) { setError('Client name is required'); return }
@@ -823,11 +842,12 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems }),
+        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct }),
       })
       if (res.ok) { onCreated(await res.json()); onClose() }
       else setError('Failed to save — please try again')
-    } finally { setSaving(false) }
+    } catch { setError('Network error — please try again') }
+    finally { setSaving(false) }
   }
 
   return (
@@ -906,7 +926,28 @@ function CreateDocumentModal({
                   ))}
                 </tbody>
                 <tfoot className="text-sm">
-                  <tr className="border-t bg-blue-50"><td colSpan={3} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td><td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(subtotal)}</td><td /></tr>
+                  <tr className="border-t bg-gray-50">
+                    <td colSpan={3} className="px-3 py-2 text-right text-gray-500">Subtotal</td>
+                    <td className="px-3 py-2 text-right font-medium">{fmtPrice(subtotal)}</td><td />
+                  </tr>
+                  <tr className="bg-gray-50">
+                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Discount %</td>
+                    <td className="px-2 py-1">
+                      <input type="number" min={0} max={100} step={0.5}
+                        className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        value={discountPct}
+                        onChange={(e) => setDiscountPct(Math.max(0, Math.min(100, Number(e.target.value))))}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-red-500 font-medium">
+                      {discountPct > 0 ? `-${fmtPrice(discountAmt)}` : '—'}
+                    </td>
+                    <td />
+                  </tr>
+                  <tr className="border-t bg-blue-50">
+                    <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
+                    <td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(total)}</td><td />
+                  </tr>
                 </tfoot>
               </table>
             </div>
@@ -947,6 +988,8 @@ function CreateDocumentModal({
 function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const discountAmt = subtotal * (data.discountPct || 0) / 100
+  const total = subtotal - discountAmt
   const activeImages = (template.imageBlock ?? []).filter(Boolean)
 
   const imagesHTML = activeImages.length > 0
@@ -1019,7 +1062,11 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   </table>
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
     <div style="width:260px">
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(subtotal)}</span></div>
+      ${(data.discountPct || 0) > 0 ? `
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#ef4444">Discount (${data.discountPct}%)</span><span style="font-weight:500;color:#ef4444">-${fmtPrice(discountAmt)}</span></div>
+      ` : ''}
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
     </div>
   </div>
   ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
@@ -1041,6 +1088,8 @@ function doPrint(data: DocViewData, template: OrderTemplate) {
 function doEmail(data: DocViewData, template: OrderTemplate) {
   const docLabel = data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const discountAmt = subtotal * (data.discountPct || 0) / 100
+  const total = subtotal - discountAmt
   const subject = `${docLabel} ${data.docNumber} – ${template.companyName || 'R66 Slot'}`
   const lines = data.lineItems.map((li, i) =>
     `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}  =  ${fmtPrice(li.qty * li.unitPrice)}`
@@ -1060,7 +1109,8 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
     '─'.repeat(52),
     lines,
     '─'.repeat(52),
-    `TOTAL:  ${fmtPrice(subtotal)}`,
+    ...(( data.discountPct || 0) > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`, `Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
+    `TOTAL:  ${fmtPrice(total)}`,
     banking,
     data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
     '',
@@ -1086,6 +1136,8 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
 
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const discountAmt = subtotal * (data.discountPct || 0) / 100
+  const total = subtotal - discountAmt
 
   // ── Logo (top left) ──────────────────────────────────────────────────────────
   if (template.logoUrl) {
@@ -1175,7 +1227,11 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
       fmtPrice(li.qty * li.unitPrice),
     ]),
     foot: [
-      ['', '', '', 'TOTAL', fmtPrice(subtotal)],
+      ...((data.discountPct || 0) > 0 ? [
+        ['', '', '', 'Subtotal', fmtPrice(subtotal)],
+        ['', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`],
+      ] : []),
+      ['', '', '', 'TOTAL', fmtPrice(total)],
     ],
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
     bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
@@ -1499,6 +1555,7 @@ export default function OrdersPage() {
       notes: b.notes ?? '',
       terms: template[c.termsKey] as string,
       status: b.status,
+      discountPct: 0,
     }
   }, [tab, template])
 
@@ -1508,6 +1565,7 @@ export default function OrdersPage() {
     clientName: doc.clientName, clientEmail: doc.clientEmail,
     clientPhone: doc.clientPhone, clientAddress: doc.clientAddress,
     lineItems: doc.lineItems, notes: doc.notes, terms: doc.terms, status: doc.status,
+    discountPct: (doc as any).discountPct || 0,
   })
 
   const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
@@ -1774,7 +1832,7 @@ export default function OrdersPage() {
                     const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
-                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 font-mono font-semibold text-blue-700">{doc.docNumber}</td>
                         <td className="py-3 px-4 text-gray-500">{fmtDate(doc.date)}</td>
                         <td className="py-3 px-4 font-medium">{doc.clientName}</td>
@@ -1788,6 +1846,25 @@ export default function OrdersPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-center gap-1">
+                            {doc.type === 'invoice' && doc.status !== 'paid' && (
+                              <button
+                                onClick={async () => {
+                                  const res = await fetch(`/api/admin/orders/documents/${doc.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'paid' }),
+                                  })
+                                  if (res.ok) setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'paid' } : d))
+                                }}
+                                className="p-1.5 border border-green-400 rounded-lg bg-white text-green-600 hover:bg-green-50 hover:border-green-600 shadow-sm transition-colors"
+                                title="Mark as Paid"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              </button>
+                            )}
+                            {doc.status === 'paid' && (
+                              <span className="text-xs font-semibold text-green-600 px-2 py-1 bg-green-100 rounded-lg border border-green-200">PAID</span>
+                            )}
                             <button onClick={() => setEditDocState(doc)} className={ICON_BTN} title="Edit">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
