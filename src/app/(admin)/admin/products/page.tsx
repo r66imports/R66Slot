@@ -614,13 +614,14 @@ export default function ProductsPage() {
     a.click()
   }
 
-  const exportMasterCSV = (rows: Product[], supplierName?: string) => {
+  const exportMasterCSV = (supplierName?: string) => {
+    const rows = supplierName
+      ? products.filter((p) => (p.supplier || '').toLowerCase() === supplierName.toLowerCase())
+      : products
     const headers = [
       'Code', 'Description', 'Brand', 'Category (Brand)', 'Item Categories (Unit)',
       'Price (Retail)', 'Average Cost', 'Cost Per Item', 'Pre Order Price',
-      'Qty', 'Barcode', 'Supplier', 'ETA', 'Status',
-      'Scale', 'Car Class', 'Sales Account', 'Purchases Account',
-      'Track Quantity', 'Page URL',
+      'Qty', 'Barcode', 'Supplier', 'Car Class', 'Sales Account', 'Purchases Account',
     ]
     const csv = [
       headers.join(','),
@@ -637,20 +638,15 @@ export default function ProductsPage() {
         p.quantity ?? '',
         p.barcode || '',
         p.supplier || '',
-        p.eta || '',
-        p.status || '',
-        (p as any).scale || '',
         (p as any).carClass || '',
         Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
         Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
-        '',
-        p.pageUrl || '',
       ].map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
     ].join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
     const slug = supplierName ? supplierName.replace(/\s+/g, '-').toLowerCase() + '-' : ''
-    a.download = `master-${slug}products-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `supplier-${slug}products-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
 
@@ -881,8 +877,8 @@ export default function ProductsPage() {
           </Button>
           <Button variant="outline" onClick={() => {
             const supplierName = supplierFilter ? suppliers.find((s) => s.id === supplierFilter)?.name : undefined
-            exportMasterCSV(supplierFilter ? filtered : products, supplierName)
-          }}>Export Master Supplier</Button>
+            exportMasterCSV(supplierName)
+          }}>Export Supplier</Button>
           <Button variant="outline" onClick={() => setShowExportModal(true)}>Export Sage CSV</Button>
           <Button variant="outline" onClick={() => setShowImportModal(true)}>Import</Button>
           <Button size="lg" asChild>
