@@ -10,6 +10,7 @@ function rowToProduct(row: any): Product {
     price: parseFloat(row.price),
     compareAtPrice: row.compare_at_price ? parseFloat(row.compare_at_price) : null,
     costPerItem: row.cost_per_item ? parseFloat(row.cost_per_item) : null,
+    preOrderPrice: row.pre_order_price ? parseFloat(row.pre_order_price) : null,
     sku: row.sku,
     barcode: row.barcode,
     brand: row.brand,
@@ -93,6 +94,7 @@ export async function PUT(
         price = COALESCE($4, price),
         compare_at_price = COALESCE($5, compare_at_price),
         cost_per_item = COALESCE($6, cost_per_item),
+        pre_order_price = COALESCE($47, pre_order_price),
         sku = COALESCE($7, sku),
         barcode = COALESCE($8, barcode),
         brand = COALESCE($9, brand),
@@ -182,6 +184,7 @@ export async function PUT(
       Array.isArray(body.sidewaysCarClasses) ? JSON.stringify(body.sidewaysCarClasses) : null,
       (typeof body.customOrgs === 'object' && body.customOrgs !== null) ? JSON.stringify(body.customOrgs) : null,
       Array.isArray(body.categoryIds) ? JSON.stringify(body.categoryIds) : null,
+      body.preOrderPrice != null ? body.preOrderPrice : null,
     ])
 
     if (result.rowCount === 0) {

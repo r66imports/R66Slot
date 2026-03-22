@@ -35,6 +35,7 @@ interface Product {
   price: number
   compareAtPrice: number | null
   costPerItem: number | null
+  preOrderPrice?: number | null
   sku: string
   barcode: string
   brand: string
@@ -188,9 +189,9 @@ function findQtyValue(obj: Record<string, string>): string {
 const IMPORT_PROFILES: Record<string, ImportProfile> = {
   generic: {
     label: 'Generic',
-    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Average Cost, Qty, Sales Account, Purchases Account, Landed Cost, Barcode, Supplier',
-    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Average Cost,Qty,Sales Account,Purchases Account,Landed Cost,Barcode,Supplier',
-    placeholder: 'NSR-0001,NSR Slot Car,NSR,Slot Car,517.50,322.00,322.00,5,Retail Sales,Retail Purchases,,6009123456789,NSR',
+    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Average Cost, Qty, Sales Account, Purchases Account, Landed Cost, Barcode, Supplier, Pre Order Price',
+    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Average Cost,Qty,Sales Account,Purchases Account,Landed Cost,Barcode,Supplier,Pre Order Price',
+    placeholder: 'NSR-0001,NSR Slot Car,NSR,Slot Car,517.50,322.00,322.00,5,Retail Sales,Retail Purchases,,6009123456789,NSR,490.00',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || '',
       title: obj['description'] || obj['title'] || obj['name'] || '',
@@ -201,6 +202,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       price: obj['price incl.'] || obj['price incl'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
       compareAtPrice: obj['average cost'] || obj['avg cost'] || '',
+      preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
       quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -210,7 +212,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       supplier: obj['supplier'] || obj['vendor'] || '',
     }),
     brandKey: '',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Average Cost', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Average Cost', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier', 'Pre Order Price'],
     exportRow: (p) => [
       p.sku,
       p.title,
@@ -224,13 +226,14 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
       p.barcode || '',
       p.supplier || '',
+      p.preOrderPrice ?? '',
     ],
   },
   nsr: {
     label: 'NSR',
-    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier',
-    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier',
-    placeholder: 'NSR-0001,NSR Audi R8 GT3,NSR,Slot Car,450,280,5,NSR Sales,NSR Purchases,,NSR',
+    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier, Pre Order Price',
+    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier,Pre Order Price',
+    placeholder: 'NSR-0001,NSR Audi R8 GT3,NSR,Slot Car,450,280,5,NSR Sales,NSR Purchases,,NSR,',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
       title: obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '',
@@ -242,6 +245,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
       quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -251,7 +255,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       supplier: obj['supplier'] || obj['vendor'] || 'NSR',
     }),
     brandKey: 'NSR',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier', 'Pre Order Price'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -259,14 +263,14 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
-      p.barcode || '', p.supplier || '',
+      p.barcode || '', p.supplier || '', p.preOrderPrice ?? '',
     ],
   },
   revo: {
     label: 'Revo',
-    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier',
-    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier',
-    placeholder: 'RV-001,Revo Slick Tyres,Revo,Parts,120,75,10,Revo Sales,Revo Purchases,,Revo Slot',
+    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier, Pre Order Price',
+    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier,Pre Order Price',
+    placeholder: 'RV-001,Revo Slick Tyres,Revo,Parts,120,75,10,Revo Sales,Revo Purchases,,Revo Slot,',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item'] || obj['item code'] || '',
       title: obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '',
@@ -277,6 +281,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       partType: obj['part_type'] || obj['parttype'] || '',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
       quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -286,7 +291,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       supplier: obj['supplier'] || obj['vendor'] || 'Revo Slot',
     }),
     brandKey: 'Revo',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier', 'Pre Order Price'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -294,14 +299,14 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
-      p.barcode || '', p.supplier || '',
+      p.barcode || '', p.supplier || '', p.preOrderPrice ?? '',
     ],
   },
   brm: {
     label: 'BRM',
-    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier',
-    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier',
-    placeholder: 'BRM-001,BRM Alfa Romeo GTA,BRM,Slot Car,650,400,3,BRM Sales,BRM Purchases,,BRM',
+    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier, Pre Order Price',
+    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier,Pre Order Price',
+    placeholder: 'BRM-001,BRM Alfa Romeo GTA,BRM,Slot Car,650,400,3,BRM Sales,BRM Purchases,,BRM,',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
       title: obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '',
@@ -313,6 +318,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/24',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
       quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -322,7 +328,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       supplier: obj['supplier'] || obj['vendor'] || 'BRM',
     }),
     brandKey: 'BRM',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier', 'Pre Order Price'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -330,14 +336,14 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
-      p.barcode || '', p.supplier || '',
+      p.barcode || '', p.supplier || '', p.preOrderPrice ?? '',
     ],
   },
   pioneer: {
     label: 'Pioneer',
-    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier',
-    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier',
-    placeholder: 'P-001,Pioneer Camaro Z28,Pioneer,Slot Car,550,340,4,Pioneer Sales,Pioneer Purchases,,Pioneer',
+    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier, Pre Order Price',
+    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier,Pre Order Price',
+    placeholder: 'P-001,Pioneer Camaro Z28,Pioneer,Slot Car,550,340,4,Pioneer Sales,Pioneer Purchases,,Pioneer,',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
       title: obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '',
@@ -349,6 +355,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
       quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -358,7 +365,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       supplier: obj['supplier'] || obj['vendor'] || 'Pioneer',
     }),
     brandKey: 'Pioneer',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier', 'Pre Order Price'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -366,14 +373,14 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
-      p.barcode || '', p.supplier || '',
+      p.barcode || '', p.supplier || '', p.preOrderPrice ?? '',
     ],
   },
   sideways: {
     label: 'Sideways',
-    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier',
-    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier',
-    placeholder: 'SW-001,Sideways Porsche 935,Sideways,Livery Car,480,295,6,Sideways Sales,Sideways Purchases,,Sideways',
+    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Cost - Inclusive, Qty, Sales Account, Purchases Account, Barcode, Supplier, Pre Order Price',
+    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Cost - Inclusive,Qty,Sales Account,Purchases Account,Barcode,Supplier,Pre Order Price',
+    placeholder: 'SW-001,Sideways Porsche 935,Sideways,Livery Car,480,295,6,Sideways Sales,Sideways Purchases,,Sideways,',
     mapRow: (obj) => ({
       sku: obj['code'] || obj['sku'] || obj['item code'] || '',
       title: obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '',
@@ -385,6 +392,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
+      preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
       quantity: findQtyValue(obj),
       salesAccount: obj['sales account'] || '',
       purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
@@ -394,7 +402,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       supplier: obj['supplier'] || obj['vendor'] || 'Sideways',
     }),
     brandKey: 'Sideways',
-    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier'],
+    exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Cost - Inclusive', 'Qty', 'Sales Account', 'Purchases Account', 'Barcode', 'Supplier', 'Pre Order Price'],
     exportRow: (p) => [
       p.sku, p.title,
       (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
@@ -402,7 +410,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       p.price, p.costPerItem ?? '', p.quantity,
       Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
       Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
-      p.barcode || '', p.supplier || '',
+      p.barcode || '', p.supplier || '', p.preOrderPrice ?? '',
     ],
   },
 }

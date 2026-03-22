@@ -16,6 +16,7 @@ export default function NewProductPage() {
   const [price, setPrice] = useState('')
   const [compareAtPrice, setCompareAtPrice] = useState('')
   const [costPerItem, setCostPerItem] = useState('')
+  const [preOrderPrice, setPreOrderPrice] = useState('')
   const [sku, setSku] = useState('')
   const [barcode, setBarcode] = useState('')
   const [trackQuantity, setTrackQuantity] = useState(true)
@@ -324,6 +325,7 @@ export default function NewProductPage() {
         price: cleanFloat(price),
         compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
         costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
+        preOrderPrice: preOrderPrice ? cleanFloat(preOrderPrice) : null,
         sku,
         barcode,
         trackQuantity,
@@ -708,6 +710,21 @@ export default function NewProductPage() {
                 <p className="mt-2 text-xs text-gray-500">
                   Customers won&apos;t see this
                 </p>
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pre Order Price</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-gray-500">R</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={preOrderPrice}
+                    onChange={(e) => setPreOrderPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">Special price for pre-order invoices</p>
               </div>
             </div>
 

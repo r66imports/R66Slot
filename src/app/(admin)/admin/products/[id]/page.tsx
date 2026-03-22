@@ -69,6 +69,7 @@ export default function EditProductPage({
   const [description, setDescription] = useState('')
   const [price, setPrice] = useState('')
   const [compareAtPrice, setCompareAtPrice] = useState('')
+  const [preOrderPrice, setPreOrderPrice] = useState('')
   const [costPerItem, setCostPerItem] = useState('')
   const [sku, setSku] = useState('')
   const [barcode, setBarcode] = useState('')
@@ -291,6 +292,7 @@ export default function EditProductPage({
           setDescription(found.description || '')
           setPrice(found.price?.toString() || '')
           setCompareAtPrice(found.compareAtPrice?.toString() || '')
+          setPreOrderPrice((found as any).preOrderPrice?.toString() || '')
           setCostPerItem(found.costPerItem?.toString() || '')
           setSku(found.sku || '')
           setBarcode(found.barcode || '')
@@ -459,6 +461,7 @@ export default function EditProductPage({
           price: cleanFloat(price),
           compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
           costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
+          preOrderPrice: preOrderPrice ? cleanFloat(preOrderPrice) : null,
           sku, barcode, trackQuantity, quantity: cleanInt(quantity),
           weight: weight ? cleanFloat(weight) : null, weightUnit,
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
@@ -493,7 +496,7 @@ export default function EditProductPage({
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(doAutosave, 1500)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, price, compareAtPrice, costPerItem, sku, barcode, trackQuantity,
+  }, [title, description, price, compareAtPrice, costPerItem, preOrderPrice, sku, barcode, trackQuantity,
       quantity, weight, weightUnit, brand, productType, categoryBrands, itemCategories,
       carBrands, sidewaysBrands, isPreOrder, units, carTypes, sidewaysCarTypes, partType, scale, supplier, collections,
       selectedCarClasses, selectedRevoParts, selectedSidewaysParts, selectedSidewaysCarClasses,
@@ -983,6 +986,21 @@ export default function EditProductPage({
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-500">Customers won&apos;t see this</p>
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pre Order Price</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-gray-500">R</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={preOrderPrice}
+                    onChange={(e) => setPreOrderPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">Special price for pre-order invoices</p>
               </div></>}
             </div>
 

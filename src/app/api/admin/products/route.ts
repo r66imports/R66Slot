@@ -8,6 +8,7 @@ export interface Product {
   price: number
   compareAtPrice: number | null
   costPerItem: number | null
+  preOrderPrice: number | null
   sku: string
   barcode: string
   brand: string
@@ -62,6 +63,7 @@ function rowToProduct(row: any): Product {
     price: parseFloat(row.price),
     compareAtPrice: row.compare_at_price ? parseFloat(row.compare_at_price) : null,
     costPerItem: row.cost_per_item ? parseFloat(row.cost_per_item) : null,
+    preOrderPrice: row.pre_order_price ? parseFloat(row.pre_order_price) : null,
     sku: row.sku,
     barcode: row.barcode,
     brand: row.brand,
@@ -130,7 +132,8 @@ async function ensureProductColumns() {
         ADD COLUMN IF NOT EXISTS sideways_car_type JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS sideways_car_classes JSONB DEFAULT '[]'::jsonb,
         ADD COLUMN IF NOT EXISTS custom_orgs JSONB DEFAULT '{}'::jsonb,
-        ADD COLUMN IF NOT EXISTS category_ids JSONB DEFAULT '[]'::jsonb
+        ADD COLUMN IF NOT EXISTS category_ids JSONB DEFAULT '[]'::jsonb,
+        ADD COLUMN IF NOT EXISTS pre_order_price NUMERIC(10,2) DEFAULT NULL
     `)
   } catch { /* ignore */ }
   _productColumnsMigrated = true
@@ -175,7 +178,7 @@ export async function POST(request: Request) {
 
     await db.query(`
       INSERT INTO products (
-        id, title, description, price, compare_at_price, cost_per_item,
+        id, title, description, price, compare_at_price, cost_per_item, pre_order_price,
         sku, barcode, brand, product_type, car_class, car_type, part_type,
         scale, supplier, collections, tags, quantity, track_quantity,
         weight, weight_unit, box_size, dimensions, eta, status,
@@ -183,13 +186,13 @@ export async function POST(request: Request) {
         seo, created_at, updated_at,
         sales_account, purchase_account, category_brands, item_categories, sideways_brands, sideways_parts, sideways_car_classes, custom_orgs, category_ids
       ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-        $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,
-        $34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+        $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,
+        $35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46
       )
     `, [
       id, body.title, body.description || '',
-      body.price || 0, body.compareAtPrice || null, body.costPerItem || null,
+      body.price || 0, body.compareAtPrice || null, body.costPerItem || null, body.preOrderPrice || null,
       body.sku || '', body.barcode || '', body.brand || '', body.productType || '',
       body.carClass || '', body.carType || '', body.partType || '', body.scale || '',
       body.supplier || '',
@@ -405,6 +408,7 @@ export async function PUT(request: Request) {
               cost_per_item    = CASE WHEN $21::numeric > 0 THEN $21::numeric ELSE cost_per_item END,
               compare_at_price = COALESCE($22::numeric, compare_at_price),
               barcode          = CASE WHEN $23 <> '' THEN $23 WHEN barcode IS NULL OR barcode = '' THEN $24 ELSE barcode END,
+              pre_order_price  = CASE WHEN $25::numeric > 0 THEN $25::numeric ELSE pre_order_price END,
               updated_at       = $14
             WHERE id = $15
           `, [
@@ -432,6 +436,7 @@ export async function PUT(request: Request) {
             avgCostValue,
             p.barcode || '',
             sku,
+            p.preOrderPrice ? parseNum(p.preOrderPrice) : null,
           ])
           updated++
           continue
@@ -442,7 +447,7 @@ export async function PUT(request: Request) {
       const id = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       await db.query(`
         INSERT INTO products (
-          id, title, description, price, compare_at_price, cost_per_item,
+          id, title, description, price, compare_at_price, cost_per_item, pre_order_price,
           sku, barcode, brand, product_type, car_class, car_type, part_type,
           scale, supplier, collections, tags, quantity, track_quantity,
           weight, weight_unit, box_size, dimensions, eta, status,
@@ -451,15 +456,16 @@ export async function PUT(request: Request) {
           item_categories, category_brands,
           created_at, updated_at
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,
-          $16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,
-          $32,$33,$34,$35,$36,$37,$38
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+          $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
+          $33,$34,$35,$36,$37,$38,$39
         )
       `, [
         id, p.title || p.name || '', p.description || '',
         parseNum(p.price),
         parseNumOrNull(p.compareAtPrice),
         parseNumOrNull(p.costPerItem),
+        p.preOrderPrice ? parseNum(p.preOrderPrice) : null,
         sku, p.barcode || sku, p.brand || '', p.productType || '',
         p.carClass || '', p.carType || '', p.partType || '', p.scale || '',
         p.supplier || '',
