@@ -614,7 +614,7 @@ export default function ProductsPage() {
     a.click()
   }
 
-  const exportMasterCSV = (rows: Product[]) => {
+  const exportMasterCSV = (rows: Product[], supplierName?: string) => {
     const headers = [
       'Code', 'Description', 'Brand', 'Category (Brand)', 'Item Categories (Unit)',
       'Price (Retail)', 'Average Cost', 'Cost Per Item', 'Pre Order Price',
@@ -649,7 +649,8 @@ export default function ProductsPage() {
     ].join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = `master-products-${new Date().toISOString().slice(0, 10)}.csv`
+    const slug = supplierName ? supplierName.replace(/\s+/g, '-').toLowerCase() + '-' : ''
+    a.download = `master-${slug}products-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
 
@@ -878,7 +879,10 @@ export default function ProductsPage() {
           <Button variant="outline" onClick={fixDuplicates} disabled={fixingDupes}>
             {fixingDupes ? 'Fixing…' : 'Fix Duplicates'}
           </Button>
-          <Button variant="outline" onClick={() => exportMasterCSV(products)}>Master CSV</Button>
+          <Button variant="outline" onClick={() => {
+            const supplierName = supplierFilter ? suppliers.find((s) => s.id === supplierFilter)?.name : undefined
+            exportMasterCSV(supplierFilter ? filtered : products, supplierName)
+          }}>Export Master Supplier</Button>
           <Button variant="outline" onClick={() => setShowExportModal(true)}>Export Sage CSV</Button>
           <Button variant="outline" onClick={() => setShowImportModal(true)}>Import</Button>
           <Button size="lg" asChild>
