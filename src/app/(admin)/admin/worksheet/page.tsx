@@ -11,7 +11,7 @@ interface CompanyInfo {
 
 interface ProductRef {
   id: string; sku: string; title: string; brand: string; price: number; quantity: number
-  unit: string; category: string
+  unit: string; category: string; preOrderPrice?: number | null
 }
 
 interface PricelistEntry {
@@ -31,6 +31,7 @@ interface WsItem {
   category: string
   inStock: number
   retailPrice: number
+  preOrderPrice: number
   qty: number
   wholesalePrice: number
   retailOverride: string
@@ -69,7 +70,7 @@ function newWsItem(): WsItem {
     id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     sku: '', skuSearch: '', description: '',
     unit: '', category: '',
-    inStock: 0, retailPrice: 0,
+    inStock: 0, retailPrice: 0, preOrderPrice: 0,
     qty: 1, wholesalePrice: 0, retailOverride: '',
   }
 }
@@ -205,6 +206,7 @@ function WorksheetEditor({
       return {
         ...it,
         retailPrice: it.retailPrice || prod.price,
+        preOrderPrice: it.preOrderPrice || prod.preOrderPrice || 0,
         inStock: it.inStock || prod.quantity,
       }
     }))
@@ -451,6 +453,7 @@ function WorksheetEditor({
         category: it.category ?? prod?.category ?? '',
         inStock: it.inStock ?? prod?.quantity ?? 0,
         retailPrice: it.retailPrice || prod?.price || 0,
+        preOrderPrice: it.preOrderPrice || prod?.preOrderPrice || 0,
       }
     }) : [newWsItem()])
     setShowArchive(false)
@@ -518,17 +521,16 @@ function WorksheetEditor({
   // ── CSV ──
   function downloadCSV() {
     const headers = ['#', 'SKU', 'Description', 'Unit', 'Category', 'Qty',
-      'Landed (ZAR)', 'Est Retail (ZAR)',
+      'Landed (ZAR)', 'Pre Order Price',
       'Final Landed (ZAR)', 'Landed Retail (ZAR)', `Total (${currency})`]
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
-      const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
       const fLanded = calcFinalLanded(it.wholesalePrice)
       const fRetail = calcFinalRetail(it.wholesalePrice)
       const totalCur = it.qty * it.wholesalePrice
       return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`,
         `"${(it.unit || '').replace(/"/g, '""')}"`, `"${(it.category || '').replace(/"/g, '""')}"`,
-        it.qty, landed.toFixed(2), retail.toFixed(2),
+        it.qty, landed.toFixed(2), it.preOrderPrice > 0 ? it.preOrderPrice.toFixed(2) : '',
         it.wholesalePrice > 0 ? fLanded.toFixed(2) : '',
         it.wholesalePrice > 0 ? fRetail.toFixed(2) : '',
         it.wholesalePrice > 0 ? totalCur.toFixed(2) : '']
@@ -631,7 +633,7 @@ function WorksheetEditor({
       <th class="c" style="width:36px">Qty</th>
       <th class="r">Wholesale (${currency})</th>
       <th class="r">Landed (ZAR)</th>
-      <th class="r">Est Retail (ZAR)</th>
+      <th class="r">Pre Order Price</th>
       <th class="r" style="color:#065f46">Final Landed</th>
       <th class="r" style="color:#065f46">Landed Retail</th>
       <th class="r" style="color:#1d4ed8">Total (${currency})</th>
@@ -1076,7 +1078,7 @@ function WorksheetEditor({
                 <th className="text-center pb-2 px-2 w-14">Qty</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '120px' }}>Wholesale ({currency})</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Landed (ZAR)</th>
-                <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Est Retail (ZAR)</th>
+                <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Pre Order Price</th>
                 <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Final Landed</th>
                 <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Landed Retail</th>
                 <th className="text-right pb-2 px-2 text-blue-500" style={{ minWidth: '120px' }}>Total ({currency})</th>
@@ -1086,7 +1088,7 @@ function WorksheetEditor({
             <tbody>
               {items.map((it, i) => {
                 const landedCost = calcLanded(it.wholesalePrice)
-                const autoRetail = calcRetail(it.wholesalePrice)
+
                 const skuMatches = filteredProducts(it.skuSearch || it.sku)
                 const hasFinal = it.wholesalePrice > 0
                 return (
@@ -1115,6 +1117,7 @@ function WorksheetEditor({
                                   sku: p.sku, skuSearch: '', description: p.title,
                                   unit: p.unit, category: p.category,
                                   inStock: p.quantity, retailPrice: p.price,
+                                  preOrderPrice: p.preOrderPrice || 0,
                                   ...(plEntry ? { wholesalePrice: plEntry.wholesalePrice } : {}),
                                 })
                                 setActiveSkuRow(null)
@@ -1206,24 +1209,13 @@ function WorksheetEditor({
                       </div>
                     </td>
 
-                    {/* Est Retail */}
+                    {/* Pre Order Price */}
                     <td className="py-2 px-2">
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-xs text-gray-400">R</span>
-                        <input type="number" min={0} step={0.01}
-                          value={it.retailOverride !== '' ? it.retailOverride : (it.wholesalePrice > 0 ? autoRetail.toFixed(2) : '')}
-                          onChange={(e) => updateItem(it.id, { retailOverride: e.target.value })}
-                          onBlur={(e) => { if (!e.target.value) updateItem(it.id, { retailOverride: '' }) }}
-                          onFocus={() => setActiveSkuRow(null)}
-                          placeholder={it.wholesalePrice > 0 ? autoRetail.toFixed(2) : '0.00'}
-                          className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                        {it.retailOverride !== '' && (
-                          <button onClick={() => updateItem(it.id, { retailOverride: '' })} title="Reset to auto"
-                            className="text-gray-300 hover:text-blue-500 transition-colors">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                          </button>
-                        )}
+                        <span className="w-24 text-xs text-right text-gray-700 px-2.5 py-1.5">
+                          {it.preOrderPrice > 0 ? it.preOrderPrice.toFixed(2) : '—'}
+                        </span>
                       </div>
                     </td>
 
