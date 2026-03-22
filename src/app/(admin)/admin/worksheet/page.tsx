@@ -11,6 +11,7 @@ interface CompanyInfo {
 
 interface ProductRef {
   id: string; sku: string; title: string; brand: string; price: number; quantity: number
+  unit: string; category: string
 }
 
 interface PricelistEntry {
@@ -26,6 +27,8 @@ interface WsItem {
   sku: string
   skuSearch: string
   description: string
+  unit: string
+  category: string
   inStock: number
   retailPrice: number
   qty: number
@@ -65,6 +68,7 @@ function newWsItem(): WsItem {
   return {
     id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     sku: '', skuSearch: '', description: '',
+    unit: '', category: '',
     inStock: 0, retailPrice: 0,
     qty: 1, wholesalePrice: 0, retailOverride: '',
   }
@@ -105,6 +109,8 @@ export default function WorksheetPage() {
           id: p.id, sku: p.sku || '', title: p.title || '',
           brand: p.brand || '', price: Number(p.price) || 0,
           quantity: Number(p.quantity) || 0,
+          unit: (Array.isArray(p.item_categories) ? p.item_categories[0] : p.item_categories) || '',
+          category: (Array.isArray(p.category_brands) ? p.category_brands[0] : p.category_brands) || '',
         })).filter((p) => p.sku || p.title))
       }
 
@@ -441,6 +447,8 @@ function WorksheetEditor({
       return {
         ...it,
         skuSearch: '',
+        unit: it.unit ?? prod?.unit ?? '',
+        category: it.category ?? prod?.category ?? '',
         inStock: it.inStock ?? prod?.quantity ?? 0,
         retailPrice: it.retailPrice || prod?.price || 0,
       }
@@ -509,8 +517,8 @@ function WorksheetEditor({
 
   // ── CSV ──
   function downloadCSV() {
-    const headers = ['#', 'SKU', 'Description', 'Retail (ZAR)', 'In Stock', 'Qty',
-      `Wholesale (${currency})`, 'Landed (ZAR)', 'Est Retail (ZAR)',
+    const headers = ['#', 'SKU', 'Description', 'Unit', 'Category', 'Qty',
+      'Landed (ZAR)', 'Est Retail (ZAR)',
       'Final Landed (ZAR)', 'Landed Retail (ZAR)', `Total (${currency})`]
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
@@ -518,8 +526,9 @@ function WorksheetEditor({
       const fLanded = calcFinalLanded(it.wholesalePrice)
       const fRetail = calcFinalRetail(it.wholesalePrice)
       const totalCur = it.qty * it.wholesalePrice
-      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`, it.retailPrice > 0 ? it.retailPrice.toFixed(2) : '', it.inStock,
-        it.qty, it.wholesalePrice.toFixed(2), landed.toFixed(2), retail.toFixed(2),
+      return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`,
+        `"${(it.unit || '').replace(/"/g, '""')}"`, `"${(it.category || '').replace(/"/g, '""')}"`,
+        it.qty, landed.toFixed(2), retail.toFixed(2),
         it.wholesalePrice > 0 ? fLanded.toFixed(2) : '',
         it.wholesalePrice > 0 ? fRetail.toFixed(2) : '',
         it.wholesalePrice > 0 ? totalCur.toFixed(2) : '']
@@ -527,7 +536,7 @@ function WorksheetEditor({
     const filledForTotal = items.filter((it) => it.wholesalePrice > 0)
     const grandTotalCur = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
     const grandTotalZAR = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
-    const totalRow = ['', '', '', '', '', 'TOTAL', '', '', '', '', '', `${grandTotalCur.toFixed(2)} (R ${grandTotalZAR.toFixed(2)})`]
+    const totalRow = ['', '', '', '', '', 'TOTAL', '', '', '', '', `${grandTotalCur.toFixed(2)} (R ${grandTotalZAR.toFixed(2)})`]
     const csv = [headers.join(','), ...rows.map((r) => r.join(',')), totalRow.join(',')].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -1104,6 +1113,7 @@ function WorksheetEditor({
                                 const plEntry = pricelist.find((e) => e.sku === p.sku)
                                 updateItem(it.id, {
                                   sku: p.sku, skuSearch: '', description: p.title,
+                                  unit: p.unit, category: p.category,
                                   inStock: p.quantity, retailPrice: p.price,
                                   ...(plEntry ? { wholesalePrice: plEntry.wholesalePrice } : {}),
                                 })
