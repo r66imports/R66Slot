@@ -117,6 +117,7 @@ export default function AdminLayout({
           { name: 'Suppliers', href: '/admin/supplier-contacts', icon: '🏭' },
         ]
       },
+      { name: 'Events', href: '/admin/events', icon: '🏁' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
       { name: 'Sage Accounting', href: '/admin/sage', icon: '📊' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
