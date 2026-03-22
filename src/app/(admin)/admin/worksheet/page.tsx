@@ -109,8 +109,8 @@ export default function WorksheetPage() {
           id: p.id, sku: p.sku || '', title: p.title || '',
           brand: p.brand || '', price: Number(p.price) || 0,
           quantity: Number(p.quantity) || 0,
-          unit: (Array.isArray(p.item_categories) ? p.item_categories[0] : p.item_categories) || '',
-          category: (Array.isArray(p.category_brands) ? p.category_brands[0] : p.category_brands) || '',
+          unit: Array.isArray(p.itemCategories) ? p.itemCategories.join(' / ') : (p.itemCategories || ''),
+          category: Array.isArray(p.categoryBrands) ? p.categoryBrands.join(' / ') : (p.categoryBrands || ''),
         })).filter((p) => p.sku || p.title))
       }
 
