@@ -35,6 +35,7 @@ interface WsItem {
   qty: number
   wholesalePrice: number
   retailOverride: string
+  sentToInventory?: boolean
 }
 
 interface WsSheet {
@@ -71,7 +72,7 @@ function newWsItem(): WsItem {
     sku: '', skuSearch: '', description: '',
     unit: '', category: '',
     inStock: 0, retailPrice: 0, preOrderPrice: 0,
-    qty: 1, wholesalePrice: 0, retailOverride: '',
+    qty: 1, wholesalePrice: 0, retailOverride: '', sentToInventory: false,
   }
 }
 
@@ -233,9 +234,11 @@ function WorksheetEditor({
         if (!prod) continue
         const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
+        const preOrderZAR = Math.round(calcRetail(it.wholesalePrice) * 100) / 100
         const patch: Record<string, number> = {}
         if (finalLanded > 0) patch.costPerItem = finalLanded
         if (retailZAR > 0) patch.price = retailZAR
+        if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
         if (Object.keys(patch).length === 0) continue
         await fetch(`/api/admin/products/${prod.id}`, {
           method: 'PUT',
@@ -272,19 +275,22 @@ function WorksheetEditor({
     setSendingInventory(true)
     setInventoryMissed([])
     const missed: string[] = []
+    const sentIds: string[] = []
     try {
       for (const it of toSend) {
         const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-        if (!prod) {
-          missed.push(it.sku)
-          continue
-        }
+        if (!prod) { missed.push(it.sku); continue }
         const res = await fetch('/api/admin/pos/stock', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: prod.id, mode: 'add', qty: it.qty }),
         })
         if (!res.ok) missed.push(it.sku)
+        else sentIds.push(it.id)
+      }
+      // Lock successfully sent items permanently
+      if (sentIds.length > 0) {
+        setItems((prev) => prev.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it))
       }
       setInventorySent(true)
       setCheckedItems(new Set())
@@ -1052,7 +1058,7 @@ function WorksheetEditor({
               }`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              {costsUpdated ? '✓ Updated!' : updatingCosts ? 'Updating…' : 'Update Final Costing'}
+              {costsUpdated ? '✓ Updated!' : updatingCosts ? 'Updating…' : 'Update Costing'}
             </button>
           </div>
         </div>
@@ -1170,21 +1176,25 @@ function WorksheetEditor({
                     <td className="py-2 px-1 text-center">
                       <input
                         type="checkbox"
-                        checked={checkedItems.has(it.id)}
-                        onChange={() => toggleCheck(it.id)}
-                        disabled={!it.sku}
-                        title="Check to confirm stock is correct"
-                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                        checked={it.sentToInventory || checkedItems.has(it.id)}
+                        onChange={() => !it.sentToInventory && toggleCheck(it.id)}
+                        disabled={!it.sku || !!it.sentToInventory}
+                        title={it.sentToInventory ? 'Sent to inventory — locked' : 'Check to confirm stock is correct'}
+                        className="w-4 h-4 rounded accent-indigo-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     </td>
 
                     {/* Qty */}
                     <td className="py-2 px-2">
-                      <input type="number" min={1} step={1} value={it.qty}
-                        onChange={(e) => updateItem(it.id, { qty: Math.max(1, Number(e.target.value)) })}
-                        onFocus={() => setActiveSkuRow(null)}
-                        className="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
-                      />
+                      {it.sentToInventory ? (
+                        <span className="w-14 inline-block text-center px-2 py-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg">{it.qty}</span>
+                      ) : (
+                        <input type="number" min={1} step={1} value={it.qty}
+                          onChange={(e) => updateItem(it.id, { qty: Math.max(1, Number(e.target.value)) })}
+                          onFocus={() => setActiveSkuRow(null)}
+                          className="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                      )}
                     </td>
 
                     {/* Wholesale */}
