@@ -530,7 +530,7 @@ function WorksheetEditor({
       const totalCur = it.qty * it.wholesalePrice
       return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`,
         `"${(it.unit || '').replace(/"/g, '""')}"`, `"${(it.category || '').replace(/"/g, '""')}"`,
-        it.qty, landed.toFixed(2), it.preOrderPrice > 0 ? it.preOrderPrice.toFixed(2) : '',
+        it.qty, landed.toFixed(2), it.wholesalePrice > 0 ? calcRetail(it.wholesalePrice).toFixed(2) : '',
         it.wholesalePrice > 0 ? fLanded.toFixed(2) : '',
         it.wholesalePrice > 0 ? fRetail.toFixed(2) : '',
         it.wholesalePrice > 0 ? totalCur.toFixed(2) : '']
@@ -1214,7 +1214,7 @@ function WorksheetEditor({
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-xs text-gray-400">R</span>
                         <span className="w-24 text-xs text-right text-gray-700 px-2.5 py-1.5">
-                          {it.preOrderPrice > 0 ? it.preOrderPrice.toFixed(2) : '—'}
+                          {it.wholesalePrice > 0 ? calcRetail(it.wholesalePrice).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
                         </span>
                       </div>
                     </td>
