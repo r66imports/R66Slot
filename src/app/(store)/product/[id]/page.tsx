@@ -151,9 +151,9 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Stock status */}
-          {!outOfStock && !isPreOrder && (
-            <p className="text-sm text-green-600 font-medium">
-              {product.quantity > 0 ? `${product.quantity} in stock` : 'Available'}
+          {!outOfStock && !isPreOrder && product.quantity > 0 && (
+            <p className="text-sm font-medium text-green-600">
+              {product.quantity} available
             </p>
           )}
 
@@ -166,14 +166,19 @@ export default function ProductDetailPage() {
                   <div className="flex items-center gap-2 border border-gray-300 rounded-lg overflow-hidden">
                     <button
                       onClick={() => setQty((q) => Math.max(1, q - 1))}
-                      className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                      disabled={qty <= 1}
+                      className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >−</button>
                     <span className="w-10 text-center font-semibold text-sm">{qty}</span>
                     <button
-                      onClick={() => setQty((q) => q + 1)}
-                      className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors"
+                      onClick={() => setQty((q) => Math.min(product.quantity, q + 1))}
+                      disabled={qty >= product.quantity}
+                      className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >+</button>
                   </div>
+                  {qty >= product.quantity && product.quantity > 0 && (
+                    <span className="text-xs text-amber-600 font-medium">Max stock reached</span>
+                  )}
                 </div>
               )}
 
