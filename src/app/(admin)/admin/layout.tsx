@@ -60,6 +60,7 @@ export default function AdminLayout({
           { name: 'Inventory', href: '/admin/inventory', icon: '📋' },
           { name: 'Categories', href: '/admin/categories', icon: '🏷️' },
           { name: 'POS / Scanner', href: '/admin/pos', icon: '🔍' },
+          { name: 'Reports', href: '/admin/reports', icon: '📊' },
         ]
       },
     ],
