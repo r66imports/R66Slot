@@ -490,6 +490,15 @@ export default function EditProductPage({
     }
   }
 
+  // Auto-deselect Pre Order when stock comes in
+  useEffect(() => {
+    if (!isLoaded.current) return
+    if (isPreOrder && parseInt(quantity || '0') > 0) {
+      setIsPreOrder(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantity])
+
   // Autosave effect — debounced 1500ms after any field change (skips during initial load)
   useEffect(() => {
     if (!isLoaded.current) return
@@ -1163,6 +1172,27 @@ export default function EditProductPage({
                 <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Product status</h3>
                 <svg className={`w-4 h-4 text-gray-400 transition-transform ${statusCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </button>
+              {/* Pre Order toggle — always visible */}
+              <button
+                type="button"
+                onClick={() => setIsPreOrder(!isPreOrder)}
+                className={`w-full mb-4 flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-all font-medium text-sm ${
+                  isPreOrder
+                    ? 'bg-amber-50 border-amber-400 text-amber-800'
+                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-base">{isPreOrder ? '🎯' : '📦'}</span>
+                  Pre Order
+                </span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isPreOrder ? 'bg-amber-400 text-white' : 'bg-gray-200 text-gray-400'}`}>
+                  {isPreOrder ? 'ON' : 'OFF'}
+                </span>
+              </button>
+              {isPreOrder && (
+                <p className="text-xs text-amber-600 mb-4 -mt-2">Item is bookable. Auto-disables when stock arrives.</p>
+              )}
               {!statusCollapsed && <><select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
