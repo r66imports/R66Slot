@@ -47,6 +47,7 @@ interface Product {
   revoParts?: string[]
   collections: string[]
   categories?: string[]
+  categoryIds?: string[]
   categoryBrands?: string[]
   itemCategories?: string[]
   quantity: number
@@ -614,38 +615,41 @@ export default function ProductsPage() {
     a.click()
   }
 
-  const exportMasterCSV = (supplierName?: string) => {
-    const rows = supplierName
-      ? products.filter((p) => (p.supplier || '').toLowerCase() === supplierName.toLowerCase())
-      : products
+  const exportMasterCSV = (rows: Product[], label?: string) => {
     const headers = [
       'Code', 'Description', 'Brand', 'Category (Brand)', 'Item Categories (Unit)',
-      'Price (Retail)', 'Average Cost', 'Cost Per Item', 'Pre Order Price',
+      'Categories', 'Price (Retail)', 'Average Cost', 'Cost Per Item', 'Pre Order Price',
       'Qty', 'Barcode', 'Supplier', 'Car Class', 'Sales Account', 'Purchases Account',
     ]
     const csv = [
       headers.join(','),
-      ...rows.map((p) => [
-        p.sku,
-        p.title,
-        p.brand || '',
-        (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
-        (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
-        p.price ?? '',
-        p.compareAtPrice ?? '',
-        p.costPerItem ?? '',
-        p.preOrderPrice ?? '',
-        p.quantity ?? '',
-        p.barcode || '',
-        p.supplier || '',
-        (p as any).carClass || '',
-        Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
-        Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
-      ].map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','))
+      ...rows.map((p) => {
+        const catNames = Array.isArray(p.categoryIds)
+          ? p.categoryIds.map((id) => categories.find((c) => c.id === id)?.name || '').filter(Boolean).join('; ')
+          : ''
+        return [
+          p.sku,
+          p.title,
+          p.brand || '',
+          (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
+          (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
+          catNames,
+          p.price ?? '',
+          p.compareAtPrice ?? '',
+          p.costPerItem ?? '',
+          p.preOrderPrice ?? '',
+          p.quantity ?? '',
+          p.barcode || '',
+          p.supplier || '',
+          (p as any).carClass || '',
+          Array.isArray(p.salesAccount) ? p.salesAccount.join('; ') : (p.salesAccount || ''),
+          Array.isArray(p.purchaseAccount) ? p.purchaseAccount.join('; ') : (p.purchaseAccount || ''),
+        ].map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
+      })
     ].join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }))
-    const slug = supplierName ? supplierName.replace(/\s+/g, '-').toLowerCase() + '-' : ''
+    const slug = label ? label.replace(/\s+/g, '-').toLowerCase() + '-' : ''
     a.download = `supplier-${slug}products-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
   }
@@ -876,8 +880,8 @@ export default function ProductsPage() {
             {fixingDupes ? 'Fixing…' : 'Fix Duplicates'}
           </Button>
           <Button variant="outline" onClick={() => {
-            const supplierName = supplierFilter ? suppliers.find((s) => s.id === supplierFilter)?.name : undefined
-            exportMasterCSV(supplierName)
+            const label = brandFilter || (supplierFilter ? suppliers.find((s) => s.id === supplierFilter)?.name : undefined)
+            exportMasterCSV(filtered, label)
           }}>Export Supplier</Button>
           <Button variant="outline" onClick={() => setShowExportModal(true)}>Export Sage CSV</Button>
           <Button variant="outline" onClick={() => setShowImportModal(true)}>Import</Button>
