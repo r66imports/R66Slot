@@ -88,9 +88,9 @@ export default function CategoriesPage() {
     setEditingImageId(null)
   }
 
-  const filtered = categories.filter(c =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = categories
+    .filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name))
 
   const getProductCount = (cat: Category) =>
     cat.productIds?.length ?? cat.productCount ?? 0
@@ -147,12 +147,12 @@ export default function CategoriesPage() {
           <p className="text-sm font-play">Click "+ New Category" to create your first one.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-6 gap-3">
           {filtered.map((cat, i) => (
             <div key={cat.id} className="group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               {/* Card image area — click to change image */}
               <div
-                className={`h-48 bg-gradient-to-br ${CARD_GRADIENTS[i % CARD_GRADIENTS.length]} relative cursor-pointer`}
+                className={`h-24 bg-gradient-to-br ${CARD_GRADIENTS[i % CARD_GRADIENTS.length]} relative cursor-pointer`}
                 onClick={(e) => openImageEdit(cat, e)}
                 title="Click to change image"
               >
@@ -219,11 +219,11 @@ export default function CategoriesPage() {
               {/* Card label — click name to go to edit page */}
               <Link
                 href={`/admin/categories/${cat.id}`}
-                className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-4 py-2.5 flex items-center justify-between hover:bg-white transition-colors"
+                className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-2 py-1.5 flex items-center justify-between hover:bg-white transition-colors"
                 onClick={e => e.stopPropagation()}
               >
-                <span className="font-semibold text-gray-900 text-sm font-play truncate">{cat.name}</span>
-                <span className="text-gray-500 text-sm font-play ml-2 flex-shrink-0">{getProductCount(cat)}</span>
+                <span className="font-semibold text-gray-900 text-xs font-play truncate">{cat.name}</span>
+                <span className="text-gray-500 text-xs font-play ml-1 flex-shrink-0">{getProductCount(cat)}</span>
               </Link>
             </div>
           ))}
