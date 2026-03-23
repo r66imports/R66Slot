@@ -897,6 +897,27 @@ function CreateDocumentModal({
       .catch(() => {})
   }, [])
 
+  // Enrich existing line items with stock/price data once products load
+  // (needed for edit mode — _stockQty is only set on fresh product selection otherwise)
+  useEffect(() => {
+    if (modalProducts.length === 0) return
+    setLineItems((prev) => prev.map((li) => {
+      if (li._stockQty !== undefined) return li // already enriched
+      // Description format is "SKU – title" — extract SKU before the dash
+      const sku = li.description.split(/\s*[–\-]\s*/)[0]?.trim()
+      if (!sku) return li
+      const prod = modalProducts.find((p) => p.sku && p.sku.toLowerCase() === sku.toLowerCase())
+      if (!prod) return li
+      return {
+        ...li,
+        _stockQty: prod.quantity,
+        _retailPrice: li._retailPrice ?? (prod.price || undefined),
+        _costPrice: li._costPrice ?? (prod.costPerItem || undefined),
+        _preOrderPrice: li._preOrderPrice ?? (prod.preOrderPrice || undefined),
+      }
+    }))
+  }, [modalProducts])
+
   // Auto-generate next invoice number (INV000001 format) for new invoices only
   useEffect(() => {
     if (editDoc || docType !== 'invoice') return

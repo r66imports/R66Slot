@@ -44,6 +44,9 @@ export async function GET() {
       const found = stored.find((r) => r.id === def.id)
       return found ? { ...def, ...found, options: def.options } : def
     })
+    // Write back if any new rules were added (self-healing)
+    const hasNew = DEFAULT_RULES.some((def) => !stored.find((r) => r.id === def.id))
+    if (hasNew) await blobWrite(KEY, merged)
     return NextResponse.json(merged)
   } catch {
     return NextResponse.json(DEFAULT_RULES)
