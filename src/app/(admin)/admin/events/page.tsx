@@ -8,6 +8,7 @@ interface EventExpense {
   id: string
   description: string
   amount: number
+  paidBy?: string
 }
 
 interface EventSalesItem {
@@ -313,6 +314,8 @@ function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
 // ─── Expense Row ───────────────────────────────────────────────────────────────
 
+const PAID_BY_OPTIONS = ['', 'Route 66 Imports', 'Self']
+
 function ExpenseRow({ exp, onChange, onRemove }: {
   exp: EventExpense
   onChange: (updated: EventExpense) => void
@@ -329,6 +332,16 @@ function ExpenseRow({ exp, onChange, onRemove }: {
           onChange={(e) => onChange({ ...exp, amount: Number(e.target.value) })}
           className="w-24 px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-indigo-500" />
       </div>
+      <select
+        value={exp.paidBy || ''}
+        onChange={(e) => onChange({ ...exp, paidBy: e.target.value })}
+        className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+        title="Paid by"
+      >
+        {PAID_BY_OPTIONS.map((o) => (
+          <option key={o} value={o}>{o || 'Paid by…'}</option>
+        ))}
+      </select>
       <button onClick={onRemove} className="text-gray-300 hover:text-red-500 text-lg leading-none px-1">✕</button>
     </div>
   )
@@ -516,20 +529,55 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
               onRemove={() => setExpenses((prev) => prev.filter((e) => e.id !== exp.id))} />
           ))}
           <button
-            onClick={() => setExpenses((prev) => [...prev, { id: uid(), description: '', amount: 0 }])}
+            onClick={() => setExpenses((prev) => [...prev, { id: uid(), description: '', amount: 0, paidBy: '' }])}
             className="w-full border-2 border-dashed border-gray-200 rounded-lg py-2.5 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2">
             + Add Expense
           </button>
           {expenses.length > 0 && (
-            <div className="pt-3 border-t border-gray-100">
+            <div className="pt-3 border-t border-gray-100 space-y-1.5">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Total Expenses</span>
                 <span className="font-bold text-orange-600">{fmtPrice(totalExpenses)}</span>
               </div>
-              <div className="flex justify-between text-sm mt-1">
+              <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Net Profit</span>
                 <span className={`font-bold ${netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtPrice(netProfit)}</span>
               </div>
+
+              {/* Reimbursement summary — grouped by paidBy */}
+              {(() => {
+                const groups = new Map<string, { exps: EventExpense[]; total: number }>()
+                for (const e of expenses) {
+                  const key = e.paidBy?.trim() || ''
+                  if (!key) continue
+                  const g = groups.get(key) || { exps: [], total: 0 }
+                  g.exps.push(e)
+                  g.total += e.amount || 0
+                  groups.set(key, g)
+                }
+                if (groups.size === 0) return null
+                return (
+                  <div className="mt-3 pt-3 border-t border-dashed border-gray-200">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Reimbursements Owed</p>
+                    {Array.from(groups.entries()).map(([person, { exps, total }]) => (
+                      <div key={person} className="mb-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-semibold text-indigo-700">{person}</span>
+                          <span className="text-sm font-bold text-indigo-700">{fmtPrice(total)}</span>
+                        </div>
+                        <div className="bg-indigo-50 rounded-lg px-3 py-2 space-y-1">
+                          {exps.map((e) => (
+                            <div key={e.id} className="flex justify-between text-xs">
+                              <span className="text-gray-600">{e.description || '(no description)'}</span>
+                              <span className="font-semibold text-gray-800">{fmtPrice(e.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           )}
           <div className="pt-2">
