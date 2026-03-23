@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { db } from '@/lib/db'
 
 const KEY = 'data/order-documents.json'
 
@@ -31,6 +32,7 @@ export interface OrderDocument {
   createdAt: string
   updatedAt: string
   backorderId?: string
+  stockDeducted?: boolean
 }
 
 async function getDocs(): Promise<OrderDocument[]> {
@@ -39,6 +41,34 @@ async function getDocs(): Promise<OrderDocument[]> {
 
 async function saveDocs(docs: OrderDocument[]): Promise<void> {
   await blobWrite(KEY, docs)
+}
+
+/** Extract SKU from a line item description like "PT1172G25 – G25 Compound Slick Tires..." */
+export function extractSku(description: string): string {
+  return description.split(/\s*[–\-]\s*/)[0]?.trim() || ''
+}
+
+/** Adjust product stock by sku. direction='subtract' deducts (floor 0), 'add' restores. */
+export async function adjustStock(items: LineItem[], direction: 'subtract' | 'add'): Promise<void> {
+  for (const li of items) {
+    const sku = extractSku(li.description)
+    if (!sku || li.qty <= 0) continue
+    try {
+      if (direction === 'subtract') {
+        await db.query(
+          `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $1, 0), updated_at = $2 WHERE LOWER(sku) = LOWER($3)`,
+          [li.qty, new Date().toISOString(), sku]
+        )
+      } else {
+        await db.query(
+          `UPDATE products SET quantity = COALESCE(quantity, 0) + $1, updated_at = $2 WHERE LOWER(sku) = LOWER($3)`,
+          [li.qty, new Date().toISOString(), sku]
+        )
+      }
+    } catch {
+      // best-effort — don't fail the whole request if one product isn't found
+    }
+  }
 }
 
 export async function GET(request: Request) {
@@ -62,6 +92,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'type, clientName and docNumber are required' }, { status: 400 })
     }
     const now = new Date().toISOString()
+    // Invoices deduct stock permanently; Sales Orders reserve (same deduction). Quotes = no impact.
+    const stockable = body.type === 'invoice' || body.type === 'salesorder'
+    const lineItems: LineItem[] = body.lineItems || []
+
+    if (stockable) {
+      await adjustStock(lineItems, 'subtract')
+    }
+
     const doc: OrderDocument = {
       id: `doc_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       type: body.type,
@@ -71,7 +109,7 @@ export async function POST(request: Request) {
       clientEmail: body.clientEmail || '',
       clientPhone: body.clientPhone || '',
       clientAddress: body.clientAddress || '',
-      lineItems: body.lineItems || [],
+      lineItems,
       notes: body.notes || '',
       terms: body.terms || '',
       status: body.status || 'draft',
@@ -82,6 +120,7 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now,
       backorderId: body.backorderId,
+      stockDeducted: stockable,
     }
     const docs = await getDocs()
     docs.unshift(doc)

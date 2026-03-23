@@ -86,7 +86,33 @@ export default function SiteRulesPage() {
                       {rule.active ? 'Active' : 'Inactive'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500 mb-4">{rule.description}</p>
+                  {/* Description — split on ". Flow:" to separate summary from workflow steps */}
+                  {rule.description.includes('. Flow:') || rule.description.includes('. Use the') ? (
+                    <div className="mb-4 space-y-2">
+                      <p className="text-sm text-gray-500">
+                        {rule.description.split(/\. (?=Flow:|Use the)/)[0]}.
+                      </p>
+                      {rule.description.includes('Flow:') && (
+                        <div className="bg-gray-50 rounded-xl border border-gray-200 px-4 py-3">
+                          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Workflow</p>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {rule.description
+                              .split(/\. (?=Flow:)/)[1]
+                              ?.replace(/^Flow:\s*/, '')
+                              .split(/\.\s+(?=[A-Z])/)
+                              .map((step, i, arr) => (
+                                <span key={i} className="flex items-center gap-1.5">
+                                  <span className="text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-2.5 py-1">{step.replace(/\.$/, '')}</span>
+                                  {i < arr.length - 1 && <span className="text-gray-300 text-xs font-bold">→</span>}
+                                </span>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 mb-4">{rule.description}</p>
+                  )}
 
                   {/* Options selector (for rules with choices) */}
                   {rule.options && rule.options.length > 0 && (

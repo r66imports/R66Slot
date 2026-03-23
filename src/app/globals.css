@@ -10,6 +10,7 @@
 
 :root {
   --font-assistant: 'Assistant', system-ui, sans-serif;
+  --font-play: 'Play', system-ui, sans-serif;
 }
 
 * {
@@ -27,7 +28,7 @@ body {
 body {
   color: #000000;
   background: #ffffff;
-  font-family: var(--font-assistant);
+  font-family: var(--font-play);
 }
 
 a {

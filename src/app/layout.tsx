@@ -32,7 +32,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${assistant.variable} ${play.variable}`}>
-      <body className={assistant.className}>
+      <body className={play.className}>
         <CartProvider>
           <LocalCartProvider>
             <HeroProvider>

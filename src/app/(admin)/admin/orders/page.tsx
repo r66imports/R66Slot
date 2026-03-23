@@ -883,7 +883,7 @@ function CreateDocumentModal({
     setLineItems((prev) => prev.map((li) => {
       if (mode === 'retail' && li._retailPrice) return { ...li, unitPrice: li._retailPrice }
       if (mode === 'cost' && li._costPrice) return { ...li, unitPrice: li._costPrice }
-      if (mode === 'preorder' && li._preOrderPrice) return { ...li, unitPrice: li._preOrderPrice }
+      if (mode === 'preorder') return { ...li, unitPrice: li._preOrderPrice && li._preOrderPrice > 0 ? li._preOrderPrice : (li._retailPrice || li.unitPrice) }
       return li
     }))
   }
@@ -913,7 +913,7 @@ function CreateDocumentModal({
         _stockQty: prod.quantity,
         _retailPrice: li._retailPrice ?? (prod.price || undefined),
         _costPrice: li._costPrice ?? (prod.costPerItem || undefined),
-        _preOrderPrice: li._preOrderPrice ?? (prod.preOrderPrice || undefined),
+        _preOrderPrice: li._preOrderPrice ?? (prod.preOrderPrice > 0 ? prod.preOrderPrice : undefined),
       }
     }))
   }, [modalProducts])
@@ -1059,8 +1059,8 @@ function CreateDocumentModal({
                   {lineItems.map((li) => (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-2 py-1">
-                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice || price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); updateLine(li.id, '_stockQty', stockQty) }} />
-                        {(li._retailPrice || li._preOrderPrice) && (
+                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); updateLine(li.id, '_stockQty', stockQty) }} />
+                        {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
                           <div className="flex gap-1 mt-1 flex-wrap">
                             {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
                             {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Pre-Order R{li._preOrderPrice.toFixed(2)}</button> : null}
@@ -1678,6 +1678,25 @@ export default function OrdersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [checkedBoIds, setCheckedBoIds] = useState<Set<string>>(new Set())
   const [pendingInvoiceBoIds, setPendingInvoiceBoIds] = useState<string[]>([])
+  const [syncingInventory, setSyncingInventory] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+
+  const handleSyncInventory = async () => {
+    setSyncingInventory(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch('/api/admin/orders/documents/sync-inventory', { method: 'POST' })
+      const data = await res.json()
+      setSyncResult(data.message || 'Done')
+      setTimeout(() => setSyncResult(null), 5000)
+      load()
+    } catch {
+      setSyncResult('Sync failed — please try again')
+      setTimeout(() => setSyncResult(null), 4000)
+    } finally {
+      setSyncingInventory(false)
+    }
+  }
 
   const [plProducts, setPlProducts] = useState<Array<{ sku: string; costPerItem: number }>>([])
 
@@ -1906,9 +1925,29 @@ export default function OrdersPage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Orders</h1>
-        <p className="text-gray-500 mt-1">Quotes, Sales Orders &amp; Invoices</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Orders</h1>
+          <p className="text-gray-500 mt-1">Quotes, Sales Orders &amp; Invoices</p>
+        </div>
+        <div className="flex items-center gap-3 mt-1">
+          {syncResult && (
+            <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg">
+              ✓ {syncResult}
+            </span>
+          )}
+          <button
+            onClick={handleSyncInventory}
+            disabled={syncingInventory}
+            title="Apply stock deductions for all invoices and sales orders not yet synced"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-white border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 shadow-sm disabled:opacity-50"
+          >
+            <svg className={`w-4 h-4 ${syncingInventory ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {syncingInventory ? 'Syncing…' : 'Sync Inventory'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs + Actions */}
