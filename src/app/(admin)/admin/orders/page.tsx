@@ -862,16 +862,31 @@ function CreateDocumentModal({
   const [error, setError] = useState('')
   const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>>([])
   const [enforceStockLimit, setEnforceStockLimit] = useState(false)
+  const [priceMode, setPriceMode] = useState<'retail' | 'cost' | 'preorder'>('retail')
 
   useEffect(() => {
     fetch('/api/admin/site-rules')
       .then((r) => r.ok ? r.json() : [])
       .then((rules: any[]) => {
-        const rule = rules.find((r) => r.id === 'enforce_stock_limit')
-        setEnforceStockLimit(rule?.active === true)
+        const stockRule = rules.find((r) => r.id === 'enforce_stock_limit')
+        setEnforceStockLimit(stockRule?.active === true)
+        const priceRule = rules.find((r) => r.id === 'invoice_price_type')
+        if (priceRule?.active && priceRule.value) {
+          setPriceMode(priceRule.value as 'retail' | 'cost' | 'preorder')
+        }
       })
       .catch(() => {})
   }, [])
+
+  const changePriceMode = (mode: 'retail' | 'cost' | 'preorder') => {
+    setPriceMode(mode)
+    setLineItems((prev) => prev.map((li) => {
+      if (mode === 'retail' && li._retailPrice) return { ...li, unitPrice: li._retailPrice }
+      if (mode === 'cost' && li._costPrice) return { ...li, unitPrice: li._costPrice }
+      if (mode === 'preorder' && li._preOrderPrice) return { ...li, unitPrice: li._preOrderPrice }
+      return li
+    }))
+  }
 
   useEffect(() => {
     fetch('/api/admin/products')
@@ -983,7 +998,30 @@ function CreateDocumentModal({
           <section>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Line Items</h3>
-              <button onClick={addLine} className="text-xs text-blue-600 hover:text-blue-800 font-semibold">+ Add Line</button>
+              <div className="flex items-center gap-3">
+                {/* Price mode selector */}
+                <div className="flex items-center bg-gray-100 rounded-lg p-0.5 gap-0.5">
+                  {([
+                    { key: 'retail', label: 'Retail' },
+                    { key: 'cost', label: 'Cost' },
+                    { key: 'preorder', label: 'Pre-Order' },
+                  ] as const).map(({ key, label }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => changePriceMode(key)}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                        priceMode === key
+                          ? 'bg-white text-indigo-700 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={addLine} className="text-xs text-blue-600 hover:text-blue-800 font-semibold">+ Add Line</button>
+              </div>
             </div>
             <div className="border rounded-xl overflow-hidden">
               <table className="w-full text-sm">
@@ -1000,7 +1038,7 @@ function CreateDocumentModal({
                   {lineItems.map((li) => (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-2 py-1">
-                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const isR66Slot = form.clientName.trim().toLowerCase() === 'r66slot'; updateLine(li.id, 'unitPrice', isR66Slot ? (costPerItem || price) : price); if (preOrderPrice) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); updateLine(li.id, '_stockQty', stockQty) }} />
+                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice || price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); updateLine(li.id, '_stockQty', stockQty) }} />
                         {(li._retailPrice || li._preOrderPrice) && (
                           <div className="flex gap-1 mt-1 flex-wrap">
                             {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}

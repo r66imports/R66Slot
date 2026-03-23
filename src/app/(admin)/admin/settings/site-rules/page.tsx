@@ -9,6 +9,8 @@ interface SiteRule {
   description: string
   active: boolean
   appliesTo: string[]
+  value?: string
+  options?: Array<{ label: string; value: string }>
 }
 
 export default function SiteRulesPage() {
@@ -27,6 +29,10 @@ export default function SiteRulesPage() {
 
   const toggle = (id: string) => {
     setRules((prev) => prev.map((r) => r.id === id ? { ...r, active: !r.active } : r))
+  }
+
+  const setValue = (id: string, value: string) => {
+    setRules((prev) => prev.map((r) => r.id === id ? { ...r, value } : r))
   }
 
   const save = async () => {
@@ -81,6 +87,28 @@ export default function SiteRulesPage() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-500 mb-4">{rule.description}</p>
+
+                  {/* Options selector (for rules with choices) */}
+                  {rule.options && rule.options.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Default Selection</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {rule.options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            onClick={() => setValue(rule.id, opt.value)}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-all ${
+                              rule.value === opt.value
+                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Applies To badges */}
                   <div>

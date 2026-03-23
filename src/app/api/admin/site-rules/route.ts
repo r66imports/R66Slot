@@ -9,6 +9,8 @@ export interface SiteRule {
   description: string
   active: boolean
   appliesTo: string[]
+  value?: string
+  options?: Array<{ label: string; value: string }>
 }
 
 const DEFAULT_RULES: SiteRule[] = [
@@ -19,12 +21,30 @@ const DEFAULT_RULES: SiteRule[] = [
     active: false,
     appliesTo: ['Admin Invoices', 'POS / Scanner', 'Online Store'],
   },
+  {
+    id: 'invoice_price_type',
+    name: 'Invoice Default Price Type',
+    description: 'Set the default price type applied when adding products to an invoice. Can be changed per-invoice in the Create / Edit Invoice modal.',
+    active: true,
+    appliesTo: ['Admin Invoices'],
+    value: 'retail',
+    options: [
+      { label: 'Retail Price', value: 'retail' },
+      { label: 'Cost Price', value: 'cost' },
+      { label: 'Pre-Order Price', value: 'preorder' },
+    ],
+  },
 ]
 
 export async function GET() {
   try {
-    const rules = await blobRead<SiteRule[]>(KEY, DEFAULT_RULES)
-    return NextResponse.json(rules)
+    const stored = await blobRead<SiteRule[]>(KEY, DEFAULT_RULES)
+    // Merge in any new default rules not yet in the stored data
+    const merged = DEFAULT_RULES.map((def) => {
+      const found = stored.find((r) => r.id === def.id)
+      return found ? { ...def, ...found, options: def.options } : def
+    })
+    return NextResponse.json(merged)
   } catch {
     return NextResponse.json(DEFAULT_RULES)
   }
@@ -34,9 +54,11 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json()
     const current = await blobRead<SiteRule[]>(KEY, DEFAULT_RULES)
-    const updated = current.map((r) => {
-      const patch = body.find((b: any) => b.id === r.id)
-      return patch ? { ...r, ...patch } : r
+    // Merge patches; preserve options from defaults
+    const updated = DEFAULT_RULES.map((def) => {
+      const stored = current.find((r) => r.id === def.id) || def
+      const patch = body.find((b: any) => b.id === def.id)
+      return patch ? { ...def, ...stored, ...patch, options: def.options } : { ...def, ...stored, options: def.options }
     })
     await blobWrite(KEY, updated)
     return NextResponse.json(updated)
