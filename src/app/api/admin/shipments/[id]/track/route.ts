@@ -24,8 +24,10 @@ async function getFedexToken(): Promise<string> {
     }),
   })
   if (!res.ok) {
-    if (res.status === 401) throw new Error('FedEx credentials invalid or not yet active (can take up to 24h for new keys)')
-    throw new Error(`FedEx auth failed (${res.status})`)
+    const body = await res.text()
+    console.error(`FedEx auth failed (${res.status}):`, body)
+    if (res.status === 401) throw new Error(`FedEx auth 401 — check FEDEX_CLIENT_ID and FEDEX_CLIENT_SECRET in Railway. FedEx said: ${body}`)
+    throw new Error(`FedEx auth failed (${res.status}): ${body}`)
   }
   const data = await res.json()
   fedexToken = { value: data.access_token, expiresAt: Date.now() + data.expires_in * 1000, base: FEDEX_BASE }
