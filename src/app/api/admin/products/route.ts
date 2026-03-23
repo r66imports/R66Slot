@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { blobRead } from '@/lib/blob-storage'
 
 export interface Product {
   id: string
@@ -350,6 +351,16 @@ export async function PUT(request: Request) {
     const parseNumOrNull = (v: any) => { const n = parseFloat(String(v || '').replace(/,/g, '')); return isNaN(n) || n === 0 ? null : n }
     const parseQty = (v: any) => parseInt(String(v || '').replace(/,/g, '')) || 0
 
+    // Load categories once for name→id resolution
+    const allCategories = await blobRead<{ id: string; name: string }[]>('data/product-categories.json', [])
+    const resolveCategoryIds = (categoriesStr: string): string[] => {
+      if (!categoriesStr) return []
+      return categoriesStr.split(';').map(s => s.trim()).filter(Boolean).map(name => {
+        const match = allCategories.find(c => c.name.toLowerCase() === name.toLowerCase())
+        return match?.id || ''
+      }).filter(Boolean)
+    }
+
     let imported = 0
     let updated = 0
     for (const p of body.products) {
@@ -384,6 +395,7 @@ export async function PUT(request: Request) {
           // ── salesAccount / purchaseAccount as JSON arrays ─────────────────
           const salesArr = Array.isArray(p.salesAccount) ? p.salesAccount : (p.salesAccount ? [p.salesAccount] : [])
           const purchaseArr = Array.isArray(p.purchaseAccount) ? p.purchaseAccount : (p.purchaseAccount ? [p.purchaseAccount] : [])
+          const resolvedCatIds = resolveCategoryIds(p.categories || '')
 
           await db.query(`
             UPDATE products SET
@@ -409,6 +421,7 @@ export async function PUT(request: Request) {
               compare_at_price = COALESCE($22::numeric, compare_at_price),
               barcode          = CASE WHEN $23 <> '' THEN $23 WHEN barcode IS NULL OR barcode = '' THEN $24 ELSE barcode END,
               pre_order_price  = CASE WHEN $25::numeric > 0 THEN $25::numeric ELSE pre_order_price END,
+              category_ids     = CASE WHEN $26::jsonb <> '[]'::jsonb THEN $26::jsonb ELSE category_ids END,
               updated_at       = $14
             WHERE id = $15
           `, [
@@ -437,6 +450,7 @@ export async function PUT(request: Request) {
             p.barcode || '',
             sku,
             p.preOrderPrice ? parseNum(p.preOrderPrice) : null,
+            JSON.stringify(resolvedCatIds),
           ])
           updated++
           continue
@@ -445,6 +459,7 @@ export async function PUT(request: Request) {
 
       // No matching SKU found — insert as new product
       const id = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const insertCatIds = resolveCategoryIds(p.categories || '')
       await db.query(`
         INSERT INTO products (
           id, title, description, price, compare_at_price, cost_per_item, pre_order_price,
@@ -453,12 +468,12 @@ export async function PUT(request: Request) {
           weight, weight_unit, box_size, dimensions, eta, status,
           image_url, images, page_id, page_ids, page_url, seo,
           unit, sales_account, purchase_account,
-          item_categories, category_brands,
+          item_categories, category_brands, category_ids,
           created_at, updated_at
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
-          $33,$34,$35,$36,$37,$38,$39
+          $33,$34,$35,$36,$37,$38,$39,$40
         )
       `, [
         id, p.title || p.name || '', p.description || '',
@@ -483,6 +498,7 @@ export async function PUT(request: Request) {
         JSON.stringify(Array.isArray(p.purchaseAccount) ? p.purchaseAccount : (p.purchaseAccount ? [p.purchaseAccount] : [])),
         JSON.stringify(Array.isArray(p.itemCategories) ? p.itemCategories : (p.itemCategories ? [p.itemCategories] : [])),
         JSON.stringify(Array.isArray(p.categoryBrands) ? p.categoryBrands : (p.categoryBrands ? [p.categoryBrands] : [])),
+        JSON.stringify(insertCatIds),
         now, now,
       ])
       imported++
