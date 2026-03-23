@@ -27,6 +27,7 @@ interface LineItem {
   _retailPrice?: number
   _costPrice?: number
   _preOrderPrice?: number
+  _stockQty?: number
 }
 
 interface OrderDocument {
@@ -756,7 +757,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   value: string
   onChange: (v: string) => void
   products: Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>
-  onSelectProduct: (sku: string, title: string, price: number, costPerItem: number, preOrderPrice: number) => void
+  onSelectProduct: (sku: string, title: string, price: number, costPerItem: number, preOrderPrice: number, stockQty: number) => void
 }) {
   const [open, setOpen] = useState(false)
   const [outOfStockMsg, setOutOfStockMsg] = useState('')
@@ -773,7 +774,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
       setTimeout(() => setOutOfStockMsg(''), 3000)
       return
     }
-    onSelectProduct(p.sku, p.title, p.price, p.costPerItem, p.preOrderPrice)
+    onSelectProduct(p.sku, p.title, p.price, p.costPerItem, p.preOrderPrice, p.quantity)
     setOpen(false)
   }
 
@@ -860,6 +861,17 @@ function CreateDocumentModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>>([])
+  const [enforceStockLimit, setEnforceStockLimit] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/admin/site-rules')
+      .then((r) => r.ok ? r.json() : [])
+      .then((rules: any[]) => {
+        const rule = rules.find((r) => r.id === 'enforce_stock_limit')
+        setEnforceStockLimit(rule?.active === true)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch('/api/admin/products')
@@ -988,7 +1000,7 @@ function CreateDocumentModal({
                   {lineItems.map((li) => (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-2 py-1">
-                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const isR66Slot = form.clientName.trim().toLowerCase() === 'r66slot'; updateLine(li.id, 'unitPrice', isR66Slot ? (costPerItem || price) : price); if (preOrderPrice) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem) }} />
+                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const isR66Slot = form.clientName.trim().toLowerCase() === 'r66slot'; updateLine(li.id, 'unitPrice', isR66Slot ? (costPerItem || price) : price); if (preOrderPrice) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); updateLine(li.id, '_stockQty', stockQty) }} />
                         {(li._retailPrice || li._preOrderPrice) && (
                           <div className="flex gap-1 mt-1 flex-wrap">
                             {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
@@ -997,7 +1009,23 @@ function CreateDocumentModal({
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-1"><input type="number" min={1} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.qty} onChange={(e) => updateLine(li.id, 'qty', Number(e.target.value))} /></td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="number"
+                          min={1}
+                          max={enforceStockLimit && li._stockQty !== undefined ? li._stockQty : undefined}
+                          className={`w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50 ${enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty ? 'text-red-600 bg-red-50' : ''}`}
+                          value={li.qty}
+                          onChange={(e) => {
+                            const v = Number(e.target.value)
+                            const max = enforceStockLimit && li._stockQty !== undefined ? li._stockQty : Infinity
+                            updateLine(li.id, 'qty', Math.min(v, max))
+                          }}
+                        />
+                        {enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty && (
+                          <div className="text-[10px] text-red-500 font-medium mt-0.5 text-right">{li._stockQty} in stock</div>
+                        )}
+                      </td>
                       <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
                       <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>
                       <td className="px-2 py-2 text-center">{lineItems.length > 1 && <button onClick={() => removeLine(li.id)} className="text-gray-300 hover:text-red-500 leading-none">✕</button>}</td>

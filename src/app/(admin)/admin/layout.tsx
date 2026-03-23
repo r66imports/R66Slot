@@ -124,6 +124,7 @@ export default function AdminLayout({
     ],
     settings: [
       { name: 'Site Settings', href: '/admin/settings', icon: '⚙️' },
+      { name: 'Site Rules', href: '/admin/settings/site-rules', icon: '📏' },
       { name: 'My Account', href: '/admin/account', icon: '👤' },
     ],
   }

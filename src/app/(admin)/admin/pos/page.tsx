@@ -334,6 +334,7 @@ export default function POSPage() {
   const [flash, setFlash] = useState<'success' | 'error' | null>(null)
   const [template, setTemplate] = useState<OrderTemplate>({})
   const [clients, setClients] = useState<ClientContact[]>([])
+  const [enforceStockLimit, setEnforceStockLimit] = useState(false)
 
   // Invoice modal
   const [showInvoice, setShowInvoice] = useState(false)
@@ -351,6 +352,13 @@ export default function POSPage() {
     fetch('/api/admin/clients')
       .then(r => r.ok ? r.json() : [])
       .then(data => setClients(Array.isArray(data) ? data : []))
+      .catch(() => {})
+    fetch('/api/admin/site-rules')
+      .then(r => r.ok ? r.json() : [])
+      .then((rules: any[]) => {
+        const rule = rules.find((r: any) => r.id === 'enforce_stock_limit')
+        setEnforceStockLimit(rule?.active === true)
+      })
       .catch(() => {})
   }, [])
 
@@ -667,12 +675,22 @@ export default function POSPage() {
                   type="number"
                   min={1}
                   value={qty}
-                  onChange={e => setQty(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={e => {
+                    const v = Math.max(1, parseInt(e.target.value) || 1)
+                    const max = enforceStockLimit && mode === 'subtract' && product && product.quantity !== null ? product.quantity : Infinity
+                    setQty(Math.min(v, max))
+                  }}
                   onBlur={() => setTimeout(() => refocus(), 100)}
                   className="w-20 text-center text-xl font-bold bg-gray-800 border border-gray-700 rounded-lg py-2 focus:outline-none focus:border-blue-500"
                 />
                 <button
-                  onClick={() => { setQty(q => q + 1); refocus() }}
+                  onClick={() => {
+                    setQty(q => {
+                      const max = enforceStockLimit && mode === 'subtract' && product && product.quantity !== null ? product.quantity : Infinity
+                      return Math.min(q + 1, max)
+                    })
+                    refocus()
+                  }}
                   className="w-10 h-10 rounded-lg bg-gray-800 hover:bg-gray-700 text-xl font-bold flex items-center justify-center"
                 >+</button>
               </div>
