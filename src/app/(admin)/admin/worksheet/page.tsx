@@ -227,11 +227,13 @@ function WorksheetEditor({
     const toUpdate = items.filter((it) => it.sku && it.wholesalePrice > 0)
     if (!toUpdate.length) return
     setUpdatingCosts(true)
+    const errors: string[] = []
+    let updated = 0
     try {
       for (const it of toUpdate) {
         const skuLower = it.sku.trim().toLowerCase()
         const prod = products.find((p) => p.sku.trim().toLowerCase() === skuLower)
-        if (!prod) continue
+        if (!prod) { errors.push(`SKU ${it.sku} not found in products`); continue }
         const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
         const preOrderZAR = Math.round(calcRetail(it.wholesalePrice) * 100) / 100
@@ -240,16 +242,25 @@ function WorksheetEditor({
         if (retailZAR > 0) patch.price = retailZAR
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
         if (Object.keys(patch).length === 0) continue
-        await fetch(`/api/admin/products/${prod.id}`, {
+        const res = await fetch(`/api/admin/products/${prod.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
         })
+        if (!res.ok) {
+          const msg = await res.text().catch(() => res.status.toString())
+          errors.push(`${it.sku}: ${msg}`)
+        } else {
+          updated++
+        }
       }
-      // Auto-save the worksheet
       await saveWorksheet()
-      setCostsUpdated(true)
-      setTimeout(() => setCostsUpdated(false), 3000)
+      if (errors.length > 0) {
+        alert(`Updated ${updated} products.\n\nFailed:\n${errors.join('\n')}`)
+      } else {
+        setCostsUpdated(true)
+        setTimeout(() => setCostsUpdated(false), 3000)
+      }
     } finally {
       setUpdatingCosts(false)
     }
