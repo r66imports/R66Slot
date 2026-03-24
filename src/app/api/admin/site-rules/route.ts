@@ -51,8 +51,15 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Back Orders', 'Admin Invoices'],
   },
   {
+    id: 'document_shipping',
+    name: 'Rule 5 — Shipping on Quotes, Sales Orders & Invoices',
+    description: 'Shipping cost, method, and tracking number can be added to any document type. Flow: Create or Edit Quote / Sales Order / Invoice → scroll to Line Items totals → select Shipping Method (Pudo Locker-to-Locker, Pudo Door-to-Door, The Courier Guy, Fastway, Aramex, PostNet, Collection, Other) → enter Shipping Cost → enter Tracking Number (hidden for Collection) → Shipping cost is added to the Total after discount (not subject to discount) → method and tracking number appear on PDF, print, and email. Tracking number field only appears when a shipping method is selected.',
+    active: true,
+    appliesTo: ['Admin Invoices', 'Quotes', 'Sales Orders'],
+  },
+  {
     id: 'invoice_price_type',
-    name: 'Rule 5 — Invoice Default Price Type',
+    name: 'Rule 6 — Invoice Default Price Type',
     description: 'Sets the default price type applied when adding products to an invoice. Choose between Retail, Cost, or Pre-Order as the default. Can be overridden per-invoice using the Retail | Cost | Pre-Order selector in the Line Items header. Per-row quick-switch buttons also appear under each line item showing all available prices. Products without a Pre-Order price configured will fall back to Retail when Pre-Order mode is selected.',
     active: true,
     appliesTo: ['Admin Invoices'],

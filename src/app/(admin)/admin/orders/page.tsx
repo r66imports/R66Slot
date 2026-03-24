@@ -1917,8 +1917,9 @@ export default function OrdersPage() {
   const docRevenue = (doc: OrderDocument) => {
     const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
     const disc = sub * ((doc as any).discountPct || 0) / 100
+    const ship = (doc as any).shippingCost || 0
     const dep = (doc as any).depositPaid || 0
-    return sub - disc - dep
+    return sub - disc + ship - dep
   }
   const plRevenue = paidInvoices.reduce((s, d) => s + docRevenue(d), 0)
   const plOutstanding = invoiceDocs
