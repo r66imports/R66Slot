@@ -28,7 +28,7 @@ body {
 body {
   color: #000000;
   background: #ffffff;
-  font-family: var(--font-play);
+  /* font-family is controlled by Rule 0 — Site Font via body className in layout.tsx */
 }
 
 a {

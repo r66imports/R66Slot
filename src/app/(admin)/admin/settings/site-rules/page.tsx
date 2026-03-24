@@ -43,9 +43,11 @@ const CATEGORY_DOT: Record<string, string> = {
  * Update this set whenever a new rule is wired up in server code.
  */
 const ENFORCED_RULES = new Set([
-  'enforce_stock_limit',     // Rule 1 — blocks invoice creation when qty exceeds stock
+  'site_font',               // Rule 0 — value drives body font class in root layout.tsx
+  'enforce_stock_limit',     // Rule 1 — blocks invoice/cart qty exceeding stock; online store cap
   'auto_create_product',     // Rule 2 — gates autoCreateMissingProducts call in POST /documents
-  'invoice_stock_deduction', // Rule 3 — gates adjustStock calls in POST + PATCH /documents
+  'invoice_stock_deduction', // Rule 3 — gates adjustStock calls in POST + PATCH /documents; UI warning
+  'document_shipping',       // Rule 5 — hides/shows discount & shipping fields in document modal
   'invoice_price_type',      // Rule 6 — value read by invoices page for default price mode
 ])
 

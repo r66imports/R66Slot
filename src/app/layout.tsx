@@ -4,6 +4,7 @@ import { CartProvider } from '@/context/cart-context'
 import { LocalCartProvider } from '@/context/local-cart-context'
 import { WhatsAppButton } from '@/components/layout/whatsapp-button'
 import { HeroProvider } from '@/contexts/HeroContext'
+import { getRuleValue } from '@/lib/site-rules'
 import './globals.css'
 
 const assistant = Assistant({
@@ -25,14 +26,18 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Rule 0 — Site Font: read configured font value and apply the matching class
+  const fontValue = await getRuleValue('site_font').catch(() => 'Play')
+  const bodyFontClass = fontValue === 'Assistant' ? assistant.className : play.className
+
   return (
     <html lang="en" className={`${assistant.variable} ${play.variable}`}>
-      <body className={play.className}>
+      <body className={bodyFontClass}>
         <CartProvider>
           <LocalCartProvider>
             <HeroProvider>

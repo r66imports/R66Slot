@@ -862,6 +862,8 @@ function CreateDocumentModal({
   prefilledClient,
   prefilledItems,
   editDoc,
+  shippingEnabled = true,
+  stockDeductionEnabled = true,
   onCreated,
   onClose,
 }: {
@@ -871,6 +873,8 @@ function CreateDocumentModal({
   prefilledClient?: { name: string; email: string; phone: string; address: string }
   prefilledItems?: LineItem[]
   editDoc?: OrderDocument
+  shippingEnabled?: boolean
+  stockDeductionEnabled?: boolean
   onCreated: (doc: OrderDocument) => void
   onClose: () => void
 }) {
@@ -895,6 +899,8 @@ function CreateDocumentModal({
   const [error, setError] = useState('')
   const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>>([])
   const [enforceStockLimit, setEnforceStockLimit] = useState(false)
+  const [shippingEnabled, setShippingEnabled] = useState(true)
+  const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [priceMode, setPriceMode] = useState<'retail' | 'cost' | 'preorder'>('retail')
 
   useEffect(() => {
@@ -903,6 +909,10 @@ function CreateDocumentModal({
       .then((rules: any[]) => {
         const stockRule = rules.find((r) => r.id === 'enforce_stock_limit')
         setEnforceStockLimit(stockRule?.active === true)
+        const deductRule = rules.find((r) => r.id === 'invoice_stock_deduction')
+        setStockDeductionEnabled(deductRule?.active !== false)
+        const shipRule = rules.find((r) => r.id === 'document_shipping')
+        setShippingEnabled(shipRule?.active !== false)
         const priceRule = rules.find((r) => r.id === 'invoice_price_type')
         if (priceRule?.active && priceRule.value) {
           setPriceMode(priceRule.value as 'retail' | 'cost' | 'preorder')
@@ -1132,69 +1142,85 @@ function CreateDocumentModal({
                     <td colSpan={3} className="px-3 py-2 text-right text-gray-500">Subtotal</td>
                     <td className="px-3 py-2 text-right font-medium">{fmtPrice(subtotal)}</td><td />
                   </tr>
-                  <tr className="bg-gray-50">
-                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Discount %</td>
-                    <td className="px-2 py-1">
-                      <input type="number" min={0} max={100} step={0.5}
-                        className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
-                        value={discountPct}
-                        onChange={(e) => setDiscountPct(Math.max(0, Math.min(100, Number(e.target.value))))}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-red-500 font-medium">
-                      {discountPct > 0 ? `-${fmtPrice(discountAmt)}` : '—'}
-                    </td>
-                    <td />
-                  </tr>
-                  {/* Shipping — not discounted */}
-                  <tr className="bg-gray-50">
-                    <td className="px-3 py-1.5 text-right text-gray-500 text-xs">Shipping</td>
-                    <td className="px-2 py-1">
-                      <select
-                        className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
-                        value={shippingMethod}
-                        onChange={(e) => setShippingMethod(e.target.value)}
-                      >
-                        <option value="">— None —</option>
-                        <option value="Pudo Locker-to-Locker">Pudo Locker-to-Locker</option>
-                        <option value="Pudo Door-to-Door">Pudo Door-to-Door</option>
-                        <option value="The Courier Guy">The Courier Guy</option>
-                        <option value="Fastway Courier">Fastway Courier</option>
-                        <option value="Aramex">Aramex</option>
-                        <option value="PostNet-to-PostNet">PostNet-to-PostNet</option>
-                        <option value="Collection">Collection (Self-Collect)</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </td>
-                    <td className="px-2 py-1">
-                      <input type="number" min={0} step={0.01}
-                        className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
-                        placeholder="0.00"
-                        value={shippingCost || ''}
-                        onChange={(e) => setShippingCost(Math.max(0, Number(e.target.value)))}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-gray-700 font-medium">
-                      {shippingCost > 0 ? fmtPrice(shippingCost) : '—'}
-                    </td>
-                    <td />
-                  </tr>
-                  {shippingMethod && shippingMethod !== 'Collection' && (
+                  {/* Rule 5 — Shipping & Discounts: only shown when rule is active */}
+                  {shippingEnabled ? (<>
                     <tr className="bg-gray-50">
-                      <td className="px-3 py-1.5 text-right text-gray-400 text-xs">Tracking #</td>
-                      <td colSpan={2} className="px-2 py-1">
-                        <input
-                          type="text"
-                          placeholder="Enter tracking number"
-                          className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
-                          value={trackingNumber}
-                          onChange={(e) => setTrackingNumber(e.target.value)}
+                      <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Discount %</td>
+                      <td className="px-2 py-1">
+                        <input type="number" min={0} max={100} step={0.5}
+                          className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          value={discountPct}
+                          onChange={(e) => setDiscountPct(Math.max(0, Math.min(100, Number(e.target.value))))}
                         />
                       </td>
-                      <td className="px-3 py-1.5 text-right text-xs text-gray-400">
-                        {trackingNumber ? '✓' : ''}
+                      <td className="px-3 py-1.5 text-right text-red-500 font-medium">
+                        {discountPct > 0 ? `-${fmtPrice(discountAmt)}` : '—'}
                       </td>
                       <td />
+                    </tr>
+                    <tr className="bg-gray-50">
+                      <td className="px-3 py-1.5 text-right text-gray-500 text-xs">Shipping</td>
+                      <td className="px-2 py-1">
+                        <select
+                          className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
+                          value={shippingMethod}
+                          onChange={(e) => setShippingMethod(e.target.value)}
+                        >
+                          <option value="">— None —</option>
+                          <option value="Pudo Locker-to-Locker">Pudo Locker-to-Locker</option>
+                          <option value="Pudo Door-to-Door">Pudo Door-to-Door</option>
+                          <option value="The Courier Guy">The Courier Guy</option>
+                          <option value="Fastway Courier">Fastway Courier</option>
+                          <option value="Aramex">Aramex</option>
+                          <option value="PostNet-to-PostNet">PostNet-to-PostNet</option>
+                          <option value="Collection">Collection (Self-Collect)</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
+                        <input type="number" min={0} step={0.01}
+                          className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          placeholder="0.00"
+                          value={shippingCost || ''}
+                          onChange={(e) => setShippingCost(Math.max(0, Number(e.target.value)))}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-gray-700 font-medium">
+                        {shippingCost > 0 ? fmtPrice(shippingCost) : '—'}
+                      </td>
+                      <td />
+                    </tr>
+                    {shippingMethod && shippingMethod !== 'Collection' && (
+                      <tr className="bg-gray-50">
+                        <td className="px-3 py-1.5 text-right text-gray-400 text-xs">Tracking #</td>
+                        <td colSpan={2} className="px-2 py-1">
+                          <input
+                            type="text"
+                            placeholder="Enter tracking number"
+                            className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                            value={trackingNumber}
+                            onChange={(e) => setTrackingNumber(e.target.value)}
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 text-right text-xs text-gray-400">
+                          {trackingNumber ? '✓' : ''}
+                        </td>
+                        <td />
+                      </tr>
+                    )}
+                  </>) : (
+                    <tr className="bg-amber-50">
+                      <td colSpan={5} className="px-3 py-2 text-xs text-amber-700 font-medium text-center">
+                        Rule 5 inactive — Shipping &amp; Discounts are disabled. Enable in Site Rules to add these fields.
+                      </td>
+                    </tr>
+                  )}
+                  {/* Rule 3 — Stock Deduction: show warning when inactive */}
+                  {!stockDeductionEnabled && (docType === 'invoice' || docType === 'salesorder') && (
+                    <tr className="bg-orange-50">
+                      <td colSpan={5} className="px-3 py-2 text-xs text-orange-700 font-medium text-center">
+                        Rule 3 inactive — Stock will NOT be deducted when this document is saved.
+                      </td>
                     </tr>
                   )}
                   <tr className="border-t bg-blue-50">
@@ -2477,6 +2503,8 @@ export default function OrdersPage() {
           clients={clients}
           prefilledClient={compileClient ?? undefined}
           prefilledItems={compileClient?.items}
+          shippingEnabled={shippingEnabled}
+          stockDeductionEnabled={stockDeductionEnabled}
           onCreated={async (doc) => {
             setDocuments((prev) => [doc, ...prev])
             setCompileClient(null)
@@ -2508,6 +2536,8 @@ export default function OrdersPage() {
           template={template}
           clients={clients}
           editDoc={editDocState}
+          shippingEnabled={shippingEnabled}
+          stockDeductionEnabled={stockDeductionEnabled}
           onCreated={(updated) => {
             setDocuments((prev) => prev.map((d) => d.id === updated.id ? updated : d))
             setEditDocState(null)
