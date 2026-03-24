@@ -899,8 +899,6 @@ function CreateDocumentModal({
   const [error, setError] = useState('')
   const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>>([])
   const [enforceStockLimit, setEnforceStockLimit] = useState(false)
-  const [shippingEnabled, setShippingEnabled] = useState(true)
-  const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [priceMode, setPriceMode] = useState<'retail' | 'cost' | 'preorder'>('retail')
 
   useEffect(() => {
@@ -909,10 +907,6 @@ function CreateDocumentModal({
       .then((rules: any[]) => {
         const stockRule = rules.find((r) => r.id === 'enforce_stock_limit')
         setEnforceStockLimit(stockRule?.active === true)
-        const deductRule = rules.find((r) => r.id === 'invoice_stock_deduction')
-        setStockDeductionEnabled(deductRule?.active !== false)
-        const shipRule = rules.find((r) => r.id === 'document_shipping')
-        setShippingEnabled(shipRule?.active !== false)
         const priceRule = rules.find((r) => r.id === 'invoice_price_type')
         if (priceRule?.active && priceRule.value) {
           setPriceMode(priceRule.value as 'retail' | 'cost' | 'preorder')
