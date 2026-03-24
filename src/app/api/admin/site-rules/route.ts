@@ -52,8 +52,8 @@ const DEFAULT_RULES: SiteRule[] = [
   },
   {
     id: 'document_shipping',
-    name: 'Rule 5 — Shipping on Quotes, Sales Orders & Invoices',
-    description: 'Shipping cost, method, and tracking number can be added to any document type. Flow: Create or Edit Quote / Sales Order / Invoice → scroll to Line Items totals → select Shipping Method (Pudo Locker-to-Locker, Pudo Door-to-Door, The Courier Guy, Fastway, Aramex, PostNet, Collection, Other) → enter Shipping Cost → enter Tracking Number (hidden for Collection) → Shipping cost is added to the Total after discount (not subject to discount) → method and tracking number appear on PDF, print, and email. Tracking number field only appears when a shipping method is selected.',
+    name: 'Rule 5 — Shipping & Discounts on Quotes, Sales Orders & Invoices',
+    description: 'Discount and shipping can be applied to any document type. Discount %: applied to the line items subtotal only — reduces the base total before shipping is added. Shipping Cost: added after discount and is never discounted. Formula: Total = Subtotal − Discount + Shipping. Flow: Create or Edit Quote / Sales Order / Invoice → scroll to Line Items totals → enter Discount % (optional) → select Shipping Method (Pudo Locker-to-Locker, Pudo Door-to-Door, The Courier Guy, Fastway, Aramex, PostNet, Collection, Other) → enter Shipping Cost → enter Tracking Number (hidden for Collection) → final Total = Subtotal − Discount + Shipping → appears correctly in the document list, PDF, print, and email. Tracking number field only appears when a shipping method is selected and method is not Collection.',
     active: true,
     appliesTo: ['Admin Invoices', 'Quotes', 'Sales Orders'],
   },

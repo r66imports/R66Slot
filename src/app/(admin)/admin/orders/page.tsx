@@ -1889,7 +1889,12 @@ export default function OrdersPage() {
 
   const grandTotal =
     boRows.reduce((s, b) => s + b.price * b.qty, 0) +
-    docRows.reduce((s, d) => s + d.lineItems.reduce((ls, li) => ls + li.qty * li.unitPrice, 0), 0)
+    docRows.reduce((s, d) => {
+      const sub = d.lineItems.reduce((ls, li) => ls + li.qty * li.unitPrice, 0)
+      const disc = sub * ((d as any).discountPct || 0) / 100
+      const ship = (d as any).shippingCost || 0
+      return s + sub - disc + ship
+    }, 0)
 
   // Group all active backorders by client — use email (lowercase) as key for reliable deduplication
   const backordersByClient: Record<string, { displayName: string; email: string; phone: string; items: Backorder[] }> = {}
@@ -2382,7 +2387,10 @@ export default function OrdersPage() {
 
                   {/* Standalone document rows */}
                   {docRows.map((doc) => {
-                    const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+                    const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+                    const disc = sub * ((doc as any).discountPct || 0) / 100
+                    const ship = (doc as any).shippingCost || 0
+                    const docTotal = sub - disc + ship
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
                       <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
@@ -2390,7 +2398,7 @@ export default function OrdersPage() {
                         <td className="py-3 px-4 text-gray-500">{fmtDate(doc.date)}</td>
                         <td className="py-3 px-4 font-medium">{doc.clientName}</td>
                         <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{firstDesc}</td>
-                        <td className="py-3 px-4 text-right font-semibold">{fmtPrice(subtotal)}</td>
+                        <td className="py-3 px-4 text-right font-semibold">{fmtPrice(docTotal)}</td>
                         <td className="py-3 px-4 text-center">
                           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
                         </td>
