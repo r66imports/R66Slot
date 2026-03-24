@@ -143,12 +143,12 @@ export async function fetchSageProducts(): Promise<SageProduct[]> {
   let nextUrl: string | null = `${SAGE_API_BASE}/products?items_per_page=200&attributes=all`
 
   while (nextUrl) {
-    const res = await fetch(nextUrl, {
+    const res: Response = await fetch(nextUrl, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) throw new Error(`Sage products fetch failed: ${res.status} ${await res.text()}`)
 
-    const data = await res.json()
+    const data: { $items?: SageProduct[]; $next?: string } = await res.json()
     all.push(...(data.$items || []))
     nextUrl = data.$next || null
   }

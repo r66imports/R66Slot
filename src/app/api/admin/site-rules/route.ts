@@ -81,6 +81,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Inventory',
   },
   {
+    id: 'button_alignment',
+    name: 'Rule 10 \u2014 Button Alignment in Page Editor',
+    description: 'Enables the Left / Center / Right alignment control for Button elements in the Page Editor. When ON: each button element can be independently aligned using the Alignment picker in the properties panel (right sidebar). When OFF: buttons default to center-aligned. This rule is always enforced \u2014 the alignment picker is visible in the editor regardless, but this rule documents the feature and allows it to be toggled for new defaults.',
+    active: true,
+    appliesTo: ['Page Editor'],
+    category: 'Elements',
+  },
+  {
     id: 'preorder_checkout_separation',
     name: 'Rule 8 \u2014 In-Stock vs Pre-Order Checkout Routing',
     description: 'Separates the checkout flow for in-stock items and pre-order items in the online store. In-stock items route to /checkout. Pre-order items route to /book. Mixed cart: both buttons shown with a notice to checkout separately. This ensures pre-order bookings are handled through the booking form while in-stock purchases go through standard checkout.',

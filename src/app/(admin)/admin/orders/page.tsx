@@ -1814,6 +1814,8 @@ export default function OrdersPage() {
   const [pendingInvoiceBoIds, setPendingInvoiceBoIds] = useState<string[]>([])
   const [syncingInventory, setSyncingInventory] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [shippingEnabled, setShippingEnabled] = useState(true)
+  const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
 
   const handleSyncInventory = async () => {
     setSyncingInventory(true)
@@ -1837,13 +1839,14 @@ export default function OrdersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, docRes, tmplRes, clRes, contactRes, prodRes] = await Promise.all([
+      const [boRes, docRes, tmplRes, clRes, contactRes, prodRes, rulesRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/orders/documents'),
         fetch('/api/admin/orders/template'),
         fetch('/api/admin/clients'),
         fetch('/api/admin/contacts'),
         fetch('/api/admin/products'),
+        fetch('/api/admin/site-rules'),
       ])
       if (boRes.ok) {
         const bos: Backorder[] = await boRes.json()
@@ -1870,6 +1873,13 @@ export default function OrdersPage() {
       if (prodRes.ok) {
         const prods: any[] = await prodRes.json()
         setPlProducts(prods.filter((p) => p.sku).map((p) => ({ sku: p.sku || '', costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0 })))
+      }
+      if (rulesRes.ok) {
+        const rules: any[] = await rulesRes.json()
+        const shipRule = rules.find((r: any) => r.id === 'document_shipping')
+        const stockRule = rules.find((r: any) => r.id === 'invoice_stock_deduction')
+        setShippingEnabled(shipRule ? shipRule.active !== false : true)
+        setStockDeductionEnabled(stockRule ? stockRule.active !== false : true)
       }
     } finally {
       setLoading(false)

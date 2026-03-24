@@ -283,7 +283,7 @@ export function PropertiesPanel() {
 
         {/* Button Settings */}
         {selectedComponent.type === 'button' && (
-          <PropertySection title="Button Link">
+          <PropertySection title="Button Settings">
             <label className="block text-sm font-medium mb-2">Link URL</label>
             <Input
               value={selectedComponent.settings.link || ''}
@@ -293,7 +293,28 @@ export function PropertiesPanel() {
                 })
               }
               placeholder="/products"
+              className="mb-4"
             />
+            <label className="block text-sm font-medium mb-2">Alignment</label>
+            <div className="flex gap-1">
+              {(['left', 'center', 'right'] as const).map((align) => {
+                const icons: Record<string, string> = { left: '⬅', center: '↔', right: '➡' }
+                const isActive = (selectedComponent.styles.textAlign || 'center') === align
+                return (
+                  <button
+                    key={align}
+                    onClick={() =>
+                      updateComponent(selectedComponent.id, {
+                        styles: { ...selectedComponent.styles, textAlign: align },
+                      })
+                    }
+                    className={`flex-1 py-1.5 text-sm rounded capitalize font-medium border transition-colors ${isActive ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                  >
+                    {icons[align]} {align}
+                  </button>
+                )
+              })}
+            </div>
           </PropertySection>
         )}
 

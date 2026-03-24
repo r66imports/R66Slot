@@ -132,7 +132,7 @@ export default function ShippingNetworkPage() {
   const [courierForm, setCourierForm] = useState<Omit<Courier, 'id'>>(EMPTY_COURIER)
   const [savingCourier, setSavingCourier] = useState(false)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
-  const actionsRef = useRef<HTMLDivElement>(null)
+  const actionsRef = useRef<HTMLTableSectionElement>(null)
 
   // Shipments
   const [shipments, setShipments] = useState<Shipment[]>([])

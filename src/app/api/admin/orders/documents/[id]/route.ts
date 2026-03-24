@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import type { OrderDocument } from '../route'
-import { adjustStock } from '../route'
+import { adjustStock } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
 
 const KEY = 'data/order-documents.json'

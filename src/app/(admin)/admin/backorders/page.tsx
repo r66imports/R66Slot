@@ -1522,6 +1522,10 @@ export default function BackordersPage() {
           companyName:    ct.companyName    || '',
           companyVAT:     ct.companyVAT     || '',
           companyAddress: ct.companyAddress || '',
+          address:   ct.address   || '',
+          suburb:    ct.suburb    || '',
+          city:      ct.city      || '',
+          postalCode: ct.postalCode || '',
           notes:     ct.notes     || '',
           createdAt: ct.createdAt || '',
           updatedAt: ct.updatedAt || '',
@@ -1902,7 +1906,7 @@ export default function BackordersPage() {
       if      (sortBy === 'date')     { av = a.createdAt || ''; bv = b.createdAt || '' }
       else if (sortBy === 'client')   { av = a.clientName || ''; bv = b.clientName || '' }
       else if (sortBy === 'sku')      { av = a.sku || ''; bv = b.sku || '' }
-      else if (sortBy === 'supplier') { av = a.supplier || ''; bv = b.supplier || '' }
+      else if (sortBy === 'supplier') { av = a.supplierId || ''; bv = b.supplierId || '' }
       else if (sortBy === 'qty')      { av = a.qty ?? 0; bv = b.qty ?? 0 }
       else if (sortBy === 'price')    { av = a.price ?? 0; bv = b.price ?? 0 }
       else if (sortBy === 'status')   { av = a.status || ''; bv = b.status || '' }

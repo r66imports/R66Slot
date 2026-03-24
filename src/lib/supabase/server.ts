@@ -190,7 +190,7 @@ class MutationBuilder {
         const where = this._conditions.length ? `WHERE ${this._conditions.join(' AND ')}` : ''
         const sql = `DELETE FROM ${this._table} ${where} RETURNING *`
         const r = await db.query(sql, this._values)
-        return { data: r.rows, error: null, count: r.rowCount ?? 0 }
+        return { data: r.rows, error: null }
       }
 
       return { data: null, error: new Error('Unknown mutation type') }

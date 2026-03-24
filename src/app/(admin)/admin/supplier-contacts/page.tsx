@@ -40,7 +40,7 @@ export default function SupplierContactsPage() {
   const [form, setForm] = useState<Omit<SupplierContact, 'id'>>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
-  const actionsRef = useRef<HTMLDivElement>(null)
+  const actionsRef = useRef<HTMLTableSectionElement>(null)
 
   // Close action dropdown on outside click
   useEffect(() => {

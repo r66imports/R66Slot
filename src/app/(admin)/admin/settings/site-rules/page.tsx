@@ -14,7 +14,7 @@ interface SiteRule {
   category?: string
 }
 
-const PRESET_CATEGORIES = ['System', 'Inventory', 'Invoices', 'Online Store', 'POS', 'Shipping', 'Customers']
+const PRESET_CATEGORIES = ['System', 'Inventory', 'Invoices', 'Online Store', 'POS', 'Shipping', 'Customers', 'Elements']
 
 const CATEGORY_COLORS: Record<string, string> = {
   System:         'bg-purple-50 border-purple-200 text-purple-700',
@@ -24,6 +24,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   POS:            'bg-yellow-50 border-yellow-200 text-yellow-700',
   Shipping:       'bg-cyan-50 border-cyan-200 text-cyan-700',
   Customers:      'bg-pink-50 border-pink-200 text-pink-700',
+  Elements:       'bg-indigo-50 border-indigo-200 text-indigo-700',
   Uncategorized:  'bg-gray-50 border-gray-200 text-gray-500',
 }
 
@@ -35,6 +36,7 @@ const CATEGORY_DOT: Record<string, string> = {
   POS:            'bg-yellow-500',
   Shipping:       'bg-cyan-600',
   Customers:      'bg-pink-500',
+  Elements:       'bg-indigo-600',
   Uncategorized:  'bg-gray-400',
 }
 
@@ -51,6 +53,7 @@ const ENFORCED_RULES = new Set([
   'invoice_price_type',             // Rule 6 — value read by invoices page for default price mode
   'preorder_checkout_separation',   // Rule 8 — cart page routes in-stock to /checkout, pre-order to /book
   'inventory_count_sync',           // Rule 9 — inventory save gates the PATCH /pos/stock call
+  'button_alignment',               // Rule 10 — alignment picker in Page Editor properties panel
 ])
 
 function getCategoryColor(cat: string) {
