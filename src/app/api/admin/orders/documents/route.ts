@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import { db } from '@/lib/db'
+import { isRuleActive } from '@/lib/site-rules'
 
 const KEY = 'data/order-documents.json'
 
@@ -143,7 +144,30 @@ export async function POST(request: Request) {
     const stockable = body.type === 'invoice' || body.type === 'salesorder'
     const lineItems: LineItem[] = body.lineItems || []
 
-    if (stockable) {
+    // Rule 1 — Enforce Stock Limits: block creation if any line item exceeds available qty
+    if (stockable && await isRuleActive('enforce_stock_limit', false)) {
+      for (const li of lineItems) {
+        const sku = extractSku(li.description)
+        if (!sku || li.qty <= 0) continue
+        const result = await db.query(
+          'SELECT quantity FROM products WHERE LOWER(sku) = LOWER($1) LIMIT 1',
+          [sku]
+        )
+        if (result.rows[0]) {
+          const available = result.rows[0].quantity ?? 0
+          if (li.qty > available) {
+            return NextResponse.json(
+              { error: `Insufficient stock for ${sku}: ${available} available, ${li.qty} requested` },
+              { status: 422 }
+            )
+          }
+        }
+      }
+    }
+
+    // Rule 3 — Stock Deduction: deduct inventory when invoice/SO is created
+    const deductStock = stockable && await isRuleActive('invoice_stock_deduction', true)
+    if (deductStock) {
       await adjustStock(lineItems, 'subtract')
     }
 
@@ -170,13 +194,15 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now,
       backorderId: body.backorderId,
-      stockDeducted: stockable,
+      stockDeducted: deductStock,
     }
     const docs = await getDocs()
     docs.unshift(doc)
     await saveDocs(docs)
-    // Auto-create draft products for any line items not yet in inventory (best-effort)
-    await autoCreateMissingProducts(lineItems).catch(() => {})
+    // Rule 2 — Auto-Create Product: create draft products for unknown SKUs (best-effort)
+    if (await isRuleActive('auto_create_product', true)) {
+      await autoCreateMissingProducts(lineItems).catch(() => {})
+    }
     return NextResponse.json(doc, { status: 201 })
   } catch (error) {
     console.error('Error creating document:', error)

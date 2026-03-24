@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import type { OrderDocument } from '../route'
 import { adjustStock } from '../route'
+import { isRuleActive } from '@/lib/site-rules'
 
 const KEY = 'data/order-documents.json'
 const CANCELLED_STATUSES = new Set(['archived', 'rejected'])
@@ -40,7 +41,8 @@ export async function PATCH(
     const wasStockable = isStockable(prev.type)
     const nowStockable = isStockable(newType)
 
-    if (wasStockable || nowStockable) {
+    // Rule 3 — Stock Deduction: only adjust stock if the rule is active
+    if ((wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
       if (prev.stockDeducted && isCancelled && !wasCancelled) {
         // Being cancelled/archived — restore stock from previous committed items
         await adjustStock(prev.lineItems, 'add')
