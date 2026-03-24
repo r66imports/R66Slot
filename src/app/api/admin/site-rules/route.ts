@@ -73,6 +73,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'preorder_checkout_separation',
+    name: 'Rule 8 \u2014 In-Stock vs Pre-Order Checkout Routing',
+    description: 'Separates the checkout flow for in-stock items and pre-order items in the online store. In-stock items route to /checkout. Pre-order items route to /book. Mixed cart: both buttons shown with a notice to checkout separately. This ensures pre-order bookings are handled through the booking form while in-stock purchases go through standard checkout.',
+    active: true,
+    appliesTo: ['Online Store', 'Cart'],
+    category: 'System',
+  },
+  {
     id: 'invoice_price_type',
     name: 'Rule 6 \u2014 Invoice Default Price Type',
     description: 'Sets the default price type applied when adding products to an invoice. Choose between Retail, Cost, or Pre-Order as the default. Can be overridden per-invoice using the Retail | Cost | Pre-Order selector in the Line Items header. Per-row quick-switch buttons also appear under each line item showing all available prices. Products without a Pre-Order price configured will fall back to Retail when Pre-Order mode is selected.',

@@ -10,10 +10,12 @@ export interface LocalCartItem {
   imageUrl: string
   pageUrl: string
   quantity: number
-  /** Available stock from the products table — stored so the cart can enforce limits client-side */
+  /** Available stock — set when Rule 1 (Enforce Stock Limits) is active */
   stockQty?: number
-  /** Whether this product has quantity tracking enabled */
+  /** True when Rule 1 is active and stock should be capped */
   trackQty?: boolean
+  /** True when this is a pre-order product */
+  isPreOrder?: boolean
 }
 
 interface LocalCartContextType {

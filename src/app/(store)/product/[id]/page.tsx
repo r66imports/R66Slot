@@ -13,7 +13,18 @@ export default function ProductDetailPage() {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
+  const [stockRuleActive, setStockRuleActive] = useState(false)
   const { addItem } = useLocalCart()
+
+  useEffect(() => {
+    fetch('/api/admin/site-rules')
+      .then((r) => r.ok ? r.json() : [])
+      .then((rules: any[]) => {
+        const rule = rules.find((r: any) => r.id === 'enforce_stock_limit')
+        setStockRuleActive(rule?.active === true)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch(`/api/admin/products/${id}`)
@@ -48,6 +59,9 @@ export default function ProductDetailPage() {
     ...((product.images as string[]) || []).filter((img: string) => img && img !== product.imageUrl),
   ]
 
+  // When Rule 1 is active, cap qty at available stock regardless of track_quantity
+  const stockLimit = stockRuleActive && product.quantity > 0 ? product.quantity : Infinity
+
   const handleAddToCart = () => {
     addItem({
       id: product.id,
@@ -56,14 +70,15 @@ export default function ProductDetailPage() {
       price: product.price || 0,
       imageUrl: product.imageUrl || '',
       pageUrl: `/product/${product.id}`,
-      stockQty: product.quantity ?? undefined,
-      trackQty: product.track_quantity ?? false,
-    }, qty)
+      stockQty: stockRuleActive ? (product.quantity ?? undefined) : undefined,
+      trackQty: stockRuleActive,
+      isPreOrder: product.isPreOrder ?? false,
+    }, Math.min(qty, isFinite(stockLimit) ? stockLimit : qty))
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }
 
-  const outOfStock = product.quantity === 0 && !product.isPreOrder
+  const outOfStock = stockRuleActive ? (product.quantity <= 0 && !product.isPreOrder) : (product.quantity === 0 && !product.isPreOrder)
   const isPreOrder = product.isPreOrder
 
   return (
@@ -173,13 +188,15 @@ export default function ProductDetailPage() {
                     >−</button>
                     <span className="w-10 text-center font-semibold text-sm">{qty}</span>
                     <button
-                      onClick={() => setQty((q) => Math.min(product.quantity, q + 1))}
-                      disabled={qty >= product.quantity}
+                      onClick={() => setQty((q) => Math.min(isFinite(stockLimit) ? stockLimit : q + 1, q + 1))}
+                      disabled={isFinite(stockLimit) && qty >= stockLimit}
                       className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >+</button>
                   </div>
-                  {qty >= product.quantity && product.quantity > 0 && (
-                    <span className="text-xs text-amber-600 font-medium">Max stock reached</span>
+                  {stockRuleActive && isFinite(stockLimit) && (
+                    <span className="text-xs font-medium text-gray-500">
+                      {qty >= stockLimit ? '⚠ Max available: ' + stockLimit + ' in stock' : stockLimit + ' in stock'}
+                    </span>
                   )}
                 </div>
               )}

@@ -7,6 +7,9 @@ import { DynamicHeader } from '@/components/layout/header/dynamic-header'
 
 export default function CartPage() {
   const { items, totalItems, subtotal, updateQuantity, removeItem, clearCart } = useLocalCart()
+  const hasPreOrder = items.some((i) => i.isPreOrder)
+  const allPreOrder = items.every((i) => i.isPreOrder)
+  const hasInStock = items.some((i) => !i.isPreOrder)
 
   return (
     <>
@@ -165,13 +168,43 @@ export default function CartPage() {
                   </div>
 
                   <div className="mt-6 space-y-3">
-                    <Button
-                      size="lg"
-                      className="w-full bg-red-600 hover:bg-red-700 text-white"
-                      asChild
-                    >
-                      <Link href="/book">Proceed to Book Now</Link>
-                    </Button>
+                    {allPreOrder ? (
+                      <Button
+                        size="lg"
+                        className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                        asChild
+                      >
+                        <Link href="/book">Proceed to Book Now</Link>
+                      </Button>
+                    ) : hasInStock && !hasPreOrder ? (
+                      <Button
+                        size="lg"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white"
+                        asChild
+                      >
+                        <Link href="/checkout">Proceed to Checkout</Link>
+                      </Button>
+                    ) : (
+                      <>
+                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                          Your cart has both in-stock and pre-order items. Please checkout separately.
+                        </div>
+                        <Button
+                          size="lg"
+                          className="w-full bg-red-600 hover:bg-red-700 text-white"
+                          asChild
+                        >
+                          <Link href="/checkout">Checkout In-Stock Items</Link>
+                        </Button>
+                        <Button
+                          size="lg"
+                          className="w-full bg-orange-500 hover:bg-orange-600 text-white"
+                          asChild
+                        >
+                          <Link href="/book">Book Pre-Order Items</Link>
+                        </Button>
+                      </>
+                    )}
                     <Button size="lg" variant="outline" className="w-full" asChild>
                       <Link href="/products">Continue Shopping</Link>
                     </Button>

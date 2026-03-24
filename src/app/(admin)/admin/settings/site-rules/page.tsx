@@ -47,8 +47,9 @@ const ENFORCED_RULES = new Set([
   'enforce_stock_limit',     // Rule 1 — blocks invoice/cart qty exceeding stock; online store cap
   'auto_create_product',     // Rule 2 — gates autoCreateMissingProducts call in POST /documents
   'invoice_stock_deduction', // Rule 3 — gates adjustStock calls in POST + PATCH /documents; UI warning
-  'document_shipping',       // Rule 5 — hides/shows discount & shipping fields in document modal
-  'invoice_price_type',      // Rule 6 — value read by invoices page for default price mode
+  'document_shipping',              // Rule 5 — hides/shows discount & shipping fields in document modal
+  'invoice_price_type',             // Rule 6 — value read by invoices page for default price mode
+  'preorder_checkout_separation',   // Rule 8 — cart page routes in-stock to /checkout, pre-order to /book
 ])
 
 function getCategoryColor(cat: string) {
