@@ -89,6 +89,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Elements',
   },
   {
+    id: 'product_grid_show_stock',
+    name: 'Rule 11 \u2014 Show Stock Quantity in Product Grid',
+    description: 'Displays the available stock quantity beneath the price on each product card in the online store Product Grid. When ON: products show a green \u201cX in stock\u201d label (or a gray \u201cOut of stock\u201d label when qty is 0). Pre-order products are excluded \u2014 they never show a stock count. When OFF: stock counts are hidden and only the price is shown.',
+    active: true,
+    appliesTo: ['Online Store', 'Page Editor'],
+    category: 'Online Store',
+  },
+  {
     id: 'preorder_checkout_separation',
     name: 'Rule 8 \u2014 In-Stock vs Pre-Order Checkout Routing',
     description: 'Separates the checkout flow for in-stock items and pre-order items in the online store. In-stock items route to /checkout. Pre-order items route to /book. Mixed cart: both buttons shown with a notice to checkout separately. This ensures pre-order bookings are handled through the booking form while in-stock purchases go through standard checkout.',

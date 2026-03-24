@@ -21,11 +21,22 @@ function ProductGridLive({
   const [loading, setLoading] = useState(true)
   const [addedId, setAddedId] = useState<string | null>(null)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [showStockQty, setShowStockQty] = useState(true)
   const { addItem } = useLocalCart()
 
   const getQty = (id: string) => quantities[id] ?? 1
   const setQty = (id: string, val: number) =>
     setQuantities((prev) => ({ ...prev, [id]: Math.max(1, val) }))
+
+  useEffect(() => {
+    fetch('/api/admin/site-rules')
+      .then((r) => r.ok ? r.json() : [])
+      .then((rules: any[]) => {
+        const rule = rules.find((r: any) => r.id === 'product_grid_show_stock')
+        setShowStockQty(rule ? rule.active !== false : true)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch('/api/admin/products')
@@ -167,7 +178,7 @@ function ProductGridLive({
                       {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
                     </p>
                   )}
-                  {!p.isPreOrder && (
+                  {showStockQty && !p.isPreOrder && (
                     <p className={`text-xs font-medium mb-2 ${p.quantity > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                       {p.quantity > 0 ? `${p.quantity} in stock` : 'Out of stock'}
                     </p>

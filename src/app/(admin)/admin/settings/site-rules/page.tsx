@@ -54,6 +54,7 @@ const ENFORCED_RULES = new Set([
   'preorder_checkout_separation',   // Rule 8 — cart page routes in-stock to /checkout, pre-order to /book
   'inventory_count_sync',           // Rule 9 — inventory save gates the PATCH /pos/stock call
   'button_alignment',               // Rule 10 — alignment picker in Page Editor properties panel
+  'product_grid_show_stock',        // Rule 11 — shows/hides stock qty label under price in product grid
 ])
 
 function getCategoryColor(cat: string) {
