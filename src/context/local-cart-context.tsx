@@ -24,6 +24,7 @@ interface LocalCartContextType {
   subtotal: number
   addItem: (product: Omit<LocalCartItem, 'quantity'>, qty?: number) => void
   updateQuantity: (id: string, quantity: number) => void
+  patchItem: (id: string, patch: Partial<LocalCartItem>) => void
   removeItem: (id: string) => void
   clearCart: () => void
 }
@@ -77,6 +78,19 @@ export function LocalCartProvider({ children }: { children: React.ReactNode }) {
     }))
   }
 
+  const patchItem = (id: string, patch: Partial<LocalCartItem>) => {
+    setItems((prev) => prev.map((i) => {
+      if (i.id !== id) return i
+      const updated = { ...i, ...patch }
+      // Re-apply stock cap if patch includes stock data
+      if (patch.stockQty !== undefined || patch.trackQty !== undefined) {
+        const max = updated.trackQty && updated.stockQty !== undefined ? updated.stockQty : Infinity
+        updated.quantity = Math.min(updated.quantity, max)
+      }
+      return updated
+    }))
+  }
+
   const removeItem = (id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id))
   }
@@ -88,7 +102,7 @@ export function LocalCartProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <LocalCartContext.Provider
-      value={{ items, totalItems, subtotal, addItem, updateQuantity, removeItem, clearCart }}
+      value={{ items, totalItems, subtotal, addItem, updateQuantity, patchItem, removeItem, clearCart }}
     >
       {children}
     </LocalCartContext.Provider>

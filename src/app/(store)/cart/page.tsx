@@ -1,15 +1,36 @@
 'use client'
 
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useLocalCart } from '@/context/local-cart-context'
 import { DynamicHeader } from '@/components/layout/header/dynamic-header'
 
 export default function CartPage() {
-  const { items, totalItems, subtotal, updateQuantity, removeItem, clearCart } = useLocalCart()
+  const { items, totalItems, subtotal, updateQuantity, patchItem, removeItem, clearCart } = useLocalCart()
   const hasPreOrder = items.some((i) => i.isPreOrder)
   const allPreOrder = items.every((i) => i.isPreOrder)
   const hasInStock = items.some((i) => !i.isPreOrder)
+
+  // On load: fetch live stock for every cart item and enforce caps
+  useEffect(() => {
+    if (items.length === 0) return
+    items.forEach((item) => {
+      fetch(`/api/admin/products/${item.id}`)
+        .then((r) => r.ok ? r.json() : null)
+        .then((p) => {
+          if (!p) return
+          const trackStock = p.trackQuantity === true
+          patchItem(item.id, {
+            stockQty: trackStock ? (p.quantity ?? 0) : undefined,
+            trackQty: trackStock,
+            isPreOrder: p.isPreOrder ?? false,
+          })
+        })
+        .catch(() => {})
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // run once on mount
 
   return (
     <>
