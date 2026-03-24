@@ -56,6 +56,8 @@ export default function ProductDetailPage() {
       price: product.price || 0,
       imageUrl: product.imageUrl || '',
       pageUrl: `/product/${product.id}`,
+      stockQty: product.quantity ?? undefined,
+      trackQty: product.track_quantity ?? false,
     }, qty)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)

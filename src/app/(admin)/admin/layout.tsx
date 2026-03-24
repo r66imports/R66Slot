@@ -81,6 +81,7 @@ export default function AdminLayout({
     shippingNetwork: [
       { name: 'Shipping Network', href: '/admin/shipping-network', icon: '🚚' },
       { name: 'Local Shipping', href: '/admin/shipping', icon: '📦' },
+      { name: 'Shipment Log', href: '/admin/shipments', icon: '📋' },
     ],
     orderNetwork: [
       {

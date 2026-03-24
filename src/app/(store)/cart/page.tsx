@@ -104,8 +104,12 @@ export default function CartPage() {
                                 {item.quantity}
                               </span>
                               <button
-                                onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded transition-colors"
+                                onClick={() => {
+                                  const atLimit = item.trackQty && item.stockQty !== undefined && item.quantity >= item.stockQty
+                                  if (!atLimit) updateQuantity(item.id, item.quantity + 1)
+                                }}
+                                disabled={item.trackQty === true && item.stockQty !== undefined && item.quantity >= item.stockQty}
+                                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                               >
                                 +
                               </button>
@@ -117,6 +121,11 @@ export default function CartPage() {
                               Remove
                             </button>
                           </div>
+                          {item.trackQty && item.stockQty !== undefined && item.quantity >= item.stockQty && (
+                            <p className="text-xs text-orange-600 font-semibold mt-1">
+                              Max available: {item.stockQty} in stock
+                            </p>
+                          )}
                         </div>
 
                         {/* Line Total */}

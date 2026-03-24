@@ -65,6 +65,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Invoices',
   },
   {
+    id: 'configurable_dropdowns',
+    name: 'Rule 7 \u2014 Configurable Dropdown Options',
+    description: 'All dropdown menus across the admin can have their options managed inline. Each dropdown shows a + Add and trash Delete icon directly inside the dropdown popup. Adding a new option: type the label, choose a colour dot, press + or Enter. Deleting: hover the option and click the trash icon. Changes save automatically. Applies to: Status, Instructions, Courier (Shipment Log), Box Sizes, and any future dropdown fields.',
+    active: true,
+    appliesTo: ['Admin', 'Shipment Log', 'All Dropdowns'],
+    category: 'System',
+  },
+  {
     id: 'invoice_price_type',
     name: 'Rule 6 \u2014 Invoice Default Price Type',
     description: 'Sets the default price type applied when adding products to an invoice. Choose between Retail, Cost, or Pre-Order as the default. Can be overridden per-invoice using the Retail | Cost | Pre-Order selector in the Line Items header. Per-row quick-switch buttons also appear under each line item showing all available prices. Products without a Pre-Order price configured will fall back to Retail when Pre-Order mode is selected.',

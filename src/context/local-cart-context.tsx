@@ -10,6 +10,10 @@ export interface LocalCartItem {
   imageUrl: string
   pageUrl: string
   quantity: number
+  /** Available stock from the products table — stored so the cart can enforce limits client-side */
+  stockQty?: number
+  /** Whether this product has quantity tracking enabled */
+  trackQty?: boolean
 }
 
 interface LocalCartContextType {
@@ -50,11 +54,12 @@ export function LocalCartProvider({ children }: { children: React.ReactNode }) {
     setItems((prev) => {
       const existing = prev.find((i) => i.id === product.id)
       if (existing) {
-        return prev.map((i) =>
-          i.id === product.id ? { ...i, quantity: i.quantity + qty } : i
-        )
+        const max = existing.trackQty && existing.stockQty !== undefined ? existing.stockQty : Infinity
+        const newQty = Math.min(existing.quantity + qty, max)
+        return prev.map((i) => i.id === product.id ? { ...i, quantity: newQty } : i)
       }
-      return [...prev, { ...product, quantity: qty }]
+      const max = product.trackQty && product.stockQty !== undefined ? product.stockQty : Infinity
+      return [...prev, { ...product, quantity: Math.min(qty, max) }]
     })
   }
 
@@ -63,7 +68,11 @@ export function LocalCartProvider({ children }: { children: React.ReactNode }) {
       removeItem(id)
       return
     }
-    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, quantity } : i)))
+    setItems((prev) => prev.map((i) => {
+      if (i.id !== id) return i
+      const max = i.trackQty && i.stockQty !== undefined ? i.stockQty : Infinity
+      return { ...i, quantity: Math.min(quantity, max) }
+    }))
   }
 
   const removeItem = (id: string) => {
