@@ -16,7 +16,7 @@ export interface ShipmentOptions {
   boxSizes: DropdownOption[]
 }
 
-export const DEFAULT_OPTIONS: ShipmentOptions = {
+const DEFAULT_OPTIONS: ShipmentOptions = {
   statuses: [
     { value: 'printed', label: 'Printed', color: 'yellow' },
     { value: 'packed', label: 'Packed', color: 'green' },

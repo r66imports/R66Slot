@@ -13,7 +13,8 @@ export default function ProductDetailPage() {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
-  const [stockRuleActive, setStockRuleActive] = useState(false)
+  // Default true — enforce until API says otherwise (prevents race condition on add-to-cart)
+  const [stockRuleActive, setStockRuleActive] = useState(true)
   const { addItem } = useLocalCart()
 
   useEffect(() => {
@@ -21,9 +22,10 @@ export default function ProductDetailPage() {
       .then((r) => r.ok ? r.json() : [])
       .then((rules: any[]) => {
         const rule = rules.find((r: any) => r.id === 'enforce_stock_limit')
-        setStockRuleActive(rule?.active === true)
+        // Only disable if rule is explicitly set to false; keep true if not found
+        setStockRuleActive(rule ? rule.active !== false : true)
       })
-      .catch(() => {})
+      .catch(() => {}) // keep true on error — fail safe
   }, [])
 
   useEffect(() => {
@@ -59,8 +61,9 @@ export default function ProductDetailPage() {
     ...((product.images as string[]) || []).filter((img: string) => img && img !== product.imageUrl),
   ]
 
-  // When Rule 1 is active, cap qty at available stock regardless of track_quantity
-  const stockLimit = stockRuleActive && product.quantity > 0 ? product.quantity : Infinity
+  // Enforce stock cap when Rule 1 is active OR product has track_quantity enabled
+  const trackStock = stockRuleActive || product.trackQuantity === true
+  const stockLimit = trackStock && product.quantity > 0 ? product.quantity : Infinity
 
   const handleAddToCart = () => {
     addItem({
@@ -70,15 +73,15 @@ export default function ProductDetailPage() {
       price: product.price || 0,
       imageUrl: product.imageUrl || '',
       pageUrl: `/product/${product.id}`,
-      stockQty: stockRuleActive ? (product.quantity ?? undefined) : undefined,
-      trackQty: stockRuleActive,
+      stockQty: trackStock ? (product.quantity ?? undefined) : undefined,
+      trackQty: trackStock,
       isPreOrder: product.isPreOrder ?? false,
     }, Math.min(qty, isFinite(stockLimit) ? stockLimit : qty))
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }
 
-  const outOfStock = stockRuleActive ? (product.quantity <= 0 && !product.isPreOrder) : (product.quantity === 0 && !product.isPreOrder)
+  const outOfStock = trackStock ? (product.quantity <= 0 && !product.isPreOrder) : (product.quantity === 0 && !product.isPreOrder)
   const isPreOrder = product.isPreOrder
 
   return (
@@ -193,7 +196,7 @@ export default function ProductDetailPage() {
                       className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                     >+</button>
                   </div>
-                  {stockRuleActive && isFinite(stockLimit) && (
+                  {trackStock && isFinite(stockLimit) && (
                     <span className="text-xs font-medium text-gray-500">
                       {qty >= stockLimit ? '⚠ Max available: ' + stockLimit + ' in stock' : stockLimit + ' in stock'}
                     </span>
