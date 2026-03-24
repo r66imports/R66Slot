@@ -27,6 +27,9 @@ export interface OrderDocument {
   pushedToSage: boolean
   sageRef?: string
   discountPct?: number
+  shippingCost?: number
+  shippingMethod?: string
+  trackingNumber?: string
   depositPaid?: number
   paymentMethod?: string
   createdAt: string
@@ -115,6 +118,9 @@ export async function POST(request: Request) {
       status: body.status || 'draft',
       pushedToSage: false,
       discountPct: body.discountPct || 0,
+      shippingCost: body.shippingCost || 0,
+      shippingMethod: body.shippingMethod || '',
+      trackingNumber: body.trackingNumber || '',
       depositPaid: body.depositPaid || 0,
       paymentMethod: body.paymentMethod || '',
       createdAt: now,

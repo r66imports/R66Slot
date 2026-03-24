@@ -80,6 +80,9 @@ interface DocViewData {
   terms: string
   status: string
   discountPct: number
+  shippingCost: number
+  shippingMethod: string
+  trackingNumber: string
   depositPaid: number
   paymentMethod: string
 }
@@ -237,7 +240,8 @@ function DocumentBody({
 }) {
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
-  const total = subtotal - discountAmt
+  const shipping = data.shippingCost || 0
+  const total = subtotal - discountAmt + shipping
   const deposit = data.depositPaid || 0
   const balanceDuePreview = total - deposit
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
@@ -320,15 +324,23 @@ function DocumentBody({
       {/* Totals */}
       <div className="flex justify-end mb-5">
         <div className="w-64">
-          {(data.discountPct || 0) > 0 && (<>
+          {((data.discountPct || 0) > 0 || shipping > 0) && (<>
             <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
               <span className="text-gray-500">Subtotal</span>
               <span className="font-medium">{fmtPrice(subtotal)}</span>
             </div>
-            <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
-              <span className="text-gray-500">Discount ({data.discountPct}%)</span>
-              <span className="font-medium text-red-500">-{fmtPrice(discountAmt)}</span>
-            </div>
+            {(data.discountPct || 0) > 0 && (
+              <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
+                <span className="text-gray-500">Discount ({data.discountPct}%)</span>
+                <span className="font-medium text-red-500">-{fmtPrice(discountAmt)}</span>
+              </div>
+            )}
+            {shipping > 0 && (
+              <div className="flex justify-between py-1 border-b border-gray-100 text-sm">
+                <span className="text-gray-500">Shipping</span>
+                <span className="font-medium">{fmtPrice(shipping)}</span>
+              </div>
+            )}
           </>)}
           <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
             <span>TOTAL</span>
@@ -346,6 +358,24 @@ function DocumentBody({
           </>)}
         </div>
       </div>
+
+      {/* Shipping info */}
+      {(data.shippingMethod || data.trackingNumber) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {data.shippingMethod && (
+            <>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Shipping:</span>
+              <span className="text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full">{data.shippingMethod}</span>
+            </>
+          )}
+          {data.trackingNumber && (
+            <>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-2">Tracking:</span>
+              <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full font-mono">{data.trackingNumber}</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Payment Method */}
       {data.paymentMethod && (
@@ -468,6 +498,9 @@ function TemplatePreviewModal({
     terms: template.invoiceTerms,
     status: 'sent',
     discountPct: 0,
+    shippingCost: 0,
+    shippingMethod: '',
+    trackingNumber: '',
     depositPaid: 0,
     paymentMethod: '',
   }
@@ -941,10 +974,13 @@ function CreateDocumentModal({
     setLineItems((p) => p.map((l) => (l.id === id ? { ...l, [k]: v } : l)))
 
   const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.discountPct || 0)
+  const [shippingCost, setShippingCost] = useState<number>((editDoc as any)?.shippingCost || 0)
+  const [shippingMethod, setShippingMethod] = useState<string>((editDoc as any)?.shippingMethod || '')
+  const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
   const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * discountPct / 100
-  const total = subtotal - discountAmt
+  const total = subtotal - discountAmt + shippingCost
   const balanceDue = total - depositPaid
 
   const handleSave = async () => {
@@ -960,7 +996,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, depositPaid, paymentMethod: form.paymentMethod }),
+        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, shippingCost, shippingMethod, trackingNumber, depositPaid, paymentMethod: form.paymentMethod }),
       })
       if (res.ok) { onCreated(await res.json()); onClose() }
       else setError('Failed to save — please try again')
@@ -1110,6 +1146,57 @@ function CreateDocumentModal({
                     </td>
                     <td />
                   </tr>
+                  {/* Shipping — not discounted */}
+                  <tr className="bg-gray-50">
+                    <td className="px-3 py-1.5 text-right text-gray-500 text-xs">Shipping</td>
+                    <td className="px-2 py-1">
+                      <select
+                        className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
+                        value={shippingMethod}
+                        onChange={(e) => setShippingMethod(e.target.value)}
+                      >
+                        <option value="">— None —</option>
+                        <option value="Pudo Locker-to-Locker">Pudo Locker-to-Locker</option>
+                        <option value="Pudo Door-to-Door">Pudo Door-to-Door</option>
+                        <option value="The Courier Guy">The Courier Guy</option>
+                        <option value="Fastway Courier">Fastway Courier</option>
+                        <option value="Aramex">Aramex</option>
+                        <option value="PostNet-to-PostNet">PostNet-to-PostNet</option>
+                        <option value="Collection">Collection (Self-Collect)</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </td>
+                    <td className="px-2 py-1">
+                      <input type="number" min={0} step={0.01}
+                        className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                        placeholder="0.00"
+                        value={shippingCost || ''}
+                        onChange={(e) => setShippingCost(Math.max(0, Number(e.target.value)))}
+                      />
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-gray-700 font-medium">
+                      {shippingCost > 0 ? fmtPrice(shippingCost) : '—'}
+                    </td>
+                    <td />
+                  </tr>
+                  {shippingMethod && shippingMethod !== 'Collection' && (
+                    <tr className="bg-gray-50">
+                      <td className="px-3 py-1.5 text-right text-gray-400 text-xs">Tracking #</td>
+                      <td colSpan={2} className="px-2 py-1">
+                        <input
+                          type="text"
+                          placeholder="Enter tracking number"
+                          className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          value={trackingNumber}
+                          onChange={(e) => setTrackingNumber(e.target.value)}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-xs text-gray-400">
+                        {trackingNumber ? '✓' : ''}
+                      </td>
+                      <td />
+                    </tr>
+                  )}
                   <tr className="border-t bg-blue-50">
                     <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
                     <td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(total)}</td><td />
@@ -1190,7 +1277,8 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
-  const total = subtotal - discountAmt
+  const shippingHTML = data.shippingCost || 0
+  const total = subtotal - discountAmt + shippingHTML
   const depositHTML = data.depositPaid || 0
   const balanceDueHTML = total - depositHTML
   const activeImages = (template.imageBlock ?? []).filter(Boolean)
@@ -1265,10 +1353,9 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   </table>
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
     <div style="width:260px">
-      ${(data.discountPct || 0) > 0 ? `
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#ef4444">Discount (${data.discountPct}%)</span><span style="font-weight:500;color:#ef4444">-${fmtPrice(discountAmt)}</span></div>
-      ` : ''}
+      ${((data.discountPct || 0) > 0 || shippingHTML > 0) ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>` : ''}
+      ${(data.discountPct || 0) > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#ef4444">Discount (${data.discountPct}%)</span><span style="font-weight:500;color:#ef4444">-${fmtPrice(discountAmt)}</span></div>` : ''}
+      ${shippingHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}</span><span style="font-weight:500">${fmtPrice(shippingHTML)}</span></div>` : ''}
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
       ${depositHTML > 0 ? `
       <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Deposit Paid</span><span style="font-weight:500;color:#16a34a">-${fmtPrice(depositHTML)}</span></div>
@@ -1276,6 +1363,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
       ` : ''}
     </div>
   </div>
+  ${(data.shippingMethod || data.trackingNumber) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${data.shippingMethod ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Shipping:</span><span style="font-size:12px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:2px 10px;border-radius:99px">${data.shippingMethod}</span>` : ''}${data.trackingNumber ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-left:8px">Tracking:</span><span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;font-family:monospace;padding:2px 10px;border-radius:99px">${data.trackingNumber}</span>` : ''}</div>` : ''}
   ${data.paymentMethod ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Payment Method:</span><span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod}</span></div>` : ''}
   ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
   ${bankHTML}
@@ -1297,7 +1385,8 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
   const docLabel = data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
-  const total = subtotal - discountAmt
+  const shippingEmail = data.shippingCost || 0
+  const total = subtotal - discountAmt + shippingEmail
   const subject = `${docLabel} ${data.docNumber} – ${template.companyName || 'R66 Slot'}`
   const lines = data.lineItems.map((li, i) =>
     `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}  =  ${fmtPrice(li.qty * li.unitPrice)}`
@@ -1317,9 +1406,13 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
     '─'.repeat(52),
     lines,
     '─'.repeat(52),
-    ...(( data.discountPct || 0) > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`, `Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
+    ...((data.discountPct || 0) > 0 || shippingEmail > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`] : []),
+    ...((data.discountPct || 0) > 0 ? [`Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
+    ...(shippingEmail > 0 ? [`Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}:  ${fmtPrice(shippingEmail)}`] : []),
     `TOTAL:  ${fmtPrice(total)}`,
     ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : []),
+    ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
+    ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
     ...(data.paymentMethod ? [`Payment Method:  ${data.paymentMethod}`] : []),
     banking,
     data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
@@ -1347,7 +1440,8 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
-  const total = subtotal - discountAmt
+  const shippingPDF = data.shippingCost || 0
+  const total = subtotal - discountAmt + shippingPDF
 
   // ── Logo (top left) ──────────────────────────────────────────────────────────
   if (template.logoUrl) {
@@ -1437,9 +1531,14 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
       fmtPrice(li.qty * li.unitPrice),
     ]),
     foot: [
-      ...((data.discountPct || 0) > 0 ? [
+      ...((data.discountPct || 0) > 0 || shippingPDF > 0 ? [
         ['', '', '', 'Subtotal', fmtPrice(subtotal)],
+      ] : []),
+      ...((data.discountPct || 0) > 0 ? [
         ['', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`],
+      ] : []),
+      ...(shippingPDF > 0 ? [
+        ['', '', '', `Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF)],
       ] : []),
       ['', '', '', 'TOTAL', fmtPrice(total)],
       ...((data.depositPaid || 0) > 0 ? [
@@ -1459,8 +1558,12 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     },
     margin: { left: margin, right: margin },
     didParseCell(hookData) {
-      const footLen = ((data.discountPct || 0) > 0 ? 2 : 0) + 1 + ((data.depositPaid || 0) > 0 ? 2 : 0)
-      const totalIdx = (data.discountPct || 0) > 0 ? 2 : 0
+      const hasSubtotal = (data.discountPct || 0) > 0 || shippingPDF > 0
+      const hasDiscount = (data.discountPct || 0) > 0
+      const hasShipping = shippingPDF > 0
+      const preRows = (hasSubtotal ? 1 : 0) + (hasDiscount ? 1 : 0) + (hasShipping ? 1 : 0)
+      const footLen = preRows + 1 + ((data.depositPaid || 0) > 0 ? 2 : 0)
+      const totalIdx = preRows
       const balanceIdx = (data.depositPaid || 0) > 0 ? footLen - 1 : -1
       if (hookData.section === 'foot' && hookData.row.index === totalIdx) {
         hookData.cell.styles.fillColor = [31, 41, 55]
@@ -1491,6 +1594,17 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     const noteLines = doc.splitTextToSize(data.notes, pageW - margin * 2)
     doc.text(noteLines, margin, y)
     y += noteLines.length * 4.5 + 6
+  }
+
+  // ── Shipping info ────────────────────────────────────────────────────────────
+  if (data.shippingMethod || data.trackingNumber) {
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(70)
+    const parts: string[] = []
+    if (data.shippingMethod) parts.push(`Shipping: ${data.shippingMethod}`)
+    if (data.trackingNumber) parts.push(`Tracking #: ${data.trackingNumber}`)
+    doc.text(parts.join('   |   '), margin, y); y += 6
   }
 
   // ── Banking ──────────────────────────────────────────────────────────────────
@@ -1887,6 +2001,9 @@ export default function OrdersPage() {
       terms: template[c.termsKey] as string,
       status: b.status,
       discountPct: 0,
+      shippingCost: 0,
+      shippingMethod: '',
+      trackingNumber: '',
       depositPaid: 0,
       paymentMethod: '',
     }
@@ -1899,6 +2016,9 @@ export default function OrdersPage() {
     clientPhone: doc.clientPhone, clientAddress: doc.clientAddress,
     lineItems: doc.lineItems, notes: doc.notes, terms: doc.terms, status: doc.status,
     discountPct: (doc as any).discountPct || 0,
+    shippingCost: (doc as any).shippingCost || 0,
+    shippingMethod: (doc as any).shippingMethod || '',
+    trackingNumber: (doc as any).trackingNumber || '',
     depositPaid: (doc as any).depositPaid || 0,
     paymentMethod: (doc as any).paymentMethod || '',
   })
