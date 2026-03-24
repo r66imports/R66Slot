@@ -70,6 +70,19 @@ export default function InventoryPage() {
   const [sendingOrders, setSendingOrders] = useState(false)
   const [orderSentDone, setOrderSentDone] = useState(false)
 
+  // Rule 9 — Inventory Count → Update Shop Inventory
+  const [inventoryCountSyncActive, setInventoryCountSyncActive] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/admin/site-rules')
+      .then((r) => r.ok ? r.json() : [])
+      .then((rules: any[]) => {
+        const rule = rules.find((r: any) => r.id === 'inventory_count_sync')
+        setInventoryCountSyncActive(rule ? rule.active !== false : true)
+      })
+      .catch(() => {})
+  }, [])
+
   // Shop Volume lock/unlock
   const [shopVolumeUnlocked, setShopVolumeUnlocked] = useState(false)
 
@@ -185,12 +198,14 @@ export default function InventoryPage() {
     if (isNaN(val)) return
     setSaving((s) => ({ ...s, [id]: true }))
     try {
-      await fetch('/api/admin/pos/stock', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, mode: 'set', qty: val }),
-      })
-      setProducts((prev) => prev.map((p) => p.id === id ? { ...p, quantity: val } : p))
+      if (inventoryCountSyncActive) {
+        await fetch('/api/admin/pos/stock', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, mode: 'set', qty: val }),
+        })
+        setProducts((prev) => prev.map((p) => p.id === id ? { ...p, quantity: val } : p))
+      }
 
       // Also save pricelist entry if supplier selected
       if (!skipPricelist && selectedSupplierId) {

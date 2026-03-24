@@ -50,6 +50,7 @@ const ENFORCED_RULES = new Set([
   'document_shipping',              // Rule 5 — hides/shows discount & shipping fields in document modal
   'invoice_price_type',             // Rule 6 — value read by invoices page for default price mode
   'preorder_checkout_separation',   // Rule 8 — cart page routes in-stock to /checkout, pre-order to /book
+  'inventory_count_sync',           // Rule 9 — inventory save gates the PATCH /pos/stock call
 ])
 
 function getCategoryColor(cat: string) {

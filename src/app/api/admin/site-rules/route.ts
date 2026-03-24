@@ -73,6 +73,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'inventory_count_sync',
+    name: 'Rule 9 \u2014 Inventory Count \u2192 Update Shop Inventory',
+    description: 'Controls whether saving an Inventory Count on the Inventory page writes the entered value back to the product\'s live stock quantity (Shop Inventory). When ON: typing a count and pressing Save/Enter commits it as the new stock level immediately. When OFF: Inventory Count is audit/reference-only \u2014 stock is only moved by POS sales or invoice deductions (Rule 3). Use OFF mode for a physical stock take where you want to count first and reconcile later.',
+    active: true,
+    appliesTo: ['Inventory Page'],
+    category: 'Inventory',
+  },
+  {
     id: 'preorder_checkout_separation',
     name: 'Rule 8 \u2014 In-Stock vs Pre-Order Checkout Routing',
     description: 'Separates the checkout flow for in-stock items and pre-order items in the online store. In-stock items route to /checkout. Pre-order items route to /book. Mixed cart: both buttons shown with a notice to checkout separately. This ensures pre-order bookings are handled through the booking form while in-stock purchases go through standard checkout.',
