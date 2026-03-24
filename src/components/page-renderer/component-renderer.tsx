@@ -163,8 +163,13 @@ function ProductGridLive({
                     )}
                   </div>
                   {settings.showPrice && (
-                    <p className="font-bold mb-2" style={{ fontSize: priceFontSize, color: priceColor }}>
+                    <p className="font-bold mb-1" style={{ fontSize: priceFontSize, color: priceColor }}>
                       {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
+                    </p>
+                  )}
+                  {!p.isPreOrder && (
+                    <p className={`text-xs font-medium mb-2 ${p.quantity > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                      {p.quantity > 0 ? `${p.quantity} in stock` : 'Out of stock'}
                     </p>
                   )}
                   {settings.showAddToCart && (
