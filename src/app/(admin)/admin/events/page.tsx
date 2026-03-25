@@ -361,6 +361,7 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
   const [tab, setTab] = useState<'sales' | 'expenses' | 'charts'>('sales')
   const [notes, setNotes] = useState(initialEvent.notes || '')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [salesSearch, setSalesSearch] = useState('')
 
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0)
   const netProfit = event.grossProfit - totalExpenses
@@ -473,6 +474,16 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
       {/* Sales Tab */}
       {tab === 'sales' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {/* Search bar */}
+          <div className="px-4 py-3 border-b border-gray-100">
+            <input
+              type="text"
+              placeholder="Search SKU or product name…"
+              value={salesSearch}
+              onChange={(e) => setSalesSearch(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50"
+            />
+          </div>
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -486,7 +497,13 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
               </tr>
             </thead>
             <tbody>
-              {(event.salesItems || []).sort((a, b) => b.totalQty - a.totalQty).map((item, i) => {
+              {(event.salesItems || [])
+                .filter((item) => {
+                  if (!salesSearch.trim()) return true
+                  const q = salesSearch.toLowerCase()
+                  return item.sku.toLowerCase().includes(q) || item.title.toLowerCase().includes(q)
+                })
+                .sort((a, b) => b.totalQty - a.totalQty).map((item, i) => {
                 const gross = item.totalRevenue - item.totalCogs
                 const maxQty = event.salesItems[0]?.totalQty || 1
                 return (
@@ -510,6 +527,13 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
               })}
               {(!event.salesItems || event.salesItems.length === 0) && (
                 <tr><td colSpan={7} className="py-10 text-center text-gray-400 text-sm">No sales data</td></tr>
+              )}
+              {event.salesItems && event.salesItems.length > 0 && salesSearch.trim() &&
+                event.salesItems.filter((item) => {
+                  const q = salesSearch.toLowerCase()
+                  return item.sku.toLowerCase().includes(q) || item.title.toLowerCase().includes(q)
+                }).length === 0 && (
+                <tr><td colSpan={7} className="py-10 text-center text-gray-400 text-sm">No items match &ldquo;{salesSearch}&rdquo;</td></tr>
               )}
             </tbody>
           </table>
