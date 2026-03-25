@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { db } from '@/lib/db'
 
 const KEY = 'data/checkout-orders.json'
 
@@ -63,6 +64,16 @@ export async function POST(request: Request) {
     }
 
     await blobWrite(KEY, [newOrder, ...orders])
+
+    // Deduct stock for each item immediately — floor at 0
+    for (const item of (body.items as CheckoutOrder['items'])) {
+      if (!item.id || !item.quantity) continue
+      await db.query(
+        `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3 WHERE id = $1`,
+        [item.id, item.quantity, new Date().toISOString()]
+      ).catch(() => {})
+    }
+
     return NextResponse.json({ success: true, orderNumber, id: newOrder.id })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })

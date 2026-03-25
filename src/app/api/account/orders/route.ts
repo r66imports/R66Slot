@@ -14,16 +14,20 @@ export async function GET(_request: NextRequest) {
     const decoded = jwt.verify(token, JWT_SECRET) as any
     const customerEmail = decoded.email?.toLowerCase()
 
-    const preorders = await blobRead<any[]>('data/preorder-list.json', [])
+    const [preorders, checkoutOrders] = await Promise.all([
+      blobRead<any[]>('data/preorder-list.json', []),
+      blobRead<any[]>('data/checkout-orders.json', []),
+    ])
 
-    // Match by customerId OR email (orders store field as customerEmail)
+    // Match by customerId OR email
     const matchesCustomer = (o: any) =>
       o.customerId === decoded.id ||
       o.email?.toLowerCase() === customerEmail ||
-      o.customerEmail?.toLowerCase() === customerEmail
+      o.customerEmail?.toLowerCase() === customerEmail ||
+      o.customer?.email?.toLowerCase() === customerEmail
 
     const orders = [
-      ...preorders.filter(matchesCustomer).map(o => ({
+      ...preorders.filter(matchesCustomer).map((o: any) => ({
         id: o.id,
         orderNumber: o.orderNumber || o.id?.slice(-8).toUpperCase() || 'N/A',
         date: o.createdAt || o.date || new Date().toISOString(),
@@ -32,6 +36,16 @@ export async function GET(_request: NextRequest) {
         itemCount: o.items?.length || o.quantity || 1,
         type: 'preorder',
         notes: o.notes || '',
+      })),
+      ...checkoutOrders.filter(matchesCustomer).map((o: any) => ({
+        id: o.id,
+        orderNumber: o.orderNumber || o.id?.slice(-8).toUpperCase() || 'N/A',
+        date: o.createdAt || new Date().toISOString(),
+        status: o.status || 'pending',
+        total: o.total || o.subtotal || 0,
+        itemCount: o.items?.reduce((s: number, i: any) => s + (i.quantity || 1), 0) || 0,
+        type: 'order',
+        notes: o.shipping?.notes || '',
       })),
     ]
 
