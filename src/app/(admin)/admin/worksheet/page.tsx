@@ -287,6 +287,7 @@ function WorksheetEditor({
     setInventoryMissed([])
     const missed: string[] = []
     const sentIds: string[] = []
+    const sentItems: WsItem[] = []
     try {
       for (const it of toSend) {
         const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
@@ -297,8 +298,29 @@ function WorksheetEditor({
           body: JSON.stringify({ id: prod.id, mode: 'add', qty: it.qty }),
         })
         if (!res.ok) missed.push(it.sku)
-        else sentIds.push(it.id)
+        else { sentIds.push(it.id); sentItems.push(it) }
       }
+
+      // Save wholesale price (supplier currency) to pricelist so Inventory shows correct value
+      const sup = suppliers.find((s) => s.name === supplier)
+      if (sup && sentItems.length > 0) {
+        const pricelistEntries = sentItems
+          .filter((it) => it.wholesalePrice > 0)
+          .map((it) => ({
+            supplierId: sup.id,
+            sku: it.sku,
+            wholesalePrice: it.wholesalePrice,
+            shopQty: it.qty,
+          }))
+        if (pricelistEntries.length > 0) {
+          await fetch('/api/admin/inventory-pricelists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entries: pricelistEntries }),
+          }).catch(() => {})
+        }
+      }
+
       // Lock successfully sent items permanently
       if (sentIds.length > 0) {
         setItems((prev) => prev.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it))
