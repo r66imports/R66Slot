@@ -70,15 +70,27 @@ export default function InventoryPage() {
   const [sendingOrders, setSendingOrders] = useState(false)
   const [orderSentDone, setOrderSentDone] = useState(false)
 
-  // Rule 9 — Inventory Count → Update Shop Inventory
-  const [inventoryCountSyncActive, setInventoryCountSyncActive] = useState(true)
+  // Inventory Count — cross-reference only, never updates Shop Inventory
+  const [lastStockTakeDate, setLastStockTakeDate] = useState<string | null>(null)
+  const [savedCounts, setSavedCounts] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    fetch('/api/admin/site-rules')
-      .then((r) => r.ok ? r.json() : [])
-      .then((rules: any[]) => {
-        const rule = rules.find((r: any) => r.id === 'inventory_count_sync')
-        setInventoryCountSyncActive(rule ? rule.active !== false : true)
+    fetch('/api/admin/inventory-counts')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return
+        if (data.date) setLastStockTakeDate(data.date)
+        if (data.counts && typeof data.counts === 'object') {
+          const update = (prev: Record<string, string>) => {
+            const merged = { ...prev }
+            Object.entries(data.counts as Record<string, number>).forEach(([id, val]) => {
+              merged[id] = String(val)
+            })
+            return merged
+          }
+          setCounts(update)
+          setSavedCounts(update)
+        }
       })
       .catch(() => {})
   }, [])
@@ -118,6 +130,7 @@ export default function InventoryPage() {
         const init: Record<string, string> = {}
         list.forEach((p) => { init[p.id] = String(p.quantity) })
         setCounts(init)
+        setSavedCounts(init)
       })
       .finally(() => setLoading(false))
   }, [])
@@ -180,7 +193,7 @@ export default function InventoryPage() {
     )
   })
 
-  const changedCount = filtered.filter((p) => String(p.quantity) !== counts[p.id]).length
+  const changedCount = filtered.filter((p) => counts[p.id] !== savedCounts[p.id]).length
 
   function getRestockQty(product: Product): number {
     const shopQtyNum = parseInt(localShopQtys[product.sku] ?? '0', 10) || 0
@@ -198,14 +211,20 @@ export default function InventoryPage() {
     if (isNaN(val)) return
     setSaving((s) => ({ ...s, [id]: true }))
     try {
-      if (inventoryCountSyncActive) {
-        await fetch('/api/admin/pos/stock', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, mode: 'set', qty: val }),
-        })
-        setProducts((prev) => prev.map((p) => p.id === id ? { ...p, quantity: val } : p))
-      }
+      // Save inventory count to cross-reference store (never updates Shop Inventory)
+      const now = new Date().toISOString()
+      const allCounts: Record<string, number> = {}
+      Object.entries(counts).forEach(([k, v]) => {
+        const n = parseInt(v, 10)
+        if (!isNaN(n)) allCounts[k] = n
+      })
+      await fetch('/api/admin/inventory-counts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ counts: allCounts, date: now }),
+      })
+      setSavedCounts((prev) => ({ ...prev, [id]: String(val) }))
+      setLastStockTakeDate(now)
 
       // Also save pricelist entry if supplier selected
       if (!skipPricelist && selectedSupplierId) {
@@ -236,7 +255,7 @@ export default function InventoryPage() {
   }
 
   async function saveAll() {
-    const changed = filtered.filter((p) => String(p.quantity) !== counts[p.id])
+    const hasChangedCounts = filtered.some((p) => counts[p.id] !== savedCounts[p.id])
 
     // Collect all dirty pricelist entries if supplier is selected
     const dirtyPricelist: PricelistEntry[] = []
@@ -259,12 +278,25 @@ export default function InventoryPage() {
       })
     }
 
-    if (!changed.length && !dirtyPricelist.length) return
+    if (!hasChangedCounts && !dirtyPricelist.length) return
 
     setSaveAllLoading(true)
     try {
-      for (const p of changed) {
-        await saveOne(p.id, true)
+      if (hasChangedCounts) {
+        // Save all inventory counts as cross-reference (never updates Shop Inventory)
+        const now = new Date().toISOString()
+        const allCounts: Record<string, number> = {}
+        Object.entries(counts).forEach(([k, v]) => {
+          const n = parseInt(v, 10)
+          if (!isNaN(n)) allCounts[k] = n
+        })
+        await fetch('/api/admin/inventory-counts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ counts: allCounts, date: now }),
+        })
+        setSavedCounts(Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])))
+        setLastStockTakeDate(now)
       }
       if (dirtyPricelist.length > 0) {
         await fetch('/api/admin/inventory-pricelists', {
@@ -619,14 +651,23 @@ export default function InventoryPage() {
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
                   Wholesale ({currency})
                 </th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Inventory Count</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">
+                  <div>
+                    Inventory Count
+                    {lastStockTakeDate && (
+                      <div className="text-[10px] text-gray-400 font-normal normal-case mt-0.5">
+                        Last: {new Date(lastStockTakeDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
+                </th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-20">Restock</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((product, idx) => {
                 const countVal = counts[product.id] ?? String(product.quantity)
-                const isDirty = countVal !== String(product.quantity)
+                const isDirty = countVal !== savedCounts[product.id]
                 const priceVal = localPrices[product.sku] ?? '0'
                 const shopQtyVal = localShopQtys[product.sku] ?? '0'
                 const restockQty = getRestockQty(product)
@@ -753,7 +794,14 @@ export default function InventoryPage() {
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  Inventory Count
+                  <div>
+                    Inventory Count
+                    {lastStockTakeDate && (
+                      <div className="text-[10px] text-gray-400 font-normal normal-case mt-0.5">
+                        Last: {new Date(lastStockTakeDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </div>
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.count; const onMove = (ev: MouseEvent) => setWidth('count', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
               </tr>
@@ -761,7 +809,7 @@ export default function InventoryPage() {
             <tbody>
               {filtered.map((product, idx) => {
                 const countVal = counts[product.id] ?? String(product.quantity)
-                const isDirty = countVal !== String(product.quantity)
+                const isDirty = countVal !== savedCounts[product.id]
                 return (
                   <tr key={product.id} className={`border-b last:border-0 ${isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>

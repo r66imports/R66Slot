@@ -74,8 +74,8 @@ const DEFAULT_RULES: SiteRule[] = [
   },
   {
     id: 'inventory_count_sync',
-    name: 'Rule 9 \u2014 Inventory Count \u2192 Update Shop Inventory',
-    description: 'Controls whether saving an Inventory Count on the Inventory page writes the entered value back to the product\'s live stock quantity (Shop Inventory). When ON: typing a count and pressing Save/Enter commits it as the new stock level immediately. When OFF: Inventory Count is audit/reference-only \u2014 stock is only moved by POS sales or invoice deductions (Rule 3). Use OFF mode for a physical stock take where you want to count first and reconcile later.',
+    name: 'Rule 9 \u2014 Inventory Count (Cross-Reference Only)',
+    description: 'Inventory Count is a cross-reference / audit column only \u2014 it never updates Shop Inventory. Use it during a physical stock take to record your counted quantities and compare them against the Shop Inventory column. Stock is only moved by POS sales, invoice deductions (Rule 3), or manual edits on the product. The last stock-take date is shown above the Inventory Count column header.',
     active: true,
     appliesTo: ['Inventory Page'],
     category: 'Inventory',
