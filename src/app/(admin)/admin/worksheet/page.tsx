@@ -462,6 +462,25 @@ function WorksheetEditor({
           body: JSON.stringify({ price: Math.round(it.retailPrice * 100) / 100 }),
         })
       }
+      // Sync wholesale price (supplier currency) to inventory pricelist
+      const sup = suppliers.find((s) => s.name === supplier)
+      if (sup) {
+        const priceEntries = items
+          .filter((it) => it.sku && it.wholesalePrice > 0)
+          .map((it) => ({
+            supplierId: sup.id,
+            sku: it.sku,
+            wholesalePrice: it.wholesalePrice,
+            shopQty: it.qty,
+          }))
+        if (priceEntries.length > 0) {
+          await fetch('/api/admin/inventory-pricelists', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entries: priceEntries }),
+          }).catch(() => {})
+        }
+      }
       await refreshSheets()
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2500)

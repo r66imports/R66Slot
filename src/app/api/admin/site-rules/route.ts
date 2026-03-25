@@ -89,6 +89,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Elements',
   },
   {
+    id: 'worksheet_wholesale_sync',
+    name: 'Rule 12 \u2014 Worksheet Wholesale Price \u2192 Inventory Sync',
+    description: 'Every time a Worksheet is saved or Update Costing is run, the Wholesale Price (in supplier currency e.g. EUR) for each line item is automatically written to the Inventory pricelist. This means the Inventory page \u2018Wholesale (EUR)\u2019 column always reflects the exact wholesale price from the Worksheet \u2014 not a calculated ZAR value. Applies per supplier: the supplier selected on the Worksheet determines which pricelist rows are updated. Send to Inventory also triggers this sync.',
+    active: true,
+    appliesTo: ['Worksheet', 'Inventory'],
+    category: 'Inventory',
+  },
+  {
     id: 'product_grid_show_stock',
     name: 'Rule 11 \u2014 Show Stock Quantity in Product Grid',
     description: 'Displays the available stock quantity beneath the price on each product card in the online store Product Grid. When ON: products show a green \u201cX in stock\u201d label (or a gray \u201cOut of stock\u201d label when qty is 0). Pre-order products are excluded \u2014 they never show a stock count. When OFF: stock counts are hidden and only the price is shown.',
