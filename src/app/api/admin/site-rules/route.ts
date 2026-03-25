@@ -113,6 +113,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'worksheet_csv_export',
+    name: 'Rule 14 \u2014 Worksheet CSV Export',
+    description: 'Defines the columns included when exporting a Worksheet to CSV. Exported columns: #, SKU, Description, Retail (ZAR) \u2014 the saved retail price from the Products database, In Stock \u2014 current inventory quantity, Unit, Category, Qty (order quantity), Wholesale (supplier currency), Landed (ZAR) \u2014 wholesale \u00d7 exchange rate, Calc Retail (ZAR) \u2014 landed \u00d7 markup \u00d7 VAT, Final Landed (ZAR), Landed Retail (ZAR), Total (supplier currency). The TOTAL row at the bottom shows grand total in supplier currency and ZAR equivalent. File is named worksheet-{supplier}-{date}.csv.',
+    active: true,
+    appliesTo: ['Worksheet'],
+    category: 'Inventory',
+  },
+  {
     id: 'event_sku_drill_down',
     name: 'Rule 13 \u2014 Event SKU Invoice Drill-down',
     description: 'When ON: clicking any SKU in the Events sales table opens a popup showing every invoice that included that product during the event period \u2014 date, client, quantity, unit price, and line total. Also shows the current stock quantity for that SKU so you can immediately see how much is left after the event. When OFF: SKUs are plain text with no drill-down.',

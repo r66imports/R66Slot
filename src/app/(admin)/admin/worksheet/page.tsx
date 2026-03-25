@@ -611,8 +611,8 @@ function WorksheetEditor({
 
   // ── CSV ──
   function downloadCSV() {
-    const headers = ['#', 'SKU', 'Description', 'Unit', 'Category', 'Qty',
-      'Landed (ZAR)', 'Pre Order Price',
+    const headers = ['#', 'SKU', 'Description', 'Retail (ZAR)', 'In Stock', 'Unit', 'Category', 'Qty',
+      `Wholesale (${currency})`, 'Landed (ZAR)', 'Calc Retail (ZAR)',
       'Final Landed (ZAR)', 'Landed Retail (ZAR)', `Total (${currency})`]
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
@@ -620,8 +620,11 @@ function WorksheetEditor({
       const fRetail = calcFinalRetail(it.wholesalePrice)
       const totalCur = it.qty * it.wholesalePrice
       return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`,
+        it.retailPrice > 0 ? it.retailPrice.toFixed(2) : '',
+        it.inStock ?? 0,
         `"${(it.unit || '').replace(/"/g, '""')}"`, `"${(it.category || '').replace(/"/g, '""')}"`,
-        it.qty, landed.toFixed(2), it.wholesalePrice > 0 ? calcRetail(it.wholesalePrice).toFixed(2) : '',
+        it.qty, it.wholesalePrice > 0 ? it.wholesalePrice.toFixed(2) : '',
+        landed.toFixed(2), it.wholesalePrice > 0 ? calcRetail(it.wholesalePrice).toFixed(2) : '',
         it.wholesalePrice > 0 ? fLanded.toFixed(2) : '',
         it.wholesalePrice > 0 ? fRetail.toFixed(2) : '',
         it.wholesalePrice > 0 ? totalCur.toFixed(2) : '']
@@ -629,7 +632,7 @@ function WorksheetEditor({
     const filledForTotal = items.filter((it) => it.wholesalePrice > 0)
     const grandTotalCur = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
     const grandTotalZAR = filledForTotal.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
-    const totalRow = ['', '', '', '', '', 'TOTAL', '', '', '', '', `${grandTotalCur.toFixed(2)} (R ${grandTotalZAR.toFixed(2)})`]
+    const totalRow = ['', '', '', '', '', '', '', 'TOTAL', '', '', '', '', '', `${grandTotalCur.toFixed(2)} (R ${grandTotalZAR.toFixed(2)})`]
     const csv = [headers.join(','), ...rows.map((r) => r.join(',')), totalRow.join(',')].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
