@@ -75,7 +75,7 @@ const DEFAULT_RULES: SiteRule[] = [
   {
     id: 'inventory_count_sync',
     name: 'Rule 9 \u2014 Inventory Count (Cross-Reference Only)',
-    description: 'Inventory Count is a cross-reference / audit column only \u2014 it never updates Shop Inventory. Use it during a physical stock take to record your counted quantities and compare them against the Shop Inventory column. Stock is only moved by POS sales, invoice deductions (Rule 3), or manual edits on the product. The last stock-take date is shown above the Inventory Count column header.',
+    description: 'Inventory Count is a cross-reference / audit column only \u2014 it never updates Shop Inventory. Use it during a physical stock take to record your counted quantities and compare them against the Shop Inventory column. Stock is only moved by POS sales, invoice deductions (Rule 3), or manual edits on the product. The last stock-take date is shown above the Inventory Count column header. Mouse wheel scrolling is disabled on count inputs to prevent accidental changes \u2014 use the up/down arrows or type directly. Values autosave 1.5 seconds after the last keystroke.',
     active: true,
     appliesTo: ['Inventory Page'],
     category: 'Inventory',

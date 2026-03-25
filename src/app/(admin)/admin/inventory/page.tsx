@@ -73,6 +73,42 @@ export default function InventoryPage() {
   // Inventory Count — cross-reference only, never updates Shop Inventory
   const [lastStockTakeDate, setLastStockTakeDate] = useState<string | null>(null)
   const [savedCounts, setSavedCounts] = useState<Record<string, string>>({})
+  const [autoSaving, setAutoSaving] = useState(false)
+
+  // Refs so the debounce timer always reads the latest state without stale closures
+  const countsRef = useRef<Record<string, string>>({})
+  const savedCountsRef = useRef<Record<string, string>>({})
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => { countsRef.current = counts }, [counts])
+  useEffect(() => { savedCountsRef.current = savedCounts }, [savedCounts])
+
+  function scheduleAutoSave() {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(async () => {
+      const cur = countsRef.current
+      const sav = savedCountsRef.current
+      const hasDirty = Object.entries(cur).some(([id, v]) => v !== sav[id])
+      if (!hasDirty) return
+      setAutoSaving(true)
+      try {
+        const now = new Date().toISOString()
+        const allCounts: Record<string, number> = {}
+        Object.entries(cur).forEach(([k, v]) => {
+          const n = parseInt(v, 10)
+          if (!isNaN(n)) allCounts[k] = n
+        })
+        await fetch('/api/admin/inventory-counts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ counts: allCounts, date: now }),
+        })
+        setSavedCounts(Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])))
+        setLastStockTakeDate(now)
+      } finally {
+        setAutoSaving(false)
+      }
+    }, 1500)
+  }
 
 
   // Shop Volume lock/unlock
@@ -598,7 +634,8 @@ export default function InventoryPage() {
       {/* Stats bar */}
       <div className="flex gap-4 mb-4 text-sm text-gray-500">
         <span>{filtered.length} products</span>
-        {changedCount > 0 && <span className="text-orange-600 font-medium">{changedCount} unsaved changes</span>}
+        {autoSaving && <span className="text-indigo-500 font-medium animate-pulse">Saving…</span>}
+        {!autoSaving && changedCount > 0 && <span className="text-orange-600 font-medium">{changedCount} unsaved changes</span>}
         {hasSupplier && restockItems.length > 0 && (
           <span className="text-red-600 font-medium">{restockItems.length} items need restocking</span>
         )}
@@ -716,8 +753,9 @@ export default function InventoryPage() {
                         type="number"
                         min="0"
                         value={countVal}
-                        onChange={(e) => setCounts((c) => ({ ...c, [product.id]: e.target.value }))}
+                        onChange={(e) => { setCounts((c) => ({ ...c, [product.id]: e.target.value })); scheduleAutoSave() }}
                         onKeyDown={(e) => handleKey(e, product.id, idx)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className={`w-16 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                           isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'
                         }`}
@@ -829,8 +867,9 @@ export default function InventoryPage() {
                         type="number"
                         min="0"
                         value={countVal}
-                        onChange={(e) => setCounts((c) => ({ ...c, [product.id]: e.target.value }))}
+                        onChange={(e) => { setCounts((c) => ({ ...c, [product.id]: e.target.value })); scheduleAutoSave() }}
                         onKeyDown={(e) => handleKey(e, product.id, idx)}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className={`w-20 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
                           isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'
                         }`}
