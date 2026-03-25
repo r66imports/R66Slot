@@ -18,6 +18,13 @@ interface Supplier {
   code: string
 }
 
+interface PricelistEntry {
+  supplierId: string
+  sku: string
+  wholesalePrice: number
+  shopQty: number
+}
+
 function formatPrice(p: number) {
   return `R ${p.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`
 }
@@ -25,6 +32,7 @@ function formatPrice(p: number) {
 export default function PriceListsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [pricelistEntries, setPricelistEntries] = useState<PricelistEntry[]>([])
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
@@ -34,15 +42,18 @@ export default function PriceListsPage() {
     async function load() {
       setLoading(true)
       try {
-        const [supRes, prodRes] = await Promise.all([
+        const [supRes, prodRes, plRes] = await Promise.all([
           fetch('/api/admin/supplier-contacts'),
           fetch('/api/admin/products'),
+          fetch('/api/admin/inventory-pricelists'),
         ])
         const supData = await supRes.json()
         const prodData = await prodRes.json()
+        const plData = await plRes.json()
         const supList: Supplier[] = Array.isArray(supData) ? supData.filter((s: Supplier) => s.name) : []
         setSuppliers(supList)
         setProducts(Array.isArray(prodData) ? prodData : [])
+        setPricelistEntries(Array.isArray(plData) ? plData : [])
         if (supList.length > 0) setSelectedSupplier(supList[0])
       } finally {
         setLoading(false)
@@ -51,21 +62,25 @@ export default function PriceListsPage() {
     load()
   }, [])
 
-  // Match products to supplier by brand name (case-insensitive partial match)
-  const filteredProducts = products.filter((p) => {
-    if (!selectedSupplier) return false
-    const supName = selectedSupplier.name.toLowerCase()
-    const supCode = selectedSupplier.code?.toLowerCase() || ''
-    const brand = (p.brand || '').toLowerCase()
-    const brandMatch = brand.includes(supName) || supName.includes(brand) ||
-      (supCode && (brand.includes(supCode) || supCode.includes(brand)))
-    if (!brandMatch) return false
-    if (search) {
-      const q = search.toLowerCase()
-      return p.sku?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)
-    }
-    return true
-  }).sort((a, b) => (a.sku || '').localeCompare(b.sku || '', undefined, { numeric: true }))
+  // Use pricelist entries (set by worksheets) to determine which SKUs belong to the selected supplier
+  const filteredProducts = (() => {
+    if (!selectedSupplier) return []
+    const supplierSkus = new Set(
+      pricelistEntries
+        .filter((e) => e.supplierId === selectedSupplier.id)
+        .map((e) => e.sku)
+    )
+    return products
+      .filter((p) => {
+        if (!supplierSkus.has(p.sku)) return false
+        if (search) {
+          const q = search.toLowerCase()
+          return p.sku?.toLowerCase().includes(q) || p.title?.toLowerCase().includes(q)
+        }
+        return true
+      })
+      .sort((a, b) => (a.sku || '').localeCompare(b.sku || '', undefined, { numeric: true }))
+  })()
 
   async function handleDownloadPDF() {
     if (!selectedSupplier || filteredProducts.length === 0) return
