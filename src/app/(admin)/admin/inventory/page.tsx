@@ -74,26 +74,6 @@ export default function InventoryPage() {
   const [lastStockTakeDate, setLastStockTakeDate] = useState<string | null>(null)
   const [savedCounts, setSavedCounts] = useState<Record<string, string>>({})
 
-  useEffect(() => {
-    fetch('/api/admin/inventory-counts')
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (!data) return
-        if (data.date) setLastStockTakeDate(data.date)
-        if (data.counts && typeof data.counts === 'object') {
-          const update = (prev: Record<string, string>) => {
-            const merged = { ...prev }
-            Object.entries(data.counts as Record<string, number>).forEach(([id, val]) => {
-              merged[id] = String(val)
-            })
-            return merged
-          }
-          setCounts(update)
-          setSavedCounts(update)
-        }
-      })
-      .catch(() => {})
-  }, [])
 
   // Shop Volume lock/unlock
   const [shopVolumeUnlocked, setShopVolumeUnlocked] = useState(false)
@@ -104,35 +84,42 @@ export default function InventoryPage() {
   })
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  // ─── Load products ─────────────────────────────────────────────────────────
+  // ─── Load products + inventory counts (parallel, set state once) ───────────
 
   useEffect(() => {
-    fetch('/api/admin/products')
-      .then((r) => r.json())
-      .then((data) => {
-        const list: Product[] = (data.products || data || []).map((p: any) => ({
-          id: p.id,
-          sku: p.sku || '',
-          title: p.title || '',
-          brand: p.brand || '',
-          price: Number(p.price) || 0,
-          quantity: p.quantity ?? 0,
-          status: p.status || 'draft',
-          imageUrl: p.imageUrl || p.image_url || '',
-        }))
-        list.sort((a, b) => {
-          const na = parseFloat(a.sku) || 0
-          const nb = parseFloat(b.sku) || 0
-          if (na !== nb) return na - nb
-          return a.sku.localeCompare(b.sku)
-        })
-        setProducts(list)
-        const init: Record<string, string> = {}
-        list.forEach((p) => { init[p.id] = String(p.quantity) })
-        setCounts(init)
-        setSavedCounts(init)
+    Promise.all([
+      fetch('/api/admin/products').then((r) => r.json()),
+      fetch('/api/admin/inventory-counts').then((r) => r.ok ? r.json() : { counts: {}, date: '' }).catch(() => ({ counts: {}, date: '' })),
+    ]).then(([productsData, countsData]) => {
+      const list: Product[] = (productsData.products || productsData || []).map((p: any) => ({
+        id: p.id,
+        sku: p.sku || '',
+        title: p.title || '',
+        brand: p.brand || '',
+        price: Number(p.price) || 0,
+        quantity: p.quantity ?? 0,
+        status: p.status || 'draft',
+        imageUrl: p.imageUrl || p.image_url || '',
+      }))
+      list.sort((a, b) => {
+        const na = parseFloat(a.sku) || 0
+        const nb = parseFloat(b.sku) || 0
+        if (na !== nb) return na - nb
+        return a.sku.localeCompare(b.sku)
       })
-      .finally(() => setLoading(false))
+      setProducts(list)
+
+      // Initialise counts: use saved API value if available, otherwise product.quantity
+      const apiCounts: Record<string, number> = (countsData.counts && typeof countsData.counts === 'object') ? countsData.counts : {}
+      const countsMap: Record<string, string> = {}
+      list.forEach((p) => {
+        countsMap[p.id] = apiCounts[p.id] !== undefined ? String(apiCounts[p.id]) : String(p.quantity)
+      })
+      setCounts(countsMap)
+      setSavedCounts(countsMap)
+
+      if (countsData.date) setLastStockTakeDate(countsData.date)
+    }).finally(() => setLoading(false))
   }, [])
 
   // ─── Load suppliers ─────────────────────────────────────────────────────────
