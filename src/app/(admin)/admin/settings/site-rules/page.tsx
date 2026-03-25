@@ -32,6 +32,38 @@ function getCatStyle(cat: string) {
   return CATEGORY_COLORS[cat] ?? CATEGORY_COLORS.Uncategorized
 }
 
+// Extract "Rule N" number from name — returns 999 if not found
+function getRuleNumber(name: string): number {
+  const m = name.match(/Rule\s+(\d+)/i)
+  return m ? parseInt(m[1], 10) : 999
+}
+
+// Strip "Rule N — " prefix → short display name
+function getShortName(name: string): string {
+  return name.replace(/^Rule\s+\d+\s*[—–\-]+\s*/i, '').trim()
+}
+
+// Split description into bullet-point sentences
+function descriptionToBullets(desc: string): string[] {
+  const mainPart = desc.split('. Flow:')[0]
+  const raw = mainPart.split('. ')
+  const bullets: string[] = []
+  let acc = ''
+  for (const s of raw) {
+    const part = s.trim()
+    if (!part) continue
+    if (!acc) { acc = part; continue }
+    if (/^[A-Z]/.test(part)) {
+      bullets.push(acc.endsWith('.') ? acc : acc + '.')
+      acc = part
+    } else {
+      acc += '. ' + part
+    }
+  }
+  if (acc) bullets.push(acc.endsWith('.') ? acc : acc + '.')
+  return bullets.filter((b) => b.length > 5)
+}
+
 const ENFORCED_RULES = new Set([
   'site_font',
   'enforce_stock_limit',
@@ -201,7 +233,9 @@ export default function SiteRulesPage() {
   ]
   const grouped = orderedCategories.map((cat) => ({
     cat,
-    rules: rules.filter((r) => (r.category || 'Uncategorized') === cat),
+    rules: rules
+      .filter((r) => (r.category || 'Uncategorized') === cat)
+      .sort((a, b) => getRuleNumber(a.name) - getRuleNumber(b.name)),
   }))
 
   const statusLabel = {
@@ -261,6 +295,8 @@ export default function SiteRulesPage() {
                   {catRules.map((rule) => {
                     const enforced = ENFORCED_RULES.has(rule.id)
                     const isExpanded = expanded.has(rule.id)
+                    const ruleNum = getRuleNumber(rule.name)
+                    const shortName = getShortName(rule.name)
                     return (
                       <div key={rule.id}>
                         {/* Compact row */}
@@ -275,10 +311,17 @@ export default function SiteRulesPage() {
                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition duration-200 ${rule.active ? 'translate-x-4' : 'translate-x-0'}`} />
                           </button>
 
+                          {/* Rule number badge */}
+                          {ruleNum !== 999 && (
+                            <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-[10px] font-bold flex items-center justify-center">
+                              {ruleNum}
+                            </span>
+                          )}
+
                           {/* Name + badges */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className={`text-sm font-semibold ${rule.active ? 'text-gray-900' : 'text-gray-400'}`}>{rule.name}</span>
+                              <span className={`text-sm font-semibold ${rule.active ? 'text-gray-900' : 'text-gray-400'}`}>{shortName}</span>
                               {enforced ? (
                                 <span className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
                                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -319,30 +362,33 @@ export default function SiteRulesPage() {
                         {/* Expanded detail */}
                         {isExpanded && (
                           <div className="px-5 pb-5 pt-3 bg-gray-50/60 border-t border-gray-100">
-                            {/* Description */}
-                            {rule.description.includes('. Flow:') ? (
-                              <div className="space-y-2 mb-4">
-                                <p className="text-sm text-gray-600">
-                                  {rule.description.split(/\. (?=Flow:)/)[0]}.
-                                </p>
-                                <div className="bg-white rounded-xl border border-gray-200 px-4 py-3">
-                                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Workflow</p>
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    {rule.description
-                                      .split(/\. (?=Flow:)/)[1]
-                                      ?.replace(/^Flow:\s*/, '')
-                                      .split(/\.\s+(?=[A-Z])/)
-                                      .map((step, i, arr) => (
-                                        <span key={i} className="flex items-center gap-1.5">
-                                          <span className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1">{step.replace(/\.$/, '')}</span>
-                                          {i < arr.length - 1 && <span className="text-gray-300 text-xs font-bold">&rarr;</span>}
-                                        </span>
-                                      ))}
-                                  </div>
+                            {/* Description as bullet points */}
+                            <ul className="space-y-1.5 mb-4">
+                              {descriptionToBullets(rule.description).map((bullet, i) => (
+                                <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
+                                  {bullet}
+                                </li>
+                              ))}
+                            </ul>
+
+                            {/* Workflow steps (if Flow: present) */}
+                            {rule.description.includes('. Flow:') && (
+                              <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 mb-4">
+                                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Workflow</p>
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {rule.description
+                                    .split(/\. (?=Flow:)/)[1]
+                                    ?.replace(/^Flow:\s*/, '')
+                                    .split(/\.\s+(?=[A-Z])/)
+                                    .map((step, i, arr) => (
+                                      <span key={i} className="flex items-center gap-1.5">
+                                        <span className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1">{step.replace(/\.$/, '')}</span>
+                                        {i < arr.length - 1 && <span className="text-gray-300 text-xs font-bold">&rarr;</span>}
+                                      </span>
+                                    ))}
                                 </div>
                               </div>
-                            ) : (
-                              <p className="text-sm text-gray-600 mb-4">{rule.description}</p>
                             )}
 
                             {/* Options selector */}
