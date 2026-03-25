@@ -44,6 +44,7 @@ const ENFORCED_RULES = new Set([
   'button_alignment',
   'product_grid_show_stock',
   'worksheet_wholesale_sync',
+  'event_sku_drill_down',
 ])
 
 function CategoryPicker({

@@ -312,6 +312,147 @@ function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
   )
 }
 
+// ─── SKU Invoice Drill-down Modal ─────────────────────────────────────────────
+
+interface SkuInvoiceRow {
+  date: string
+  clientName: string
+  qty: number
+  unitPrice: number
+  lineTotal: number
+}
+
+function SkuDetailModal({ item, event, onClose }: {
+  item: EventSalesItem
+  event: SlotEvent
+  onClose: () => void
+}) {
+  const [rows, setRows] = useState<SkuInvoiceRow[]>([])
+  const [stock, setStock] = useState<number | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : []),
+      fetch('/api/admin/products').then((r) => r.ok ? r.json() : []),
+    ]).then(([docs, prodsData]) => {
+      const products: any[] = prodsData.products || prodsData || []
+
+      // Current stock for this SKU
+      if (item.sku) {
+        const prod = products.find((p: any) => p.sku?.trim().toLowerCase() === item.sku.toLowerCase())
+        setStock(prod?.quantity ?? null)
+      }
+
+      const fromDate = new Date(event.dateFrom)
+      const toDate = new Date(event.dateTo)
+      toDate.setHours(23, 59, 59, 999)
+
+      const result: SkuInvoiceRow[] = []
+      for (const doc of docs as RawInvoice[]) {
+        if (doc.status === 'archived' || doc.status === 'rejected') continue
+        const d = new Date(doc.date || '')
+        if (d < fromDate || d > toDate) continue
+        for (const li of doc.lineItems) {
+          const { sku, title } = parseSku(li.description)
+          const match = item.sku
+            ? sku.trim().toLowerCase() === item.sku.toLowerCase()
+            : (title || li.description).trim() === item.title.trim()
+          if (match) {
+            result.push({
+              date: doc.date,
+              clientName: (doc as any).clientName || '—',
+              qty: li.qty,
+              unitPrice: li.unitPrice,
+              lineTotal: li.qty * li.unitPrice,
+            })
+          }
+        }
+      }
+      result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      setRows(result)
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalQty = rows.reduce((s, r) => s + r.qty, 0)
+  const totalRev = rows.reduce((s, r) => s + r.lineTotal, 0)
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {item.sku && <span className="font-mono text-sm font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">{item.sku}</span>}
+              <h2 className="text-base font-bold text-gray-900">{item.title}</h2>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">Invoice breakdown · {event.name}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-4">✕</button>
+        </div>
+
+        {/* Stats row */}
+        <div className="grid grid-cols-4 gap-px bg-gray-100 border-b border-gray-100">
+          {[
+            { label: 'Units sold', value: String(totalQty), color: 'text-indigo-700' },
+            { label: 'Revenue', value: fmtPrice(totalRev), color: 'text-gray-900' },
+            { label: 'In stock now', value: stock === null ? '—' : String(stock), color: stock === null ? 'text-gray-400' : stock > 0 ? 'text-green-600' : 'text-red-500' },
+            { label: 'Invoices', value: String(rows.length), color: 'text-gray-600' },
+          ].map((s) => (
+            <div key={s.label} className="bg-gray-50 px-4 py-3 text-center">
+              <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>
+              <div className="text-[10px] text-gray-400 uppercase tracking-wide mt-0.5">{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Invoice table */}
+        <div className="overflow-y-auto flex-1">
+          {loading ? (
+            <div className="py-12 text-center text-gray-400 text-sm">Loading invoices…</div>
+          ) : rows.length === 0 ? (
+            <div className="py-12 text-center text-gray-400 text-sm">No invoice lines found for this period</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">#</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Client</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Qty</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Unit Price</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-4 py-2.5 text-xs text-gray-400">{i + 1}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-600">{fmtDate(row.date)}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-800 font-medium">{row.clientName}</td>
+                    <td className="px-4 py-2.5 text-right font-bold text-gray-900">{row.qty}</td>
+                    <td className="px-4 py-2.5 text-right text-xs text-gray-600">{fmtPrice(row.unitPrice)}</td>
+                    <td className="px-4 py-2.5 text-right text-xs font-semibold text-gray-800">{fmtPrice(row.lineTotal)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                <tr>
+                  <td colSpan={3} className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase">Total</td>
+                  <td className="px-4 py-2.5 text-right font-bold text-indigo-700">{totalQty}</td>
+                  <td />
+                  <td className="px-4 py-2.5 text-right font-bold text-gray-900">{fmtPrice(totalRev)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Expense Row ───────────────────────────────────────────────────────────────
 
 const PAID_BY_OPTIONS = ['', 'Route 66 Imports', 'Self']
@@ -362,6 +503,18 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
   const [notes, setNotes] = useState(initialEvent.notes || '')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [salesSearch, setSalesSearch] = useState('')
+  const [selectedSkuItem, setSelectedSkuItem] = useState<EventSalesItem | null>(null)
+  const [drillDownEnabled, setDrillDownEnabled] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/admin/site-rules')
+      .then((r) => r.ok ? r.json() : [])
+      .then((rules: Array<{ id: string; active: boolean }>) => {
+        const rule = rules.find((r) => r.id === 'event_sku_drill_down')
+        if (rule) setDrillDownEnabled(rule.active)
+      })
+      .catch(() => {})
+  }, [])
 
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0)
   const netProfit = event.grossProfit - totalExpenses
@@ -509,7 +662,19 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
                 return (
                   <tr key={item.sku || item.title} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-2.5 px-4 text-xs text-gray-400">{i + 1}</td>
-                    <td className="py-2.5 px-4 font-mono text-xs text-indigo-700 font-semibold">{item.sku || '—'}</td>
+                    <td className="py-2.5 px-4">
+                      {drillDownEnabled ? (
+                        <button
+                          onClick={() => setSelectedSkuItem(item)}
+                          className="font-mono text-xs text-indigo-700 font-semibold hover:underline hover:text-indigo-900 transition-colors"
+                          title="Click to see invoice breakdown"
+                        >
+                          {item.sku || '—'}
+                        </button>
+                      ) : (
+                        <span className="font-mono text-xs text-indigo-700 font-semibold">{item.sku || '—'}</span>
+                      )}
+                    </td>
                     <td className="py-2.5 px-4">
                       <div className="text-gray-800 font-medium text-xs">{item.title}</div>
                       <div className="mt-0.5 h-1 bg-gray-100 rounded-full w-full max-w-[140px]">
@@ -662,6 +827,11 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
             </div>
           </div>
         </div>
+      )}
+
+      {/* SKU drill-down modal */}
+      {selectedSkuItem && drillDownEnabled && (
+        <SkuDetailModal item={selectedSkuItem} event={event} onClose={() => setSelectedSkuItem(null)} />
       )}
 
       {/* Danger zone */}

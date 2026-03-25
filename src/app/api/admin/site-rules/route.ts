@@ -113,6 +113,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'event_sku_drill_down',
+    name: 'Rule 13 \u2014 Event SKU Invoice Drill-down',
+    description: 'When ON: clicking any SKU in the Events sales table opens a popup showing every invoice that included that product during the event period \u2014 date, client, quantity, unit price, and line total. Also shows the current stock quantity for that SKU so you can immediately see how much is left after the event. When OFF: SKUs are plain text with no drill-down.',
+    active: true,
+    appliesTo: ['Events', 'Admin Invoices', 'Inventory'],
+    category: 'Invoices',
+  },
+  {
     id: 'invoice_price_type',
     name: 'Rule 6 \u2014 Invoice Default Price Type',
     description: 'Sets the default price type applied when adding products to an invoice. Choose between Retail, Cost, or Pre-Order as the default. Can be overridden per-invoice using the Retail | Cost | Pre-Order selector in the Line Items header. Per-row quick-switch buttons also appear under each line item showing all available prices. Products without a Pre-Order price configured will fall back to Retail when Pre-Order mode is selected.',
