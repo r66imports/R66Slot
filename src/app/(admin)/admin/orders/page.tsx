@@ -1816,6 +1816,7 @@ export default function OrdersPage() {
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const [shippingEnabled, setShippingEnabled] = useState(true)
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
+  const [showArchive, setShowArchive] = useState(false)
 
   const handleSyncInventory = async () => {
     setSyncingInventory(true)
@@ -1897,7 +1898,7 @@ export default function OrdersPage() {
   const boRows = tab !== 'backorders' ? backorders.filter(cfg.boPhase) : []
   const docRows = tab !== 'backorders'
     ? documents
-        .filter((d) => d.type === cfg.docType && d.status !== 'archived')
+        .filter((d) => d.type === cfg.docType && (showArchive ? d.status === 'archived' : d.status !== 'archived'))
         .sort((a, b) => {
           let av: string | number = ''
           let bv: string | number = ''
@@ -2112,7 +2113,7 @@ export default function OrdersPage() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setTab(t.key)}
+              onClick={() => { setTab(t.key); setShowArchive(false) }}
               className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                 tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
@@ -2340,8 +2341,23 @@ export default function OrdersPage() {
           )}
 
           <div className="flex items-center justify-between mb-3">
-            <p className="text-sm text-gray-500">{totalCount} {cfg.label}</p>
-            <p className="text-sm font-semibold text-gray-700">Total (excl. VAT): {fmtPrice(grandTotal)}</p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-gray-500">{totalCount} {showArchive ? 'Archived' : ''} {cfg.label}</p>
+              <button
+                onClick={() => setShowArchive((v) => !v)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  showArchive
+                    ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12" />
+                </svg>
+                {showArchive ? 'Back to Active' : 'View Archive'}
+              </button>
+            </div>
+            {!showArchive && <p className="text-sm font-semibold text-gray-700">Total (excl. VAT): {fmtPrice(grandTotal)}</p>}
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
