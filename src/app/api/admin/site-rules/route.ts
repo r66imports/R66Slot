@@ -113,6 +113,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'products_supplier_filter',
+    name: 'Rule 15 \u2014 Products Page Supplier Filter',
+    description: 'A Supplier dropdown on the Products page filters the product list to show only items belonging to the selected supplier. The supplier-to-SKU mapping is sourced from the inventory pricelist (written by worksheets via Send to Inventory). Flow: Products page loads \u2192 fetches all suppliers and inventory pricelist entries \u2192 Supplier dropdown appears in the filter bar \u2192 select a supplier \u2192 only products whose SKU appears in that supplier\u2019s pricelist are shown. Selecting \u201cAll Suppliers\u201d removes the filter. The supplier filter combines with existing search, brand, category, and Revo filters. Products not yet assigned to any supplier via a worksheet will not appear under any supplier filter \u2014 they are visible under All Suppliers only.',
+    active: true,
+    appliesTo: ['Products'],
+    category: 'Inventory',
+  },
+  {
     id: 'worksheet_csv_export',
     name: 'Rule 14 \u2014 Worksheet CSV Export',
     description: 'Defines the columns included when exporting a Worksheet to CSV. Exported columns: #, SKU, Description, Retail (ZAR) \u2014 the saved retail price from the Products database, In Stock \u2014 current inventory quantity, Unit, Category, Qty (order quantity), Wholesale (supplier currency), Landed (ZAR) \u2014 wholesale \u00d7 exchange rate, Calc Retail (ZAR) \u2014 landed \u00d7 markup \u00d7 VAT, Final Landed (ZAR), Landed Retail (ZAR), Total (supplier currency). The TOTAL row at the bottom shows grand total in supplier currency and ZAR equivalent. File is named worksheet-{supplier}-{date}.csv.',
