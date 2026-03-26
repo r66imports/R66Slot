@@ -11,10 +11,17 @@ interface LineItem {
 interface OrderDocument {
   id: string
   type: string
+  docNumber: string
   status: string
   date: string
   clientName: string
   lineItems: LineItem[]
+}
+
+interface Product {
+  id: string
+  sku: string
+  quantity: number
 }
 
 interface SalesRow {
@@ -24,6 +31,16 @@ interface SalesRow {
   totalRevenue: number
   invoiceCount: number
   lastSold: string
+  inStock: number
+}
+
+interface InvoiceDrillRow {
+  docNumber: string
+  date: string
+  clientName: string
+  qty: number
+  unitPrice: number
+  lineTotal: number
 }
 
 const DATE_RANGES = [
@@ -42,20 +59,43 @@ function parseSku(description: string): { sku: string; title: string } {
   return { sku: '', title: description.trim() }
 }
 
+function fmtPrice(n: number) {
+  return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+function fmtDate(d: string) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 export default function ReportsPage() {
   const [docs, setDocs] = useState<OrderDocument[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [rangeDays, setRangeDays] = useState(90)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'qty' | 'revenue' | 'count'>('qty')
   const [excludeCancelled, setExcludeCancelled] = useState(true)
+  const [drillSku, setDrillSku] = useState<SalesRow | null>(null)
 
   useEffect(() => {
-    fetch('/api/admin/orders/documents?type=invoice')
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => { setDocs(data); setLoading(false) })
-      .catch(() => setLoading(false))
+    Promise.all([
+      fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : []),
+      fetch('/api/admin/products').then((r) => r.ok ? r.json() : []),
+    ]).then(([docData, prodData]) => {
+      setDocs(Array.isArray(docData) ? docData : [])
+      setProducts(Array.isArray(prodData) ? prodData : [])
+      setLoading(false)
+    }).catch(() => setLoading(false))
   }, [])
+
+  // SKU → stock quantity map
+  const stockMap = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const p of products) {
+      if (p.sku) m.set(p.sku.trim().toUpperCase(), p.quantity ?? 0)
+    }
+    return m
+  }, [products])
 
   const rows = useMemo<SalesRow[]>(() => {
     const cutoff = rangeDays > 0
@@ -82,6 +122,7 @@ export default function ReportsPage() {
           existing.invoiceCount += 1
           if (doc.date > existing.lastSold) existing.lastSold = doc.date
         } else {
+          const inStock = stockMap.get(sku.toUpperCase()) ?? -1
           map.set(key, {
             sku,
             title: title || sku,
@@ -89,6 +130,7 @@ export default function ReportsPage() {
             totalRevenue: li.qty * li.unitPrice,
             invoiceCount: 1,
             lastSold: doc.date || '',
+            inStock,
           })
         }
       }
@@ -110,31 +152,45 @@ export default function ReportsPage() {
     })
 
     return result
-  }, [docs, rangeDays, search, sortBy, excludeCancelled])
+  }, [docs, rangeDays, search, sortBy, excludeCancelled, stockMap])
+
+  // Invoice drill-down: all invoices containing the selected SKU (any date, not range-filtered)
+  const drillRows = useMemo<InvoiceDrillRow[]>(() => {
+    if (!drillSku) return []
+    const results: InvoiceDrillRow[] = []
+    for (const doc of docs) {
+      for (const li of doc.lineItems) {
+        const { sku } = parseSku(li.description)
+        if (sku === drillSku.sku || (!drillSku.sku && li.description.trim() === drillSku.title)) {
+          results.push({
+            docNumber: doc.docNumber || doc.id,
+            date: doc.date || '',
+            clientName: doc.clientName || '—',
+            qty: li.qty,
+            unitPrice: li.unitPrice,
+            lineTotal: li.qty * li.unitPrice,
+          })
+        }
+      }
+    }
+    results.sort((a, b) => b.date.localeCompare(a.date))
+    return results
+  }, [drillSku, docs])
 
   const totalQty = rows.reduce((s, r) => s + r.totalQty, 0)
   const totalRevenue = rows.reduce((s, r) => s + r.totalRevenue, 0)
   const uniqueSkus = rows.length
-
-  function fmtPrice(n: number) {
-    return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-  }
-  function fmtDate(d: string) {
-    if (!d) return '—'
-    return new Date(d).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
-  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Sales Reports</h1>
-        <p className="text-sm text-gray-500 mt-1">Best-selling items based on invoices — use this to plan your next order</p>
+        <p className="text-sm text-gray-500 mt-1">Best-selling items based on invoices — double-click a row to see invoice breakdown</p>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
-        {/* Date range */}
         <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white shadow-sm">
           {DATE_RANGES.map((dr) => (
             <button
@@ -151,7 +207,6 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {/* Search */}
         <input
           type="text"
           placeholder="Search SKU or product name…"
@@ -160,7 +215,6 @@ export default function ReportsPage() {
           className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white shadow-sm w-56"
         />
 
-        {/* Sort */}
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as 'qty' | 'revenue' | 'count')}
@@ -212,6 +266,7 @@ export default function ReportsPage() {
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">SKU</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Product</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Units Sold</th>
+                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">In Stock</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Revenue</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoices</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Last Sold</th>
@@ -221,24 +276,34 @@ export default function ReportsPage() {
               {rows.map((row, i) => {
                 const pct = rows[0].totalQty > 0 ? (row.totalQty / rows[0].totalQty) * 100 : 0
                 return (
-                  <tr key={row.sku || row.title} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={row.sku || row.title}
+                    className="border-b border-gray-100 hover:bg-indigo-50 transition-colors cursor-pointer select-none"
+                    onDoubleClick={() => setDrillSku(row)}
+                    title="Double-click to see invoice breakdown"
+                  >
                     <td className="py-3 px-4 text-gray-400 text-xs font-medium">{i + 1}</td>
                     <td className="py-3 px-4 font-mono text-xs text-blue-700 font-semibold">
                       {row.sku || '—'}
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-medium text-gray-800">{row.title}</div>
-                      {/* Bar showing relative volume */}
                       <div className="mt-1 h-1.5 rounded-full bg-gray-100 w-full max-w-[200px]">
-                        <div
-                          className="h-1.5 rounded-full bg-indigo-500"
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className="h-1.5 rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
                       </div>
                     </td>
                     <td className="py-3 px-4 text-right">
                       <span className="font-bold text-gray-900">{row.totalQty}</span>
                       <span className="text-gray-400 text-xs ml-1">units</span>
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      {row.inStock < 0 ? (
+                        <span className="text-gray-300 text-xs">—</span>
+                      ) : (
+                        <span className={`font-semibold text-sm ${row.inStock === 0 ? 'text-red-500' : row.inStock <= 3 ? 'text-amber-600' : 'text-green-600'}`}>
+                          {row.inStock}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right font-semibold text-gray-700">{fmtPrice(row.totalRevenue)}</td>
                     <td className="py-3 px-4 text-right text-gray-500">{row.invoiceCount}</td>
@@ -250,6 +315,81 @@ export default function ReportsPage() {
           </table>
         )}
       </div>
+
+      {/* Invoice Drill-down Modal */}
+      {drillSku && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setDrillSku(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Modal header */}
+            <div className="flex items-start justify-between px-6 py-4 border-b border-gray-200 bg-gray-50">
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Invoice Breakdown</p>
+                <h2 className="text-base font-bold text-gray-900 font-mono">{drillSku.sku || drillSku.title}</h2>
+                <p className="text-sm text-gray-500 mt-0.5">{drillSku.sku ? drillSku.title : ''}</p>
+              </div>
+              <button onClick={() => setDrillSku(null)} className="text-gray-400 hover:text-gray-600 mt-1">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Stats bar */}
+            <div className="flex divide-x divide-gray-100 bg-indigo-50 border-b border-indigo-100">
+              <div className="flex-1 px-5 py-3 text-center">
+                <p className="text-xs text-indigo-500 font-semibold uppercase tracking-wider">Total Sold</p>
+                <p className="text-xl font-bold text-indigo-700">{drillRows.reduce((s, r) => s + r.qty, 0)}</p>
+              </div>
+              <div className="flex-1 px-5 py-3 text-center">
+                <p className="text-xs text-indigo-500 font-semibold uppercase tracking-wider">In Stock Now</p>
+                <p className={`text-xl font-bold ${drillSku.inStock < 0 ? 'text-gray-400' : drillSku.inStock === 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {drillSku.inStock < 0 ? '—' : drillSku.inStock}
+                </p>
+              </div>
+              <div className="flex-1 px-5 py-3 text-center">
+                <p className="text-xs text-indigo-500 font-semibold uppercase tracking-wider">Revenue</p>
+                <p className="text-xl font-bold text-indigo-700">{fmtPrice(drillRows.reduce((s, r) => s + r.lineTotal, 0))}</p>
+              </div>
+              <div className="flex-1 px-5 py-3 text-center">
+                <p className="text-xs text-indigo-500 font-semibold uppercase tracking-wider">Invoices</p>
+                <p className="text-xl font-bold text-indigo-700">{drillRows.length}</p>
+              </div>
+            </div>
+
+            {/* Invoice list */}
+            <div className="overflow-y-auto max-h-[60vh]">
+              {drillRows.length === 0 ? (
+                <p className="p-8 text-center text-gray-400 text-sm">No invoices found for this SKU.</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice</th>
+                      <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                      <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
+                      <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                      <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Unit Price</th>
+                      <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {drillRows.map((r, i) => (
+                      <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2.5 px-4 font-mono text-xs text-blue-700 font-semibold">{r.docNumber}</td>
+                        <td className="py-2.5 px-4 text-gray-500 text-xs">{fmtDate(r.date)}</td>
+                        <td className="py-2.5 px-4 text-gray-700">{r.clientName}</td>
+                        <td className="py-2.5 px-4 text-right font-bold text-gray-900">{r.qty}</td>
+                        <td className="py-2.5 px-4 text-right text-gray-600">{fmtPrice(r.unitPrice)}</td>
+                        <td className="py-2.5 px-4 text-right font-semibold text-gray-800">{fmtPrice(r.lineTotal)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
