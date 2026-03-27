@@ -90,10 +90,10 @@ const DEFAULT_RULES: SiteRule[] = [
   },
   {
     id: 'worksheet_wholesale_sync',
-    name: 'Rule 12 \u2014 Worksheet Wholesale Price \u2192 Inventory Sync',
-    description: 'Every time a Worksheet is saved or Update Costing is run, the Wholesale Price (in supplier currency e.g. EUR) for each line item is automatically written to the Inventory pricelist. This means the Inventory page \u2018Wholesale (EUR)\u2019 column always reflects the exact wholesale price from the Worksheet \u2014 not a calculated ZAR value. Applies per supplier: the supplier selected on the Worksheet determines which pricelist rows are updated. Send to Inventory also triggers this sync.',
+    name: 'Rule 12 \u2014 Worksheet Wholesale Price \u2192 Inventory & Product Sync',
+    description: 'Wholesale Price on the Worksheet is always shown in the supplier\u2019s selected currency (e.g. EUR for Sideways, USD for US suppliers). Every time a Worksheet is saved, Update Costing is run, or Send to Inventory is triggered, the Wholesale Price for each line item is automatically written to the Inventory pricelist \u2014 the Inventory page \u2018Wholesale (EUR/USD)\u2019 column always reflects the exact wholesale price from the Worksheet, not a calculated ZAR value. The Wholesale Price also reflects on the Price (Rand) card on the Product add and edit pages in the admin \u2014 it is used for cost calculations (Landed, Final Landed, Landed Retail). Wholesale Price is strictly an internal/admin field and is NEVER shown on the customer-facing website or any public product page. Applies per supplier: the supplier selected on the Worksheet determines which pricelist and product rows are updated.',
     active: true,
-    appliesTo: ['Worksheet', 'Inventory'],
+    appliesTo: ['Worksheet', 'Inventory', 'Products'],
     category: 'Inventory',
   },
   {
