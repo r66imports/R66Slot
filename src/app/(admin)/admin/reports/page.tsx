@@ -24,6 +24,16 @@ interface Product {
   quantity: number
 }
 
+interface Supplier {
+  id: string
+  name: string
+}
+
+interface PricelistEntry {
+  supplierId: string
+  sku: string
+}
+
 interface SalesRow {
   sku: string
   title: string
@@ -70,10 +80,14 @@ function fmtDate(d: string) {
 export default function ReportsPage() {
   const [docs, setDocs] = useState<OrderDocument[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [pricelistEntries, setPricelistEntries] = useState<PricelistEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [rangeDays, setRangeDays] = useState(90)
   const [search, setSearch] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState('')
   const [sortBy, setSortBy] = useState<'qty' | 'revenue' | 'count'>('qty')
+  const [skuSort, setSkuSort] = useState<'none' | 'asc' | 'desc'>('none')
   const [excludeCancelled, setExcludeCancelled] = useState(true)
   const [drillSku, setDrillSku] = useState<SalesRow | null>(null)
   const [drillSearch, setDrillSearch] = useState('')
@@ -82,12 +96,26 @@ export default function ReportsPage() {
     Promise.all([
       fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : []),
       fetch('/api/admin/products').then((r) => r.ok ? r.json() : []),
-    ]).then(([docData, prodData]) => {
+      fetch('/api/admin/supplier-contacts').then((r) => r.ok ? r.json() : []),
+      fetch('/api/admin/inventory-pricelists').then((r) => r.ok ? r.json() : []),
+    ]).then(([docData, prodData, supData, plData]) => {
       setDocs(Array.isArray(docData) ? docData : [])
       setProducts(Array.isArray(prodData) ? prodData : [])
+      setSuppliers(Array.isArray(supData) ? supData.filter((s: Supplier) => s.name) : [])
+      setPricelistEntries(Array.isArray(plData) ? plData : [])
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
+
+  // supplierId → Set<sku> from pricelist entries
+  const supplierSkuMap = useMemo(() => {
+    const m = new Map<string, Set<string>>()
+    for (const e of pricelistEntries) {
+      if (!m.has(e.supplierId)) m.set(e.supplierId, new Set())
+      m.get(e.supplierId)!.add((e.sku || '').trim().toUpperCase())
+    }
+    return m
+  }, [pricelistEntries])
 
   // SKU → stock quantity map
   const stockMap = useMemo(() => {
@@ -103,6 +131,8 @@ export default function ReportsPage() {
       ? new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000)
       : new Date(0)
 
+    const supplierSkus = supplierFilter ? supplierSkuMap.get(supplierFilter) : null
+
     const map = new Map<string, SalesRow>()
 
     for (const doc of docs) {
@@ -115,6 +145,9 @@ export default function ReportsPage() {
         const { sku, title } = parseSku(li.description)
         const key = sku || title
         if (!key) continue
+
+        // Supplier filter — skip SKUs not in the selected supplier's pricelist
+        if (supplierSkus && !supplierSkus.has(sku.trim().toUpperCase())) continue
 
         const existing = map.get(key)
         if (existing) {
@@ -146,14 +179,21 @@ export default function ReportsPage() {
       )
     }
 
-    result.sort((a, b) => {
-      if (sortBy === 'qty') return b.totalQty - a.totalQty
-      if (sortBy === 'revenue') return b.totalRevenue - a.totalRevenue
-      return b.invoiceCount - a.invoiceCount
-    })
+    if (skuSort !== 'none') {
+      result.sort((a, b) => {
+        const cmp = a.sku.localeCompare(b.sku, undefined, { numeric: true, sensitivity: 'base' })
+        return skuSort === 'asc' ? cmp : -cmp
+      })
+    } else {
+      result.sort((a, b) => {
+        if (sortBy === 'qty') return b.totalQty - a.totalQty
+        if (sortBy === 'revenue') return b.totalRevenue - a.totalRevenue
+        return b.invoiceCount - a.invoiceCount
+      })
+    }
 
     return result
-  }, [docs, rangeDays, search, sortBy, excludeCancelled, stockMap])
+  }, [docs, rangeDays, search, sortBy, skuSort, supplierFilter, supplierSkuMap, excludeCancelled, stockMap])
 
   // Invoice drill-down: all invoices containing the selected SKU (any date, not range-filtered)
   const drillRows = useMemo<InvoiceDrillRow[]>(() => {
@@ -267,6 +307,20 @@ export default function ReportsPage() {
           <option value="count">Sort: Invoice Count</option>
         </select>
 
+        {/* Supplier filter */}
+        {suppliers.length > 0 && (
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            className={`px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 bg-white shadow-sm ${supplierFilter ? 'border-gray-900 font-semibold' : 'border-gray-200'}`}
+          >
+            <option value="">All Suppliers</option>
+            {suppliers.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
+
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
           <input
             type="checkbox"
@@ -305,7 +359,18 @@ export default function ReportsPage() {
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
-                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">SKU</th>
+                <th
+                  className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wider cursor-pointer select-none group"
+                  onClick={() => setSkuSort((s) => s === 'asc' ? 'desc' : 'asc')}
+                  title="Sort alphabetically"
+                >
+                  <span className={`inline-flex items-center gap-1 ${skuSort !== 'none' ? 'text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                    SKU
+                    <span className="text-xs">
+                      {skuSort === 'asc' ? '↑' : skuSort === 'desc' ? '↓' : <span className="opacity-30 group-hover:opacity-60">↕</span>}
+                    </span>
+                  </span>
+                </th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Product</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Units Sold</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">In Stock</th>

@@ -113,6 +113,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'reports_column_sort',
+    name: 'Rule 16 \u2014 Sales Reports Column Sort',
+    description: 'Column headers in the Sales Reports table are clickable to sort the list. SKU column: click once to sort A \u2192 Z (\u2191), click again to sort Z \u2192 A (\u2193). The \u2195 icon on the SKU header indicates no sort is active \u2014 click to activate. When SKU sort is active it overrides the Sort dropdown (Units Sold / Revenue / Invoice Count). The Sort dropdown still controls ordering when SKU sort is not active. Supplier filter dropdown also available to narrow results to a single supplier\u2019s SKUs.',
+    active: true,
+    appliesTo: ['Sales Reports'],
+    category: 'System',
+  },
+  {
     id: 'products_supplier_filter',
     name: 'Rule 15 \u2014 Products Page Supplier Filter',
     description: 'A Supplier dropdown on the Products page filters the product list to show only items belonging to the selected supplier. The supplier-to-SKU mapping is sourced from the inventory pricelist (written by worksheets via Send to Inventory). Flow: Products page loads \u2192 fetches all suppliers and inventory pricelist entries \u2192 Supplier dropdown appears in the filter bar \u2192 select a supplier \u2192 only products whose SKU appears in that supplier\u2019s pricelist are shown. Selecting \u201cAll Suppliers\u201d removes the filter. The supplier filter combines with existing search, brand, category, and Revo filters. Products not yet assigned to any supplier via a worksheet will not appear under any supplier filter \u2014 they are visible under All Suppliers only.',
