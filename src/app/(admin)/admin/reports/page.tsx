@@ -76,6 +76,7 @@ export default function ReportsPage() {
   const [sortBy, setSortBy] = useState<'qty' | 'revenue' | 'count'>('qty')
   const [excludeCancelled, setExcludeCancelled] = useState(true)
   const [drillSku, setDrillSku] = useState<SalesRow | null>(null)
+  const [drillSearch, setDrillSearch] = useState('')
 
   useEffect(() => {
     Promise.all([
@@ -320,7 +321,7 @@ export default function ReportsPage() {
                   <tr
                     key={row.sku || row.title}
                     className="border-b border-gray-100 hover:bg-indigo-50 transition-colors cursor-pointer select-none"
-                    onDoubleClick={() => setDrillSku(row)}
+                    onDoubleClick={() => { setDrillSku(row); setDrillSearch('') }}
                     title="Double-click to see invoice breakdown"
                   >
                     <td className="py-3 px-4 text-gray-400 text-xs font-medium">{i + 1}</td>
@@ -397,36 +398,62 @@ export default function ReportsPage() {
               </div>
             </div>
 
+            {/* Modal search */}
+            {drillRows.length > 0 && (
+              <div className="px-4 py-3 border-b border-gray-100 bg-white">
+                <input
+                  type="text"
+                  placeholder="Search client or invoice number…"
+                  value={drillSearch}
+                  onChange={(e) => setDrillSearch(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  autoFocus
+                />
+              </div>
+            )}
+
             {/* Invoice list */}
-            <div className="overflow-y-auto max-h-[60vh]">
-              {drillRows.length === 0 ? (
-                <p className="p-8 text-center text-gray-400 text-sm">No invoices found for this SKU.</p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                    <tr>
-                      <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
-                      <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
-                      <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
-                      <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Unit Price</th>
-                      <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {drillRows.map((r, i) => (
-                      <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-2.5 px-4 font-mono text-xs text-blue-700 font-semibold">{r.docNumber}</td>
-                        <td className="py-2.5 px-4 text-gray-500 text-xs">{fmtDate(r.date)}</td>
-                        <td className="py-2.5 px-4 text-gray-700">{r.clientName}</td>
-                        <td className="py-2.5 px-4 text-right font-bold text-gray-900">{r.qty}</td>
-                        <td className="py-2.5 px-4 text-right text-gray-600">{fmtPrice(r.unitPrice)}</td>
-                        <td className="py-2.5 px-4 text-right font-semibold text-gray-800">{fmtPrice(r.lineTotal)}</td>
+            <div className="overflow-y-auto max-h-[55vh]">
+              {(() => {
+                const q = drillSearch.toLowerCase()
+                const visible = drillSearch
+                  ? drillRows.filter((r) =>
+                      r.clientName.toLowerCase().includes(q) ||
+                      r.docNumber.toLowerCase().includes(q)
+                    )
+                  : drillRows
+                if (visible.length === 0) return (
+                  <p className="p-8 text-center text-gray-400 text-sm">
+                    {drillRows.length === 0 ? 'No invoices found for this SKU.' : 'No results match your search.'}
+                  </p>
+                )
+                return (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                      <tr>
+                        <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice</th>
+                        <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date</th>
+                        <th className="text-left py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Client</th>
+                        <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Qty</th>
+                        <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Unit Price</th>
+                        <th className="text-right py-2.5 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                    </thead>
+                    <tbody>
+                      {visible.map((r, i) => (
+                        <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                          <td className="py-2.5 px-4 font-mono text-xs text-blue-700 font-semibold">{r.docNumber}</td>
+                          <td className="py-2.5 px-4 text-gray-500 text-xs">{fmtDate(r.date)}</td>
+                          <td className="py-2.5 px-4 text-gray-700">{r.clientName}</td>
+                          <td className="py-2.5 px-4 text-right font-bold text-gray-900">{r.qty}</td>
+                          <td className="py-2.5 px-4 text-right text-gray-600">{fmtPrice(r.unitPrice)}</td>
+                          <td className="py-2.5 px-4 text-right font-semibold text-gray-800">{fmtPrice(r.lineTotal)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              })()}
             </div>
           </div>
         </div>
