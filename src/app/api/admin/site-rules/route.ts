@@ -113,6 +113,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'footer_sticky_bottom',
+    name: 'Rule 17 \u2014 Footer Always at Bottom of Page',
+    description: 'The website footer is always anchored to the bottom of the viewport, even on pages with very little content. Implemented using a flex column layout on the page wrapper with min-height: 100vh and flex-grow: 1 on the main content area. This pushes the footer to the bottom without fixing it to the viewport \u2014 on long pages it scrolls naturally below the content. Applies to all customer-facing layouts: Store pages and Content pages. The admin layout is not affected.',
+    active: true,
+    appliesTo: ['Online Store', 'All Pages'],
+    category: 'System',
+  },
+  {
     id: 'reports_column_sort',
     name: 'Rule 16 \u2014 Sales Reports Column Sort',
     description: 'Column headers in the Sales Reports table are clickable to sort the list. SKU column: click once to sort A \u2192 Z (\u2191), click again to sort Z \u2192 A (\u2193). The \u2195 icon on the SKU header indicates no sort is active \u2014 click to activate. When SKU sort is active it overrides the Sort dropdown (Units Sold / Revenue / Invoice Count). The Sort dropdown still controls ordering when SKU sort is not active. Supplier filter dropdown also available to narrow results to a single supplier\u2019s SKUs.',
