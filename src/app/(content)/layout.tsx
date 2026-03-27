@@ -7,11 +7,11 @@ export default function ContentLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col min-h-screen">
+    <>
       {/* Dynamic header - editable from admin settings */}
       <DynamicHeader />
-      <main className="flex-1 bg-white">{children}</main>
+      <main className="min-h-screen bg-white">{children}</main>
       <Footer />
-    </div>
+    </>
   )
 }

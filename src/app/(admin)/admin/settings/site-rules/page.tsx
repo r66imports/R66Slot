@@ -79,7 +79,7 @@ const ENFORCED_RULES = new Set([
   'worksheet_csv_export',
   'products_supplier_filter',
   'reports_column_sort',
-  'footer_sticky_bottom',
+  'header_sticky_top',
   'event_sku_drill_down',
 ])
 

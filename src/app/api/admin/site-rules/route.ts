@@ -113,9 +113,9 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
-    id: 'footer_sticky_bottom',
-    name: 'Rule 17 \u2014 Footer Always at Bottom of Page',
-    description: 'The website footer is always anchored to the bottom of the viewport, even on pages with very little content. Implemented using a flex column layout on the page wrapper with min-height: 100vh and flex-grow: 1 on the main content area. This pushes the footer to the bottom without fixing it to the viewport \u2014 on long pages it scrolls naturally below the content. Applies to all customer-facing layouts: Store pages and Content pages. The admin layout is not affected.',
+    id: 'header_sticky_top',
+    name: 'Rule 17 \u2014 Header Always Locked to Top of Page',
+    description: 'The website header (navigation bar) is permanently locked to the top of the viewport using CSS sticky positioning. As the user scrolls down any page, the header remains visible at the top at all times. Implemented via sticky top-0 z-50 on the header element. The sticky behaviour is controlled by the sticky flag in the header config (Admin \u2192 Settings \u2192 Site Settings \u2192 Header). Default is always ON. Applies to all customer-facing pages that use the DynamicHeader component (Content and Store layouts). The admin layout uses its own fixed sidebar and is not affected.',
     active: true,
     appliesTo: ['Online Store', 'All Pages'],
     category: 'System',
