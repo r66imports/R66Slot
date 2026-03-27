@@ -181,12 +181,53 @@ export default function ReportsPage() {
   const totalRevenue = rows.reduce((s, r) => s + r.totalRevenue, 0)
   const uniqueSkus = rows.length
 
+  function downloadCSV() {
+    const rangLabel = DATE_RANGES.find((d) => d.days === rangeDays)?.label || 'Custom'
+    const headers = ['#', 'SKU', 'Product', 'Units Sold', 'In Stock', 'Revenue (ZAR)', 'Invoices', 'Last Sold']
+    const dataRows = rows.map((r, i) => [
+      i + 1,
+      r.sku || '',
+      `"${r.title.replace(/"/g, '""')}"`,
+      r.totalQty,
+      r.inStock < 0 ? '' : r.inStock,
+      r.totalRevenue.toFixed(2),
+      r.invoiceCount,
+      r.lastSold ? new Date(r.lastSold).toLocaleDateString('en-ZA') : '',
+    ])
+    const totalsRow = ['', '', 'TOTAL', totalQty, '', totalRevenue.toFixed(2), '', '']
+    const csv = [
+      `# Sales Report — ${rangLabel} — exported ${new Date().toLocaleDateString('en-ZA')}`,
+      headers.join(','),
+      ...dataRows.map((r) => r.join(',')),
+      totalsRow.join(','),
+    ].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sales-report-${rangLabel.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Sales Reports</h1>
-        <p className="text-sm text-gray-500 mt-1">Best-selling items based on invoices — double-click a row to see invoice breakdown</p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Sales Reports</h1>
+          <p className="text-sm text-gray-500 mt-1">Best-selling items based on invoices — double-click a row to see invoice breakdown</p>
+        </div>
+        <button
+          onClick={downloadCSV}
+          disabled={rows.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Export CSV
+        </button>
       </div>
 
       {/* Filters */}
