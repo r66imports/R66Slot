@@ -539,6 +539,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
       const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
       const isFreeform = settings.heroLayout === 'freeform'
+      const heroHeight = typeof settings.heroHeight === 'number' ? settings.heroHeight : 400
 
       return (
         <section
@@ -548,8 +549,8 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',
-            minHeight: isFreeform ? '500px' : undefined,
-            overflow: isFreeform ? 'hidden' : undefined,
+            height: `${heroHeight}px`,
+            overflow: 'hidden',
           }}
         >
           {heroHasImage && (
@@ -557,7 +558,7 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
           )}
 
           {isFreeform ? (
-            <div className="relative z-10" style={{ position: 'relative', minHeight: '460px' }}>
+            <div className="relative z-10" style={{ position: 'relative', height: `${heroHeight}px` }}>
               {/* Title */}
               <div style={{ position: 'absolute', left: (settings.titleX as number) || 0, top: (settings.titleY as number) || 0 }}>
                 <h1 className="text-4xl md:text-6xl font-bold">

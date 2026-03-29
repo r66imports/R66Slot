@@ -1075,6 +1075,23 @@ function ContentTab({
             />
           </div>
 
+          {/* Hero Height */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Hero Height</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={100}
+                max={1200}
+                step={10}
+                value={(component.settings.heroHeight as number) || 400}
+                onChange={(e) => updateSetting('heroHeight', parseInt(e.target.value) || 400)}
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              />
+              <span className="text-xs text-gray-400 font-play flex-shrink-0">px</span>
+            </div>
+          </div>
+
           {/* Overlay Opacity */}
           <div>
             <div className="flex items-center justify-between mb-1">

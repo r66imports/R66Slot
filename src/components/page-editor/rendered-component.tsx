@@ -66,6 +66,7 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
       const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
       const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
       const isFreeform = settings.heroLayout === 'freeform'
+      const heroHeight = typeof settings.heroHeight === 'number' ? settings.heroHeight : 400
 
       return (
         <section
@@ -75,8 +76,8 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             position: 'relative',
-            minHeight: isFreeform ? '500px' : undefined,
-            overflow: isFreeform ? 'hidden' : undefined,
+            height: `${heroHeight}px`,
+            overflow: 'hidden',
           }}
         >
           {heroHasImage && (
@@ -84,7 +85,7 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
           )}
 
           {isFreeform ? (
-            <div className="relative z-10" style={{ position: 'relative', minHeight: '460px' }}>
+            <div className="relative z-10" style={{ position: 'relative', height: `${heroHeight}px` }}>
               {/* Title - freely movable */}
               <HeroDraggableElement
                 isEditing={isEditing}
