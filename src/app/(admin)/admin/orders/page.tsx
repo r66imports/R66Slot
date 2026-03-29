@@ -971,6 +971,22 @@ function CreateDocumentModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Auto-generate next SO number (SO001 format) for new sales orders only
+  useEffect(() => {
+    if (editDoc || docType !== 'salesorder') return
+    fetch('/api/admin/orders/documents?type=salesorder')
+      .then((r) => r.ok ? r.json() : [])
+      .then((docs: any[]) => {
+        const nums = docs
+          .map((d: any) => { const m = /^SO(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
+          .filter((n) => n > 0)
+        const next = (nums.length ? Math.max(...nums) : 0) + 1
+        setForm((f) => ({ ...f, docNumber: `SO${String(next).padStart(3, '0')}` }))
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
   const addLine = () => setLineItems((p) => [...p, newLine()])
   const removeLine = (id: string) => setLineItems((p) => p.filter((l) => l.id !== id))
@@ -1496,6 +1512,32 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
 
   y += 30
 
+  // ── Brand image block (matches modal preview) ─────────────────────────────
+  const activeImages = (template.imageBlock ?? []).filter(Boolean)
+  if (activeImages.length > 0) {
+    const gap = 4
+    const imgW = (pageW - margin * 2 - gap * (activeImages.length - 1)) / activeImages.length
+    const imgH = Math.round(imgW * (9 / 16))
+    let ix = margin
+    for (const url of activeImages) {
+      try {
+        const res = await fetch(url)
+        const blob = await res.blob()
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(blob)
+        })
+        const ext = (url.split('.').pop() ?? 'png').toUpperCase().split('?')[0]
+        const fmt = ext === 'JPG' ? 'JPEG' : ['PNG', 'JPEG', 'WEBP'].includes(ext) ? ext : 'PNG'
+        doc.addImage(dataUrl, fmt as 'PNG', ix, y, imgW, imgH, undefined, 'FAST')
+      } catch { /* skip failed image */ }
+      ix += imgW + gap
+    }
+    y += imgH + 8
+  }
+
   // ── Divider ──────────────────────────────────────────────────────────────────
   doc.setDrawColor(220)
   doc.setLineWidth(0.3)
@@ -1568,7 +1610,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     ],
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
     bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
-    footStyles: { fontSize: 8.5, textColor: [31, 41, 55] },
+    footStyles: { fontSize: 8.5, textColor: [80, 80, 80], fillColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [249, 250, 251] },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
@@ -1581,16 +1623,34 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
       const hasSubtotal = (data.discountPct || 0) > 0 || shippingPDF > 0
       const hasDiscount = (data.discountPct || 0) > 0
       const hasShipping = shippingPDF > 0
+      const subtotalIdx = 0
+      const discountIdx = hasSubtotal ? 1 : 0
+      const shippingIdx = (hasSubtotal ? 1 : 0) + (hasDiscount ? 1 : 0)
       const preRows = (hasSubtotal ? 1 : 0) + (hasDiscount ? 1 : 0) + (hasShipping ? 1 : 0)
       const footLen = preRows + 1 + ((data.depositPaid || 0) > 0 ? 2 : 0)
       const totalIdx = preRows
       const balanceIdx = (data.depositPaid || 0) > 0 ? footLen - 1 : -1
-      if (hookData.section === 'foot' && hookData.row.index === totalIdx) {
+      if (hookData.section !== 'foot') return
+      // Subtotal row — grey text
+      if (hasSubtotal && hookData.row.index === subtotalIdx) {
+        hookData.cell.styles.textColor = [107, 114, 128]
+      }
+      // Discount row — red text
+      if (hasDiscount && hookData.row.index === discountIdx) {
+        hookData.cell.styles.textColor = [239, 68, 68]
+      }
+      // Shipping row — grey text
+      if (hasShipping && hookData.row.index === shippingIdx) {
+        hookData.cell.styles.textColor = [107, 114, 128]
+      }
+      // TOTAL row — dark fill, white text
+      if (hookData.row.index === totalIdx) {
         hookData.cell.styles.fillColor = [31, 41, 55]
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
       }
-      if (hookData.section === 'foot' && hookData.row.index === balanceIdx) {
+      // BALANCE DUE row — orange fill, white text
+      if (hookData.row.index === balanceIdx) {
         hookData.cell.styles.fillColor = [234, 88, 12]
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
@@ -1814,6 +1874,8 @@ export default function OrdersPage() {
   const [pendingInvoiceBoIds, setPendingInvoiceBoIds] = useState<string[]>([])
   const [syncingInventory, setSyncingInventory] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [renumberingSODocs, setRenumberingSODocs] = useState(false)
+  const [renumberSOResult, setRenumberSOResult] = useState<string | null>(null)
   const [shippingEnabled, setShippingEnabled] = useState(true)
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
@@ -2343,6 +2405,31 @@ export default function OrdersPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <p className="text-sm text-gray-500">{totalCount} {showArchive ? 'Archived' : ''} {cfg.label}</p>
+              {activeTab === 'salesorder' && !showArchive && (
+                <button
+                  onClick={async () => {
+                    setRenumberingSODocs(true)
+                    setRenumberSOResult(null)
+                    try {
+                      const res = await fetch('/api/admin/orders/renumber-so', { method: 'POST' })
+                      const data = await res.json()
+                      if (res.ok) {
+                        setRenumberSOResult(`✓ Renumbered ${data.renumbered} Sales Orders`)
+                        await loadDocs()
+                      } else {
+                        setRenumberSOResult(`Error: ${data.error}`)
+                      }
+                    } finally {
+                      setRenumberingSODocs(false)
+                      setTimeout(() => setRenumberSOResult(null), 3000)
+                    }
+                  }}
+                  disabled={renumberingSODocs}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors disabled:opacity-50"
+                >
+                  {renumberingSODocs ? '⏳ Renumbering…' : renumberSOResult || '↻ Renumber SO'}
+                </button>
+              )}
               <button
                 onClick={() => setShowArchive((v) => !v)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${

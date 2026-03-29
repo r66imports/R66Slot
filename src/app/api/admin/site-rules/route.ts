@@ -167,6 +167,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Invoices',
   },
   {
+    id: 'so_renumber_format',
+    name: 'Rule 19 — Sales Order Numbering & Master PDF Format',
+    description: 'Sales Orders are numbered in the format SO001, SO002, SO003… in chronological order (oldest = SO001). New Sales Orders auto-generate the next SO number. Use the "Renumber SO" button on the Sales Orders tab to re-sequence all existing SOs by date. PDF format (Download, Print, Email): matches the modal preview — brand image block shown below the header, white background on Subtotal/Discount rows with grey text, red Discount text, dark (#1f2937) TOTAL row with white text. The old blue autotable footer background is removed. Applies to all document output types: Print, Print & Email, Email, Download.',
+    active: true,
+    appliesTo: ['Sales Orders', 'Admin Orders'],
+    category: 'Orders',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',
