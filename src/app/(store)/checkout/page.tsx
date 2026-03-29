@@ -148,7 +148,6 @@ export default function CheckoutPage() {
 
   return (
     <>
-      <DynamicHeader />
       <div className="container mx-auto px-4 py-10 max-w-6xl">
         {/* Breadcrumb */}
         <nav className="mb-6 text-sm text-gray-500 flex items-center gap-1.5">
