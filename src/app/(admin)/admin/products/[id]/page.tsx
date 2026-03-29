@@ -84,7 +84,8 @@ export default function EditProductPage({
   const [partType, setPartType] = useState('')
   const [scale, setScale] = useState('')
   const [supplier, setSupplier] = useState('')
-  const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string }[]>([])
+  const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string; preferredCurrency?: string }[]>([])
+  const [wholesaleInfo, setWholesaleInfo] = useState<{ price: number; currency: string } | null>(null)
   const [collections, setCollections] = useState<string[]>([])
   const [tags, setTags] = useState('')
   const [status, setStatus] = useState('draft')
@@ -233,8 +234,22 @@ export default function EditProductPage({
   // Load categories list
   useEffect(() => {
     fetch('/api/admin/categories').then(r => r.json()).then(d => setAllCategories(Array.isArray(d) ? d : [])).catch(() => {})
-    fetch('/api/admin/supplier-contacts').then(r => r.json()).then(d => setSupplierOptions(Array.isArray(d) ? d.map((s: any) => ({ id: s.id, name: s.name })) : [])).catch(() => {})
+    fetch('/api/admin/supplier-contacts').then(r => r.json()).then(d => setSupplierOptions(Array.isArray(d) ? d.map((s: any) => ({ id: s.id, name: s.name, preferredCurrency: s.preferredCurrency })) : [])).catch(() => {})
   }, [])
+
+  // Fetch wholesale price from inventory pricelist when supplier + SKU are set
+  useEffect(() => {
+    if (!supplier || !sku) { setWholesaleInfo(null); return }
+    const found = supplierOptions.find(s => s.name === supplier)
+    if (!found) { setWholesaleInfo(null); return }
+    fetch(`/api/admin/inventory-pricelists?supplierId=${found.id}`)
+      .then(r => r.json())
+      .then((entries: any[]) => {
+        const entry = Array.isArray(entries) ? entries.find((e: any) => (e.sku || '').toLowerCase() === sku.toLowerCase()) : null
+        setWholesaleInfo(entry ? { price: Number(entry.wholesalePrice), currency: found.preferredCurrency || 'ZAR' } : null)
+      })
+      .catch(() => setWholesaleInfo(null))
+  }, [supplier, sku, supplierOptions])
 
   // Save options to persistent store
   const saveOptions = async (key: string, list: string[]) => {
@@ -1041,18 +1056,31 @@ export default function EditProductPage({
                     />
                   </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Supplier</label>
-                  <select
-                    value={supplier}
-                    onChange={(e) => setSupplier(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">— No supplier —</option>
-                    {supplierOptions.map((s) => (
-                      <option key={s.id} value={s.name}>{s.name}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Supplier</label>
+                    <select
+                      value={supplier}
+                      onChange={(e) => setSupplier(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    >
+                      <option value="">— No supplier —</option>
+                      {supplierOptions.map((s) => (
+                        <option key={s.id} value={s.name}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Wholesale Price
+                      {wholesaleInfo && <span className="ml-1 text-xs font-normal text-gray-400">({wholesaleInfo.currency})</span>}
+                    </label>
+                    <div className={`w-full px-3 py-2 border rounded-lg text-sm ${wholesaleInfo ? 'border-gray-300 bg-gray-50 text-gray-900 font-semibold' : 'border-gray-200 bg-gray-50 text-gray-400 italic'}`}>
+                      {wholesaleInfo
+                        ? `${{ EUR: '€', USD: '$', GBP: '£', ZAR: 'R' }[wholesaleInfo.currency] ?? wholesaleInfo.currency}${wholesaleInfo.price.toFixed(2)}`
+                        : supplier && sku ? 'Not in pricelist' : '— No supplier / SKU —'}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center">
                   <input

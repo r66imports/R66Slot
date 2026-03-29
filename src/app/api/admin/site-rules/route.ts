@@ -175,6 +175,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Orders',
   },
   {
+    id: 'product_wholesale_price_display',
+    name: 'Rule 20 — Supplier Wholesale Price on Product Pages',
+    description: 'Displays the Wholesale Price from the Inventory Pricelist next to the Supplier field on both Add and Edit Product pages. The price shown is the value stored via the Worksheet (Send to Inventory) for the current SKU + Supplier combination. Currency is determined by the supplier\'s Preferred Currency setting (e.g. Sideways = EUR shown as €, USD suppliers shown as $). If no pricelist entry exists for the SKU, the field shows "Not in pricelist". The field is read-only — it reflects the pricelist and is updated via the Worksheet.',
+    active: true,
+    appliesTo: ['Products', 'Inventory', 'Worksheet'],
+    category: 'Inventory',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',
