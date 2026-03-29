@@ -775,6 +775,7 @@ function ContentTab({
               <option value="compact">Compact (small image)</option>
               <option value="standard">Standard</option>
               <option value="large">Large (tall image)</option>
+              <option value="xlarge">Extra Large (portrait 9:16)</option>
             </select>
           </div>
           <div>

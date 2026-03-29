@@ -657,7 +657,7 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
       const pgRows = (settings.productRows as number) || 3
       const pgCount = pgRows * pgCols
       const cardSize = (settings.cardSize as string) || 'standard'
-      const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
+      const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : cardSize === 'xlarge' ? '360px' : '160px'
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">

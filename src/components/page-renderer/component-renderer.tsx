@@ -22,6 +22,7 @@ function ProductGridLive({
   const [addedId, setAddedId] = useState<string | null>(null)
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [showStockQty, setShowStockQty] = useState(true)
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; alt: string } | null>(null)
   const { addItem } = useLocalCart()
 
   const getQty = (id: string) => quantities[id] ?? 1
@@ -126,7 +127,7 @@ function ProductGridLive({
           <div className={pgCls}>
             {products.map((p) => {
               const cardSize = (settings.cardSize as string) || 'standard'
-              const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : '160px'
+              const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : cardSize === 'xlarge' ? '360px' : '160px'
               const imgFit = ((settings.imageFit as string) || 'contain') as React.CSSProperties['objectFit']
               const cardPad = { none: '0', sm: '8px', md: '12px', lg: '16px', xl: '24px' }[(settings.cardPadding as string) || 'md'] || '12px'
               const szMap: Record<string, string> = { xs: '10px', sm: '12px', md: '14px', lg: '16px', xl: '20px' }
@@ -144,22 +145,36 @@ function ProductGridLive({
                 className="rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col"
                 style={{ backgroundColor: cardBgColor }}
               >
-                {/* Image — click to open product page */}
-                <a href={productUrl} target="_blank" rel="noopener noreferrer" className="block flex-shrink-0 cursor-pointer">
-                  <div className="relative bg-white flex items-center justify-center overflow-hidden" style={{ height: imgHpx }}>
-                    {p.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.imageUrl}
-                        alt={p.title}
-                        className="w-full h-full"
-                        style={{ objectFit: imgFit }}
-                      />
-                    ) : (
-                      <span className="text-gray-400 text-4xl">🏎️</span>
-                    )}
-                  </div>
-                </a>
+                {/* Image — click to open product page; zoom icon opens full-size popup */}
+                <div className="relative flex-shrink-0 group/img">
+                  <a href={productUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
+                    <div className="relative bg-white flex items-center justify-center overflow-hidden" style={{ height: imgHpx }}>
+                      {p.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.imageUrl}
+                          alt={p.title}
+                          className="w-full h-full"
+                          style={{ objectFit: imgFit }}
+                        />
+                      ) : (
+                        <span className="text-gray-400 text-4xl">🏎️</span>
+                      )}
+                    </div>
+                  </a>
+                  {p.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomedImage({ url: p.imageUrl, alt: p.title }) }}
+                      className="absolute top-2 right-2 w-7 h-7 bg-black/50 hover:bg-black/75 text-white rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10"
+                      title="View full size"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0zM11 8v6M8 11h6" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
                 <div className="flex flex-col flex-1" style={{ padding: cardPad }}>
                   {p.brand && (
                     <p className="font-bold uppercase tracking-wider truncate mb-0.5" style={{ fontSize: metaFontSize, color: metaColor }}>{p.brand}</p>
@@ -236,6 +251,22 @@ function ProductGridLive({
           </>
         )}
       </div>
+
+      {/* Full-size image popup — click anywhere to close */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/85 flex items-center justify-center cursor-zoom-out"
+          onClick={() => setZoomedImage(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomedImage.url}
+            alt={zoomedImage.alt}
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded shadow-2xl"
+            onClick={() => setZoomedImage(null)}
+          />
+        </div>
+      )}
     </div>
   )
 }
