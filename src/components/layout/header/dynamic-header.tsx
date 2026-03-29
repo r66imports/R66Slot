@@ -103,7 +103,7 @@ export function DynamicHeader() {
   if (isLoading) {
     return (
       <header
-        className={`${headerConfig.sticky ? 'sticky top-0' : ''} z-50 w-full border-b border-gray-200`}
+        className="sticky top-0 z-50 w-full border-b border-gray-200"
         style={{ backgroundColor: headerConfig.backgroundColor }}
       >
         <div className="container mx-auto px-4">
@@ -133,7 +133,7 @@ export function DynamicHeader() {
       )}
 
       <header
-        className={`${headerConfig.sticky ? 'sticky top-0' : ''} z-50 w-full border-b border-gray-200`}
+        className="sticky top-0 z-50 w-full border-b border-gray-200"
         style={{ backgroundColor: headerConfig.backgroundColor }}
       >
         {/* Search overlay bar */}
