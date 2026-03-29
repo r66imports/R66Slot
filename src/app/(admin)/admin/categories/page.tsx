@@ -152,7 +152,7 @@ export default function CategoriesPage() {
             <div key={cat.id} className="group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               {/* Card image area — click to change image */}
               <div
-                className={`h-24 bg-gradient-to-br ${CARD_GRADIENTS[i % CARD_GRADIENTS.length]} relative cursor-pointer`}
+                className={`h-28 bg-gradient-to-br ${CARD_GRADIENTS[i % CARD_GRADIENTS.length]} relative cursor-pointer`}
                 onClick={(e) => openImageEdit(cat, e)}
                 title="Click to change image"
               >
@@ -219,11 +219,11 @@ export default function CategoriesPage() {
               {/* Card label — click name to go to edit page */}
               <Link
                 href={`/admin/categories/${cat.id}`}
-                className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-2 py-1.5 flex items-center justify-between hover:bg-white transition-colors"
+                className="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-2 py-2 flex items-start justify-between hover:bg-white transition-colors min-h-[40px]"
                 onClick={e => e.stopPropagation()}
               >
-                <span className="font-semibold text-gray-900 text-xs font-play truncate">{cat.name}</span>
-                <span className="text-gray-500 text-xs font-play ml-1 flex-shrink-0">{getProductCount(cat)}</span>
+                <span className="font-semibold text-gray-900 text-xs font-play leading-tight line-clamp-2 break-words flex-1 min-w-0">{cat.name}</span>
+                <span className="text-gray-500 text-xs font-play ml-1 flex-shrink-0 mt-0.5">{getProductCount(cat)}</span>
               </Link>
             </div>
           ))}
