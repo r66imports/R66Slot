@@ -128,8 +128,6 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('')
   const [filterBrand, setFilterBrand] = useState('')
   const [filterClass, setFilterClass] = useState('')
-  const [menuOpen, setMenuOpen] = useState(false)
-
   useEffect(() => {
     fetch('/api/admin/products')
       .then((r) => r.json())
@@ -181,59 +179,6 @@ export default function ProductsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-
-      {/* ─── Site Nav Header ─────────────────────────────────── */}
-      <header className="bg-black text-white sticky top-0 z-50 border-b border-gray-800">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-14">
-            {/* Logo */}
-            <Link href="/" className="text-xl font-bold font-play flex-shrink-0">
-              <span className="text-white">R66</span>
-              <span className="text-red-500">SLOT</span>
-            </Link>
-
-            {/* Desktop nav */}
-            <nav className="hidden md:flex items-center gap-6">
-              <Link href="/" className="text-sm text-gray-300 hover:text-white transition-colors">Home</Link>
-              <span className="text-sm text-white font-bold border-b-2 border-red-500 pb-0.5">Products</span>
-              <Link href="/book" className="text-sm text-gray-300 hover:text-white transition-colors">Book Now</Link>
-              <Link href="/brands" className="text-sm text-gray-300 hover:text-white transition-colors">Brands</Link>
-              <Link href="/account" className="text-sm text-gray-300 hover:text-white transition-colors">Account</Link>
-            </nav>
-
-            {/* Book Now CTA + mobile menu */}
-            <div className="flex items-center gap-3">
-              <Link
-                href="/book"
-                className="hidden md:inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-              >
-                Book Now →
-              </Link>
-              <button
-                className="md:hidden p-2 text-gray-300 hover:text-white"
-                onClick={() => setMenuOpen(!menuOpen)}
-                aria-label="Menu"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d={menuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'} />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Mobile menu */}
-          {menuOpen && (
-            <nav className="md:hidden py-4 border-t border-gray-800 flex flex-col gap-3">
-              <Link href="/" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Home</Link>
-              <span className="text-sm text-white font-bold">Products</span>
-              <Link href="/book" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Book Now</Link>
-              <Link href="/brands" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Brands</Link>
-              <Link href="/account" className="text-sm text-gray-300 hover:text-white" onClick={() => setMenuOpen(false)}>Account</Link>
-            </nav>
-          )}
-        </div>
-      </header>
 
       {/* ─── Page Header / Filters ───────────────────────────── */}
       <div className="bg-black text-white py-10">

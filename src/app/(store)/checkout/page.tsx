@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLocalCart } from '@/context/local-cart-context'
-import { DynamicHeader } from '@/components/layout/header/dynamic-header'
 
 const SHIPPING_METHODS = [
   { value: 'pudo_locker', label: 'Pudo Locker-to-Locker' },
@@ -117,7 +116,6 @@ export default function CheckoutPage() {
   if (success) {
     return (
       <>
-        <DynamicHeader />
         <div className="container mx-auto px-4 py-16 max-w-lg text-center">
           <div className="bg-white border rounded-2xl p-10 shadow-sm">
             <div className="text-6xl mb-4">✅</div>

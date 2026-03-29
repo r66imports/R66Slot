@@ -4,7 +4,6 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { useLocalCart } from '@/context/local-cart-context'
-import { DynamicHeader } from '@/components/layout/header/dynamic-header'
 
 export default function CartPage() {
   const { items, totalItems, subtotal, updateQuantity, patchItem, removeItem, clearCart } = useLocalCart()
@@ -34,8 +33,6 @@ export default function CartPage() {
 
   return (
     <>
-      <DynamicHeader />
-
       {items.length === 0 ? (
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto">

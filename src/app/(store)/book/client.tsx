@@ -154,36 +154,6 @@ export default function BookNowClient() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-play">
-      {/* Header */}
-      <header className="bg-gray-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold font-play">
-            <span className="text-white">R66</span>
-            <span className="text-red-500">SLOT</span>
-          </Link>
-          <nav className="flex items-center gap-6">
-            <Link href="/" className="text-sm text-gray-300 hover:text-white font-play">
-              Home
-            </Link>
-            <Link href="/products" className="text-sm text-gray-300 hover:text-white font-play">
-              Products
-            </Link>
-            <span className="text-sm text-white font-bold font-play border-b-2 border-red-500 pb-1">
-              Book Now
-            </span>
-            {loggedInUser ? (
-              <Link href="/account" className="text-sm text-green-400 hover:text-green-300 font-play flex items-center gap-1">
-                <span>●</span> {loggedInUser.firstName}
-              </Link>
-            ) : (
-              <Link href="/account/login" className="text-sm text-gray-300 hover:text-white font-play">
-                Login
-              </Link>
-            )}
-          </nav>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <div className="bg-gray-900 text-white pb-12 pt-8">
         <div className="max-w-7xl mx-auto px-4 text-center">
