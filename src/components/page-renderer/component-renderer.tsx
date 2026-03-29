@@ -540,14 +540,16 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
       const isFreeform = settings.heroLayout === 'freeform'
       const heroHeight = typeof settings.heroHeight === 'number' ? settings.heroHeight : 400
+      const heroImageFit = (settings.heroImageFit as string) || 'cover'
 
       return (
         <section
           style={{
             ...containerStyle,
             backgroundImage: heroHasImage ? `url("${settings.imageUrl}")` : undefined,
-            backgroundSize: 'cover',
+            backgroundSize: heroImageFit,
             backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
             position: 'relative',
             height: `${heroHeight}px`,
             overflow: 'hidden',
