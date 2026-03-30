@@ -356,10 +356,8 @@ export default function ShipmentLogPage() {
               <thead>
                 <tr className="bg-gray-900 text-white text-xs uppercase tracking-wider">
                   <th className="py-3 px-3 text-center w-10">#</th>
-                  <th className="py-3 px-3 text-left min-w-[110px]">Account</th>
                   <th className="py-3 px-3 text-left min-w-[100px]">Name</th>
                   <th className="py-3 px-3 text-left min-w-[110px]">Invoice</th>
-                  <th className="py-3 px-3 text-left w-24">Wix Ref</th>
                   <th className="py-3 px-3 text-left min-w-[110px]">Status</th>
                   <th className="py-3 px-3 text-left min-w-[130px]">Instructions</th>
                   <th className="py-3 px-3 text-left w-24">Box Size</th>
@@ -371,10 +369,10 @@ export default function ShipmentLogPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={12} className="py-16 text-center text-gray-400 text-sm">Loading&hellip;</td></tr>
+                  <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">Loading&hellip;</td></tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-16 text-center">
+                    <td colSpan={10} className="py-16 text-center">
                       <p className="text-gray-400 text-sm mb-3">No shipments for {monthLabel}</p>
                       <button onClick={addRow} className="text-indigo-600 text-sm font-semibold hover:underline">+ Add first shipment</button>
                     </td>
@@ -385,16 +383,10 @@ export default function ShipmentLogPage() {
                       <td className="py-2 px-3 text-center text-xs text-gray-400 font-mono">{rows.length - idx}</td>
 
                       <td className="py-2 px-2">
-                        <InlineCell value={row.account} onChange={(v) => updateRow(row.id, 'account', v)} placeholder="Account" />
-                      </td>
-                      <td className="py-2 px-2">
                         <InlineCell value={row.name} onChange={(v) => updateRow(row.id, 'name', v)} placeholder="Name" />
                       </td>
                       <td className="py-2 px-2">
                         <InlineCell value={row.invoiceNumber} onChange={(v) => updateRow(row.id, 'invoiceNumber', v)} placeholder="INV000…" />
-                      </td>
-                      <td className="py-2 px-2">
-                        <InlineCell value={row.wixRef} onChange={(v) => updateRow(row.id, 'wixRef', v)} placeholder="—" />
                       </td>
 
                       <td className="py-2 px-2">
