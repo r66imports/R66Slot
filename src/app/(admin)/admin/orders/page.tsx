@@ -2405,7 +2405,7 @@ export default function OrdersPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <p className="text-sm text-gray-500">{totalCount} {showArchive ? 'Archived' : ''} {cfg.label}</p>
-              {activeTab === 'salesorder' && !showArchive && (
+              {tab === 'salesorders' && !showArchive && (
                 <button
                   onClick={async () => {
                     setRenumberingSODocs(true)
@@ -2415,7 +2415,7 @@ export default function OrdersPage() {
                       const data = await res.json()
                       if (res.ok) {
                         setRenumberSOResult(`✓ Renumbered ${data.renumbered} Sales Orders`)
-                        await loadDocs()
+                        await load()
                       } else {
                         setRenumberSOResult(`Error: ${data.error}`)
                       }
