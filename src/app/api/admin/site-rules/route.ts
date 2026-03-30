@@ -183,6 +183,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Inventory',
   },
   {
+    id: 'packing_list_autosave',
+    name: 'Rule 21 — Packing List Cell Autosave',
+    description: 'Every cell edit on the Packing List page (/admin/shipments) is saved automatically — no Save button required. Flow: click any cell to edit → type or select a value → changes are written to the database immediately on blur or dropdown select. Applies to all editable columns: Account, Name, Invoice, Wix Ref, Status, Instructions, Box Size, Tracking Number, Send Via, Notes. The footer hint "Click any cell to edit — changes auto-save" is always shown to remind users that no manual save is needed.',
+    active: true,
+    appliesTo: ['Packing List', 'Shipping Network'],
+    category: 'Shipping',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',

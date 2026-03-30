@@ -81,6 +81,7 @@ const ENFORCED_RULES = new Set([
   'reports_column_sort',
   'header_sticky_top',
   'event_sku_drill_down',
+  'packing_list_autosave',
 ])
 
 function CategoryPicker({
