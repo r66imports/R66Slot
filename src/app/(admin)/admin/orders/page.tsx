@@ -1879,6 +1879,32 @@ export default function OrdersPage() {
   const [shippingEnabled, setShippingEnabled] = useState(true)
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
+  const [packingListResult, setPackingListResult] = useState<string | null>(null)
+
+  const handleSendToPackingList = async (doc: OrderDocument) => {
+    try {
+      const res = await fetch('/api/admin/shipments-register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoiceRef: doc.docNumber,
+          clientName: doc.clientName,
+          clientEmail: doc.clientEmail || '',
+          clientPhone: doc.clientPhone || '',
+        }),
+      })
+      if (res.ok) {
+        setPackingListResult(`✓ ${doc.docNumber} sent to Packing List`)
+        setTimeout(() => setPackingListResult(null), 4000)
+      } else {
+        setPackingListResult('Error sending to Packing List')
+        setTimeout(() => setPackingListResult(null), 3000)
+      }
+    } catch {
+      setPackingListResult('Error sending to Packing List')
+      setTimeout(() => setPackingListResult(null), 3000)
+    }
+  }
 
   const handleSyncInventory = async () => {
     setSyncingInventory(true)
@@ -2153,6 +2179,11 @@ export default function OrdersPage() {
           {syncResult && (
             <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg">
               ✓ {syncResult}
+            </span>
+          )}
+          {packingListResult && (
+            <span className={`text-xs font-medium px-3 py-1.5 rounded-lg border ${packingListResult.startsWith('✓') ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
+              {packingListResult}
             </span>
           )}
           <button
@@ -2563,6 +2594,12 @@ export default function OrdersPage() {
                             { label: 'Print', icon: <IconPrint />, onClick: () => doPrint(docToViewData(doc), template) },
                             { label: 'Email', icon: <IconEmail />, onClick: () => doEmail(docToViewData(doc), template) },
                             { label: 'Download', icon: <IconDownload />, onClick: () => doDownload(docToViewData(doc), template) },
+                            ...(doc.type === 'invoice' ? [{
+                              label: 'Send to Packing List',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8" /></svg>,
+                              className: 'text-blue-600',
+                              onClick: () => handleSendToPackingList(doc),
+                            }] : []),
                             'separator' as const,
                             {
                               label: 'Send to Archive',
