@@ -1880,6 +1880,52 @@ export default function OrdersPage() {
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
+  const [soToInvoiceResult, setSoToInvoiceResult] = useState<string | null>(null)
+
+  const handleSendSOToInvoice = async (doc: OrderDocument) => {
+    try {
+      const existing = await fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : [])
+      const nums = (existing as any[])
+        .map((d: any) => { const m = /^INV(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
+        .filter((n: number) => n > 0)
+      const next = Math.max(25, ...(nums.length ? nums : [0])) + 1
+      const newDocNumber = `INV${String(next).padStart(4, '0')}`
+
+      const res = await fetch('/api/admin/orders/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'invoice',
+          docNumber: newDocNumber,
+          date: new Date().toISOString().split('T')[0],
+          clientName: doc.clientName,
+          clientEmail: doc.clientEmail,
+          clientPhone: doc.clientPhone,
+          clientAddress: doc.clientAddress,
+          lineItems: doc.lineItems,
+          notes: doc.notes,
+          terms: doc.terms,
+          status: 'draft',
+          discountPct: (doc as any).discountPct || 0,
+          shippingMethod: (doc as any).shippingMethod || '',
+          shippingCost: (doc as any).shippingCost || 0,
+          trackingNumber: (doc as any).trackingNumber || '',
+        }),
+      })
+      if (res.ok) {
+        const newInvoice = await res.json()
+        setDocuments((prev) => [newInvoice, ...prev])
+        setSoToInvoiceResult(`✓ ${doc.docNumber} → ${newDocNumber}`)
+        setTimeout(() => setSoToInvoiceResult(null), 4000)
+      } else {
+        setSoToInvoiceResult('Error creating invoice')
+        setTimeout(() => setSoToInvoiceResult(null), 3000)
+      }
+    } catch {
+      setSoToInvoiceResult('Error creating invoice')
+      setTimeout(() => setSoToInvoiceResult(null), 3000)
+    }
+  }
 
   const handleSendToPackingList = async (doc: OrderDocument) => {
     try {
@@ -2182,6 +2228,11 @@ export default function OrdersPage() {
           {packingListResult && (
             <span className={`text-xs font-medium px-3 py-1.5 rounded-lg border ${packingListResult.startsWith('✓') ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
               {packingListResult}
+            </span>
+          )}
+          {soToInvoiceResult && (
+            <span className={`text-xs font-medium px-3 py-1.5 rounded-lg border ${soToInvoiceResult.startsWith('✓') ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
+              {soToInvoiceResult}
             </span>
           )}
           <button
@@ -2607,6 +2658,12 @@ export default function OrdersPage() {
                             { label: 'Print', icon: <IconPrint />, onClick: () => doPrint(docToViewData(doc), template) },
                             { label: 'Email', icon: <IconEmail />, onClick: () => doEmail(docToViewData(doc), template) },
                             { label: 'Download', icon: <IconDownload />, onClick: () => doDownload(docToViewData(doc), template) },
+                            ...(doc.type === 'salesorder' ? [{
+                              label: 'Send to Invoice',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+                              className: 'text-indigo-600',
+                              onClick: () => handleSendSOToInvoice(doc),
+                            }] : []),
                             ...(doc.type === 'invoice' ? [{
                               label: 'Send to Packing List',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8" /></svg>,
