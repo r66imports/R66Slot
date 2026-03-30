@@ -1884,11 +1884,12 @@ export default function OrdersPage() {
 
   const handleSendSOToInvoice = async (doc: OrderDocument) => {
     try {
-      const existing = await fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : [])
-      const nums = (existing as any[])
+      const existingRaw = await fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : [])
+      const existing: any[] = Array.isArray(existingRaw) ? existingRaw : []
+      const nums = existing
         .map((d: any) => { const m = /^INV(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
         .filter((n: number) => n > 0)
-      const next = Math.max(25, ...(nums.length ? nums : [0])) + 1
+      const next = (nums.length > 0 ? Math.max(...nums) : 25) + 1
       const newDocNumber = `INV${String(next).padStart(4, '0')}`
 
       const res = await fetch('/api/admin/orders/documents', {
@@ -1898,13 +1899,13 @@ export default function OrdersPage() {
           type: 'invoice',
           docNumber: newDocNumber,
           date: new Date().toISOString().split('T')[0],
-          clientName: doc.clientName,
-          clientEmail: doc.clientEmail,
-          clientPhone: doc.clientPhone,
-          clientAddress: doc.clientAddress,
-          lineItems: doc.lineItems,
-          notes: doc.notes,
-          terms: doc.terms,
+          clientName: doc.clientName || 'Unknown',
+          clientEmail: doc.clientEmail || '',
+          clientPhone: doc.clientPhone || '',
+          clientAddress: doc.clientAddress || '',
+          lineItems: doc.lineItems || [],
+          notes: doc.notes || '',
+          terms: doc.terms || '',
           status: 'draft',
           discountPct: (doc as any).discountPct || 0,
           shippingMethod: (doc as any).shippingMethod || '',
@@ -1918,12 +1919,13 @@ export default function OrdersPage() {
         setSoToInvoiceResult(`✓ ${doc.docNumber} → ${newDocNumber}`)
         setTimeout(() => setSoToInvoiceResult(null), 4000)
       } else {
-        setSoToInvoiceResult('Error creating invoice')
-        setTimeout(() => setSoToInvoiceResult(null), 3000)
+        const errData = await res.json().catch(() => ({}))
+        setSoToInvoiceResult(`Error: ${errData.error || res.status}`)
+        setTimeout(() => setSoToInvoiceResult(null), 5000)
       }
-    } catch {
-      setSoToInvoiceResult('Error creating invoice')
-      setTimeout(() => setSoToInvoiceResult(null), 3000)
+    } catch (e: any) {
+      setSoToInvoiceResult(`Error: ${e?.message || 'unknown'}`)
+      setTimeout(() => setSoToInvoiceResult(null), 5000)
     }
   }
 
