@@ -484,7 +484,7 @@ function TemplatePreviewModal({
 }) {
   const sampleData: DocViewData = {
     docType: 'invoice',
-    docNumber: 'INV-001',
+    docNumber: 'INV0001',
     date: new Date().toISOString().slice(0, 10),
     clientName: 'Sample Client',
     clientEmail: 'client@example.com',
@@ -965,7 +965,7 @@ function CreateDocumentModal({
           .map((d: any) => { const m = /^INV(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
           .filter((n) => n > 0)
         const next = Math.max(25, ...(nums.length ? nums : [0])) + 1
-        setForm((f) => ({ ...f, docNumber: `INV${String(next).padStart(7, '0')}` }))
+        setForm((f) => ({ ...f, docNumber: `INV${String(next).padStart(4, '0')}` }))
       })
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
