@@ -1883,14 +1883,12 @@ export default function OrdersPage() {
 
   const handleSendToPackingList = async (doc: OrderDocument) => {
     try {
-      const res = await fetch('/api/admin/shipments-register', {
+      const res = await fetch('/api/admin/shipment-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          invoiceRef: doc.docNumber,
-          clientName: doc.clientName,
-          clientEmail: doc.clientEmail || '',
-          clientPhone: doc.clientPhone || '',
+          invoiceNumber: doc.docNumber,
+          name: doc.clientName,
         }),
       })
       if (res.ok) {
