@@ -2542,8 +2542,23 @@ export default function OrdersPage() {
                           { label: 'Print', icon: <IconPrint />, onClick: () => doPrint(boToViewData(b), template) },
                           { label: 'Email', icon: <IconEmail />, onClick: () => doEmail(boToViewData(b), template) },
                           { label: 'Download', icon: <IconDownload />, onClick: () => doDownload(boToViewData(b), template) },
-                          'separator',
+                          'separator' as const,
                           { label: 'Push to Sage', onClick: () => {}, disabled: true, className: 'text-gray-400' },
+                          'separator' as const,
+                          {
+                            label: deleteConfirm === b.id ? 'Confirm Delete' : 'Delete',
+                            icon: <IconTrash />,
+                            className: 'text-red-500',
+                            onClick: async () => {
+                              if (deleteConfirm === b.id) {
+                                const res = await fetch(`/api/admin/backorders/${b.id}`, { method: 'DELETE' })
+                                if (res.ok) setBackorders((prev) => prev.filter((x) => x.id !== b.id))
+                                setDeleteConfirm(null)
+                              } else {
+                                setDeleteConfirm(b.id)
+                              }
+                            },
+                          },
                         ]} />
                       </td>
                     </tr>
