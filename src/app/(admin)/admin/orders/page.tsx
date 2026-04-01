@@ -1941,6 +1941,13 @@ export default function OrdersPage() {
         }),
       })
       if (res.ok) {
+        // Mark the document as sent so it can't be sent again
+        await fetch(`/api/admin/orders/documents/${doc.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sentToPackingList: true }),
+        })
+        setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, sentToPackingList: true } as any : d))
         setPackingListResult(`✓ ${doc.docNumber} sent to Packing List`)
         setTimeout(() => setPackingListResult(null), 4000)
       } else {
@@ -2631,7 +2638,15 @@ export default function OrdersPage() {
                         <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{firstDesc}</td>
                         <td className="py-3 px-4 text-right font-semibold">{fmtPrice(docTotal)}</td>
                         <td className="py-3 px-4 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
+                            {(doc as any).sentToPackingList && (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 text-white" title="Sent to Packing List">
+                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8" /></svg>
+                                Packing List
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">
@@ -2668,10 +2683,11 @@ export default function OrdersPage() {
                               onClick: () => handleSendSOToInvoice(doc),
                             }] : []),
                             ...(doc.type === 'invoice' ? [{
-                              label: 'Send to Packing List',
+                              label: (doc as any).sentToPackingList ? '✓ Sent to Packing List' : 'Send to Packing List',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8" /></svg>,
-                              className: 'text-blue-600',
-                              onClick: () => handleSendToPackingList(doc),
+                              className: (doc as any).sentToPackingList ? 'text-gray-400' : 'text-blue-600',
+                              disabled: !!(doc as any).sentToPackingList,
+                              onClick: () => { if (!(doc as any).sentToPackingList) handleSendToPackingList(doc) },
                             }] : []),
                             'separator' as const,
                             {
