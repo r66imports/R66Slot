@@ -143,14 +143,23 @@ function ConfigurableDropdown({
   placeholder?: string
 }) {
   const [open, setOpen] = useState(false)
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0 })
   const [newLabel, setNewLabel] = useState('')
   const [newColor, setNewColor] = useState('gray')
   const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const s = () => setOpen(false)
     document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
+    window.addEventListener('scroll', s, true)
+    window.addEventListener('resize', s)
+    return () => {
+      document.removeEventListener('mousedown', h)
+      window.removeEventListener('scroll', s, true)
+      window.removeEventListener('resize', s)
+    }
   }, [])
 
   const selected = options.find((o) => o.value === value)
@@ -170,10 +179,19 @@ function ConfigurableDropdown({
     if (value === val) onSelect('')
   }
 
+  const handleOpen = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setDropPos({ top: r.bottom + 4, left: r.left })
+    }
+    setOpen((o) => !o)
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={() => setOpen((o) => !o)}
+        ref={btnRef}
+        onClick={handleOpen}
         className={`min-w-[90px] text-xs font-semibold px-2 py-1 rounded-lg text-left whitespace-nowrap ${
           selected ? pill(selected.color) : 'text-gray-400 bg-transparent'
         }`}
@@ -182,7 +200,7 @@ function ConfigurableDropdown({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-white rounded-xl border border-gray-200 shadow-xl w-52 py-1">
+        <div style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, zIndex: 9999 }} className="bg-white rounded-xl border border-gray-200 shadow-xl w-52 py-1">
           {/* Options list */}
           {options.length === 0 && (
             <p className="px-3 py-2 text-xs text-gray-400">No options yet</p>
