@@ -583,16 +583,6 @@ export default function InventoryPage() {
             ))}
           </select>
 
-          {/* Import CSV */}
-          {hasSupplier && (
-            <button
-              onClick={() => setShowImport(true)}
-              className="px-3 py-2 text-sm font-medium bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-1"
-            >
-              Import CSV
-            </button>
-          )}
-
           {/* Create Order */}
           {hasSupplier && restockItems.length > 0 && (
             <button
