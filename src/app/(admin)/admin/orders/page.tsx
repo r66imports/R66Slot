@@ -1911,6 +1911,7 @@ export default function OrdersPage() {
           shippingMethod: (doc as any).shippingMethod || '',
           shippingCost: (doc as any).shippingCost || 0,
           trackingNumber: (doc as any).trackingNumber || '',
+          stockAlreadyReserved: true,
         }),
       })
       if (res.ok) {

@@ -68,8 +68,12 @@ export async function POST(request: Request) {
     const stockable = body.type === 'invoice' || body.type === 'salesorder'
     const lineItems: LineItem[] = body.lineItems || []
 
+    // stockAlreadyReserved = true when converting a Sales Order to Invoice.
+    // The SO already deducted stock — skip both the stock limit check and re-deduction.
+    const stockAlreadyReserved = !!body.stockAlreadyReserved
+
     // Rule 1 — Enforce Stock Limits: block creation if any line item exceeds available qty
-    if (stockable && await isRuleActive('enforce_stock_limit', false)) {
+    if (!stockAlreadyReserved && stockable && await isRuleActive('enforce_stock_limit', false)) {
       for (const li of lineItems) {
         const sku = extractSku(li.description)
         if (!sku || li.qty <= 0) continue
@@ -90,7 +94,8 @@ export async function POST(request: Request) {
     }
 
     // Rule 3 — Stock Deduction: deduct inventory when invoice/SO is created
-    const deductStock = stockable && await isRuleActive('invoice_stock_deduction', true)
+    // Skip if stock was already reserved by the originating Sales Order
+    const deductStock = !stockAlreadyReserved && stockable && await isRuleActive('invoice_stock_deduction', true)
     if (deductStock) {
       await adjustStock(lineItems, 'subtract')
     }
