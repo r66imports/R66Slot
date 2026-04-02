@@ -273,7 +273,7 @@ function DocumentBody({
         <div className="flex gap-2 mb-4">
           {activeImages.map((url, i) => (
             <div key={i} className="flex-1 overflow-hidden rounded border border-gray-100 bg-gray-50" style={{ aspectRatio: '16/9' }}>
-              <img src={url} alt="" className="w-full h-full object-contain" />
+              <img src={url} alt="" title={url} className="w-full h-full object-contain" />
             </div>
           ))}
         </div>
