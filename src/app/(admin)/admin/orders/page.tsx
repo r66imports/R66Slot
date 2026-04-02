@@ -2016,7 +2016,29 @@ export default function OrdersPage() {
         setBackorders(bos)
         // openGroups is intentionally NOT reset here — preserves user's open/closed state across focus reloads
       }
-      if (docRes.ok) setDocuments(await docRes.json())
+      if (docRes.ok) {
+        const docs: OrderDocument[] = await docRes.json()
+        setDocuments(docs)
+        // Background sync — flag any invoices already in the packing list that aren't marked yet
+        const plRes = await fetch('/api/admin/shipment-log').catch(() => null)
+        if (plRes?.ok) {
+          const plEntries: { invoiceNumber: string }[] = await plRes.json()
+          const plNums = new Set(plEntries.map((e) => e.invoiceNumber?.trim()).filter(Boolean))
+          const unflagged = docs.filter((d) => d.type === 'invoice' && plNums.has(d.docNumber) && !(d as any).sentToPackingList)
+          for (const d of unflagged) {
+            fetch(`/api/admin/orders/documents/${d.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sentToPackingList: true }),
+            }).catch(() => {})
+          }
+          if (unflagged.length > 0) {
+            setDocuments(docs.map((d) =>
+              unflagged.some((u) => u.id === d.id) ? { ...d, sentToPackingList: true } as any : d
+            ))
+          }
+        }
+      }
       if (tmplRes.ok) {
         const t = await tmplRes.json()
         setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: t.imageBlock?.length === 6 ? t.imageBlock : ['', '', '', '', '', ''] })
@@ -2664,7 +2686,7 @@ export default function OrdersPage() {
                             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
                             {(doc as any).sentToPackingList && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-600 text-white" title="Sent to Packing List">
-                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8" /></svg>
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>
                                 Packing List
                               </span>
                             )}
