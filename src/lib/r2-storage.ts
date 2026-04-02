@@ -27,7 +27,7 @@ export async function r2Upload(
     Body: data,
     ContentType: contentType,
   }))
-  return `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${key}`
+  return `/api/media/${key}`
 }
 
 /**
