@@ -1698,7 +1698,10 @@ function ProductInfoModal({
   }, [])
 
   useEffect(() => {
-    const handler = () => setOpenDrop(null)
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-multiselect]')) setOpenDrop(null)
+    }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
@@ -1714,9 +1717,10 @@ function ProductInfoModal({
 
   async function handleSave() {
     setSaving(true)
-    const errors: string[] = []
+    let savedCount = 0
+    const failed: string[] = []
     for (const row of rows) {
-      if (!row.prodId) { errors.push(`${row.sku}: not in products DB`); continue }
+      if (!row.prodId) continue // skip "Not in DB" silently
       const res = await fetch(`/api/admin/products/${row.prodId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1727,11 +1731,12 @@ function ProductInfoModal({
           purchaseAccount: row.purchaseAccount,
         }),
       })
-      if (!res.ok) errors.push(`${row.sku}: save failed`)
+      if (res.ok) savedCount++
+      else failed.push(row.sku)
     }
     setSaving(false)
-    if (errors.length) {
-      alert(`Saved with issues:\n${errors.join('\n')}`)
+    if (failed.length) {
+      alert(`Save failed for: ${failed.join(', ')}`)
     } else {
       setSaved(true)
       setTimeout(() => { setSaved(false); onClose() }, 1500)
@@ -1745,16 +1750,16 @@ function ProductInfoModal({
     const selected = rows[rowIdx]?.[field] as string[]
     const isOpen = openDrop === key
     return (
-      <div className="relative" onMouseDown={e => e.stopPropagation()}>
+      <div className="relative" data-multiselect="true">
         <button type="button" onClick={() => setOpenDrop(isOpen ? null : key)}
-          className="w-full min-w-[130px] px-2 py-1.5 border border-gray-200 rounded-lg text-left text-xs flex items-center justify-between bg-white hover:border-gray-400 focus:outline-none">
-          <span className={`truncate max-w-[105px] ${selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>
+          className="w-full min-w-[160px] px-3 py-2 border border-gray-200 rounded-lg text-left text-xs flex items-center justify-between bg-white hover:border-gray-400 focus:outline-none">
+          <span className={`truncate max-w-[130px] ${selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>
             {selected.length === 0 ? `— ${label} —` : selected.length === 1 ? selected[0] : `${selected.length} selected`}
           </span>
           <svg className="w-3 h-3 text-gray-400 flex-shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
         </button>
         {isOpen && (
-          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[160px] max-h-52 overflow-y-auto">
+          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[200px] max-h-60 overflow-y-auto">
             <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
               <input type="checkbox" checked={selected.length === 0} onChange={() => updateRow(rowIdx, { [field]: [] } as any)} className="rounded" readOnly />
               <span className="text-xs text-gray-400 italic">— None —</span>
@@ -1762,7 +1767,7 @@ function ProductInfoModal({
             {options.length === 0
               ? <p className="px-3 py-2 text-xs text-gray-400 italic">No options — add from Product edit page</p>
               : options.map(opt => (
-                <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
                   <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggleVal(rowIdx, field, opt)} className="rounded" />
                   <span className="text-xs text-gray-800">{opt}</span>
                 </label>
@@ -1776,7 +1781,7 @@ function ProductInfoModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col" onMouseDown={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[92vh] flex flex-col" onMouseDown={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Update Product Information</h2>
@@ -1806,7 +1811,7 @@ function ProductInfoModal({
                     <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{row.sku}</span>
                     {!row.prodId && <span className="block text-[10px] text-red-400 mt-0.5">Not in DB</span>}
                   </td>
-                  <td className="py-2 pr-4 text-xs text-gray-600 max-w-[180px]">
+                  <td className="py-2 pr-4 text-xs text-gray-600 max-w-[260px]">
                     <span className="truncate block">{row.description || '—'}</span>
                   </td>
                   <td className="py-2 pr-3">
