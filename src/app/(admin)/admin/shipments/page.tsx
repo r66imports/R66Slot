@@ -9,6 +9,7 @@ interface ShipmentOptions {
   instructions: DropdownOption[]
   couriers: DropdownOption[]
   boxSizes: DropdownOption[]
+  staff: DropdownOption[]
 }
 interface ShipmentRow {
   id: string
@@ -21,6 +22,8 @@ interface ShipmentRow {
   boxSize: string
   trackingNumber: string
   sendVia: string
+  packingDate: string
+  packedBy: string
   notes: string
   createdAt: string
   updatedAt: string
@@ -305,7 +308,7 @@ function InlineCell({ value, onChange, placeholder }: { value: string; onChange:
 export default function ShipmentLogPage() {
   const [rows, setRows] = useState<ShipmentRow[]>([])
   const [options, setOptions] = useState<ShipmentOptions>({
-    statuses: [], instructions: [], couriers: [], boxSizes: [],
+    statuses: [], instructions: [], couriers: [], boxSizes: [], staff: [],
   })
   const [contacts, setContacts] = useState<Contact[]>([])
   const [clientPopup, setClientPopup] = useState<Contact | null>(null)
@@ -479,16 +482,18 @@ export default function ShipmentLogPage() {
                   <th className="py-3 px-3 text-left w-24">Box Size</th>
                   <th className="py-3 px-3 text-left min-w-[130px]">Tracking Number</th>
                   <th className="py-3 px-3 text-left min-w-[120px]">Send Via</th>
+                  <th className="py-3 px-3 text-left min-w-[110px]">Packing Date</th>
+                  <th className="py-3 px-3 text-left min-w-[120px]">Packed By</th>
                   <th className="py-3 px-3 text-left min-w-[140px]">Notes</th>
                   <th className="py-3 px-3 w-10" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} className="py-16 text-center text-gray-400 text-sm">Loading&hellip;</td></tr>
+                  <tr><td colSpan={12} className="py-16 text-center text-gray-400 text-sm">Loading&hellip;</td></tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center">
+                    <td colSpan={12} className="py-16 text-center">
                       <p className="text-gray-400 text-sm mb-3">No shipments for {monthLabel}</p>
                       <button onClick={addRow} className="text-indigo-600 text-sm font-semibold hover:underline">+ Add first shipment</button>
                     </td>
@@ -551,6 +556,20 @@ export default function ShipmentLogPage() {
                           onSelect={(v) => updateRow(row.id, 'sendVia', v)}
                           onOptionsChange={(opts) => updateOptions('couriers', opts)}
                           placeholder="Courier"
+                        />
+                      </td>
+
+                      <td className="py-2 px-2">
+                        <InlineCell value={row.packingDate || ''} onChange={(v) => updateRow(row.id, 'packingDate', v)} placeholder="DD/MM/YYYY" />
+                      </td>
+
+                      <td className="py-2 px-2">
+                        <ConfigurableDropdown
+                          value={row.packedBy || ''}
+                          options={options.staff}
+                          onSelect={(v) => updateRow(row.id, 'packedBy', v)}
+                          onOptionsChange={(opts) => updateOptions('staff', opts)}
+                          placeholder="Staff"
                         />
                       </td>
 

@@ -14,6 +14,7 @@ export interface ShipmentOptions {
   instructions: DropdownOption[]
   couriers: DropdownOption[]
   boxSizes: DropdownOption[]
+  staff: DropdownOption[]
 }
 
 const DEFAULT_OPTIONS: ShipmentOptions = {
@@ -43,6 +44,7 @@ const DEFAULT_OPTIONS: ShipmentOptions = {
     { value: 'lg', label: 'Large', color: 'gray' },
     { value: 'xl', label: 'XL', color: 'gray' },
   ],
+  staff: [],
 }
 
 export async function GET() {
@@ -54,6 +56,7 @@ export async function GET() {
       instructions: stored.instructions ?? DEFAULT_OPTIONS.instructions,
       couriers: stored.couriers ?? DEFAULT_OPTIONS.couriers,
       boxSizes: stored.boxSizes ?? DEFAULT_OPTIONS.boxSizes,
+      staff: stored.staff ?? DEFAULT_OPTIONS.staff,
     }
     return NextResponse.json(merged)
   } catch {
@@ -70,6 +73,7 @@ export async function PATCH(request: Request) {
       instructions: body.instructions ?? current.instructions,
       couriers: body.couriers ?? current.couriers,
       boxSizes: body.boxSizes ?? current.boxSizes,
+      staff: body.staff ?? current.staff ?? [],
     }
     await blobWrite(KEY, updated)
     return NextResponse.json(updated)

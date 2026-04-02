@@ -14,6 +14,8 @@ export interface ShipmentRow {
   boxSize: string
   trackingNumber: string
   sendVia: string
+  packingDate: string
+  packedBy: string
   notes: string
   createdAt: string
   updatedAt: string
@@ -54,6 +56,8 @@ export async function POST(request: Request) {
       boxSize: body.boxSize || '',
       trackingNumber: body.trackingNumber || '',
       sendVia: body.sendVia || '',
+      packingDate: body.packingDate || '',
+      packedBy: body.packedBy || '',
       notes: body.notes || '',
       createdAt: now,
       updatedAt: now,
