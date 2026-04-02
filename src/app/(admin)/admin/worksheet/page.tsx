@@ -213,6 +213,9 @@ function WorksheetEditor({
     }))
   }, [products])
 
+  // ── Product Info Modal ──
+  const [showProductInfo, setShowProductInfo] = useState(false)
+
   // ── Dropdown row states ──
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [activeSkuRow, setActiveSkuRow] = useState<string | null>(null)
@@ -1120,8 +1123,23 @@ function WorksheetEditor({
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
               {costsUpdated ? '✓ Updated!' : updatingCosts ? 'Updating…' : 'Update Costing'}
             </button>
+            <button
+              onClick={() => setShowProductInfo(true)}
+              disabled={!items.some((it) => it.sku)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+              Update Product Info
+            </button>
           </div>
         </div>
+        {showProductInfo && (
+          <ProductInfoModal
+            items={items}
+            products={products}
+            onClose={() => setShowProductInfo(false)}
+          />
+        )}
 
         {/* Date display */}
         {displayDate && (
@@ -1616,3 +1634,210 @@ function AddProductModal({
   )
 }
 
+// ─── Product Info Modal ────────────────────────────────────────────────────────
+
+interface ProdInfoRow {
+  wsId: string
+  sku: string
+  description: string
+  prodId: string | null
+  categoryBrands: string[]
+  itemCategories: string[]
+  salesAccount: string[]
+  purchaseAccount: string[]
+}
+
+interface ProdOptions {
+  brands: string[]
+  categories: string[]
+  salesAccounts: string[]
+  purchaseAccounts: string[]
+}
+
+function ProductInfoModal({
+  items,
+  products,
+  onClose,
+}: {
+  items: WsItem[]
+  products: ProductRef[]
+  onClose: () => void
+}) {
+  const skuItems = items.filter((it) => it.sku.trim())
+  const [rows, setRows] = useState<ProdInfoRow[]>([])
+  const [opts, setOpts] = useState<ProdOptions>({ brands: [], categories: [], salesAccounts: [], purchaseAccounts: [] })
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [openDrop, setOpenDrop] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/product-options').then(r => r.json()).then((o: any) => {
+      setOpts({
+        brands: o.brands || [],
+        categories: o.categories || [],
+        salesAccounts: o.salesAccounts || [],
+        purchaseAccounts: o.purchaseAccounts || [],
+      })
+    }).catch(() => {})
+
+    const built: ProdInfoRow[] = skuItems.map((it) => {
+      const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()) as any
+      return {
+        wsId: it.id,
+        sku: it.sku.trim(),
+        description: it.description,
+        prodId: prod?.id ?? null,
+        categoryBrands: Array.isArray(prod?.categoryBrands) ? prod.categoryBrands : [],
+        itemCategories: Array.isArray(prod?.itemCategories) ? prod.itemCategories : [],
+        salesAccount: Array.isArray(prod?.salesAccount) ? prod.salesAccount : [],
+        purchaseAccount: Array.isArray(prod?.purchaseAccount) ? prod.purchaseAccount : [],
+      }
+    })
+    setRows(built)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const handler = () => setOpenDrop(null)
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  function updateRow(idx: number, patch: Partial<ProdInfoRow>) {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
+  }
+
+  function toggleVal(idx: number, field: keyof ProdInfoRow, val: string) {
+    const arr = rows[idx][field] as string[]
+    updateRow(idx, { [field]: arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val] } as any)
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const errors: string[] = []
+    for (const row of rows) {
+      if (!row.prodId) { errors.push(`${row.sku}: not in products DB`); continue }
+      const res = await fetch(`/api/admin/products/${row.prodId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          categoryBrands: row.categoryBrands,
+          itemCategories: row.itemCategories,
+          salesAccount: row.salesAccount,
+          purchaseAccount: row.purchaseAccount,
+        }),
+      })
+      if (!res.ok) errors.push(`${row.sku}: save failed`)
+    }
+    setSaving(false)
+    if (errors.length) {
+      alert(`Saved with issues:\n${errors.join('\n')}`)
+    } else {
+      setSaved(true)
+      setTimeout(() => { setSaved(false); onClose() }, 1500)
+    }
+  }
+
+  function MultiSelect({ rowIdx, field, options, label }: {
+    rowIdx: number; field: keyof ProdInfoRow; options: string[]; label: string
+  }) {
+    const key = `${rowIdx}-${field}`
+    const selected = rows[rowIdx]?.[field] as string[]
+    const isOpen = openDrop === key
+    return (
+      <div className="relative" onMouseDown={e => e.stopPropagation()}>
+        <button type="button" onClick={() => setOpenDrop(isOpen ? null : key)}
+          className="w-full min-w-[130px] px-2 py-1.5 border border-gray-200 rounded-lg text-left text-xs flex items-center justify-between bg-white hover:border-gray-400 focus:outline-none">
+          <span className={`truncate max-w-[105px] ${selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>
+            {selected.length === 0 ? `— ${label} —` : selected.length === 1 ? selected[0] : `${selected.length} selected`}
+          </span>
+          <svg className="w-3 h-3 text-gray-400 flex-shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {isOpen && (
+          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[160px] max-h-52 overflow-y-auto">
+            <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+              <input type="checkbox" checked={selected.length === 0} onChange={() => updateRow(rowIdx, { [field]: [] } as any)} className="rounded" readOnly />
+              <span className="text-xs text-gray-400 italic">— None —</span>
+            </label>
+            {options.length === 0
+              ? <p className="px-3 py-2 text-xs text-gray-400 italic">No options — add from Product edit page</p>
+              : options.map(opt => (
+                <label key={opt} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                  <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggleVal(rowIdx, field, opt)} className="rounded" />
+                  <span className="text-xs text-gray-800">{opt}</span>
+                </label>
+              ))
+            }
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col" onMouseDown={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Update Product Information</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{rows.length} items — Sage Accounts &amp; Categories</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div className="overflow-auto flex-1 px-6 py-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left border-b border-gray-100">
+                <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">SKU</th>
+                <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
+                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Category (Brand)</th>
+                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Item Category (Unit)</th>
+                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Sales Account</th>
+                <th className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Purchase Account</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, idx) => (
+                <tr key={row.wsId} className={`border-b border-gray-50 ${!row.prodId ? 'opacity-50' : ''}`}>
+                  <td className="py-2 pr-4">
+                    <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{row.sku}</span>
+                    {!row.prodId && <span className="block text-[10px] text-red-400 mt-0.5">Not in DB</span>}
+                  </td>
+                  <td className="py-2 pr-4 text-xs text-gray-600 max-w-[180px]">
+                    <span className="truncate block">{row.description || '—'}</span>
+                  </td>
+                  <td className="py-2 pr-3">
+                    <MultiSelect rowIdx={idx} field="categoryBrands" options={opts.brands} label="Brand" />
+                  </td>
+                  <td className="py-2 pr-3">
+                    <MultiSelect rowIdx={idx} field="itemCategories" options={opts.categories} label="Unit" />
+                  </td>
+                  <td className="py-2 pr-3">
+                    <MultiSelect rowIdx={idx} field="salesAccount" options={opts.salesAccounts} label="Sales" />
+                  </td>
+                  <td className="py-2">
+                    <MultiSelect rowIdx={idx} field="purchaseAccount" options={opts.purchaseAccounts} label="Purchase" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
+          <p className="text-xs text-gray-400">Saves directly to each product record in the database</p>
+          <div className="flex gap-3">
+            <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSave} disabled={saving || saved}
+              className={`px-5 py-2 text-sm font-semibold rounded-xl transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50'}`}>
+              {saved ? '✓ Saved!' : saving ? 'Saving…' : 'Save All'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
