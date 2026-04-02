@@ -41,8 +41,11 @@ export async function PATCH(
     const wasStockable = isStockable(prev.type)
     const nowStockable = isStockable(newType)
 
+    // Only run stock logic if something stock-relevant actually changed
+    const stockRelevantChange = body.status !== undefined || body.type !== undefined || body.lineItems !== undefined
+
     // Rule 3 — Stock Deduction: only adjust stock if the rule is active
-    if ((wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
+    if (stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
       if (prev.stockDeducted && isCancelled && !wasCancelled) {
         // Being cancelled/archived — restore stock from previous committed items
         await adjustStock(prev.lineItems, 'add')
