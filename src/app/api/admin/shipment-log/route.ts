@@ -16,6 +16,7 @@ export interface ShipmentRow {
   sendVia: string
   packingDate: string
   packedBy: string
+  checkedBy: string
   notes: string
   createdAt: string
   updatedAt: string
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       sendVia: body.sendVia || '',
       packingDate: body.packingDate || '',
       packedBy: body.packedBy || '',
+      checkedBy: body.checkedBy || '',
       notes: body.notes || '',
       createdAt: now,
       updatedAt: now,

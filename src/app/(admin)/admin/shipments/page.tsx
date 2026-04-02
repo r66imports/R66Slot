@@ -24,6 +24,7 @@ interface ShipmentRow {
   sendVia: string
   packingDate: string
   packedBy: string
+  checkedBy: string
   notes: string
   createdAt: string
   updatedAt: string
@@ -304,6 +305,54 @@ function InlineCell({ value, onChange, placeholder }: { value: string; onChange:
   )
 }
 
+/* ─── Date Picker Cell ───────────────────────────────────────────────────── */
+function DatePickerCell({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // value stored as DD/MM/YYYY, input needs YYYY-MM-DD
+  const toInputVal = (v: string) => {
+    if (!v) return ''
+    const parts = v.split('/')
+    if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`
+    return ''
+  }
+  const toDisplay = (iso: string) => {
+    if (!iso) return ''
+    const parts = iso.split('-')
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`
+    return iso
+  }
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(toDisplay(e.target.value))
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className={`text-xs ${value ? 'text-gray-800' : 'text-gray-300'}`}>
+        {value || 'DD/MM/YYYY'}
+      </span>
+      <button
+        onClick={() => inputRef.current?.showPicker?.() ?? inputRef.current?.click()}
+        className="text-gray-400 hover:text-indigo-600 transition-colors"
+        title="Pick date"
+      >
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </button>
+      <input
+        ref={inputRef}
+        type="date"
+        value={toInputVal(value)}
+        onChange={handleChange}
+        className="sr-only"
+        tabIndex={-1}
+      />
+    </div>
+  )
+}
+
 /* ─── Main Page ──────────────────────────────────────────────────────────── */
 export default function ShipmentLogPage() {
   const [rows, setRows] = useState<ShipmentRow[]>([])
@@ -484,16 +533,17 @@ export default function ShipmentLogPage() {
                   <th className="py-3 px-3 text-left min-w-[120px]">Send Via</th>
                   <th className="py-3 px-3 text-left min-w-[110px]">Packing Date</th>
                   <th className="py-3 px-3 text-left min-w-[120px]">Packed By</th>
+                  <th className="py-3 px-3 text-left min-w-[120px]">Checked By</th>
                   <th className="py-3 px-3 text-left min-w-[140px]">Notes</th>
                   <th className="py-3 px-3 w-10" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={12} className="py-16 text-center text-gray-400 text-sm">Loading&hellip;</td></tr>
+                  <tr><td colSpan={13} className="py-16 text-center text-gray-400 text-sm">Loading&hellip;</td></tr>
                 ) : rows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-16 text-center">
+                    <td colSpan={13} className="py-16 text-center">
                       <p className="text-gray-400 text-sm mb-3">No shipments for {monthLabel}</p>
                       <button onClick={addRow} className="text-indigo-600 text-sm font-semibold hover:underline">+ Add first shipment</button>
                     </td>
@@ -559,8 +609,8 @@ export default function ShipmentLogPage() {
                         />
                       </td>
 
-                      <td className="py-2 px-2">
-                        <InlineCell value={row.packingDate || ''} onChange={(v) => updateRow(row.id, 'packingDate', v)} placeholder="DD/MM/YYYY" />
+                      <td className="py-2 px-3">
+                        <DatePickerCell value={row.packingDate || ''} onChange={(v) => updateRow(row.id, 'packingDate', v)} />
                       </td>
 
                       <td className="py-2 px-2">
@@ -568,6 +618,16 @@ export default function ShipmentLogPage() {
                           value={row.packedBy || ''}
                           options={options.staff}
                           onSelect={(v) => updateRow(row.id, 'packedBy', v)}
+                          onOptionsChange={(opts) => updateOptions('staff', opts)}
+                          placeholder="Staff"
+                        />
+                      </td>
+
+                      <td className="py-2 px-2">
+                        <ConfigurableDropdown
+                          value={row.checkedBy || ''}
+                          options={options.staff}
+                          onSelect={(v) => updateRow(row.id, 'checkedBy', v)}
                           onOptionsChange={(opts) => updateOptions('staff', opts)}
                           placeholder="Staff"
                         />
