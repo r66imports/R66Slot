@@ -7,9 +7,10 @@ export interface LineItem {
   unitPrice: number
 }
 
-/** Extract SKU from a line item description like "PT1172G25 – G25 Compound Slick Tires..." */
+/** Extract SKU from a line item description like "SC-5068 – Car-motor test-bench" or "PT1172G25 – G25 Compound..." */
 export function extractSku(description: string): string {
-  return description.split(/\s*[–\-]\s*/)[0]?.trim() || ''
+  // Split only on em dash (–) or a hyphen surrounded by spaces ( - ), not on hyphens within SKUs like SC-5068
+  return description.split(/\s*–\s*|\s+-\s+/)[0]?.trim() || ''
 }
 
 /**
