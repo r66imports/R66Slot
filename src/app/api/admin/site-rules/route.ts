@@ -191,6 +191,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Shipping',
   },
   {
+    id: 'hover_tooltips',
+    name: 'Rule 22 — Hover Tooltip Icons',
+    description: 'Status and action icons across the admin show a descriptive tooltip on hover. Examples: the shipping box icon under an invoice status shows "Sent to Packing List", payment method badges show the method name, and action icon buttons show their function. Tooltips are rendered as native HTML title attributes — no extra UI elements are added. When ON: all tooltip-enabled icons are active. When OFF: icons remain visible but no tooltip text appears on hover.',
+    active: true,
+    appliesTo: ['Admin Invoices', 'Orders', 'Packing List', 'Admin'],
+    category: 'Admin UI',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',
