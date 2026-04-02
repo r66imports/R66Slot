@@ -1023,7 +1023,10 @@ function CreateDocumentModal({
         body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, shippingCost, shippingMethod, trackingNumber, depositPaid, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2 }),
       })
       if (res.ok) { onCreated(await res.json()); onClose() }
-      else setError('Failed to save — please try again')
+      else {
+        const body = await res.json().catch(() => null)
+        setError(body?.error ? `Error: ${body.error}` : `Failed to save (${res.status}) — please try again`)
+      }
     } catch { setError('Network error — please try again') }
     finally { setSaving(false) }
   }
