@@ -219,19 +219,10 @@ function WorksheetEditor({
   const [showNewMenu, setShowNewMenu] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
 
-  // ── Wholesale price → pricelist sync ──
-  const [syncingPrices, setSyncingPrices] = useState(false)
-  const [syncPricesDone, setSyncPricesDone] = useState(false)
-  const [syncPricesError, setSyncPricesError] = useState('')
-
   async function syncWholesalePricelist(): Promise<boolean> {
     const sup = suppliers.find((s) => s.name === supplier)
       || suppliers.find((s) => s.name.toLowerCase() === supplier.toLowerCase())
-    if (!sup) {
-      setSyncPricesError('No supplier selected — select a supplier first')
-      setTimeout(() => setSyncPricesError(''), 5000)
-      return false
-    }
+    if (!sup) return false
     const priceEntries = items
       .filter((it) => it.sku && it.wholesalePrice > 0)
       .map((it) => ({
@@ -246,30 +237,10 @@ function WorksheetEditor({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entries: priceEntries }),
     })
-    if (!res.ok) {
-      const msg = await res.text().catch(() => res.status.toString())
-      setSyncPricesError(`Sync failed: ${msg}`)
-      setTimeout(() => setSyncPricesError(''), 6000)
-      return false
-    }
-    return true
+    return res.ok
   }
 
-  async function handleSyncPrices() {
-    setSyncingPrices(true)
-    setSyncPricesError('')
-    try {
-      const ok = await syncWholesalePricelist()
-      if (ok) {
-        setSyncPricesDone(true)
-        setTimeout(() => setSyncPricesDone(false), 3000)
-      }
-    } finally {
-      setSyncingPrices(false)
-    }
-  }
-
-  // ── Update Final Costing ──
+  // ── Update Final Costing (also syncs wholesale pricelist) ──
   const [updatingCosts, setUpdatingCosts] = useState(false)
   const [costsUpdated, setCostsUpdated] = useState(false)
 
@@ -304,6 +275,7 @@ function WorksheetEditor({
           updated++
         }
       }
+      await syncWholesalePricelist()
       await saveWorksheet()
       if (errors.length > 0) {
         alert(`Updated ${updated} products.\n\nFailed:\n${errors.join('\n')}`)
@@ -1136,22 +1108,6 @@ function WorksheetEditor({
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               Download PDF
             </button>
-            <button
-              onClick={handleSyncPrices}
-              disabled={syncingPrices || !supplier || !items.some((it) => it.sku && it.wholesalePrice > 0)}
-              title="Write wholesale prices from this worksheet into the Inventory pricelist"
-              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
-                syncPricesDone ? 'bg-green-600 text-white' :
-                syncingPrices ? 'bg-gray-400 text-white' :
-                'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
-              {syncPricesDone ? '✓ Prices Synced!' : syncingPrices ? 'Syncing…' : 'Sync Wholesale Prices'}
-            </button>
-            {syncPricesError && (
-              <span className="text-xs text-red-600 font-medium">{syncPricesError}</span>
-            )}
             <button
               onClick={updateFinalCosting}
               disabled={updatingCosts || !items.some((it) => it.sku && it.wholesalePrice > 0)}
