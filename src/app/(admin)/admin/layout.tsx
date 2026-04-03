@@ -35,6 +35,19 @@ export default function AdminLayout({
   const [showCostingModal, setShowCostingModal] = useState(false)
   const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['Inventory Management', 'Order Network', 'Shipping Network']) // Default expanded
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    const saved = localStorage.getItem('adminSidebarOpen')
+    if (saved !== null) setSidebarOpen(saved !== 'false')
+  }, [])
+
+  const toggleSidebar = () => {
+    setSidebarOpen(prev => {
+      localStorage.setItem('adminSidebarOpen', String(!prev))
+      return !prev
+    })
+  }
 
   const toggleSubmenu = (name: string) => {
     setExpandedMenus(prev =>
@@ -199,9 +212,27 @@ export default function AdminLayout({
       </header>
 
       <div className="flex">
-        {/* Sidebar - Wix Style */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)] flex flex-col">
-          <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
+        {/* Sidebar */}
+        <aside className={cn(
+          'bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)] flex flex-col transition-all duration-300 overflow-hidden shrink-0',
+          sidebarOpen ? 'w-64' : 'w-10'
+        )}>
+          {/* Toggle button row */}
+          <div className={cn('flex shrink-0 border-b border-gray-100 py-2', sidebarOpen ? 'justify-end px-2' : 'justify-center')}>
+            <button
+              onClick={toggleSidebar}
+              title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                {sidebarOpen
+                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  : <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />}
+              </svg>
+            </button>
+          </div>
+          {/* Nav — hidden when collapsed */}
+          <nav className={cn('flex-1 p-3 space-y-6 overflow-y-auto', !sidebarOpen && 'hidden')}>
             {/* Site Section */}
             <div>
               {navigation.site.map((item) => {
@@ -635,8 +666,8 @@ export default function AdminLayout({
           </nav>
 
           {/* Bottom Section */}
-          <div className="p-3 border-t border-gray-200">
-            <div className="space-y-1">
+          {sidebarOpen && (
+            <div className="p-3 border-t border-gray-200 shrink-0">
               <Link
                 href="/"
                 target="_blank"
@@ -646,7 +677,7 @@ export default function AdminLayout({
                 View Live Site
               </Link>
             </div>
-          </div>
+          )}
         </aside>
 
         {/* Main Content */}
