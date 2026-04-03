@@ -259,12 +259,17 @@ function DocumentBody({
 
   return (
     <div className="bg-white text-gray-900 text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
-      {/* Header: Logo left, Doc title/number/date right */}
+      {/* Header: Logo + company info left, Doc title/number/date right */}
       <div className="flex items-start justify-between mb-4">
         <div>
           {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="h-16 w-auto object-contain" />
+            <img src={logoUrl} alt="Logo" className="h-16 w-auto object-contain mb-1" />
           )}
+          <div className="text-xs text-gray-700 font-semibold">{template.companyName || ''}</div>
+          {template.companyAddress && <div className="text-xs text-gray-500 whitespace-pre-line">{template.companyAddress}</div>}
+          {template.companyVAT && <div className="text-xs text-gray-500">VAT: {template.companyVAT}</div>}
+          {template.companyPhone && <div className="text-xs text-gray-500">Tel: {template.companyPhone}</div>}
+          {template.companyEmail && <div className="text-xs text-gray-500">{template.companyEmail}</div>}
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-gray-800 tracking-widest">{docTitle}</div>
@@ -277,34 +282,24 @@ function DocumentBody({
         </div>
       </div>
 
-      {/* Image block — full width, 16:9 containers, above addresses */}
+      {/* Image block — full width, cover-fit containers, above addresses */}
       {activeImages.length > 0 && (
         <div className="flex gap-2 mb-4">
           {activeImages.map((url, i) => (
-            <div key={i} className="flex-1 overflow-hidden rounded border border-gray-100 bg-gray-50" style={{ aspectRatio: '16/9' }}>
-              <img src={url} alt="" className="w-full h-full object-contain" />
+            <div key={i} className="flex-1 overflow-hidden rounded border border-gray-100" style={{ aspectRatio: '16/9' }}>
+              <img src={url} alt="" className="w-full h-full object-cover" />
             </div>
           ))}
         </div>
       )}
 
-      {/* Company + Client row */}
-      <div className="flex gap-8 mb-5 pt-4 border-t border-gray-200">
-        <div className="flex-1">
-          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">From</div>
-          <div className="font-semibold text-gray-800">{template.companyName || 'Your Company'}</div>
-          {template.companyAddress && <div className="text-xs text-gray-600 whitespace-pre-line">{template.companyAddress}</div>}
-          {template.companyVAT && <div className="text-xs text-gray-500">VAT: {template.companyVAT}</div>}
-          {template.companyPhone && <div className="text-xs text-gray-500">Tel: {template.companyPhone}</div>}
-          {template.companyEmail && <div className="text-xs text-gray-500">{template.companyEmail}</div>}
-        </div>
-        <div className="flex-1">
-          <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Bill To</div>
-          <div className="font-semibold text-gray-800">{data.clientName}</div>
-          {data.clientEmail && <div className="text-xs text-gray-600">{data.clientEmail}</div>}
-          {data.clientPhone && <div className="text-xs text-gray-600">{data.clientPhone}</div>}
-          {data.clientAddress && <div className="text-xs text-gray-600 whitespace-pre-line">{data.clientAddress}</div>}
-        </div>
+      {/* Bill To */}
+      <div className="mb-5 pt-4 border-t border-gray-200">
+        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Bill To</div>
+        <div className="font-semibold text-gray-800">{data.clientName}</div>
+        {data.clientEmail && <div className="text-xs text-gray-600">{data.clientEmail}</div>}
+        {data.clientPhone && <div className="text-xs text-gray-600">{data.clientPhone}</div>}
+        {data.clientAddress && <div className="text-xs text-gray-600 whitespace-pre-line">{data.clientAddress}</div>}
       </div>
 
       {/* Line items */}
@@ -1382,7 +1377,14 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:40px;color:#111;font-size:14px}@media print{body{margin:20px}}</style>
   </head><body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-    <div>${logoUrlHTML ? `<img src="${logoUrlHTML}" style="height:64px;width:auto;object-fit:contain"/>` : ''}</div>
+    <div>
+      ${logoUrlHTML ? `<img src="${logoUrlHTML}" style="height:64px;width:auto;object-fit:contain;display:block;margin-bottom:4px"/>` : ''}
+      ${template.companyName ? `<div style="font-size:12px;font-weight:600;color:#374151">${template.companyName}</div>` : ''}
+      ${template.companyAddress ? `<div style="font-size:11px;color:#6b7280;white-space:pre-line">${template.companyAddress}</div>` : ''}
+      ${template.companyVAT ? `<div style="font-size:11px;color:#6b7280">VAT: ${template.companyVAT}</div>` : ''}
+      ${template.companyPhone ? `<div style="font-size:11px;color:#6b7280">Tel: ${template.companyPhone}</div>` : ''}
+      ${template.companyEmail ? `<div style="font-size:11px;color:#6b7280">${template.companyEmail}</div>` : ''}
+    </div>
     <div style="text-align:right">
       <div style="font-size:24px;font-weight:700;letter-spacing:0.1em;color:#1f2937">${docTitle}</div>
       <div style="font-size:16px;font-weight:600;margin-top:4px">${data.docNumber}</div>
@@ -1390,22 +1392,12 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
     </div>
   </div>
   ${imagesHTML}
-  <div style="display:flex;gap:32px;margin-bottom:20px;padding-top:16px;border-top:1px solid #e5e7eb">
-    <div style="flex:1">
-      <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">From</div>
-      <div style="font-weight:600">${template.companyName || 'R66 Slot'}</div>
-      ${template.companyAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${template.companyAddress}</div>` : ''}
-      ${template.companyVAT ? `<div style="font-size:12px;color:#6b7280">VAT: ${template.companyVAT}</div>` : ''}
-      ${template.companyPhone ? `<div style="font-size:12px;color:#6b7280">Tel: ${template.companyPhone}</div>` : ''}
-      ${template.companyEmail ? `<div style="font-size:12px;color:#6b7280">${template.companyEmail}</div>` : ''}
-    </div>
-    <div style="flex:1">
-      <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Bill To</div>
-      <div style="font-weight:600">${data.clientName}</div>
-      ${data.clientEmail ? `<div style="font-size:12px;color:#4b5563">${data.clientEmail}</div>` : ''}
-      ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
-      ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
-    </div>
+  <div style="margin-bottom:20px;padding-top:16px;border-top:1px solid #e5e7eb">
+    <div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Bill To</div>
+    <div style="font-weight:600">${data.clientName}</div>
+    ${data.clientEmail ? `<div style="font-size:12px;color:#4b5563">${data.clientEmail}</div>` : ''}
+    ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
+    ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
     <thead><tr style="background:#1f2937;color:white">
@@ -1526,6 +1518,21 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     } catch { /* logo optional */ }
   }
 
+  // ── Company info below logo (left) ────────────────────────────────────────────
+  let logoTextY = y + 20
+  if (template.companyName) {
+    doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(55)
+    doc.text(template.companyName, margin, logoTextY); logoTextY += 4.5
+  }
+  doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100)
+  if (template.companyAddress) {
+    const lines = doc.splitTextToSize(template.companyAddress, 80)
+    doc.text(lines, margin, logoTextY); logoTextY += lines.length * 3.8
+  }
+  if (template.companyVAT) { doc.text(`VAT: ${template.companyVAT}`, margin, logoTextY); logoTextY += 3.8 }
+  if (template.companyPhone) { doc.text(`Tel: ${template.companyPhone}`, margin, logoTextY); logoTextY += 3.8 }
+  if (template.companyEmail) { doc.text(template.companyEmail, margin, logoTextY); logoTextY += 3.8 }
+
   // ── Doc title block (top right) ──────────────────────────────────────────────
   doc.setFontSize(20)
   doc.setFont('helvetica', 'bold')
@@ -1541,7 +1548,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   doc.setTextColor(120)
   doc.text(fmtDateLong(data.date), pageW - margin, y + 19, { align: 'right' })
 
-  y += 30
+  y = Math.max(y + 30, logoTextY + 2)
 
   // ── Brand image block (matches modal preview) ─────────────────────────────
   const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
@@ -1575,42 +1582,31 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   doc.line(margin, y, pageW - margin, y)
   y += 6
 
-  // ── From / Bill To ───────────────────────────────────────────────────────────
+  // ── Bill To ──────────────────────────────────────────────────────────────────
   doc.setFontSize(7)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(160)
-  doc.text('FROM', margin, y)
-  doc.text('BILL TO', col2, y)
+  doc.text('BILL TO', margin, y)
   y += 4
 
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(30)
-  doc.text(template.companyName || 'R66 Slot', margin, y)
-  doc.text(data.clientName, col2, y)
+  doc.text(data.clientName, margin, y)
 
   doc.setFontSize(8.5)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(80)
 
-  let fromY = y + 5
-  if (template.companyAddress) {
-    const lines = doc.splitTextToSize(template.companyAddress, pageW / 2 - margin - 5)
-    doc.text(lines, margin, fromY); fromY += lines.length * 4.5
-  }
-  if (template.companyVAT) { doc.text(`VAT: ${template.companyVAT}`, margin, fromY); fromY += 4.5 }
-  if (template.companyPhone) { doc.text(`Tel: ${template.companyPhone}`, margin, fromY); fromY += 4.5 }
-  if (template.companyEmail) { doc.text(template.companyEmail, margin, fromY); fromY += 4.5 }
-
   let toY = y + 5
-  if (data.clientEmail) { doc.text(data.clientEmail, col2, toY); toY += 4.5 }
-  if (data.clientPhone) { doc.text(data.clientPhone, col2, toY); toY += 4.5 }
+  if (data.clientEmail) { doc.text(data.clientEmail, margin, toY); toY += 4.5 }
+  if (data.clientPhone) { doc.text(data.clientPhone, margin, toY); toY += 4.5 }
   if (data.clientAddress) {
-    const lines = doc.splitTextToSize(data.clientAddress, pageW / 2 - margin - 5)
-    doc.text(lines, col2, toY); toY += lines.length * 4.5
+    const lines = doc.splitTextToSize(data.clientAddress, pageW - margin * 2)
+    doc.text(lines, margin, toY); toY += lines.length * 4.5
   }
 
-  y = Math.max(fromY, toY) + 8
+  y = toY + 8
 
   // ── Line items table ─────────────────────────────────────────────────────────
   autoTable(doc, {
