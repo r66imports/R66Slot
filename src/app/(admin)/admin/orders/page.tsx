@@ -608,7 +608,7 @@ function TemplateModal({
               <div className="flex items-center gap-3 mb-3 bg-gray-50 rounded-lg px-3 py-2">
                 <label className="text-xs text-gray-500 whitespace-nowrap">Image Height</label>
                 <input
-                  type="range" min={40} max={200} step={5}
+                  type="range" min={10} max={200} step={5}
                   value={form.imageBlockHeight ?? 80}
                   onChange={(e) => setForm(f => ({ ...f, imageBlockHeight: Number(e.target.value) }))}
                   className="flex-1 accent-blue-600"
