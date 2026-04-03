@@ -56,6 +56,7 @@ interface OrderTemplate {
   companyEmail: string
   logoUrl: string
   imageBlock: string[]
+  imageBlockHeight: number
   bankName: string
   bankAccount: string
   bankBranch: string
@@ -98,6 +99,7 @@ const DEFAULT_TEMPLATE: OrderTemplate = {
   companyEmail: '',
   logoUrl: '',
   imageBlock: ['', '', '', '', '', ''],
+  imageBlockHeight: 80,
   bankName: '',
   bankAccount: '',
   bankBranch: '',
@@ -282,12 +284,12 @@ function DocumentBody({
         </div>
       </div>
 
-      {/* Image block — full width, cover-fit containers, above addresses */}
+      {/* Image block */}
       {activeImages.length > 0 && (
         <div className="flex gap-2 mb-4">
           {activeImages.map((url, i) => (
-            <div key={i} className="flex-1 overflow-hidden rounded border border-gray-100" style={{ aspectRatio: '16/9' }}>
-              <img src={url} alt="" className="w-full h-full object-cover" />
+            <div key={i} className="flex-1 overflow-hidden rounded border border-gray-100 bg-white flex items-center justify-center" style={{ height: template.imageBlockHeight || 80 }}>
+              <img src={url} alt="" className="max-w-full max-h-full object-contain" />
             </div>
           ))}
         </div>
@@ -601,7 +603,18 @@ function TemplateModal({
             {/* Image Block */}
             <section>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Image Block</h3>
-              <p className="text-xs text-gray-400 mb-3">6 images displayed below the logo on documents (product showcase, certifications, etc.)</p>
+              <p className="text-xs text-gray-400 mb-3">6 images displayed below the logo on documents</p>
+              {/* Height control */}
+              <div className="flex items-center gap-3 mb-3 bg-gray-50 rounded-lg px-3 py-2">
+                <label className="text-xs text-gray-500 whitespace-nowrap">Image Height</label>
+                <input
+                  type="range" min={40} max={200} step={5}
+                  value={form.imageBlockHeight ?? 80}
+                  onChange={(e) => setForm(f => ({ ...f, imageBlockHeight: Number(e.target.value) }))}
+                  className="flex-1 accent-blue-600"
+                />
+                <span className="text-xs font-mono text-gray-700 w-12 text-right">{form.imageBlockHeight ?? 80}px</span>
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 {form.imageBlock.map((url, i) => (
                   <div key={i}>
@@ -1344,9 +1357,10 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
   const logoUrlHTML = normalizeMediaUrl(template.logoUrl || '')
 
+  const imgH = template.imageBlockHeight || 80
   const imagesHTML = activeImages.length > 0
     ? `<div style="display:flex;gap:8px;margin-bottom:16px">${activeImages.map(url =>
-        `<div style="flex:1;aspect-ratio:16/9;overflow:hidden;border-radius:4px;border:1px solid #f3f4f6;background:#f9fafb"><img src="${url}" style="width:100%;height:100%;object-fit:contain"/></div>`
+        `<div style="flex:1;height:${imgH}px;overflow:hidden;border-radius:4px;border:1px solid #f3f4f6;background:#fff;display:flex;align-items:center;justify-content:center"><img src="${url}" style="max-width:100%;max-height:100%;object-fit:contain"/></div>`
       ).join('')}</div>`
     : ''
 
@@ -1492,7 +1506,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   const pageW = doc.internal.pageSize.getWidth()
   const pageH = doc.internal.pageSize.getHeight()
   const margin = 18
-  const col2 = pageW / 2 + 5
+
   let y = 18
 
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
@@ -1555,7 +1569,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   if (activeImages.length > 0) {
     const gap = 4
     const imgW = (pageW - margin * 2 - gap * (activeImages.length - 1)) / activeImages.length
-    const imgH = Math.round(imgW * (9 / 16))
+    const imgH = Math.round(((template.imageBlockHeight || 80) / 96) * 25.4) // px → mm (96dpi)
     let ix = margin
     for (const url of activeImages) {
       try {
@@ -2050,7 +2064,7 @@ export default function OrdersPage() {
         const t = await tmplRes.json()
         const ib = Array.isArray(t.imageBlock) ? t.imageBlock : []
         const padded = [...ib, '', '', '', '', '', ''].slice(0, 6)
-        setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: padded })
+        setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: padded, imageBlockHeight: t.imageBlockHeight ?? 80 })
       }
       // Merge clients + contacts for autofill
       const clList: ClientContact[] = clRes.ok ? await clRes.json() : []

@@ -11,6 +11,7 @@ export interface OrderTemplate {
   companyEmail: string
   logoUrl: string
   imageBlock: string[] // 6 image URLs displayed below logo on documents
+  imageBlockHeight: number // px height of image block row (default 80)
   bankName: string
   bankAccount: string
   bankBranch: string
@@ -29,6 +30,7 @@ const DEFAULT_TEMPLATE: OrderTemplate = {
   companyEmail: '',
   logoUrl: '',
   imageBlock: ['', '', '', '', '', ''],
+  imageBlockHeight: 80,
   bankName: '',
   bankAccount: '',
   bankBranch: '',
