@@ -230,6 +230,14 @@ function ImageUpload({
   )
 }
 
+// Rewrite any Cloudflare R2 public URLs to go through the local proxy route
+function normalizeMediaUrl(url: string): string {
+  if (!url) return url
+  const m = url.match(/https?:\/\/[^/]*r2\.dev\/(.+)/) || url.match(/https?:\/\/[^/]*r2\.cloudflarestorage\.com\/[^/]+\/(.+)/)
+  if (m) return `/api/media/${m[1]}`
+  return url
+}
+
 // ─── Document View (rendered document body, shared by View & Print) ───────────
 
 function DocumentBody({
@@ -246,15 +254,16 @@ function DocumentBody({
   const deposit = data.depositPaid || 0
   const balanceDuePreview = total - deposit
   const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
-  const activeImages = template.imageBlock?.filter(Boolean) ?? []
+  const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
+  const logoUrl = normalizeMediaUrl(template.logoUrl || '')
 
   return (
     <div className="bg-white text-gray-900 text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
       {/* Header: Logo left, Doc title/number/date right */}
       <div className="flex items-start justify-between mb-4">
         <div>
-          {template.logoUrl && (
-            <img src={template.logoUrl} alt="Logo" className="h-16 w-auto object-contain" />
+          {logoUrl && (
+            <img src={logoUrl} alt="Logo" className="h-16 w-auto object-contain" />
           )}
         </div>
         <div className="text-right">
@@ -273,7 +282,7 @@ function DocumentBody({
         <div className="flex gap-2 mb-4">
           {activeImages.map((url, i) => (
             <div key={i} className="flex-1 overflow-hidden rounded border border-gray-100 bg-gray-50" style={{ aspectRatio: '16/9' }}>
-              <img src={url} alt="" title={url} className="w-full h-full object-contain" />
+              <img src={url} alt="" className="w-full h-full object-contain" />
             </div>
           ))}
         </div>
@@ -539,7 +548,7 @@ function TemplateModal({
 }) {
   const [form, setForm] = useState<OrderTemplate>({
     ...template,
-    imageBlock: template.imageBlock?.length === 6 ? template.imageBlock : ['', '', '', '', '', ''],
+    imageBlock: (() => { const ib = Array.isArray(template.imageBlock) ? template.imageBlock : []; return [...ib, '', '', '', '', '', ''].slice(0, 6) })(),
   })
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -1337,7 +1346,8 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   const total = subtotal - discountAmt + shippingHTML
   const depositHTML = data.depositPaid || 0
   const balanceDueHTML = total - depositHTML
-  const activeImages = (template.imageBlock ?? []).filter(Boolean)
+  const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
+  const logoUrlHTML = normalizeMediaUrl(template.logoUrl || '')
 
   const imagesHTML = activeImages.length > 0
     ? `<div style="display:flex;gap:8px;margin-bottom:16px">${activeImages.map(url =>
@@ -1372,7 +1382,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:40px;color:#111;font-size:14px}@media print{body{margin:20px}}</style>
   </head><body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
-    <div>${template.logoUrl ? `<img src="${template.logoUrl}" style="height:64px;width:auto;object-fit:contain"/>` : ''}</div>
+    <div>${logoUrlHTML ? `<img src="${logoUrlHTML}" style="height:64px;width:auto;object-fit:contain"/>` : ''}</div>
     <div style="text-align:right">
       <div style="font-size:24px;font-weight:700;letter-spacing:0.1em;color:#1f2937">${docTitle}</div>
       <div style="font-size:16px;font-weight:600;margin-top:4px">${data.docNumber}</div>
@@ -1500,16 +1510,17 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   const total = subtotal - discountAmt + shippingPDF
 
   // ── Logo (top left) ──────────────────────────────────────────────────────────
-  if (template.logoUrl) {
+  const pdfLogoUrl = normalizeMediaUrl(template.logoUrl || '')
+  if (pdfLogoUrl) {
     try {
-      const res = await fetch(template.logoUrl)
+      const res = await fetch(pdfLogoUrl)
       const blob = await res.blob()
       const dataUrl = await new Promise<string>((resolve) => {
         const reader = new FileReader()
         reader.onload = () => resolve(reader.result as string)
         reader.readAsDataURL(blob)
       })
-      const ext = (template.logoUrl.split('.').pop() ?? 'png').toUpperCase()
+      const ext = (pdfLogoUrl.split('.').pop() ?? 'png').toUpperCase()
       const fmt = ext === 'JPG' ? 'JPEG' : ['PNG', 'JPEG', 'WEBP'].includes(ext) ? ext : 'PNG'
       doc.addImage(dataUrl, fmt as 'PNG', margin, y, 0, 16)
     } catch { /* logo optional */ }
@@ -1533,7 +1544,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   y += 30
 
   // ── Brand image block (matches modal preview) ─────────────────────────────
-  const activeImages = (template.imageBlock ?? []).filter(Boolean)
+  const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
   if (activeImages.length > 0) {
     const gap = 4
     const imgW = (pageW - margin * 2 - gap * (activeImages.length - 1)) / activeImages.length
@@ -2041,7 +2052,9 @@ export default function OrdersPage() {
       }
       if (tmplRes.ok) {
         const t = await tmplRes.json()
-        setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: t.imageBlock?.length === 6 ? t.imageBlock : ['', '', '', '', '', ''] })
+        const ib = Array.isArray(t.imageBlock) ? t.imageBlock : []
+        const padded = [...ib, '', '', '', '', '', ''].slice(0, 6)
+        setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: padded })
       }
       // Merge clients + contacts for autofill
       const clList: ClientContact[] = clRes.ok ? await clRes.json() : []
