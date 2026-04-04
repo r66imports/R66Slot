@@ -27,8 +27,9 @@ export async function GET(
 
     const response = await r2.send(command)
     const bytes = await response.Body!.transformToByteArray()
+    const buffer = Buffer.from(bytes)
 
-    return new NextResponse(bytes, {
+    return new NextResponse(buffer, {
       headers: {
         'Content-Type': response.ContentType || 'image/jpeg',
         'Cache-Control': 'public, max-age=31536000, immutable',

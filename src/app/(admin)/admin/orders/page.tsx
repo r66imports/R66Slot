@@ -87,6 +87,8 @@ interface DocViewData {
   depositPaid: number
   paymentMethod: string
   paymentMethod2: string
+  paymentMethod1Amount: number
+  paymentMethod2Amount: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -388,8 +390,16 @@ function DocumentBody({
       {(data.paymentMethod || data.paymentMethod2) && (
         <div className="mb-4 flex items-center gap-2">
           <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Payment:</span>
-          {data.paymentMethod && <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{data.paymentMethod}</span>}
-          {data.paymentMethod2 && <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{data.paymentMethod2}</span>}
+          {data.paymentMethod && (
+            <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
+              {data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}{data.paymentMethod}
+            </span>
+          )}
+          {data.paymentMethod2 && (
+            <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
+              {data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}{data.paymentMethod2}
+            </span>
+          )}
         </div>
       )}
 
@@ -512,6 +522,8 @@ function TemplatePreviewModal({
     depositPaid: 0,
     paymentMethod: '',
     paymentMethod2: '',
+    paymentMethod1Amount: 0,
+    paymentMethod2Amount: 0,
   }
 
   return (
@@ -912,6 +924,8 @@ function CreateDocumentModal({
     status: (editDoc?.status || 'draft') as 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete',
     paymentMethod: (editDoc as any)?.paymentMethod || '',
     paymentMethod2: (editDoc as any)?.paymentMethod2 || '',
+    paymentMethod1Amount: (editDoc as any)?.paymentMethod1Amount || 0,
+    paymentMethod2Amount: (editDoc as any)?.paymentMethod2Amount || 0,
   })
   const [lineItems, setLineItems] = useState<LineItem[]>(
     editDoc?.lineItems?.length ? editDoc.lineItems : prefilledItems?.length ? prefilledItems : [newLine()]
@@ -1008,7 +1022,7 @@ function CreateDocumentModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const setField = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
+  const setField = (k: string, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
   const addLine = () => setLineItems((p) => [...p, newLine()])
   const removeLine = (id: string) => setLineItems((p) => p.filter((l) => l.id !== id))
   const updateLine = (id: string, k: keyof LineItem, v: string | number) =>
@@ -1037,7 +1051,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, shippingCost, shippingMethod, trackingNumber, depositPaid, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2 }),
+        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, shippingCost, shippingMethod, trackingNumber, depositPaid, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
       })
       if (res.ok) { onCreated(await res.json()); onClose() }
       else {
@@ -1303,29 +1317,45 @@ function CreateDocumentModal({
               </select>
             </div>
             {docType === 'invoice' && (
-              <div className="w-44">
-                <label className="text-xs font-semibold text-gray-500 mb-1 block">Payment Method</label>
-                <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod} onChange={(e) => setField('paymentMethod', e.target.value)}>
-                  <option value="">— Select —</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Card</option>
-                  <option value="EFT">EFT</option>
-                  <option value="Snapscan">Snapscan</option>
-                  <option value="Other">Other</option>
-                </select>
+              <div className="flex items-end gap-2">
+                <div className="w-36">
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Payment Method</label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod} onChange={(e) => setField('paymentMethod', e.target.value)}>
+                    <option value="">— Select —</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="EFT">EFT</option>
+                    <option value="Snapscan">Snapscan</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                {form.paymentMethod && (
+                  <div className="w-24">
+                    <label className="text-xs font-semibold text-gray-500 mb-1 block">Amount</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod1Amount || ''} onChange={(e) => setField('paymentMethod1Amount', parseFloat(e.target.value) || 0)} />
+                  </div>
+                )}
               </div>
             )}
             {docType === 'invoice' && (
-              <div className="w-44">
-                <label className="text-xs font-semibold text-gray-500 mb-1 block">Payment Method 2</label>
-                <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod2} onChange={(e) => setField('paymentMethod2', e.target.value)}>
-                  <option value="">— None —</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Card">Card</option>
-                  <option value="EFT">EFT</option>
-                  <option value="Snapscan">Snapscan</option>
-                  <option value="Other">Other</option>
-                </select>
+              <div className="flex items-end gap-2">
+                <div className="w-36">
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Payment Method 2</label>
+                  <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod2} onChange={(e) => setField('paymentMethod2', e.target.value)}>
+                    <option value="">— None —</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Card">Card</option>
+                    <option value="EFT">EFT</option>
+                    <option value="Snapscan">Snapscan</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                {form.paymentMethod2 && (
+                  <div className="w-24">
+                    <label className="text-xs font-semibold text-gray-500 mb-1 block">Amount</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod2Amount || ''} onChange={(e) => setField('paymentMethod2Amount', parseFloat(e.target.value) || 0)} />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1436,7 +1466,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
     </div>
   </div>
   ${(data.shippingMethod || data.trackingNumber) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${data.shippingMethod ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Shipping:</span><span style="font-size:12px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:2px 10px;border-radius:99px">${data.shippingMethod}</span>` : ''}${data.trackingNumber ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-left:8px">Tracking:</span><span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;font-family:monospace;padding:2px 10px;border-radius:99px">${data.trackingNumber}</span>` : ''}</div>` : ''}
-  ${(data.paymentMethod || data.paymentMethod2) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Payment Method:</span>${data.paymentMethod ? `<span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod}</span>` : ''}${data.paymentMethod2 ? `<span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod2}</span>` : ''}</div>` : ''}
+  ${(data.paymentMethod || data.paymentMethod2) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Payment:</span>${data.paymentMethod ? `<span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}${data.paymentMethod}</span>` : ''}${data.paymentMethod2 ? `<span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}${data.paymentMethod2}</span>` : ''}</div>` : ''}
   ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
   ${bankHTML}
   ${data.terms ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Terms &amp; Conditions</div><div style="font-size:12px;color:#6b7280;white-space:pre-line">${data.terms}</div></div>` : ''}
@@ -1485,7 +1515,7 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
     ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : []),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
-    ...(data.paymentMethod || data.paymentMethod2 ? [`Payment Method:  ${[data.paymentMethod, data.paymentMethod2].filter(Boolean).join(' + ')}`] : []),
+    ...(data.paymentMethod || data.paymentMethod2 ? [`Payment:  ${[data.paymentMethod ? `${data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}${data.paymentMethod}` : '', data.paymentMethod2 ? `${data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}${data.paymentMethod2}` : ''].filter(Boolean).join(' + ')}`] : []),
     banking,
     data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
     '',
@@ -1726,6 +1756,17 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     if (data.shippingMethod) parts.push(`Shipping: ${data.shippingMethod}`)
     if (data.trackingNumber) parts.push(`Tracking #: ${data.trackingNumber}`)
     doc.text(parts.join('   |   '), margin, y); y += 6
+  }
+
+  // ── Payment method ───────────────────────────────────────────────────────────
+  if (data.paymentMethod || data.paymentMethod2) {
+    const parts: string[] = []
+    if (data.paymentMethod) parts.push(`${data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}${data.paymentMethod}`)
+    if (data.paymentMethod2) parts.push(`${data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}${data.paymentMethod2}`)
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(70)
+    doc.text(`Payment: ${parts.join('  +  ')}`, margin, y); y += 6
   }
 
   // ── Banking ──────────────────────────────────────────────────────────────────
@@ -2251,6 +2292,8 @@ export default function OrdersPage() {
       depositPaid: 0,
       paymentMethod: '',
       paymentMethod2: '',
+      paymentMethod1Amount: 0,
+      paymentMethod2Amount: 0,
     }
   }, [tab, template])
 
@@ -2267,6 +2310,8 @@ export default function OrdersPage() {
     depositPaid: (doc as any).depositPaid || 0,
     paymentMethod: (doc as any).paymentMethod || '',
     paymentMethod2: (doc as any).paymentMethod2 || '',
+    paymentMethod1Amount: (doc as any).paymentMethod1Amount || 0,
+    paymentMethod2Amount: (doc as any).paymentMethod2Amount || 0,
   })
 
   const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
