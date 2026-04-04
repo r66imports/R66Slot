@@ -625,7 +625,7 @@ export default function ProductsPage() {
     const headers = [
       'Code', 'Description', 'Brand', 'Category (Brand)', 'Item Categories (Unit)',
       'Categories', 'Price (Retail)', 'Average Cost', 'Cost Per Item', 'Pre Order Price',
-      'Qty', 'Barcode', 'Supplier', 'Car Class', 'Sales Account', 'Purchases Account',
+      'Barcode', 'Supplier', 'Car Class', 'Sales Account', 'Purchases Account',
     ]
     const csv = [
       headers.join(','),
@@ -644,7 +644,6 @@ export default function ProductsPage() {
           p.compareAtPrice ?? '',
           p.costPerItem ?? '',
           p.preOrderPrice ?? '',
-          p.quantity ?? '',
           p.barcode || '',
           p.supplier || '',
           (p as any).carClass || '',

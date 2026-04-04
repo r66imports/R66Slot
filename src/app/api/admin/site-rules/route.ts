@@ -207,6 +207,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Page Editor',
   },
   {
+    id: 'export_supplier_csv',
+    name: 'Rule 24 — Export Supplier CSV Format',
+    description: 'Controls the column set exported by the "Export Supplier" button on the Products page. Current columns (Apr 2026): Code, Description, Brand, Category (Brand), Item Categories (Unit), Categories, Price (Retail), Average Cost, Cost Per Item, Pre Order Price, Barcode, Supplier, Car Class, Sales Account, Purchases Account. Qty (stock quantity) is intentionally excluded from the supplier export — it is an internal inventory figure not relevant to supplier ordering. Filename format: supplier-{supplier-name}-products-{date}.csv. The export respects the active supplier filter so you can export per-supplier by selecting a supplier first.',
+    active: true,
+    appliesTo: ['Products', 'Export'],
+    category: 'Products',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',
