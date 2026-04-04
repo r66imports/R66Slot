@@ -199,6 +199,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Admin UI',
   },
   {
+    id: 'columns_media_library',
+    name: 'Rule 23 — Columns Component: Media Library Image Picker',
+    description: 'Enables the Media Library image picker inside the page editor Columns component. When ON: each column in the Columns block shows a "Choose from Media Library" button (empty state) and a "Library" button on hover (when an image is already set). Clicking either opens the full Media Library modal — browse, search by name, filter by folder, or upload a new image directly from the picker. Selecting an image sets it as the column image. When OFF: the Library button is hidden and only direct file upload is available. The media library fetches all images from /api/admin/media (media_files table). Applies to the Columns element in the Page Editor.',
+    active: true,
+    appliesTo: ['Page Editor', 'Columns', 'Media Library'],
+    category: 'Page Editor',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',

@@ -2344,6 +2344,7 @@ function VisualColumnEditor({
 }) {
   const children = component.children || []
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  const [mediaPickerIdx, setMediaPickerIdx] = useState<number | null>(null)
 
   const updateChild = (index: number, updates: Partial<PageComponent>) => {
     const updated = children.map((child, i) =>
@@ -2427,6 +2428,12 @@ function VisualColumnEditor({
                     Change
                   </button>
                   <button
+                    onClick={() => setMediaPickerIdx(idx)}
+                    className="px-2 py-0.5 bg-blue-500 text-white text-[10px] rounded font-play"
+                  >
+                    Library
+                  </button>
+                  <button
                     onClick={() => updateChildSetting(idx, 'imageUrl', '')}
                     className="px-2 py-0.5 bg-red-500 text-white text-[10px] rounded"
                   >
@@ -2435,12 +2442,20 @@ function VisualColumnEditor({
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => fileRefs.current[idx]?.click()}
-                className="w-full py-2 border border-dashed border-gray-300 rounded text-[10px] text-gray-400 hover:text-blue-500 hover:border-blue-300 transition-colors font-play"
-              >
-                + Upload Image
-              </button>
+              <div className="space-y-1">
+                <button
+                  onClick={() => fileRefs.current[idx]?.click()}
+                  className="w-full py-2 border border-dashed border-gray-300 rounded text-[10px] text-gray-400 hover:text-blue-500 hover:border-blue-300 transition-colors font-play"
+                >
+                  + Upload Image
+                </button>
+                <button
+                  onClick={() => setMediaPickerIdx(idx)}
+                  className="w-full py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-[10px] rounded font-play font-medium transition-colors"
+                >
+                  🖼️ Choose from Media Library
+                </button>
+              </div>
             )}
             <input
               ref={(el) => { fileRefs.current[idx] = el }}
@@ -2546,6 +2561,14 @@ function VisualColumnEditor({
           />
         </div>
       ))}
+      <MediaLibraryPicker
+        open={mediaPickerIdx !== null}
+        onClose={() => setMediaPickerIdx(null)}
+        onSelect={(url) => {
+          if (mediaPickerIdx !== null) updateChildSetting(mediaPickerIdx, 'imageUrl', url)
+          setMediaPickerIdx(null)
+        }}
+      />
     </div>
   )
 }
