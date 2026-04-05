@@ -657,8 +657,7 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
         : viewMode === 'tablet'
         ? ((settings.gridColumnsTablet as number) || (settings.gridColumns as number) || 3)
         : ((settings.gridColumns as number) || 3)
-      const pgRows = (settings.productRows as number) || 3
-      const pgCount = pgRows * pgCols
+      const pgCount = pgCols * 2
       const cardSize = (settings.cardSize as string) || 'standard'
       const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : cardSize === 'xlarge' ? '360px' : '160px'
       return (

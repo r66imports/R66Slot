@@ -207,6 +207,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Page Editor',
   },
   {
+    id: 'product_grid_auto_rows',
+    name: 'Rule 25 — Product Grid: Auto-Expand Rows',
+    description: 'The Product Grid component on live pages automatically shows ALL matching active products — there is no "Rows to Show" cap. As new products are added and assigned to a page or category, they appear in the grid immediately on the next page load without any editor changes required. The grid respects the columns setting (Desktop / Tablet / Mobile), the Category filter, and the Image Fit / Card Size / Gap / Padding settings. The "Rows to Show" field has been removed from the editor; the grid grows vertically to accommodate every product that matches the current filter. In the page editor, the preview shows a fixed 2-row placeholder to indicate the layout.',
+    active: true,
+    appliesTo: ['Page Editor', 'Product Grid', 'Online Store'],
+    category: 'Page Editor',
+  },
+  {
     id: 'export_supplier_csv',
     name: 'Rule 24 — Export Supplier CSV Format',
     description: 'Controls the column set exported by the "Export Supplier" button on the Products page. Current columns (Apr 2026): Code, Description, Brand, Category (Brand), Item Categories (Unit), Categories, Price (Retail), Average Cost, Cost Per Item, Pre Order Price, Barcode, Supplier, Car Class, Sales Account, Purchases Account. Qty (stock quantity) is intentionally excluded from the supplier export — it is an internal inventory figure not relevant to supplier ordering. Filename format: supplier-{supplier-name}-products-{date}.csv. The export respects the active supplier filter so you can export per-supplier by selecting a supplier first.',

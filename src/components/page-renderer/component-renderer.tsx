@@ -56,14 +56,11 @@ function ProductGridLive({
           if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum
           return (a.sku || '').localeCompare(b.sku || '')
         })
-        const rows = (settings.productRows as number) || 3
-        const gridCols = (settings.gridColumns as number) || 3
-        const cap = rows * gridCols
-        setProducts(list.slice(0, cap))
+        setProducts(list)
       })
       .catch(() => setProducts([]))
       .finally(() => setLoading(false))
-  }, [settings.assignedCategories, settings.productRows, settings.gridColumns])
+  }, [settings.assignedCategories])
 
   const handleAddToCart = (p: any) => {
     addItem({

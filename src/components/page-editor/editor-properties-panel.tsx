@@ -754,18 +754,6 @@ function ContentTab({
             <p className="text-[10px] text-gray-400 font-play">Each view is saved independently — switching views does not change other settings.</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Rows to Show</label>
-            <input
-              type="number"
-              value={(component.settings.productRows as number) || 3}
-              onChange={(e) => updateSetting('productRows', parseInt(e.target.value) || 3)}
-              min={1}
-              max={10}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-            />
-            <p className="text-[10px] text-gray-400 mt-1 font-play">Rows × columns = total products shown.</p>
-          </div>
-          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Card Size</label>
             <select
               value={(component.settings.cardSize as string) || 'standard'}
