@@ -225,7 +225,7 @@ const DEFAULT_RULES: SiteRule[] = [
   {
     id: 'product_grid_auto_rows',
     name: 'Rule 25 — Product Grid: Auto-Expand Rows',
-    description: 'The Product Grid component on live pages automatically shows ALL matching active products — there is no "Rows to Show" cap. As new products are added and assigned to a page or category, they appear in the grid immediately on the next page load without any editor changes required. The grid respects the columns setting (Desktop / Tablet / Mobile), the Category filter, and the Image Fit / Card Size / Gap / Padding settings. The "Rows to Show" field has been removed from the editor; the grid grows vertically to accommodate every product that matches the current filter. In the page editor, the preview shows a fixed 2-row placeholder to indicate the layout.',
+    description: 'The Product Grid component on live pages automatically shows ALL matching active products — there is no "Rows to Show" cap. As new products are added and assigned to a page or category, they appear in the grid immediately on the next page load without any editor changes required. The grid respects the columns setting (Desktop / Tablet / Mobile), the Category filter, and the Image Fit / Card Size / Gap / Padding settings. The "Rows to Show" field has been removed from the editor; the grid grows vertically to accommodate every product that matches the current filter. In the page editor, the preview shows a fixed 2-row placeholder to indicate the layout. Category Filter list in the Settings tab is automatically sorted A→Z so categories are easy to find.',
     active: true,
     appliesTo: ['Page Editor', 'Product Grid', 'Online Store'],
     category: 'Page Editor',

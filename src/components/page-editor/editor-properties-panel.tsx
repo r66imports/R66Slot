@@ -3230,7 +3230,7 @@ function SettingsTab({
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Choose Categories</label>
               <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-                {categoriesList.map((cat) => {
+                {[...categoriesList].sort((a, b) => a.name.localeCompare(b.name)).map((cat) => {
                   const selected: string[] = Array.isArray(component.settings.assignedCategories) ? (component.settings.assignedCategories as string[]) : []
                   const checked = selected.includes(cat.id)
                   return (
