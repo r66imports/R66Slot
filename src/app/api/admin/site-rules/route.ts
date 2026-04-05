@@ -239,6 +239,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Products',
   },
   {
+    id: 'quote_auto_archive',
+    name: 'Rule 28 — Quote Auto-Archive on Conversion',
+    description: 'When a Quote is converted to a Sales Order or Invoice via "Send to Sales Order" or "Send to Invoice" in the Actions menu: (1) The original Quote is automatically archived — it moves out of the active Quotes list and into the Archive. (2) The resulting Sales Order or Invoice stores the source Quote number as "sourceQuoteNumber". This reference is displayed on the document header as "Quote Ref: Q-XXXX", in the PDF, and as a small label under the document number in the Orders table. This creates a complete audit trail from Quote → Sales Order / Invoice.',
+    active: true,
+    appliesTo: ['Orders', 'Quotes'],
+    category: 'Orders',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',

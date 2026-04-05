@@ -282,6 +282,9 @@ function DocumentBody({
         <div className="text-right">
           <div className="text-2xl font-bold text-gray-800 tracking-widest">{docTitle}</div>
           <div className="text-base font-semibold mt-1">{data.docNumber}</div>
+          {(data as any).sourceQuoteNumber && (
+            <div className="text-xs text-gray-400 mt-0.5">Quote Ref: {(data as any).sourceQuoteNumber}</div>
+          )}
           <div className="text-xs text-gray-500 mt-0.5">{fmtDateLong(data.date)}</div>
           <div className={`mt-2 inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize
             ${DOC_STATUS_COLORS[data.status] ?? BO_STATUS_COLORS[data.status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -1463,6 +1466,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
     <div style="text-align:right">
       <div style="font-size:24px;font-weight:700;letter-spacing:0.1em;color:#1f2937">${docTitle}</div>
       <div style="font-size:16px;font-weight:600;margin-top:4px">${data.docNumber}</div>
+      ${(data as any).sourceQuoteNumber ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px">Quote Ref: ${(data as any).sourceQuoteNumber}</div>` : ''}
       <div style="font-size:12px;color:#6b7280;margin-top:2px">${fmtDateLong(data.date)}</div>
     </div>
   </div>
@@ -1621,9 +1625,14 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
 
   doc.setFontSize(9)
   doc.setTextColor(120)
-  doc.text(fmtDateLong(data.date), pageW - margin, y + 19, { align: 'right' })
-
-  y = Math.max(y + 30, logoTextY + 2)
+  if ((data as any).sourceQuoteNumber) {
+    doc.text(`Quote Ref: ${(data as any).sourceQuoteNumber}`, pageW - margin, y + 19, { align: 'right' })
+    doc.text(fmtDateLong(data.date), pageW - margin, y + 24, { align: 'right' })
+    y = Math.max(y + 34, logoTextY + 2)
+  } else {
+    doc.text(fmtDateLong(data.date), pageW - margin, y + 19, { align: 'right' })
+    y = Math.max(y + 30, logoTextY + 2)
+  }
 
   // ── Brand image block (matches modal preview) ─────────────────────────────
   const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
@@ -2151,13 +2160,23 @@ export default function OrdersPage() {
           shippingMethod: (doc as any).shippingMethod || '',
           shippingCost: (doc as any).shippingCost || 0,
           trackingNumber: (doc as any).trackingNumber || '',
+          sourceQuoteNumber: doc.docNumber,
         }),
       })
       if (res.ok) {
         const newDoc = await res.json()
         setDocuments((prev) => [newDoc, ...prev])
-        setSoToInvoiceResult(`✓ ${doc.docNumber} → ${newDocNumber}`)
-        setTimeout(() => setSoToInvoiceResult(null), 4000)
+        // Archive the source quote
+        const archiveRes = await fetch(`/api/admin/orders/documents/${doc.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'archived' }),
+        })
+        if (archiveRes.ok) {
+          setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'archived' } : d))
+        }
+        setSoToInvoiceResult(`✓ ${doc.docNumber} → ${newDocNumber} (quote archived)`)
+        setTimeout(() => setSoToInvoiceResult(null), 5000)
       } else {
         const errData = await res.json().catch(() => ({}))
         setSoToInvoiceResult(`Error: ${errData.error || res.status}`)
@@ -3022,7 +3041,12 @@ export default function OrdersPage() {
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
                       <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
-                        <td className="py-3 px-4 font-mono font-semibold text-blue-700">{doc.docNumber}</td>
+                        <td className="py-3 px-4">
+                          <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
+                          {(doc as any).sourceQuoteNumber && (
+                            <div className="text-[10px] text-gray-400 mt-0.5">Q: {(doc as any).sourceQuoteNumber}</div>
+                          )}
+                        </td>
                         <td className="py-3 px-4 text-gray-500">{fmtDate(doc.date)}</td>
                         <td className="py-3 px-4 font-medium">{doc.clientName}</td>
                         <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{firstDesc}</td>
