@@ -1154,7 +1154,7 @@ export default function ProductsPage() {
                           {visibleCols.sku && <SortTh col="sku" label="SKU" />}
                           <SortTh col="title" label="Product" />
                           {visibleCols.brand && <SortTh col="brand" label="Category (Brand)" />}
-                          {visibleCols.categories && <SortTh col="categories" label="Item Categories (Unit)" />}
+                          {visibleCols.categories && <SortTh col="categories" label="Unit" />}
                           {visibleCols.price && <SortTh col="price" label="Price" align="right" />}
                           {visibleCols.eta && <SortTh col="eta" label="ETA" align="center" />}
                           {visibleCols.qty && <SortTh col="qty" label="Qty" align="center" />}

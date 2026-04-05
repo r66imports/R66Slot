@@ -122,10 +122,10 @@ const DEFAULT_RULES: SiteRule[] = [
   },
   {
     id: 'reports_column_sort',
-    name: 'Rule 16 \u2014 Sales Reports Column Sort',
-    description: 'Column headers in the Sales Reports table are clickable to sort the list. SKU column: click once to sort A \u2192 Z (\u2191), click again to sort Z \u2192 A (\u2193). The \u2195 icon on the SKU header indicates no sort is active \u2014 click to activate. When SKU sort is active it overrides the Sort dropdown (Units Sold / Revenue / Invoice Count). The Sort dropdown still controls ordering when SKU sort is not active. Supplier filter dropdown also available to narrow results to a single supplier\u2019s SKUs.',
+    name: 'Rule 16 \u2014 Column Sort (Sales Reports + Products)',
+    description: 'Clickable column sort applies to two admin pages. (1) Sales Reports: SKU column sorts A\u2192Z / Z\u2192A; overrides the Sort dropdown when active. (2) Products: all column headers are sortable \u2014 SKU, Product, Category (Brand), Item Categories (Unit), Price, ETA, Qty, Status. The Item Categories (Unit) column is labelled "Unit" in the table header (Sage terminology) and sorts alphabetically by the first unit value. Sort direction toggles on each click (\u2191 \u2193). The \u2195 icon indicates no active sort.',
     active: true,
-    appliesTo: ['Sales Reports'],
+    appliesTo: ['Sales Reports', 'Products'],
     category: 'System',
   },
   {
