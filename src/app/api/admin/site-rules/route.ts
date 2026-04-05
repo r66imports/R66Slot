@@ -207,6 +207,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Page Editor',
   },
   {
+    id: 'inventory_shop_inventory_unlock',
+    name: 'Rule 26 — Inventory: Shop Inventory Unlock Editing',
+    description: 'Adds a padlock toggle to the Shop Inventory column header on the Inventory page (both supplier mode and base mode). When locked (default): the Shop Inventory column shows the actual stock quantity as a read-only value. When unlocked: each row shows an editable input (blue-tinted) allowing manual stock correction. Changes are saved when the Save button is clicked — the updated quantity is written to the products table via PUT /api/admin/products/{id}. Row highlight: if the Inventory Count value for a row does not match the Shop Inventory quantity, the entire row is highlighted red and the Shop Inventory value is shown in red text — this flags a stock discrepancy between the physical count and the system record.',
+    active: true,
+    appliesTo: ['Inventory', 'Products'],
+    category: 'Inventory',
+  },
+  {
     id: 'product_grid_auto_rows',
     name: 'Rule 25 — Product Grid: Auto-Expand Rows',
     description: 'The Product Grid component on live pages automatically shows ALL matching active products — there is no "Rows to Show" cap. As new products are added and assigned to a page or category, they appear in the grid immediately on the next page load without any editor changes required. The grid respects the columns setting (Desktop / Tablet / Mobile), the Category filter, and the Image Fit / Card Size / Gap / Padding settings. The "Rows to Show" field has been removed from the editor; the grid grows vertically to accommodate every product that matches the current filter. In the page editor, the preview shows a fixed 2-row placeholder to indicate the layout.',

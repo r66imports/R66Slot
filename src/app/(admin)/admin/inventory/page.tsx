@@ -114,6 +114,10 @@ export default function InventoryPage() {
   // Shop Volume lock/unlock
   const [shopVolumeUnlocked, setShopVolumeUnlocked] = useState(false)
 
+  // Shop Inventory lock/unlock + local edits
+  const [shopInventoryUnlocked, setShopInventoryUnlocked] = useState(false)
+  const [localQuantities, setLocalQuantities] = useState<Record<string, string>>({})
+
   // Column resize (base mode only)
   const { widths: colW, setWidth } = useColumnResize('inventory', {
     idx: 40, sku: 90, product: 220, retail: 90, brand: 120, dbQty: 80, count: 90, save: 70,
@@ -332,6 +336,24 @@ export default function InventoryPage() {
         const updated: PricelistEntry[] = await res.json()
         setPricelist(Array.isArray(updated) ? updated : [])
       }
+      // Save any manually-edited Shop Inventory quantities
+      const dirtyQtys = filtered.filter((p) => {
+        const local = localQuantities[p.id]
+        return local !== undefined && parseInt(local, 10) !== p.quantity
+      })
+      for (const p of dirtyQtys) {
+        const newQty = parseInt(localQuantities[p.id], 10)
+        if (!isNaN(newQty)) {
+          await fetch(`/api/admin/products/${p.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity: newQty }),
+          })
+          setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, quantity: newQty } : x))
+        }
+      }
+      if (dirtyQtys.length > 0) setLocalQuantities({})
+
       setSaveAllDone(true)
       setTimeout(() => setSaveAllDone(false), 2500)
     } finally {
@@ -661,7 +683,22 @@ export default function InventoryPage() {
                     </button>
                   </div>
                 </th>
-                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">Shop Inventory</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">
+                  <div className="flex items-center justify-center gap-1.5">
+                    Shop Inventory
+                    <button
+                      onClick={() => setShopInventoryUnlocked(u => !u)}
+                      title={shopInventoryUnlocked ? 'Lock editing' : 'Unlock editing'}
+                      className={`p-0.5 rounded transition-colors ${shopInventoryUnlocked ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {shopInventoryUnlocked ? (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
+                      )}
+                    </button>
+                  </div>
+                </th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
                   Wholesale ({currency})
                 </th>
@@ -685,8 +722,11 @@ export default function InventoryPage() {
                 const priceVal = localPrices[product.sku] ?? '0'
                 const shopQtyVal = localShopQtys[product.sku] ?? '0'
                 const restockQty = getRestockQty(product)
+                const displayQty = localQuantities[product.id] ?? String(product.quantity)
+                const invCount = counts[product.id] ?? String(product.quantity)
+                const qtyMismatch = invCount !== '' && displayQty !== '' && invCount !== displayQty
                 return (
-                  <tr key={product.id} className={`border-b last:border-0 ${isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                  <tr key={product.id} className={`border-b last:border-0 ${qtyMismatch ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-2 text-xs text-gray-400">{idx + 1}</td>
                     <td className="px-3 py-2">
                       <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
@@ -722,7 +762,18 @@ export default function InventoryPage() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
+                      {shopInventoryUnlocked ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={displayQty}
+                          onChange={(e) => setLocalQuantities((q) => ({ ...q, [product.id]: e.target.value }))}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
+                        />
+                      ) : (
+                        <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : 'text-gray-700'}`}>{product.quantity}</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <div className="flex items-center gap-1 justify-center">
@@ -805,7 +856,20 @@ export default function InventoryPage() {
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.brand; const onMove = (ev: MouseEvent) => setWidth('brand', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  Shop Inventory
+                  <div className="flex items-center justify-center gap-1.5">
+                    Shop Inventory
+                    <button
+                      onClick={() => setShopInventoryUnlocked(u => !u)}
+                      title={shopInventoryUnlocked ? 'Lock editing' : 'Unlock editing'}
+                      className={`p-0.5 rounded transition-colors ${shopInventoryUnlocked ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                      {shopInventoryUnlocked ? (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
+                      )}
+                    </button>
+                  </div>
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
@@ -825,8 +889,10 @@ export default function InventoryPage() {
               {filtered.map((product, idx) => {
                 const countVal = counts[product.id] ?? String(product.quantity)
                 const isDirty = countVal !== savedCounts[product.id]
+                const displayQtyBase = localQuantities[product.id] ?? String(product.quantity)
+                const qtyMismatchBase = countVal !== '' && displayQtyBase !== '' && countVal !== displayQtyBase
                 return (
-                  <tr key={product.id} className={`border-b last:border-0 ${isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                  <tr key={product.id} className={`border-b last:border-0 ${qtyMismatchBase ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>
                     <td className="px-4 py-2">
                       <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
@@ -849,7 +915,18 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
                     <td className="px-4 py-2 text-center">
-                      <span className="text-sm font-semibold text-gray-700">{product.quantity}</span>
+                      {shopInventoryUnlocked ? (
+                        <input
+                          type="number"
+                          min="0"
+                          value={displayQtyBase}
+                          onChange={(e) => setLocalQuantities((q) => ({ ...q, [product.id]: e.target.value }))}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
+                        />
+                      ) : (
+                        <span className={`text-sm font-semibold ${qtyMismatchBase ? 'text-red-600' : 'text-gray-700'}`}>{product.quantity}</span>
+                      )}
                     </td>
                     <td className="px-4 py-2 text-center">
                       <input
