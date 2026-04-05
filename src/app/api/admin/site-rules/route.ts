@@ -207,6 +207,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Page Editor',
   },
   {
+    id: 'item_categories_unit',
+    name: 'Rule 27 — Item Categories (Unit): Import Mapping & Display',
+    description: 'Governs two behaviours for the Item Categories (Unit) field on Products. (1) CSV Import mapping: the field is read from column headers in priority order — "item categories (unit)" (exported header), "item categories", "unit", "type". Previously only "unit" and "type" were checked, so re-importing an exported CSV would silently skip the field. Fix applied Apr 2026 across all 6 import profiles (generic, NSR, Revo, BRM, Pioneer, Sideways). (2) Display: Item Categories (Unit) badges in the products table are always rendered as plain grey tags — no hyperlinks. Previously, if a category name matched a page category with a URL it would render as a blue link, which was incorrect for unit-type values like Bushing, Bushings, Slot Car.',
+    active: true,
+    appliesTo: ['Products', 'Import'],
+    category: 'Products',
+  },
+  {
     id: 'inventory_shop_inventory_unlock',
     name: 'Rule 26 — Inventory: Shop Inventory Unlock Editing',
     description: 'Adds a padlock toggle to the Shop Inventory column header on the Inventory page (both supplier mode and base mode). When locked (default): the Shop Inventory column shows the actual stock quantity as a read-only value. When unlocked: each row shows an editable input (blue-tinted) allowing manual stock correction. Changes are saved when the Save button is clicked — the updated quantity is written to the products table via PUT /api/admin/products/{id}. Row highlight: if the Inventory Count value for a row does not match the Shop Inventory quantity, the entire row is highlighted red and the Shop Inventory value is shown in red text — this flags a stock discrepancy between the physical count and the system record.',

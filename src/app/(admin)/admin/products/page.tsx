@@ -199,7 +199,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       brand: obj['category'] || obj['brand'] || '',
       categoryBrands: obj['category'] || obj['brand'] || '',
       productType: obj['unit'] || obj['category'] || obj['type'] || '',
-      itemCategories: obj['unit'] || obj['type'] || '',
+      itemCategories: obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost price'] || obj['cost'] || '',
       compareAtPrice: obj['average cost'] || obj['avg cost'] || '',
@@ -241,7 +241,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       brand: 'NSR',
       categoryBrands: obj['category'] || obj['brand'] || 'NSR',
       productType: obj['unit'] || obj['type'] || 'Slot Car',
-      itemCategories: obj['unit'] || obj['type'] || '',
+      itemCategories: obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
@@ -279,7 +279,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       brand: 'Revo',
       categoryBrands: obj['category'] || obj['brand'] || 'Revo',
       productType: obj['unit'] || obj['type'] || 'Parts',
-      itemCategories: obj['unit'] || obj['type'] || '',
+      itemCategories: obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '',
       partType: obj['part_type'] || obj['parttype'] || '',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
       costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
@@ -316,7 +316,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       brand: 'BRM',
       categoryBrands: obj['category'] || obj['brand'] || 'BRM',
       productType: obj['unit'] || obj['type'] || 'Slot Car',
-      itemCategories: obj['unit'] || obj['type'] || '',
+      itemCategories: obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/24',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
@@ -354,7 +354,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       brand: 'Pioneer',
       categoryBrands: obj['category'] || obj['brand'] || 'Pioneer',
       productType: obj['unit'] || obj['type'] || 'Slot Car',
-      itemCategories: obj['unit'] || obj['type'] || '',
+      itemCategories: obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
@@ -392,7 +392,7 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
       brand: 'Sideways',
       categoryBrands: obj['category'] || obj['brand'] || 'Sideways',
       productType: obj['unit'] || obj['type'] || 'Slot Car',
-      itemCategories: obj['unit'] || obj['type'] || '',
+      itemCategories: obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '',
       carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
       scale: obj['scale'] || '1/32',
       price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
@@ -1245,21 +1245,9 @@ export default function ProductsPage() {
                           <td className="py-2 px-2">
                             {allCats.length > 0 ? (
                               <div className="flex flex-wrap gap-1 max-w-[130px]">
-                                {allCats.slice(0, 3).map((c) => {
-                                  const cat = categories.find((cat) => cat.slug === c || cat.name === c)
-                                  return cat?.pageUrl ? (
-                                    <a
-                                      key={c}
-                                      href={cat.pageUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full hover:bg-blue-100"
-                                      title={cat.pageUrl}
-                                    >{c}</a>
-                                  ) : (
-                                    <span key={c} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full">{c}</span>
-                                  )
-                                })}
+                                {allCats.slice(0, 3).map((c) => (
+                                  <span key={c} className="text-[10px] bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded-full">{c}</span>
+                                ))}
                                 {allCats.length > 3 && <span className="text-[10px] text-gray-400">+{allCats.length - 3}</span>}
                               </div>
                             ) : (
