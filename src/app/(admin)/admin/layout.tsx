@@ -74,6 +74,7 @@ export default function AdminLayout({
           { name: 'Categories', href: '/admin/categories', icon: '🏷️' },
           { name: 'POS / Scanner', href: '/admin/pos', icon: '🔍' },
           { name: 'Reports', href: '/admin/reports', icon: '📊' },
+          { name: 'Stock Audit', href: '/admin/stock-audit', icon: '🔎' },
         ]
       },
     ],
