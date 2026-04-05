@@ -1964,6 +1964,64 @@ export default function OrdersPage() {
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
   const [soToInvoiceResult, setSoToInvoiceResult] = useState<string | null>(null)
 
+  const handleConvertQuote = async (doc: OrderDocument, toType: 'salesorder' | 'invoice') => {
+    try {
+      let newDocNumber: string
+      if (toType === 'salesorder') {
+        const existingRaw = await fetch('/api/admin/orders/documents?type=salesorder').then((r) => r.ok ? r.json() : [])
+        const existing: any[] = Array.isArray(existingRaw) ? existingRaw : []
+        const nums = existing
+          .map((d: any) => { const m = /^SO(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
+          .filter((n: number) => n > 0)
+        const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1
+        newDocNumber = `SO${String(next).padStart(3, '0')}`
+      } else {
+        const existingRaw = await fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : [])
+        const existing: any[] = Array.isArray(existingRaw) ? existingRaw : []
+        const nums = existing
+          .map((d: any) => { const m = /^INV(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
+          .filter((n: number) => n > 0)
+        const next = (nums.length > 0 ? Math.max(...nums) : 25) + 1
+        newDocNumber = `INV${String(next).padStart(4, '0')}`
+      }
+
+      const res = await fetch('/api/admin/orders/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: toType,
+          docNumber: newDocNumber,
+          date: new Date().toISOString().split('T')[0],
+          clientName: doc.clientName || 'Unknown',
+          clientEmail: doc.clientEmail || '',
+          clientPhone: doc.clientPhone || '',
+          clientAddress: doc.clientAddress || '',
+          lineItems: doc.lineItems || [],
+          notes: doc.notes || '',
+          terms: doc.terms || '',
+          status: 'draft',
+          discountPct: (doc as any).discountPct || 0,
+          shippingMethod: (doc as any).shippingMethod || '',
+          shippingCost: (doc as any).shippingCost || 0,
+          trackingNumber: (doc as any).trackingNumber || '',
+        }),
+      })
+      if (res.ok) {
+        const newDoc = await res.json()
+        setDocuments((prev) => [newDoc, ...prev])
+        setSoToInvoiceResult(`✓ ${doc.docNumber} → ${newDocNumber}`)
+        setTimeout(() => setSoToInvoiceResult(null), 4000)
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        setSoToInvoiceResult(`Error: ${errData.error || res.status}`)
+        setTimeout(() => setSoToInvoiceResult(null), 5000)
+      }
+    } catch (e: any) {
+      setSoToInvoiceResult(`Error: ${e?.message || 'unknown'}`)
+      setTimeout(() => setSoToInvoiceResult(null), 5000)
+    }
+  }
+
   const handleSendSOToInvoice = async (doc: OrderDocument) => {
     try {
       const existingRaw = await fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : [])
@@ -2790,6 +2848,20 @@ export default function OrdersPage() {
                             { label: 'Print', icon: <IconPrint />, onClick: () => doPrint(docToViewData(doc), template) },
                             { label: 'Email', icon: <IconEmail />, onClick: () => doEmail(docToViewData(doc), template) },
                             { label: 'Download', icon: <IconDownload />, onClick: () => doDownload(docToViewData(doc), template) },
+                            ...(doc.type === 'quote' ? [
+                              {
+                                label: 'Send to Sales Order',
+                                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+                                className: 'text-blue-600',
+                                onClick: () => handleConvertQuote(doc, 'salesorder'),
+                              },
+                              {
+                                label: 'Send to Invoice',
+                                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+                                className: 'text-indigo-600',
+                                onClick: () => handleConvertQuote(doc, 'invoice'),
+                              },
+                            ] : []),
                             ...(doc.type === 'salesorder' ? [{
                               label: 'Send to Invoice',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
