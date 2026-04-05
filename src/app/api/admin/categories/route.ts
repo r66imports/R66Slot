@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { db } from '@/lib/db'
 
 const CATEGORIES_KEY = 'data/product-categories.json'
 
@@ -29,7 +30,30 @@ async function saveCategories(categories: any[]) {
 export async function GET() {
   try {
     const categories = await getCategories()
-    return NextResponse.json(categories)
+
+    // Compute live product counts from the DB — count active products per category_id
+    let liveCounts: Record<string, number> = {}
+    try {
+      const result = await db.query(
+        `SELECT cat_id, COUNT(*) AS cnt
+         FROM products, jsonb_array_elements_text(category_ids) AS cat_id
+         WHERE status = 'active'
+         GROUP BY cat_id`
+      )
+      result.rows.forEach((row: any) => {
+        liveCounts[row.cat_id] = parseInt(row.cnt, 10)
+      })
+    } catch {
+      // If query fails (e.g. column missing), fall through with stored counts
+    }
+
+    const withCounts = categories.map((cat: any) => ({
+      ...cat,
+      productCount: liveCounts[cat.id] ?? 0,
+      productIds: undefined, // don't send stale productIds — count is live now
+    }))
+
+    return NextResponse.json(withCounts)
   } catch (error) {
     console.error('Error fetching categories:', error)
     return NextResponse.json(DEFAULT_CATEGORIES)
