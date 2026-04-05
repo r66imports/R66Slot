@@ -89,6 +89,10 @@ interface DocViewData {
   paymentMethod2: string
   paymentMethod1Amount: number
   paymentMethod2Amount: number
+  creditApplied: number
+  amountPaid: number
+  overpaymentCredit: number
+  showCreditOnInvoice: boolean
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -355,16 +359,39 @@ function DocumentBody({
             <span>TOTAL</span>
             <span>{fmtPrice(total)}</span>
           </div>
-          {deposit > 0 && (<>
+          {deposit > 0 && (
             <div className="flex justify-between py-1 border-b border-gray-100 text-sm mt-1">
               <span className="text-gray-500">Deposit Paid</span>
               <span className="font-medium text-green-600">-{fmtPrice(deposit)}</span>
             </div>
-            <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
-              <span>BALANCE DUE</span>
-              <span>{fmtPrice(balanceDuePreview)}</span>
+          )}
+          {(data.creditApplied || 0) > 0 && (
+            <div className="flex justify-between py-1 border-b border-green-100 text-sm mt-1">
+              <span className="text-green-600 font-medium">Credit Applied</span>
+              <span className="font-medium text-green-600">-{fmtPrice(data.creditApplied)}</span>
             </div>
-          </>)}
+          )}
+          {(data.overpaymentCredit || 0) > 0 && data.showCreditOnInvoice && (
+            <div className="flex justify-between py-1 border-b border-amber-100 text-sm mt-1">
+              <span className="text-amber-600 font-medium">Overpayment Credit <span className="text-[10px] font-normal">(carried to your account)</span></span>
+              <span className="font-medium text-amber-600">{fmtPrice(data.overpaymentCredit)}</span>
+            </div>
+          )}
+          {(data.amountPaid || 0) > 0 && (
+            <div className="flex justify-between py-1 border-b border-blue-100 text-sm mt-1">
+              <span className="text-blue-600 font-medium">Amount Paid</span>
+              <span className="font-medium text-blue-600">-{fmtPrice(data.amountPaid)}</span>
+            </div>
+          )}
+          {(() => {
+            const remaining = total - deposit - (data.creditApplied || 0) - (data.amountPaid || 0)
+            return remaining > 0.005 ? (
+              <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
+                <span>BALANCE DUE</span>
+                <span>{fmtPrice(remaining)}</span>
+              </div>
+            ) : null
+          })()}
         </div>
       </div>
 
@@ -524,6 +551,10 @@ function TemplatePreviewModal({
     paymentMethod2: '',
     paymentMethod1Amount: 0,
     paymentMethod2Amount: 0,
+    creditApplied: 0,
+    amountPaid: 0,
+    overpaymentCredit: 0,
+    showCreditOnInvoice: false,
   }
 
   return (
@@ -1870,6 +1901,115 @@ function PushToSageBtn() {
   )
 }
 
+// ─── Payment Modal ─────────────────────────────────────────────────────────────
+
+type PaymentFormState = {
+  amountReceived: string; creditApplied: string; useCredit: boolean
+  showCreditOnInvoice: boolean; paymentMethod: string; notes: string
+}
+
+function PaymentModal({
+  doc, clientCreditBalance, paymentForm, setPaymentForm, onSave, onClose,
+}: {
+  doc: OrderDocument
+  clientCreditBalance: number
+  paymentForm: PaymentFormState
+  setPaymentForm: React.Dispatch<React.SetStateAction<PaymentFormState>>
+  onSave: (r: { amountPaid: number; creditApplied: number; overpaymentCredit: number; showCreditOnInvoice: boolean; paymentMethod: string; notes: string }) => void
+  onClose: () => void
+}) {
+  const [saving, setSaving] = useState(false)
+  const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+  const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
+  const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
+  const creditApplied = paymentForm.useCredit
+    ? Math.min(clientCreditBalance, parseFloat(paymentForm.creditApplied) || clientCreditBalance)
+    : 0
+  const balanceDue = Math.max(0, invoiceTotal - creditApplied)
+  const amountReceived = parseFloat(paymentForm.amountReceived) || 0
+  const overpayment = Math.max(0, amountReceived - balanceDue)
+  const shortfall = Math.max(0, balanceDue - amountReceived)
+  const set = (k: keyof PaymentFormState, v: string | boolean) => setPaymentForm(f => ({ ...f, [k]: v }))
+
+  const handleSave = async () => {
+    setSaving(true)
+    try { await onSave({ amountPaid: amountReceived, creditApplied, overpaymentCredit: overpayment, showCreditOnInvoice: paymentForm.showCreditOnInvoice, paymentMethod: paymentForm.paymentMethod, notes: paymentForm.notes }) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div>
+            <h2 className="text-lg font-bold">Record Payment</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{doc.docNumber} · {doc.clientName}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          <div className="flex justify-between py-2 border-b border-gray-100 text-sm">
+            <span className="text-gray-500">Invoice Total</span>
+            <span className="font-semibold">{fmtPrice(invoiceTotal)}</span>
+          </div>
+          {clientCreditBalance > 0 && (
+            <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+              <label className="flex items-center gap-2 text-sm font-medium text-green-700 cursor-pointer">
+                <input type="checkbox" checked={paymentForm.useCredit} onChange={e => set('useCredit', e.target.checked)} className="w-4 h-4 accent-green-600" />
+                Apply existing credit (R{clientCreditBalance.toFixed(2)})
+              </label>
+              {paymentForm.useCredit && (
+                <div className="mt-2">
+                  <label className="text-xs text-green-600 block mb-1">Credit amount to apply</label>
+                  <input type="number" min={0} max={clientCreditBalance} step="0.01" value={paymentForm.creditApplied} placeholder={clientCreditBalance.toFixed(2)} onChange={e => set('creditApplied', e.target.value)} className="w-full border border-green-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-400" />
+                </div>
+              )}
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Amount Received (R)</label>
+            <input type="number" min={0} step="0.01" value={paymentForm.amountReceived} onChange={e => set('amountReceived', e.target.value)} placeholder="0.00" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1.5">
+            <div className="flex justify-between"><span className="text-gray-500">Invoice Total</span><span className="font-medium">{fmtPrice(invoiceTotal)}</span></div>
+            {creditApplied > 0 && <div className="flex justify-between text-green-600"><span>Credit Applied</span><span>-{fmtPrice(creditApplied)}</span></div>}
+            <div className="flex justify-between border-t border-gray-200 pt-1.5"><span className="text-gray-500">Balance Due</span><span className="font-semibold">{fmtPrice(balanceDue)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Amount Received</span><span className="font-medium">{fmtPrice(amountReceived)}</span></div>
+          </div>
+          {overpayment > 0.005 && (
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-sm text-amber-700">
+              <p>R{overpayment.toFixed(2)} will be added to <strong>{doc.clientName}</strong>'s credit balance.</p>
+              <label className="flex items-center gap-2 mt-2 cursor-pointer text-xs">
+                <input type="checkbox" checked={paymentForm.showCreditOnInvoice} onChange={e => set('showCreditOnInvoice', e.target.checked)} className="w-4 h-4 accent-amber-600" />
+                Show credit detail on invoice to customer
+              </label>
+            </div>
+          )}
+          {shortfall > 0.005 && amountReceived > 0 && (
+            <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-sm text-red-600">
+              R{shortfall.toFixed(2)} still outstanding — invoice will remain open.
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Payment Method</label>
+            <select value={paymentForm.paymentMethod} onChange={e => set('paymentMethod', e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400">
+              <option>EFT</option><option>Card</option><option>Cash</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Notes (optional)</label>
+            <input type="text" value={paymentForm.notes} onChange={e => set('notes', e.target.value)} placeholder="e.g. EFT ref 123456" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 font-semibold">{saving ? 'Saving…' : 'Save Payment'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Actions Dropdown ──────────────────────────────────────────────────────────
 
 type ActionItem =
@@ -1963,6 +2103,13 @@ export default function OrdersPage() {
   const [showArchive, setShowArchive] = useState(false)
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
   const [soToInvoiceResult, setSoToInvoiceResult] = useState<string | null>(null)
+  const [paymentModal, setPaymentModal] = useState<OrderDocument | null>(null)
+  const [clientCreditBalance, setClientCreditBalance] = useState(0)
+  const [creditBalances, setCreditBalances] = useState<Record<string, number>>({})
+  const [paymentForm, setPaymentForm] = useState<{
+    amountReceived: string; creditApplied: string; useCredit: boolean
+    showCreditOnInvoice: boolean; paymentMethod: string; notes: string
+  }>({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '' })
 
   const handleConvertQuote = async (doc: OrderDocument, toType: 'salesorder' | 'invoice') => {
     try {
@@ -2100,6 +2247,63 @@ export default function OrdersPage() {
     }
   }
 
+  const handleRecordPayment = async (doc: OrderDocument) => {
+    const key = doc.clientName.toLowerCase().replace(/\s+/g, '_')
+    const res = await fetch(`/api/admin/customer-credits/${key}`)
+    const data = res.ok ? await res.json() : { balance: 0 }
+    setClientCreditBalance(data.balance ?? 0)
+    setPaymentForm({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '' })
+    setPaymentModal(doc)
+  }
+
+  const handleSavePayment = async (result: {
+    amountPaid: number; creditApplied: number; overpaymentCredit: number
+    showCreditOnInvoice: boolean; paymentMethod: string; notes: string
+  }) => {
+    if (!paymentModal) return
+    await fetch('/api/admin/customer-credits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'record_payment',
+        clientName: paymentModal.clientName,
+        invoiceNumber: paymentModal.docNumber,
+        amountPaid: result.amountPaid,
+        creditApplied: result.creditApplied,
+        overpayment: result.overpaymentCredit,
+        notes: result.notes,
+      }),
+    })
+    const subtotal = paymentModal.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+    const discountAmt = subtotal * ((paymentModal as any).discountPct || 0) / 100
+    const invoiceTotal = subtotal - discountAmt + ((paymentModal as any).shippingCost || 0)
+    const fullySettled = result.amountPaid + result.creditApplied >= invoiceTotal - 0.005
+    const patchRes = await fetch(`/api/admin/orders/documents/${paymentModal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amountPaid: result.amountPaid,
+        creditApplied: result.creditApplied,
+        overpaymentCredit: result.overpaymentCredit,
+        showCreditOnInvoice: result.showCreditOnInvoice,
+        paymentMethod: result.paymentMethod,
+        notes: result.notes || (paymentModal as any).notes || '',
+        ...(fullySettled ? { status: 'paid' } : {}),
+      }),
+    })
+    if (patchRes.ok) {
+      const updated = await patchRes.json()
+      setDocuments((prev) => prev.map((d) => d.id === updated.id ? updated : d))
+    }
+    // Refresh credit badge for this client
+    const key = paymentModal.clientName.toLowerCase().replace(/\s+/g, '_')
+    fetch(`/api/admin/customer-credits/${key}`)
+      .then(r => r.ok ? r.json() : { balance: 0 })
+      .then(rec => setCreditBalances(prev => ({ ...prev, [key]: rec.balance ?? 0 })))
+      .catch(() => {})
+    setPaymentModal(null)
+  }
+
   const handleSyncInventory = async () => {
     setSyncingInventory(true)
     setSyncResult(null)
@@ -2188,6 +2392,14 @@ export default function OrdersPage() {
         setShippingEnabled(shipRule ? shipRule.active !== false : true)
         setStockDeductionEnabled(stockRule ? stockRule.active !== false : true)
       }
+      // Load credit balances for badge display
+      fetch('/api/admin/customer-credits')
+        .then(r => r.ok ? r.json() : {})
+        .then((store: Record<string, { balance: number }>) => {
+          const map: Record<string, number> = {}
+          for (const [key, rec] of Object.entries(store)) { if (rec.balance > 0) map[key] = rec.balance }
+          setCreditBalances(map)
+        }).catch(() => {})
     } finally {
       setLoading(false)
     }
@@ -2352,6 +2564,10 @@ export default function OrdersPage() {
       paymentMethod2: '',
       paymentMethod1Amount: 0,
       paymentMethod2Amount: 0,
+      creditApplied: 0,
+      amountPaid: 0,
+      overpaymentCredit: 0,
+      showCreditOnInvoice: false,
     }
   }, [tab, template])
 
@@ -2370,6 +2586,10 @@ export default function OrdersPage() {
     paymentMethod2: (doc as any).paymentMethod2 || '',
     paymentMethod1Amount: (doc as any).paymentMethod1Amount || 0,
     paymentMethod2Amount: (doc as any).paymentMethod2Amount || 0,
+    creditApplied: (doc as any).creditApplied || 0,
+    amountPaid: (doc as any).amountPaid || 0,
+    overpaymentCredit: (doc as any).overpaymentCredit || 0,
+    showCreditOnInvoice: (doc as any).showCreditOnInvoice ?? false,
   })
 
   const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
@@ -2826,10 +3046,25 @@ export default function OrdersPage() {
                             {(doc as any).paymentMethod2 && (
                               <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod2}</span>
                             )}
+                            {doc.type === 'invoice' && (() => {
+                              const key = doc.clientName.toLowerCase().replace(/\s+/g, '_')
+                              const bal = creditBalances[key]
+                              return bal && bal > 0 ? (
+                                <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full" title={`Credit balance: R${bal.toFixed(2)}`}>
+                                  Credit R{bal.toFixed(2)}
+                                </span>
+                              ) : null
+                            })()}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">
                           <ActionsDropdown items={[
+                            ...(doc.type === 'invoice' ? [{
+                              label: 'Record Payment',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
+                              className: 'text-blue-600',
+                              onClick: () => handleRecordPayment(doc),
+                            }] : []),
                             ...(doc.type === 'invoice' && doc.status !== 'paid' ? [{
                               label: 'Mark as Paid',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
@@ -2962,6 +3197,16 @@ export default function OrdersPage() {
             setEditDocState(null)
           }}
           onClose={() => setEditDocState(null)}
+        />
+      )}
+      {paymentModal && (
+        <PaymentModal
+          doc={paymentModal}
+          clientCreditBalance={clientCreditBalance}
+          paymentForm={paymentForm}
+          setPaymentForm={setPaymentForm}
+          onSave={handleSavePayment}
+          onClose={() => setPaymentModal(null)}
         />
       )}
     </div>
