@@ -5,45 +5,67 @@ import { extractSku } from '@/lib/order-helpers'
 import type { OrderDocument } from '@/app/api/admin/orders/documents/route'
 
 const KEY = 'data/order-documents.json'
-
 const CANCELLED = new Set(['archived', 'rejected'])
+
+export interface InvoiceLine {
+  docNumber: string
+  type: 'invoice' | 'salesorder'
+  date: string
+  clientName: string
+  qty: number
+  synced: boolean
+}
 
 export interface SkuAuditRow {
   sku: string
   title: string
+  supplier: string
   currentQty: number
-  soldQty: number       // confirmed deducted invoices
-  reservedQty: number   // confirmed deducted SOs
-  unsyncedQty: number   // invoices/SOs where stockDeducted !== true
-  unsyncedDocs: string[]  // doc numbers not yet synced
+  impliedStarting: number   // currentQty + totalSoldQty + totalReservedQty
+  totalSoldQty: number      // ALL invoice line items (synced + unsynced)
+  syncedSoldQty: number     // only stockDeducted=true invoices
+  totalReservedQty: number  // ALL SO line items
+  unsyncedDocs: string[]
+  invoices: InvoiceLine[]
   status: 'ok' | 'unsynced' | 'oversold'
 }
 
 export async function GET() {
   try {
-    // Load all documents
     const docs = await blobRead<OrderDocument[]>(KEY, [])
 
-    // Load all products for current quantities + titles
+    // Load products: sku, title, quantity, supplier
     const prodResult = await db.query(
-      `SELECT sku, title, COALESCE(quantity, 0) AS quantity FROM products WHERE sku IS NOT NULL AND sku <> '' ORDER BY sku`
+      `SELECT sku, title, COALESCE(quantity, 0) AS quantity, COALESCE(supplier, '') AS supplier
+       FROM products WHERE sku IS NOT NULL AND sku <> '' ORDER BY sku`
     )
-    const productMap: Record<string, { title: string; qty: number }> = {}
+    const productMap: Record<string, { title: string; qty: number; supplier: string }> = {}
     for (const row of prodResult.rows) {
-      productMap[row.sku.toLowerCase()] = { title: row.title, qty: parseInt(row.quantity, 10) }
+      productMap[row.sku.toLowerCase()] = {
+        title: row.title,
+        qty: parseInt(row.quantity, 10),
+        supplier: row.supplier || '',
+      }
     }
 
-    // Aggregate per SKU from documents
+    // Aggregate per SKU
     const skuData: Record<string, {
-      soldQty: number
-      reservedQty: number
-      unsyncedQty: number
+      totalSoldQty: number
+      syncedSoldQty: number
+      totalReservedQty: number
       unsyncedDocs: string[]
+      invoices: InvoiceLine[]
     }> = {}
 
     const ensure = (sku: string) => {
       const k = sku.toLowerCase()
-      if (!skuData[k]) skuData[k] = { soldQty: 0, reservedQty: 0, unsyncedQty: 0, unsyncedDocs: [] }
+      if (!skuData[k]) skuData[k] = {
+        totalSoldQty: 0,
+        syncedSoldQty: 0,
+        totalReservedQty: 0,
+        unsyncedDocs: [],
+        invoices: [],
+      }
       return k
     }
 
@@ -61,66 +83,73 @@ export async function GET() {
         if (!sku || li.qty <= 0) continue
         const k = ensure(sku)
 
-        if (doc.stockDeducted) {
-          if (doc.type === 'invoice') skuData[k].soldQty += li.qty
-          else if (doc.type === 'salesorder') skuData[k].reservedQty += li.qty
-        } else {
-          skuData[k].unsyncedQty += li.qty
-          if (!skuData[k].unsyncedDocs.includes(doc.docNumber)) {
-            skuData[k].unsyncedDocs.push(doc.docNumber)
-          }
+        if (doc.type === 'invoice') {
+          skuData[k].totalSoldQty += li.qty
+          if (doc.stockDeducted) skuData[k].syncedSoldQty += li.qty
+        } else if (doc.type === 'salesorder') {
+          skuData[k].totalReservedQty += li.qty
         }
+
+        if (!doc.stockDeducted && !skuData[k].unsyncedDocs.includes(doc.docNumber)) {
+          skuData[k].unsyncedDocs.push(doc.docNumber)
+        }
+
+        // Build invoice breakdown list (invoices + SOs)
+        skuData[k].invoices.push({
+          docNumber: doc.docNumber,
+          type: doc.type as 'invoice' | 'salesorder',
+          date: (doc as any).date || (doc as any).createdAt || '',
+          clientName: (doc as any).clientName || (doc as any).toName || '',
+          qty: li.qty,
+          synced: !!doc.stockDeducted,
+        })
       }
     }
 
-    // Build result rows — only SKUs that appear in documents OR have stock discrepancies
     const rows: SkuAuditRow[] = []
-
-    const allSkus = new Set([
-      ...Object.keys(skuData),
-      // Also include products with qty 0 that have been sold
-    ])
+    const allSkus = new Set(Object.keys(skuData))
 
     for (const k of allSkus) {
       const product = productMap[k]
-      const data = skuData[k] || { soldQty: 0, reservedQty: 0, unsyncedQty: 0, unsyncedDocs: [] }
+      const data = skuData[k]
       const currentQty = product?.qty ?? 0
+      const impliedStarting = currentQty + data.totalSoldQty + data.totalReservedQty
 
-      // Detect "oversold": stock is 0 but there are confirmed sold/reserved quantities
-      // (stock was floored at 0 by GREATEST clause — means we sold more than we had)
-      const totalDemand = data.soldQty + data.reservedQty
-      const impliedStarting = currentQty + totalDemand
-      const oversold = impliedStarting < totalDemand && currentQty === 0 && totalDemand > 0
+      const unsyncedQty = data.totalSoldQty - data.syncedSoldQty
+      const oversold = currentQty === 0 && data.totalSoldQty > 0 && impliedStarting < data.totalSoldQty
 
       let status: SkuAuditRow['status'] = 'ok'
-      if (data.unsyncedQty > 0) status = 'unsynced'
+      if (unsyncedQty > 0) status = 'unsynced'
       if (oversold) status = 'oversold'
+
+      // Sort invoices newest first
+      const sortedInvoices = data.invoices.sort((a, b) => {
+        if (a.date && b.date) return b.date.localeCompare(a.date)
+        return 0
+      })
 
       rows.push({
         sku: k,
         title: product?.title ?? '(unknown product)',
+        supplier: product?.supplier ?? '',
         currentQty,
-        soldQty: data.soldQty,
-        reservedQty: data.reservedQty,
-        unsyncedQty: data.unsyncedQty,
+        impliedStarting,
+        totalSoldQty: data.totalSoldQty,
+        syncedSoldQty: data.syncedSoldQty,
+        totalReservedQty: data.totalReservedQty,
         unsyncedDocs: data.unsyncedDocs,
+        invoices: sortedInvoices,
         status,
       })
     }
 
-    // Sort: unsynced first, then oversold, then ok; within group by sku
     rows.sort((a, b) => {
       const order = { unsynced: 0, oversold: 1, ok: 2 }
       if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status]
       return a.sku.localeCompare(b.sku)
     })
 
-    return NextResponse.json({
-      totalDocs,
-      syncedDocs,
-      unsyncedDocs,
-      rows,
-    })
+    return NextResponse.json({ totalDocs, syncedDocs, unsyncedDocs, rows })
   } catch (err: any) {
     console.error('[stock-audit]', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
