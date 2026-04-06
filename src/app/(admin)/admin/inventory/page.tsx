@@ -224,7 +224,10 @@ export default function InventoryPage() {
 
   function getRestockQty(product: Product): number {
     const shopQtyNum = parseInt(localShopQtys[product.sku] ?? '0', 10) || 0
-    return Math.max(0, shopQtyNum - product.quantity)
+    const currentQty = localQuantities[product.id] !== undefined
+      ? (parseInt(localQuantities[product.id], 10) || 0)
+      : product.quantity
+    return Math.max(0, shopQtyNum - currentQty)
   }
 
   const restockItems = selectedSupplierId
@@ -305,7 +308,8 @@ export default function InventoryPage() {
       })
     }
 
-    if (!hasChangedCounts && !dirtyPricelist.length) return
+    const hasDirtyQtys = filtered.some((p) => localQuantities[p.id] !== undefined && parseInt(localQuantities[p.id], 10) !== p.quantity)
+    if (!hasChangedCounts && !dirtyPricelist.length && !hasDirtyQtys) return
 
     setSaveAllLoading(true)
     try {
@@ -578,7 +582,8 @@ export default function InventoryPage() {
     const currentShopQty = parseInt(localShopQtys[p.sku] ?? '0', 10) || 0
     return currentPrice !== (existing?.wholesalePrice ?? 0) || currentShopQty !== (existing?.shopQty ?? 0)
   })
-  const saveAllDirty = changedCount > 0 || hasDirtyPricelist
+  const hasDirtyLocalQtys = filtered.some((p) => localQuantities[p.id] !== undefined && parseInt(localQuantities[p.id], 10) !== p.quantity)
+  const saveAllDirty = changedCount > 0 || hasDirtyPricelist || hasDirtyLocalQtys
 
   return (
     <div className="max-w-6xl mx-auto">
