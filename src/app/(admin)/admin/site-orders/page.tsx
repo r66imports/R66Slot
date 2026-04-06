@@ -49,6 +49,8 @@ export default function SiteOrdersPage() {
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled' | 'invoiced'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [converting, setConverting] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState<string | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<CheckoutOrder | null>(null)
   const [search, setSearch] = useState('')
 
   useEffect(() => { load() }, [])
@@ -135,6 +137,22 @@ export default function SiteOrdersPage() {
       body: JSON.stringify({ id: order.id, status }),
     })
     setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, status } : o))
+  }
+
+  async function handleCancelConfirmed() {
+    if (!confirmCancel) return
+    setCancelling(confirmCancel.id)
+    setConfirmCancel(null)
+    try {
+      await fetch('/api/checkout', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: confirmCancel.id, status: 'cancelled' }),
+      })
+      setOrders((prev) => prev.map((o) => o.id === confirmCancel.id ? { ...o, status: 'cancelled' } : o))
+    } finally {
+      setCancelling(null)
+    }
   }
 
   const filtered = orders.filter((o) => {
@@ -293,10 +311,11 @@ export default function SiteOrdersPage() {
                         )}
                         {order.status !== 'cancelled' && order.status !== 'invoiced' && (
                           <button
-                            onClick={() => updateStatus(order, 'cancelled')}
-                            className="px-2 py-1.5 text-gray-400 hover:text-red-600 text-xs font-semibold rounded-lg hover:bg-red-50 whitespace-nowrap"
+                            onClick={() => setConfirmCancel(order)}
+                            disabled={cancelling === order.id}
+                            className="px-2 py-1.5 text-gray-400 hover:text-red-600 text-xs font-semibold rounded-lg hover:bg-red-50 whitespace-nowrap disabled:opacity-50"
                           >
-                            Cancel
+                            {cancelling === order.id ? 'Cancelling…' : 'Cancel'}
                           </button>
                         )}
                       </div>
@@ -356,6 +375,35 @@ export default function SiteOrdersPage() {
           </table>
         )}
       </div>
+
+      {/* Cancel confirmation modal */}
+      {confirmCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Cancel Order?</h3>
+            <p className="text-sm text-gray-500 mb-1">
+              Order <span className="font-semibold text-gray-800">{confirmCancel.orderNumber}</span> — {confirmCancel.customer.firstName} {confirmCancel.customer.lastName}
+            </p>
+            <div className="my-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-medium">
+              ⚠ Stock for {confirmCancel.items.reduce((s, i) => s + i.quantity, 0)} item{confirmCancel.items.reduce((s, i) => s + i.quantity, 0) !== 1 ? 's' : ''} will be restored to inventory.
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setConfirmCancel(null)}
+                className="flex-1 px-4 py-2 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50"
+              >
+                Keep Order
+              </button>
+              <button
+                onClick={handleCancelConfirmed}
+                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700"
+              >
+                Yes, Cancel &amp; Restore Stock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -89,6 +89,21 @@ export async function PATCH(request: Request) {
     const orders = await blobRead<CheckoutOrder[]>(KEY, [])
     const idx = orders.findIndex((o) => o.id === id)
     if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const prev = orders[idx]
+
+    // Restore stock when cancelling — only if order was not already cancelled
+    if (status === 'cancelled' && prev.status !== 'cancelled') {
+      const now = new Date().toISOString()
+      for (const item of prev.items) {
+        if (!item.id || !item.quantity) continue
+        await db.query(
+          `UPDATE products SET quantity = COALESCE(quantity, 0) + $2, updated_at = $3 WHERE id = $1`,
+          [item.id, item.quantity, now]
+        ).catch(() => {})
+      }
+    }
+
     if (status) orders[idx].status = status
     if (invoiceRef) orders[idx].invoiceRef = invoiceRef
     await blobWrite(KEY, orders)
