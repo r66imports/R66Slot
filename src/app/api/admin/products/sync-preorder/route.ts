@@ -2,18 +2,17 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // POST /api/admin/products/sync-preorder
-// Bulk-applies Rule 30: sets is_pre_order=true for all qty=0 active products,
-// clears is_pre_order=false for all qty>0 products currently marked as pre-order.
+// Bulk-applies Rule 30 to ALL products regardless of status:
+// sets is_pre_order=true for qty=0 products, clears for qty>0 products.
 export async function POST() {
   try {
     const now = new Date().toISOString()
 
-    // Set pre-order for all active products at zero stock
+    // Set pre-order for ALL products at zero stock (active AND draft)
     const setRes = await db.query(
       `UPDATE products
        SET is_pre_order = true, updated_at = $1
        WHERE quantity = 0
-         AND status = 'active'
          AND NOT COALESCE(is_pre_order, false)
        RETURNING id`,
       [now]
