@@ -255,6 +255,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Orders',
   },
   {
+    id: 'auto_preorder_on_oos',
+    name: 'Rule 30 \u2014 Auto Pre-Order When Out of Stock',
+    description: 'When a product\'s stock quantity reaches 0 (via invoice deduction, POS sale, or direct inventory edit), it is automatically marked as Pre-Order so customers can still book ahead instead of seeing a dead "Out of Stock" button. When stock is later restored above 0, the Pre-Order flag is automatically cleared and the product returns to normal. Applies to: Invoice/SO stock deductions, Inventory Sync, and POS Sell mode. Pre-Order status means the product shows a "Book Now" button on the store and routes through /book instead of /checkout.',
+    active: true,
+    appliesTo: ['Online Store', 'Admin Invoices', 'Sales Orders', 'POS / Scanner', 'Products'],
+    category: 'Inventory',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',

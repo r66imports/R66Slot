@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { isRuleActive } from '@/lib/site-rules'
 
 // PATCH /api/admin/pos/stock
 // Body: { id: string, mode: 'add' | 'subtract' | 'set', qty: number }
@@ -32,7 +33,24 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ id: result.rows[0].id, quantity: result.rows[0].quantity })
+    const newQty: number = result.rows[0].quantity
+    const autoPreOrder = await isRuleActive('auto_preorder_on_oos', true)
+    if (autoPreOrder) {
+      const now = new Date().toISOString()
+      if (newQty === 0 && mode !== 'add') {
+        await db.query(
+          `UPDATE products SET is_pre_order = true, updated_at = $1 WHERE id = $2 AND NOT COALESCE(is_pre_order, false)`,
+          [now, id]
+        )
+      } else if (newQty > 0) {
+        await db.query(
+          `UPDATE products SET is_pre_order = false, updated_at = $1 WHERE id = $2 AND COALESCE(is_pre_order, false)`,
+          [now, id]
+        )
+      }
+    }
+
+    return NextResponse.json({ id: result.rows[0].id, quantity: newQty })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

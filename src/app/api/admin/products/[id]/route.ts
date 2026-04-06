@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { isRuleActive } from '@/lib/site-rules'
 import type { Product } from '../route'
 
 function rowToProduct(row: any): Product {
@@ -190,6 +191,28 @@ export async function PUT(
     if (result.rowCount === 0) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
+
+    // Auto pre-order toggle when quantity is explicitly set and isPreOrder wasn't manually changed
+    if (body.quantity != null && body.isPreOrder == null) {
+      const autoPreOrder = await isRuleActive('auto_preorder_on_oos', true)
+      if (autoPreOrder) {
+        const newQty: number = result.rows[0].quantity ?? 0
+        if (newQty === 0) {
+          await db.query(
+            `UPDATE products SET is_pre_order = true, updated_at = $1 WHERE id = $2 AND NOT COALESCE(is_pre_order, false)`,
+            [now, id]
+          )
+          result.rows[0].is_pre_order = true
+        } else {
+          await db.query(
+            `UPDATE products SET is_pre_order = false, updated_at = $1 WHERE id = $2 AND COALESCE(is_pre_order, false)`,
+            [now, id]
+          )
+          result.rows[0].is_pre_order = false
+        }
+      }
+    }
+
     return NextResponse.json(rowToProduct(result.rows[0]))
   } catch (error: any) {
     console.error('Error updating product:', error)
