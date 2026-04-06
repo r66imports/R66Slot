@@ -31,8 +31,8 @@ export function Footer() {
               <Link href="/collections/new-arrivals" className="text-gray-400 hover:text-primary transition-colors">
                 New Arrivals
               </Link>
-              <Link href="/pre-orders" className="text-gray-400 hover:text-primary transition-colors">
-                Pre-Orders
+              <Link href="/book" className="text-gray-400 hover:text-primary transition-colors">
+                Pre Order
               </Link>
             </nav>
           </div>
@@ -46,9 +46,6 @@ export function Footer() {
               </Link>
               <Link href="/contact" className="text-gray-400 hover:text-primary transition-colors">
                 Contact
-              </Link>
-              <Link href="/shipping" className="text-gray-400 hover:text-primary transition-colors">
-                Shipping Info
               </Link>
               <Link href="/returns" className="text-gray-400 hover:text-primary transition-colors">
                 Returns

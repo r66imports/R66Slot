@@ -71,34 +71,16 @@ export function Header() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             <Link
-              href="/products"
-              className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-            >
-              Shop All
-            </Link>
-            <Link
-              href="/brands"
-              className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-            >
-              Brands
-            </Link>
-            <Link
               href="/collections/new-arrivals"
               className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
             >
               New Arrivals
             </Link>
             <Link
-              href="/pre-orders"
+              href="/book"
               className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
             >
-              Pre-Orders
-            </Link>
-            <Link
-              href="/blog"
-              className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-            >
-              Blog
+              Pre Order
             </Link>
 
             {editorEnabled && isAdmin && (
@@ -212,20 +194,6 @@ export function Header() {
           <nav className="md:hidden py-4 border-t border-gray-200">
             <div className="flex flex-col space-y-4">
               <Link
-                href="/products"
-                className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Shop All
-              </Link>
-              <Link
-                href="/brands"
-                className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Brands
-              </Link>
-              <Link
                 href="/collections/new-arrivals"
                 className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
                 onClick={() => setIsMenuOpen(false)}
@@ -233,18 +201,11 @@ export function Header() {
                 New Arrivals
               </Link>
               <Link
-                href="/pre-orders"
+                href="/book"
                 className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Pre-Orders
-              </Link>
-              <Link
-                href="/blog"
-                className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Blog
+                Pre Order
               </Link>
 
               {editorEnabled && isAdmin && (

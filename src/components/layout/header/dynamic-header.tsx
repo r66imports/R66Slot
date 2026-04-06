@@ -69,11 +69,8 @@ export function DynamicHeader() {
     backgroundColor: '#ffffff',
     textColor: '#111827',
     navItems: [
-      { label: 'Shop All', href: '/products' },
-      { label: 'Brands', href: '/brands' },
       { label: 'New Arrivals', href: '/collections/new-arrivals' },
-      { label: 'Pre-Orders', href: '/pre-orders' },
-      { label: 'Blog', href: '/blog' },
+      { label: 'Pre Order', href: '/book' },
     ],
     showSearch: true,
     showAccount: true,
