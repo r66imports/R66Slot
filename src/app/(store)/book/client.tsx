@@ -29,7 +29,7 @@ export default function BookNowClient() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [filterBrand, setFilterBrand] = useState('all')
-  const [filterType, setFilterType] = useState<'all' | 'new-order' | 'pre-order'>('all')
+  const [filterType] = useState<'all' | 'new-order' | 'pre-order'>('all')
 
   // Logged-in user for auto-fill
   const [loggedInUser, setLoggedInUser] = useState<LoggedInUser | null>(null)
@@ -184,18 +184,6 @@ export default function BookNowClient() {
               {brands.map(brand => (
                 <option key={brand} value={brand}>{brand}</option>
               ))}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-semibold text-gray-600 font-play">Type:</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-play focus:ring-2 focus:ring-red-500"
-            >
-              <option value="all">All Types</option>
-              <option value="new-order">New Orders</option>
-              <option value="pre-order">Pre-Orders</option>
             </select>
           </div>
           <div className="ml-auto text-sm text-gray-500 font-play">
