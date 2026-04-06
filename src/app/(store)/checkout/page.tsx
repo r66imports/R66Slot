@@ -128,7 +128,7 @@ export default function CheckoutPage() {
             </p>
             <div className="flex flex-col gap-3">
               <Link
-                href="/products"
+                href="/"
                 className="w-full py-3 bg-red-600 text-white font-bold rounded-lg text-center hover:bg-red-700 transition-colors"
               >
                 Continue Shopping
