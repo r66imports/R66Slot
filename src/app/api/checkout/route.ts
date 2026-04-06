@@ -7,7 +7,8 @@ const KEY = 'data/checkout-orders.json'
 export interface CheckoutOrder {
   id: string
   orderNumber: string
-  status: 'pending' | 'confirmed' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'invoiced'
+  invoiceRef?: string
   createdAt: string
   customer: {
     firstName: string
@@ -75,6 +76,23 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ success: true, orderNumber, id: newOrder.id })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json()
+    const { id, status, invoiceRef } = body
+    if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    const orders = await blobRead<CheckoutOrder[]>(KEY, [])
+    const idx = orders.findIndex((o) => o.id === id)
+    if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (status) orders[idx].status = status
+    if (invoiceRef) orders[idx].invoiceRef = invoiceRef
+    await blobWrite(KEY, orders)
+    return NextResponse.json(orders[idx])
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

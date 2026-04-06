@@ -255,6 +255,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Orders',
   },
   {
+    id: 'site_orders_stock_deduction',
+    name: 'Rule 31 \u2014 Site Orders: Stock Deducted at Checkout',
+    description: 'When a customer places an order on the website via /checkout, stock is immediately deducted from the product inventory at the time of order submission. This means Site Orders arrive in /admin/site-orders with stock already deducted. When you click "Send to Invoice" on a Site Order, the resulting invoice is created with stockDeducted=true so that the stock is NOT deducted a second time. Flow: Customer submits order \u2192 stock deducted immediately \u2192 order saved to data/checkout-orders.json \u2192 appears in Site Orders admin \u2192 "Send to Invoice" creates invoice (no re-deduction) \u2192 order status changes to Invoiced with invoice reference.',
+    active: true,
+    appliesTo: ['Online Store', 'Admin Invoices', 'Products'],
+    category: 'Inventory',
+  },
+  {
     id: 'auto_preorder_on_oos',
     name: 'Rule 30 \u2014 Auto Pre-Order When Out of Stock',
     description: 'When a product\'s stock quantity reaches 0 (via invoice deduction, POS sale, or direct inventory edit), it is automatically marked as Pre-Order so customers can still book ahead instead of seeing a dead "Out of Stock" button. When stock is later restored above 0, the Pre-Order flag is automatically cleared and the product returns to normal. Applies to: Invoice/SO stock deductions, Inventory Sync, and POS Sell mode. Pre-Order status means the product shows a "Book Now" button on the store and routes through /book instead of /checkout.',
