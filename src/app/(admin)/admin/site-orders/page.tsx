@@ -8,6 +8,7 @@ interface CheckoutOrder {
   orderNumber: string
   status: 'pending' | 'confirmed' | 'cancelled' | 'invoiced'
   invoiceRef?: string
+  stockRestored?: boolean
   createdAt: string
   customer: {
     firstName: string
@@ -144,12 +145,28 @@ export default function SiteOrdersPage() {
     setCancelling(confirmCancel.id)
     setConfirmCancel(null)
     try {
-      await fetch('/api/checkout', {
+      const res = await fetch('/api/checkout', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: confirmCancel.id, status: 'cancelled' }),
+        body: JSON.stringify({ id: confirmCancel.id, status: 'cancelled', restoreStock: true }),
       })
-      setOrders((prev) => prev.map((o) => o.id === confirmCancel.id ? { ...o, status: 'cancelled' } : o))
+      const updated = await res.json()
+      setOrders((prev) => prev.map((o) => o.id === confirmCancel.id ? { ...o, ...updated } : o))
+    } finally {
+      setCancelling(null)
+    }
+  }
+
+  async function handleRestoreStock(order: CheckoutOrder) {
+    setCancelling(order.id)
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: order.id, restoreStock: true }),
+      })
+      const updated = await res.json()
+      setOrders((prev) => prev.map((o) => o.id === order.id ? { ...o, ...updated } : o))
     } finally {
       setCancelling(null)
     }
@@ -317,6 +334,18 @@ export default function SiteOrdersPage() {
                           >
                             {cancelling === order.id ? 'Cancelling…' : 'Cancel'}
                           </button>
+                        )}
+                        {order.status === 'cancelled' && !order.stockRestored && (
+                          <button
+                            onClick={() => handleRestoreStock(order)}
+                            disabled={cancelling === order.id}
+                            className="px-3 py-1.5 bg-amber-500 text-white text-xs font-semibold rounded-lg hover:bg-amber-600 disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {cancelling === order.id ? 'Restoring…' : 'Restore Stock'}
+                          </button>
+                        )}
+                        {order.status === 'cancelled' && order.stockRestored && (
+                          <span className="text-xs text-green-600 font-semibold">✓ Stock restored</span>
                         )}
                       </div>
                     </td>
