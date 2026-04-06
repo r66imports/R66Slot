@@ -81,9 +81,13 @@ export default function BookNowClient() {
     }
   }
 
-  const brands = [...new Set(products.map(p => p.brand).filter(Boolean))].sort()
+  const EXCLUDED_BRANDS = ['Minichamps']
 
-  const filteredProducts = products.filter(p => {
+  const visibleProducts = products.filter(p => !EXCLUDED_BRANDS.includes(p.brand))
+
+  const brands = [...new Set(visibleProducts.map(p => p.brand).filter(Boolean))].sort()
+
+  const filteredProducts = visibleProducts.filter(p => {
     if (filterBrand !== 'all' && p.brand !== filterBrand) return false
     if (filterType !== 'all' && p.orderType !== filterType) return false
     return true
