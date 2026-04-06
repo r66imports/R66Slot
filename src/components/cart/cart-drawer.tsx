@@ -182,15 +182,6 @@ export function CartDrawer({ isOpen, onClose }: CartDrawerProps) {
                 >
                   <Link href="/cart">View Cart</Link>
                 </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="w-full"
-                  onClick={onClose}
-                  asChild
-                >
-                  <Link href="/book">Book Now</Link>
-                </Button>
               </div>
             </div>
           )}
