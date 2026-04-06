@@ -84,14 +84,12 @@ export default function AccountDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{stats.pendingOrders}</p>
-            {stats.pendingOrders > 0 && (
-              <Link
-                href="/account/orders?status=pending"
-                className="text-sm text-primary hover:underline mt-2 inline-block"
-              >
-                Track orders →
-              </Link>
-            )}
+            <Link
+              href="/account/orders"
+              className="text-sm text-primary hover:underline mt-2 inline-block"
+            >
+              Track orders →
+            </Link>
           </CardContent>
         </Card>
 

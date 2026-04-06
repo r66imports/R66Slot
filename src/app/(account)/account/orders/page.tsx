@@ -19,16 +19,16 @@ export default function OrdersPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Fetch orders
     fetch('/api/account/orders')
-      .then((res) => res.json())
+      .then((res) => {
+        if (res.status === 401) { window.location.href = '/account/login'; return null }
+        return res.json()
+      })
       .then((data) => {
-        setOrders(data)
+        if (Array.isArray(data)) setOrders(data)
         setIsLoading(false)
       })
-      .catch(() => {
-        setIsLoading(false)
-      })
+      .catch(() => setIsLoading(false))
   }, [])
 
   const getStatusColor = (status: Order['status']) => {
@@ -115,7 +115,7 @@ export default function OrdersPage() {
                     </span>
                     <span>📦 {order.itemCount} items</span>
                     <span className="font-semibold text-black">
-                      ${order.total.toFixed(2)}
+                      R{Number(order.total).toFixed(2)}
                     </span>
                   </div>
                 </div>

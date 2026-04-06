@@ -19,17 +19,23 @@ export async function GET(_request: NextRequest) {
       o.email?.toLowerCase() === customerEmail ||
       o.customerEmail?.toLowerCase() === customerEmail
 
-    const [preorders, addresses] = await Promise.all([
+    const [preorders, checkoutOrders, addresses] = await Promise.all([
       blobRead<any[]>('data/preorder-list.json', []),
+      blobRead<any[]>('data/checkout-orders.json', []),
       blobRead<any[]>('data/addresses.json', []),
     ])
 
-    const orders = preorders.filter(matchesCustomer)
+    const allOrders = [
+      ...preorders.filter(matchesCustomer),
+      ...checkoutOrders.filter((o: any) =>
+        o.customer?.email?.toLowerCase() === customerEmail
+      ),
+    ]
 
     return NextResponse.json({
-      totalOrders: orders.length,
-      pendingOrders: orders.filter((o: any) =>
-        o.status === 'pending' || o.status === 'processing'
+      totalOrders: allOrders.length,
+      pendingOrders: allOrders.filter((o: any) =>
+        o.status === 'pending' || o.status === 'processing' || o.status === 'confirmed'
       ).length,
       savedAddresses: addresses.filter((a: any) => a.customerId === decoded.id).length,
     })
