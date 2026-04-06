@@ -165,6 +165,8 @@ export default function SiteRulesPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const initialized = useRef(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [syncingPreorder, setSyncingPreorder] = useState(false)
+  const [syncPreorderResult, setSyncPreorderResult] = useState<{ set: number; cleared: number } | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/site-rules')
@@ -222,6 +224,20 @@ export default function SiteRulesPage() {
       scheduleAutoSave(next)
       return next
     })
+  }
+
+  const syncPreorder = async () => {
+    setSyncingPreorder(true)
+    setSyncPreorderResult(null)
+    try {
+      const res = await fetch('/api/admin/products/sync-preorder', { method: 'POST' })
+      const data = await res.json()
+      setSyncPreorderResult(data)
+    } catch {
+      setSyncPreorderResult(null)
+    } finally {
+      setSyncingPreorder(false)
+    }
   }
 
   const toggleExpand = (id: string) => {
@@ -415,6 +431,28 @@ export default function SiteRulesPage() {
                                       {opt.label}
                                     </button>
                                   ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Rule 30 — Sync existing products */}
+                            {rule.id === 'auto_preorder_on_oos' && (
+                              <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-xl">
+                                <p className="text-xs font-semibold text-orange-700 mb-1">Apply to existing products</p>
+                                <p className="text-xs text-orange-600 mb-2">This rule only fires on future stock changes. Click below to immediately apply it to all current products.</p>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={syncPreorder}
+                                    disabled={syncingPreorder}
+                                    className="px-3 py-1.5 bg-orange-600 text-white text-xs font-semibold rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                  >
+                                    {syncingPreorder ? <><span className="animate-spin inline-block">⏳</span> Syncing…</> : '⚡ Sync Now'}
+                                  </button>
+                                  {syncPreorderResult && (
+                                    <span className="text-xs text-green-700 font-semibold">
+                                      ✓ {syncPreorderResult.set} set to Pre-Order · {syncPreorderResult.cleared} cleared
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             )}
