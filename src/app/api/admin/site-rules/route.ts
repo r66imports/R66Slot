@@ -239,6 +239,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Products',
   },
   {
+    id: 'hero_image_display',
+    name: 'Rule 29 — Hero Element: Full-Width Image Display',
+    description: 'Hero elements are always rendered full-width (no left/right padding or auto margins) — they bleed edge-to-edge on every screen size. Image Display modes: Fill (cover — crops edges to fill canvas), Fit All (contain — shows complete image), Stretch (100%×100% — distorts to exact canvas size). Image Position: 3×3 grid (top-left to bottom-right) controls background-position. Height is set in px (desktop); on mobile/tablet the browser scales proportionally. The Layout Mode panel (Flow/Freeform) has been removed from Hero — it was non-functional. Text content (title/subtitle/buttons) is stacked and respects the Alignment setting (Left/Center/Right) in the Style tab.',
+    active: true,
+    appliesTo: ['Pages', 'Editor', 'Hero'],
+    category: 'Editor',
+  },
+  {
     id: 'quote_auto_archive',
     name: 'Rule 28 — Quote Auto-Archive on Conversion',
     description: 'When a Quote is converted to a Sales Order or Invoice via "Send to Sales Order" or "Send to Invoice" in the Actions menu: (1) The original Quote is automatically archived — it moves out of the active Quotes list and into the Archive. (2) The resulting Sales Order or Invoice stores the source Quote number as "sourceQuoteNumber". This reference is displayed on the document header as "Quote Ref: Q-XXXX", in the PDF, and as a small label under the document number in the Orders table. This creates a complete audit trail from Quote → Sales Order / Invoice.',

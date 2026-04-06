@@ -535,187 +535,66 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     case 'hero': {
       const heroHasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
       const overlayOpacity = typeof settings.overlayOpacity === 'number' ? settings.overlayOpacity : 0.5
-      const isFreeform = settings.heroLayout === 'freeform'
       const heroHeight = typeof settings.heroHeight === 'number' ? settings.heroHeight : 400
       const heroImageFit = (settings.heroImageFit as string) || 'cover'
+      const heroImagePosition = (settings.heroImagePosition as string) || 'center'
 
       return (
         <section
           style={{
-            ...containerStyle,
+            // Hero is always full-width edge-to-edge — override containerStyle padding/margin
+            opacity: containerStyle.opacity,
+            backgroundColor: (containerStyle.backgroundColor !== 'transparent' ? containerStyle.backgroundColor : undefined) || (heroHasImage ? undefined : '#1f2937'),
+            color: containerStyle.color,
             backgroundImage: heroHasImage ? `url("${settings.imageUrl}")` : undefined,
-            backgroundSize: heroImageFit,
-            backgroundPosition: 'center',
+            backgroundSize: heroImageFit === 'contain' ? 'contain' : heroImageFit === 'stretch' ? '100% 100%' : 'cover',
+            backgroundPosition: heroImagePosition,
             backgroundRepeat: 'no-repeat',
             position: 'relative',
+            width: '100%',
             height: `${heroHeight}px`,
             overflow: 'hidden',
+            padding: 0,
+            margin: 0,
+            maxWidth: 'none',
+            boxSizing: 'border-box',
           }}
         >
           {heroHasImage && (
             <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${overlayOpacity})` }} />
           )}
 
-          {isFreeform ? (
-            <div className="relative z-10" style={{ position: 'relative', height: `${heroHeight}px` }}>
-              {/* Title */}
-              <div style={{ position: 'absolute', left: (settings.titleX as number) || 0, top: (settings.titleY as number) || 0 }}>
-                <h1 className="text-4xl md:text-6xl font-bold">
-                  {String(settings.title || 'Hero Title')}
+          {/* Hero content — stacked layout, centred by alignment setting */}
+          {(settings.title || settings.subtitle || settings.buttonText || settings.secondaryButtonText) && (
+            <div className={`relative z-10 flex flex-col h-full px-6 py-8 ${
+              settings.alignment === 'center' ? 'items-center justify-center text-center' :
+              settings.alignment === 'right' ? 'items-end justify-center text-right' :
+              'items-start justify-center'
+            }`}>
+              {settings.title && (
+                <h1 className="text-3xl sm:text-4xl md:text-6xl font-bold mb-4 leading-tight">
+                  {String(settings.title)}
                 </h1>
-              </div>
-
-              {/* Subtitle */}
+              )}
               {settings.subtitle && (
-                <div style={{ position: 'absolute', left: (settings.subtitleX as number) || 0, top: (settings.subtitleY as number) || 60 }}>
-                  <p className="text-lg md:text-xl opacity-80">
-                    {String(settings.subtitle)}
-                  </p>
-                </div>
+                <p className="text-base sm:text-lg md:text-xl opacity-90 mb-6 max-w-2xl">
+                  {String(settings.subtitle)}
+                </p>
               )}
-
-              {/* Primary Button */}
-              {settings.buttonText && (
-                <div style={{ position: 'absolute', left: (settings.btnPrimaryX as number) || 0, top: (settings.btnPrimaryY as number) || 120 }}>
-                  <Button
-                    size="lg"
-                    className="bg-primary hover:bg-primary-dark text-white"
-                    asChild
-                  >
-                    <Link href={(settings.buttonLink as string) || '#'}>
-                      {String(settings.buttonText)}
-                    </Link>
-                  </Button>
-                </div>
-              )}
-
-              {/* Secondary Button */}
-              {settings.secondaryButtonText && (
-                <div style={{ position: 'absolute', left: (settings.btnSecondaryX as number) || 200, top: (settings.btnSecondaryY as number) || 120 }}>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="bg-transparent text-white border-white hover:bg-white hover:text-secondary"
-                    asChild
-                  >
-                    <Link href={(settings.secondaryButtonLink as string) || '#'}>
-                      {String(settings.secondaryButtonText)}
-                    </Link>
-                  </Button>
-                </div>
-              )}
-
-              {/* Freeform children elements */}
-              {children?.map((child) => {
-                if (child.positionMode === 'absolute') {
-                  // Use normalized percentage position if available, otherwise fall back to legacy pixels
-                  const hasNormalized = child.normalizedPosition?.desktop
-                  const pos = hasNormalized ? child.normalizedPosition!.desktop : null
-                  const legacyPos = child.position
-
-                  const posStyle: React.CSSProperties = hasNormalized && pos ? {
-                    position: 'absolute',
-                    left: `${pos.xPercent}%`,
-                    top: `${pos.yPercent}%`,
-                    width: `${pos.widthPercent}%`,
-                    height: `${pos.heightPercent}%`,
-                    zIndex: pos.zIndex || 10,
-                    transform: pos.rotation ? `rotate(${pos.rotation}deg)` : undefined,
-                  } : legacyPos ? {
-                    position: 'absolute',
-                    left: `${legacyPos.x}px`,
-                    top: `${legacyPos.y}px`,
-                    width: `${legacyPos.width}px`,
-                    height: `${legacyPos.height}px`,
-                    zIndex: legacyPos.zIndex || 10,
-                    transform: legacyPos.rotation ? `rotate(${legacyPos.rotation}deg)` : undefined,
-                  } : { position: 'absolute' as const }
-
-                  return (
-                    <div key={child.id} style={posStyle}>
-                      <ComponentRenderer component={child} />
-                    </div>
-                  )
-                }
-                return <ComponentRenderer key={child.id} component={child} />
-              })}
-            </div>
-          ) : (
-            <div className="container mx-auto relative z-10">
-              <div
-                className={`max-w-3xl ${
-                  settings.alignment === 'center' ? 'mx-auto text-center' : ''
-                }`}
-              >
-                <h1 className="text-4xl md:text-6xl font-bold mb-6">
-                  {String(settings.title || 'Hero Title')}
-                </h1>
-                {settings.subtitle && (
-                  <p className="text-lg md:text-xl opacity-80 mb-8">
-                    {String(settings.subtitle)}
-                  </p>
-                )}
-                <div className={`flex flex-col sm:flex-row gap-4 ${settings.alignment === 'center' ? 'justify-center' : ''}`}>
+              {(settings.buttonText || settings.secondaryButtonText) && (
+                <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
                   {settings.buttonText && (
-                    <Button
-                      size="lg"
-                      className="bg-primary hover:bg-primary-dark text-white"
-                      asChild
-                    >
-                      <Link href={(settings.buttonLink as string) || '#'}>
-                        {String(settings.buttonText)}
-                      </Link>
+                    <Button size="lg" className="bg-primary hover:bg-primary-dark text-white" asChild>
+                      <Link href={(settings.buttonLink as string) || '#'}>{String(settings.buttonText)}</Link>
                     </Button>
                   )}
                   {settings.secondaryButtonText && (
-                    <Button
-                      size="lg"
-                      variant="outline"
-                      className="bg-transparent text-white border-white hover:bg-white hover:text-secondary"
-                      asChild
-                    >
-                      <Link href={(settings.secondaryButtonLink as string) || '#'}>
-                        {String(settings.secondaryButtonText)}
-                      </Link>
+                    <Button size="lg" variant="outline" className="bg-transparent text-white border-white hover:bg-white hover:text-secondary" asChild>
+                      <Link href={(settings.secondaryButtonLink as string) || '#'}>{String(settings.secondaryButtonText)}</Link>
                     </Button>
                   )}
                 </div>
-              </div>
-
-              {/* Freeform children elements for non-freeform hero layout */}
-              {children?.map((child) => {
-                if (child.positionMode === 'absolute') {
-                  // Use normalized percentage position if available, otherwise fall back to legacy pixels
-                  const hasNormalized = child.normalizedPosition?.desktop
-                  const pos = hasNormalized ? child.normalizedPosition!.desktop : null
-                  const legacyPos = child.position
-
-                  const posStyle: React.CSSProperties = hasNormalized && pos ? {
-                    position: 'absolute',
-                    left: `${pos.xPercent}%`,
-                    top: `${pos.yPercent}%`,
-                    width: `${pos.widthPercent}%`,
-                    height: `${pos.heightPercent}%`,
-                    zIndex: pos.zIndex || 10,
-                    transform: pos.rotation ? `rotate(${pos.rotation}deg)` : undefined,
-                  } : legacyPos ? {
-                    position: 'absolute',
-                    left: `${legacyPos.x}px`,
-                    top: `${legacyPos.y}px`,
-                    width: `${legacyPos.width}px`,
-                    height: `${legacyPos.height}px`,
-                    zIndex: legacyPos.zIndex || 10,
-                    transform: legacyPos.rotation ? `rotate(${legacyPos.rotation}deg)` : undefined,
-                  } : { position: 'absolute' as const }
-
-                  return (
-                    <div key={child.id} style={posStyle}>
-                      <ComponentRenderer component={child} />
-                    </div>
-                  )
-                }
-                return <ComponentRenderer key={child.id} component={child} />
-              })}
+              )}
             </div>
           )}
         </section>

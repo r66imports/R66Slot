@@ -656,8 +656,10 @@ function ContentTab({
   }
   return (
     <>
-      {/* ─── Layout Mode (all components) ─── */}
-      <LayoutModePanel component={component} viewMode={viewMode} onUpdate={onUpdate} />
+      {/* ─── Layout Mode (all components except hero — hero has its own image controls) ─── */}
+      {component.type !== 'hero' && (
+        <LayoutModePanel component={component} viewMode={viewMode} onUpdate={onUpdate} />
+      )}
 
       {/* Product Grid Layout controls */}
       {component.type === 'product-grid' && (
@@ -1004,34 +1006,57 @@ function ContentTab({
       {/* Hero Content */}
       {component.type === 'hero' && (
         <>
-          {/* Hero inner layout (Flow / Freeform elements) */}
-          <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-200">
-            <label className="block text-[10px] font-semibold text-purple-600 mb-1.5 font-play uppercase tracking-wider">Hero Element Layout</label>
+          {/* Hero Image Display — simple fit controls */}
+          <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-200 space-y-2.5">
+            <label className="block text-[10px] font-semibold text-blue-600 mb-1 font-play uppercase tracking-wider">Image Display</label>
             <div className="flex gap-1">
-              <button
-                onClick={() => updateSetting('heroLayout', 'flow')}
-                className={`flex-1 py-1.5 text-[11px] rounded font-play font-medium transition-colors ${
-                  (component.settings.heroLayout || 'flow') === 'flow'
-                    ? 'bg-white text-blue-700 ring-1 ring-blue-300'
-                    : 'bg-purple-100 text-gray-500 hover:bg-purple-200'
-                }`}
-              >
-                Stacked
-              </button>
-              <button
-                onClick={() => updateSetting('heroLayout', 'freeform')}
-                className={`flex-1 py-1.5 text-[11px] rounded font-play font-medium transition-colors ${
-                  component.settings.heroLayout === 'freeform'
-                    ? 'bg-white text-purple-700 ring-1 ring-purple-300'
-                    : 'bg-purple-100 text-gray-500 hover:bg-purple-200'
-                }`}
-              >
-                Freeform
-              </button>
+              {[
+                { value: 'cover', label: 'Fill', hint: 'Fills canvas, crops edges' },
+                { value: 'contain', label: 'Fit All', hint: 'Shows full image' },
+                { value: 'stretch', label: 'Stretch', hint: 'Stretches to fit exactly' },
+              ].map(({ value, label, hint }) => (
+                <button
+                  key={value}
+                  title={hint}
+                  onClick={() => updateSetting('heroImageFit', value)}
+                  className={`flex-1 py-1.5 text-[11px] rounded font-play font-medium transition-colors ${
+                    (component.settings.heroImageFit || 'cover') === value
+                      ? 'bg-white text-blue-700 ring-1 ring-blue-300'
+                      : 'bg-blue-100 text-gray-500 hover:bg-blue-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-            {component.settings.heroLayout === 'freeform' && (
-              <p className="text-[10px] text-purple-500 mt-1 font-play">Drag title, subtitle & buttons freely</p>
-            )}
+            <div>
+              <label className="block text-[10px] text-gray-500 mb-1 font-play">Image Position</label>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { value: 'top left', label: '↖' },
+                  { value: 'top center', label: '↑' },
+                  { value: 'top right', label: '↗' },
+                  { value: 'center left', label: '←' },
+                  { value: 'center', label: '●' },
+                  { value: 'center right', label: '→' },
+                  { value: 'bottom left', label: '↙' },
+                  { value: 'bottom center', label: '↓' },
+                  { value: 'bottom right', label: '↘' },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    onClick={() => updateSetting('heroImagePosition', value)}
+                    className={`py-1 text-xs rounded font-play transition-colors ${
+                      (component.settings.heroImagePosition || 'center') === value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-blue-100 text-gray-500 hover:bg-blue-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div>
@@ -1063,34 +1088,22 @@ function ContentTab({
             />
           </div>
 
-          {/* Hero Height + Image Fit */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Hero Height</label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="number"
-                  min={100}
-                  max={1200}
-                  step={10}
-                  value={(component.settings.heroHeight as number) || 400}
-                  onChange={(e) => updateSetting('heroHeight', parseInt(e.target.value) || 400)}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-                />
-                <span className="text-xs text-gray-400 font-play flex-shrink-0">px</span>
-              </div>
+          {/* Hero Height */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Hero Height</label>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={100}
+                max={1200}
+                step={10}
+                value={(component.settings.heroHeight as number) || 400}
+                onChange={(e) => updateSetting('heroHeight', parseInt(e.target.value) || 400)}
+                className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+              />
+              <span className="text-xs text-gray-400 font-play flex-shrink-0">px</span>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Image Fit</label>
-              <select
-                value={(component.settings.heroImageFit as string) || 'cover'}
-                onChange={(e) => updateSetting('heroImageFit', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-              >
-                <option value="cover">Cover (fill)</option>
-                <option value="contain">Contain (fit)</option>
-              </select>
-            </div>
+            <p className="text-[10px] text-gray-400 font-play mt-1">Desktop height. Mobile/tablet auto-scale to fit image.</p>
           </div>
 
           {/* Overlay Opacity */}
@@ -1150,35 +1163,6 @@ function ContentTab({
             />
           </div>
 
-          {/* Freeform Position Controls */}
-          {component.settings.heroLayout === 'freeform' && (
-            <div className="pt-2 border-t border-gray-100">
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider font-play">Element Positions</h4>
-                <button
-                  onClick={() => {
-                    updateSetting('titleX', 0)
-                    updateSetting('titleY', 0)
-                    updateSetting('subtitleX', 0)
-                    updateSetting('subtitleY', 60)
-                    updateSetting('btnPrimaryX', 0)
-                    updateSetting('btnPrimaryY', 120)
-                    updateSetting('btnSecondaryX', 200)
-                    updateSetting('btnSecondaryY', 120)
-                  }}
-                  className="text-[10px] text-blue-500 hover:text-blue-700 font-play font-medium"
-                >
-                  Reset All
-                </button>
-              </div>
-              <div className="space-y-2">
-                <PositionInput label="Title" x={(component.settings.titleX as number) || 0} y={(component.settings.titleY as number) || 0} onChangeX={(v) => updateSetting('titleX', v)} onChangeY={(v) => updateSetting('titleY', v)} />
-                <PositionInput label="Subtitle" x={(component.settings.subtitleX as number) || 0} y={(component.settings.subtitleY as number) || 60} onChangeX={(v) => updateSetting('subtitleX', v)} onChangeY={(v) => updateSetting('subtitleY', v)} />
-                <PositionInput label="Primary Btn" x={(component.settings.btnPrimaryX as number) || 0} y={(component.settings.btnPrimaryY as number) || 120} onChangeX={(v) => updateSetting('btnPrimaryX', v)} onChangeY={(v) => updateSetting('btnPrimaryY', v)} />
-                <PositionInput label="Secondary Btn" x={(component.settings.btnSecondaryX as number) || 200} y={(component.settings.btnSecondaryY as number) || 120} onChangeX={(v) => updateSetting('btnSecondaryX', v)} onChangeY={(v) => updateSetting('btnSecondaryY', v)} />
-              </div>
-            </div>
-          )}
         </>
       )}
 
