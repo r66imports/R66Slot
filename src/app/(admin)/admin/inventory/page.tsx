@@ -111,6 +111,23 @@ export default function InventoryPage() {
   }
 
 
+  // SKU stats popup
+  const [skuPopup, setSkuPopup] = useState<{ product: Product } | null>(null)
+  const [skuStats, setSkuStats] = useState<any>(null)
+  const [skuStatsLoading, setSkuStatsLoading] = useState(false)
+
+  async function openSkuPopup(product: Product) {
+    setSkuPopup({ product })
+    setSkuStats(null)
+    setSkuStatsLoading(true)
+    try {
+      const res = await fetch(`/api/admin/products/sku-stats?sku=${encodeURIComponent(product.sku)}`)
+      if (res.ok) setSkuStats(await res.json())
+    } finally {
+      setSkuStatsLoading(false)
+    }
+  }
+
   // Shop Volume lock/unlock
   const [shopVolumeUnlocked, setShopVolumeUnlocked] = useState(false)
 
@@ -734,7 +751,11 @@ export default function InventoryPage() {
                   <tr key={product.id} className={`border-b last:border-0 ${qtyMismatch ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-2 text-xs text-gray-400">{idx + 1}</td>
                     <td className="px-3 py-2">
-                      <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
+                      <button
+                        onClick={() => openSkuPopup(product)}
+                        className="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                        title="View sales & purchase stats"
+                      >{product.sku || '—'}</button>
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2">
@@ -900,7 +921,11 @@ export default function InventoryPage() {
                   <tr key={product.id} className={`border-b last:border-0 ${qtyMismatchBase ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>
                     <td className="px-4 py-2">
-                      <span className="font-mono text-xs text-gray-600">{product.sku || '—'}</span>
+                      <button
+                        onClick={() => openSkuPopup(product)}
+                        className="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                        title="View sales & purchase stats"
+                      >{product.sku || '—'}</button>
                     </td>
                     <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
@@ -957,6 +982,134 @@ export default function InventoryPage() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── SKU Stats Popup ── */}
+      {skuPopup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSkuPopup(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+              <div>
+                <div className="flex items-center gap-3">
+                  {skuPopup.product.imageUrl && (
+                    <img src={skuPopup.product.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-gray-200" />
+                  )}
+                  <div>
+                    <h2 className="text-base font-bold text-gray-900 font-mono">{skuPopup.product.sku}</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">{skuPopup.product.title}</p>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setSkuPopup(null)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">×</button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+              {skuStatsLoading ? (
+                <div className="text-center py-12 text-gray-400">Loading stats…</div>
+              ) : !skuStats ? (
+                <div className="text-center py-12 text-gray-400">No data</div>
+              ) : (
+                <>
+                  {/* Summary cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-indigo-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wide mb-1">Sales</p>
+                      <div className="flex items-end gap-3">
+                        <div>
+                          <p className="text-2xl font-bold text-indigo-700">{skuStats.sales.totalQtySold}</p>
+                          <p className="text-xs text-indigo-500">units sold</p>
+                        </div>
+                        <div className="border-l border-indigo-200 pl-3">
+                          <p className="text-lg font-bold text-indigo-700">R{Number(skuStats.sales.totalRevenue).toFixed(2)}</p>
+                          <p className="text-xs text-indigo-500">total revenue</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-indigo-400 mt-2">
+                        {skuStats.sales.invoiceCount} invoice{skuStats.sales.invoiceCount !== 1 ? 's' : ''}
+                        {skuStats.sales.lastSold && ` · Last: ${new Date(skuStats.sales.lastSold).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                      </p>
+                    </div>
+                    <div className="bg-orange-50 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-orange-500 uppercase tracking-wide mb-1">Purchases</p>
+                      <div>
+                        <p className="text-2xl font-bold text-orange-700">{skuStats.purchases.totalQtyOrdered}</p>
+                        <p className="text-xs text-orange-500">units ordered</p>
+                      </div>
+                      <p className="text-xs text-orange-400 mt-2">
+                        {skuStats.purchases.orderCount} backorder{skuStats.purchases.orderCount !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sales breakdown */}
+                  {skuStats.sales.rows.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Sales History</p>
+                      <div className="border border-gray-100 rounded-xl overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Invoice</th>
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Date</th>
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Client</th>
+                              <th className="text-center px-3 py-2 text-gray-500 font-semibold">Qty</th>
+                              <th className="text-right px-3 py-2 text-gray-500 font-semibold">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {skuStats.sales.rows.map((row: any, i: number) => (
+                              <tr key={i} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-medium text-indigo-700">{row.docNumber}</td>
+                                <td className="px-3 py-2 text-gray-500">{new Date(row.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                                <td className="px-3 py-2 text-gray-600">{row.clientName || '—'}</td>
+                                <td className="px-3 py-2 text-center font-semibold text-gray-700">×{row.qty}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-gray-800">R{Number(row.lineTotal).toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Purchases breakdown */}
+                  {skuStats.purchases.rows.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Purchase History (Backorders)</p>
+                      <div className="border border-gray-100 rounded-xl overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-100">
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Order #</th>
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Date</th>
+                              <th className="text-left px-3 py-2 text-gray-500 font-semibold">Client</th>
+                              <th className="text-center px-3 py-2 text-gray-500 font-semibold">Qty</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {skuStats.purchases.rows.map((row: any, i: number) => (
+                              <tr key={i} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-medium text-orange-700">{row.orderNumber}</td>
+                                <td className="px-3 py-2 text-gray-500">{row.date ? new Date(row.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                                <td className="px-3 py-2 text-gray-600">{row.clientName || '—'}</td>
+                                <td className="px-3 py-2 text-center font-semibold text-gray-700">×{row.qty}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {skuStats.sales.rows.length === 0 && skuStats.purchases.rows.length === 0 && (
+                    <div className="text-center py-8 text-gray-400 text-sm">No sales or purchase history found for this SKU.</div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

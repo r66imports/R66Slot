@@ -6,7 +6,7 @@ import Link from 'next/link'
 interface CheckoutOrder {
   id: string
   orderNumber: string
-  status: 'pending' | 'confirmed' | 'cancelled' | 'invoiced'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'invoiced' | 'archived'
   invoiceRef?: string
   stockRestored?: boolean
   createdAt: string
@@ -42,12 +42,13 @@ const STATUS_STYLES: Record<string, string> = {
   confirmed: 'bg-green-100 text-green-800 border-green-200',
   cancelled: 'bg-red-100 text-red-800 border-red-200',
   invoiced:  'bg-blue-100 text-blue-800 border-blue-200',
+  archived:  'bg-gray-100 text-gray-500 border-gray-200',
 }
 
 export default function SiteOrdersPage() {
   const [orders, setOrders] = useState<CheckoutOrder[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled' | 'invoiced'>('all')
+  const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled' | 'invoiced' | 'archived'>('all')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [converting, setConverting] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState<string | null>(null)
@@ -173,6 +174,7 @@ export default function SiteOrdersPage() {
   }
 
   const filtered = orders.filter((o) => {
+    if (filter === 'all' && o.status === 'archived') return false
     if (filter !== 'all' && o.status !== filter) return false
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -186,11 +188,12 @@ export default function SiteOrdersPage() {
   })
 
   const counts = {
-    all: orders.length,
+    all: orders.filter((o) => o.status !== 'archived').length,
     pending: orders.filter((o) => o.status === 'pending').length,
     confirmed: orders.filter((o) => o.status === 'confirmed').length,
     invoiced: orders.filter((o) => o.status === 'invoiced').length,
     cancelled: orders.filter((o) => o.status === 'cancelled').length,
+    archived: orders.filter((o) => o.status === 'archived').length,
   }
 
   return (
@@ -237,7 +240,7 @@ export default function SiteOrdersPage() {
           className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400"
         />
         <div className="flex gap-1">
-          {(['all', 'pending', 'confirmed', 'invoiced', 'cancelled'] as const).map((s) => (
+          {(['all', 'pending', 'confirmed', 'invoiced', 'cancelled', 'archived'] as const).map((s) => (
             <button
               key={s}
               onClick={() => setFilter(s)}
@@ -326,7 +329,7 @@ export default function SiteOrdersPage() {
                             Confirm
                           </button>
                         )}
-                        {order.status !== 'cancelled' && order.status !== 'invoiced' && (
+                        {order.status !== 'cancelled' && (
                           <button
                             onClick={() => setConfirmCancel(order)}
                             disabled={cancelling === order.id}
@@ -346,6 +349,14 @@ export default function SiteOrdersPage() {
                         )}
                         {order.status === 'cancelled' && order.stockRestored && (
                           <span className="text-xs text-green-600 font-semibold">✓ Stock restored</span>
+                        )}
+                        {(order.status === 'invoiced' || order.status === 'cancelled') && (
+                          <button
+                            onClick={() => updateStatus(order, 'archived')}
+                            className="px-2 py-1.5 text-gray-400 hover:text-gray-700 text-xs font-semibold rounded-lg hover:bg-gray-100 whitespace-nowrap"
+                          >
+                            Archive
+                          </button>
                         )}
                       </div>
                     </td>
@@ -416,6 +427,11 @@ export default function SiteOrdersPage() {
             <div className="my-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 font-medium">
               ⚠ Stock for {confirmCancel.items.reduce((s, i) => s + i.quantity, 0)} item{confirmCancel.items.reduce((s, i) => s + i.quantity, 0) !== 1 ? 's' : ''} will be restored to inventory.
             </div>
+            {confirmCancel.invoiceRef && (
+              <div className="my-2 p-3 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-800">
+                Linked invoice <span className="font-semibold">{confirmCancel.invoiceRef}</span> will not be automatically archived — please cancel it manually in the Orders page.
+              </div>
+            )}
             <div className="flex gap-3 mt-4">
               <button
                 onClick={() => setConfirmCancel(null)}

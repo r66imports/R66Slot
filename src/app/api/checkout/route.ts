@@ -7,7 +7,7 @@ const KEY = 'data/checkout-orders.json'
 export interface CheckoutOrder {
   id: string
   orderNumber: string
-  status: 'pending' | 'confirmed' | 'cancelled' | 'invoiced'
+  status: 'pending' | 'confirmed' | 'cancelled' | 'invoiced' | 'archived'
   invoiceRef?: string
   stockRestored?: boolean
   createdAt: string
