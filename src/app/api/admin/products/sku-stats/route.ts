@@ -44,7 +44,11 @@ export async function GET(request: Request) {
       }
     }
   }
-  salesRows.sort((a, b) => a.date.localeCompare(b.date))
+  salesRows.sort((a, b) => {
+    const na = parseInt(a.docNumber.replace(/\D/g, '') || '0', 10)
+    const nb = parseInt(b.docNumber.replace(/\D/g, '') || '0', 10)
+    return na - nb
+  })
 
   // ── Purchases: from backorders ────────────────────────────────────────────
   type BackorderItem = { sku: string; qty: number; description?: string; brand?: string }
