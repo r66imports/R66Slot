@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       }
     }
   }
-  salesRows.sort((a, b) => b.date.localeCompare(a.date))
+  salesRows.sort((a, b) => a.date.localeCompare(b.date))
 
   // ── Purchases: from backorders ────────────────────────────────────────────
   type BackorderItem = { sku: string; qty: number; description?: string; brand?: string }
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
       }
     }
   }
-  purchaseRows.sort((a, b) => b.date.localeCompare(a.date))
+  purchaseRows.sort((a, b) => a.date.localeCompare(b.date))
 
   return NextResponse.json({
     sku,
