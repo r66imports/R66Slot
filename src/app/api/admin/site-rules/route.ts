@@ -271,6 +271,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Inventory',
   },
   {
+    id: 'sku_stats_include_archived',
+    name: 'Rule 32 \u2014 SKU Sales History Includes Archived Invoices',
+    description: 'When viewing the SKU Stats popup on the Inventory page (click any SKU), the Sales History table includes ALL invoices for that SKU \u2014 both active and archived. Archived invoices represent completed or cancelled sales that have been filed away from the main Orders view, but they are still part of the full sales record. Including them ensures the Total Units Sold, Total Revenue, and Invoice Count figures are accurate for the entire lifetime of the product. Flow: click SKU in Inventory \u2192 popup opens \u2192 GET /api/admin/products/sku-stats?sku= \u2192 all invoices (regardless of status) are scanned \u2192 Sales History table shows INV0001 onwards. This rule is always enforced \u2014 archived invoice data is never excluded from historical reporting.',
+    active: true,
+    appliesTo: ['Inventory', 'Admin Invoices', 'Sales Reports'],
+    category: 'Invoices',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',

@@ -18,7 +18,8 @@ export async function GET(request: Request) {
   type OrderDoc = { id: string; docNumber: string; date: string; clientName: string; type: string; status: string; lineItems: LineItem[] }
 
   const docs = await blobRead<OrderDoc[]>('data/order-documents.json', [])
-  const invoices = docs.filter((d) => d.type === 'invoice' && d.status !== 'archived')
+  // Include ALL invoices — active and archived — for complete sales history (Rule 32)
+  const invoices = docs.filter((d) => d.type === 'invoice')
 
   type SaleRow = { docNumber: string; date: string; clientName: string; qty: number; unitPrice: number; lineTotal: number }
   const salesRows: SaleRow[] = []
