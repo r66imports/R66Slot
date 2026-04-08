@@ -133,6 +133,9 @@ export function R66Editor({ pageId }: R66EditorProps) {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; componentId: string } | null>(null)
   const [propertiesInitialTab, setPropertiesInitialTab] = useState<'content' | 'style' | 'settings'>('content')
 
+  // Copy-to-pages modal
+  const [copyToPages, setCopyToPages] = useState<PageComponent | null>(null)
+
   // Close context menu on click anywhere
   useEffect(() => {
     const close = () => setContextMenu(null)
@@ -810,6 +813,12 @@ ${canvasHTML}
               <span>📄</span> Copy Element
             </button>
             <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-blue-50 text-blue-700 flex items-center gap-2"
+              onClick={() => { setCopyToPages(comp); setContextMenu(null) }}
+            >
+              <span>📤</span> Copy to Page(s)…
+            </button>
+            <button
               className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
               onClick={() => { handlePaste(comp.id); setContextMenu(null) }}
             >
@@ -873,6 +882,218 @@ ${canvasHTML}
         open={showTemplateChooser}
         onClose={() => setShowTemplateChooser(false)}
       />
+
+      {/* Copy to Pages Modal */}
+      {copyToPages && (
+        <CopyToPagesModal
+          component={copyToPages}
+          currentPageId={pageId}
+          onClose={() => setCopyToPages(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Copy to Pages Modal ─────────────────────────────────────────────────────
+function CopyToPagesModal({
+  component,
+  currentPageId,
+  onClose,
+}: {
+  component: PageComponent
+  currentPageId: string
+  onClose: () => void
+}) {
+  const [pages, setPages] = useState<{ id: string; title: string; slug: string }[]>([])
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [copying, setCopying] = useState(false)
+  const [results, setResults] = useState<{ pageId: string; pageTitle: string; success: boolean; error?: string }[] | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/pages')
+      .then(r => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        setPages(
+          (Array.isArray(data) ? data : [])
+            .filter(p => p.id !== currentPageId)
+            .sort((a, b) => a.title.localeCompare(b.title))
+        )
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [currentPageId])
+
+  const filtered = pages.filter(p =>
+    p.title.toLowerCase().includes(search.toLowerCase()) ||
+    p.slug?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const toggleAll = () => {
+    if (selected.size === filtered.length) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map(p => p.id)))
+    }
+  }
+
+  const toggle = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const handleCopy = async () => {
+    if (selected.size === 0) return
+    setCopying(true)
+    try {
+      const res = await fetch('/api/admin/pages/copy-element', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ component, pageIds: Array.from(selected) }),
+      })
+      const data = await res.json()
+      setResults(data.results ?? [])
+    } catch {
+      setResults([])
+    } finally {
+      setCopying(false)
+    }
+  }
+
+  const shortName = (component as any).type ?? 'Element'
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[80vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900 text-base">Copy Element to Pages</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Select pages to copy the <span className="font-semibold text-indigo-600">{shortName}</span> element onto
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 rounded transition-colors">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Results view */}
+        {results ? (
+          <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="space-y-2">
+              {results.map(r => (
+                <div key={r.pageId} className={`flex items-center gap-3 p-3 rounded-xl border ${r.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <span className="text-lg">{r.success ? '✅' : '❌'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{r.pageTitle}</p>
+                    {!r.success && <p className="text-xs text-red-600">{r.error}</p>}
+                  </div>
+                  {r.success && (
+                    <a
+                      href={`/admin/pages/editor/${r.pageId}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-indigo-600 hover:underline flex-shrink-0"
+                    >
+                      Open →
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-between items-center">
+              <p className="text-sm text-gray-500">
+                {results.filter(r => r.success).length} of {results.length} pages updated
+              </p>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Search + select all */}
+            <div className="px-5 pt-4 pb-2 border-b border-gray-100">
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search pages…"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 mb-2"
+              />
+              {!loading && filtered.length > 0 && (
+                <button
+                  onClick={toggleAll}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+                >
+                  {selected.size === filtered.length ? 'Deselect All' : `Select All (${filtered.length})`}
+                </button>
+              )}
+            </div>
+
+            {/* Page list */}
+            <div className="flex-1 overflow-y-auto px-5 py-2">
+              {loading ? (
+                <div className="py-8 text-center text-sm text-gray-400">Loading pages…</div>
+              ) : filtered.length === 0 ? (
+                <div className="py-8 text-center text-sm text-gray-400">No pages found</div>
+              ) : (
+                <div className="space-y-1 py-2">
+                  {filtered.map(p => (
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${selected.has(p.id) ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-gray-50 border border-transparent'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.has(p.id)}
+                        onChange={() => toggle(p.id)}
+                        className="w-4 h-4 rounded accent-indigo-600 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{p.title}</p>
+                        {p.slug && <p className="text-xs text-gray-400 truncate">/{p.slug}</p>}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-3">
+              <span className="text-xs text-gray-500">
+                {selected.size > 0 ? `${selected.size} page${selected.size > 1 ? 's' : ''} selected` : 'No pages selected'}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCopy}
+                  disabled={selected.size === 0 || copying}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {copying && <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}
+                  {copying ? 'Copying…' : `Copy to ${selected.size || ''} Page${selected.size !== 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
