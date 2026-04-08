@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useLocalCart } from '@/context/local-cart-context'
@@ -32,6 +32,29 @@ export default function CheckoutPage() {
   const [postalCode, setPostalCode] = useState('')
   const [shippingMethod, setShippingMethod] = useState('')
   const [notes, setNotes] = useState('')
+
+  const [lookingUpZip, setLookingUpZip] = useState(false)
+  const zipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const triggerZipLookup = (nextSuburb: string, nextCity: string) => {
+    if (zipTimerRef.current) clearTimeout(zipTimerRef.current)
+    zipTimerRef.current = setTimeout(async () => {
+      const q = [nextSuburb, nextCity, 'South Africa'].filter(Boolean).join(', ')
+      if (q.length < 4) return
+      setLookingUpZip(true)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=1`,
+          { headers: { 'User-Agent': 'R66Slot/1.0' } }
+        )
+        const data = await res.json()
+        const postal = data?.[0]?.address?.postcode
+        if (postal) setPostalCode(postal)
+      } catch { /* non-fatal */ } finally {
+        setLookingUpZip(false)
+      }
+    }, 900)
+  }
 
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
@@ -262,7 +285,7 @@ export default function CheckoutPage() {
                       <input
                         type="text"
                         value={suburb}
-                        onChange={(e) => setSuburb(e.target.value)}
+                        onChange={(e) => { setSuburb(e.target.value); triggerZipLookup(e.target.value, city) }}
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
                         placeholder="Honeydew"
                       />
@@ -272,20 +295,23 @@ export default function CheckoutPage() {
                       <input
                         type="text"
                         value={city}
-                        onChange={(e) => setCity(e.target.value)}
+                        onChange={(e) => { setCity(e.target.value); triggerZipLookup(suburb, e.target.value) }}
                         className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
                         placeholder="Johannesburg"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Postal Code *
+                      {lookingUpZip && <span className="ml-2 text-xs text-indigo-500 font-normal animate-pulse">Looking up…</span>}
+                    </label>
                     <input
                       type="text"
                       value={postalCode}
                       onChange={(e) => setPostalCode(e.target.value)}
                       className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                      placeholder="2040"
+                      placeholder="Auto-fills from suburb + city"
                     />
                   </div>
                 </div>
