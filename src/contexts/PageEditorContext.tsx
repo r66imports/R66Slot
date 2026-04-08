@@ -20,6 +20,7 @@ interface PageEditorContextType {
   updateComponent: (id: string, updates: Partial<PageComponent>) => void
   deleteComponent: (id: string) => void
   duplicateComponent: (id: string) => void
+  pasteComponent: (component: PageComponent, afterId?: string) => void
   moveComponent: (id: string, direction: 'up' | 'down') => void
   reorderComponents: (fromIndex: number, toIndex: number) => void
   updatePageSettings: (settings: Partial<PageSettings>) => void
@@ -235,6 +236,36 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     setPage(newPage)
     saveToHistory(newPage)
     setSelectedComponentId(duplicated.id)
+  }, [page, saveToHistory])
+
+  // Deep-clone a component with fresh IDs (recursive)
+  function deepCloneWithNewIds(component: PageComponent): PageComponent {
+    return {
+      ...component,
+      id: `comp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      children: component.children?.map(deepCloneWithNewIds),
+    }
+  }
+
+  // Paste component (from clipboard or direct) — inserts after afterId or appends
+  const pasteComponent = useCallback((component: PageComponent, afterId?: string) => {
+    if (!page) return
+    const cloned = deepCloneWithNewIds(component)
+    const newComponents = [...page.components]
+    if (afterId) {
+      const idx = newComponents.findIndex((c) => c.id === afterId)
+      if (idx !== -1) {
+        newComponents.splice(idx + 1, 0, cloned)
+      } else {
+        newComponents.push(cloned)
+      }
+    } else {
+      newComponents.push(cloned)
+    }
+    const newPage = { ...page, components: newComponents }
+    setPage(newPage)
+    saveToHistory(newPage)
+    setSelectedComponentId(cloned.id)
   }, [page, saveToHistory])
 
   // Move component
@@ -485,6 +516,7 @@ export function PageEditorProvider({ children, componentLibrary }: PageEditorPro
     updateComponent,
     deleteComponent,
     duplicateComponent,
+    pasteComponent,
     moveComponent,
     reorderComponents,
     updatePageSettings,

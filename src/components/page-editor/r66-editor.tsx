@@ -73,6 +73,7 @@ export function R66Editor({ pageId }: R66EditorProps) {
     updateComponent,
     deleteComponent,
     duplicateComponent,
+    pasteComponent,
     moveComponent,
     reorderComponents,
     updatePageSettings,
@@ -87,6 +88,36 @@ export function R66Editor({ pageId }: R66EditorProps) {
     selectedComponent,
     hasUnsavedChanges,
   } = usePageEditor()
+
+  const [pasteStatus, setPasteStatus] = useState<'idle' | 'success' | 'error'>('idle')
+
+  const handlePaste = async (afterId?: string) => {
+    try {
+      const text = await navigator.clipboard.readText()
+      const parsed = JSON.parse(text)
+      if (!parsed?.type) throw new Error('Not a valid element')
+      pasteComponent(parsed, afterId)
+      setPasteStatus('success')
+      setTimeout(() => setPasteStatus('idle'), 2000)
+    } catch {
+      setPasteStatus('error')
+      setTimeout(() => setPasteStatus('idle'), 2000)
+    }
+  }
+
+  // Ctrl+V paste shortcut (skip when typing in an input)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+        e.preventDefault()
+        handlePaste(selectedComponentId ?? undefined)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedComponentId])
 
   const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop')
   const [showTemplateChooser, setShowTemplateChooser] = useState(false)
@@ -450,22 +481,41 @@ ${canvasHTML}
             </button>
           </div>
           {leftTab === 'components' ? (
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {COMPONENT_LIBRARY.map((item) => (
+            <div className="flex flex-col flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {COMPONENT_LIBRARY.map((item) => (
+                  <button
+                    key={item.type}
+                    onClick={() => addComponent(item.type)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
+                  >
+                    <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
+                      {item.icon}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
+                      <p className="text-xs text-gray-400 font-play">{item.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {/* Paste from clipboard */}
+              <div className="border-t border-gray-100 p-2 flex-shrink-0">
                 <button
-                  key={item.type}
-                  onClick={() => addComponent(item.type)}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-gray-50 transition-colors group"
+                  onClick={() => handlePaste(selectedComponentId ?? undefined)}
+                  className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium font-play transition-colors border ${
+                    pasteStatus === 'success'
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : pasteStatus === 'error'
+                      ? 'bg-red-50 text-red-600 border-red-200'
+                      : 'bg-white text-gray-600 border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200'
+                  }`}
                 >
-                  <span className="text-lg flex-shrink-0 w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50">
-                    {item.icon}
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 font-play">{item.label}</p>
-                    <p className="text-xs text-gray-400 font-play">{item.desc}</p>
-                  </div>
+                  <span>📋</span>
+                  {pasteStatus === 'success' ? 'Pasted!' : pasteStatus === 'error' ? 'Nothing to paste' : 'Paste Element'}
+                  {pasteStatus === 'idle' && <span className="text-[10px] text-gray-400 ml-auto">Ctrl+V</span>}
                 </button>
-              ))}
+              </div>
             </div>
           ) : (
             <LayersPanel
@@ -758,6 +808,12 @@ ${canvasHTML}
               }}
             >
               <span>📄</span> Copy Element
+            </button>
+            <button
+              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              onClick={() => { handlePaste(comp.id); setContextMenu(null) }}
+            >
+              <span>📋</span> Paste after this
             </button>
             <div className="border-t border-gray-100 my-1" />
             {/* Move */}
