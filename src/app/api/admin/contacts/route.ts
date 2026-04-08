@@ -12,6 +12,7 @@ export interface Contact {
   lastName: string
   email: string
   phone: string
+  mobile: string
   // Address
   addressStreet: string
   addressCity: string
@@ -73,6 +74,7 @@ export async function GET() {
         lastName:             cust.lastName?.trim()   || '',
         email:                cust.email.trim(),
         phone:                cust.phone?.trim()      || '',
+        mobile:               '',
         addressStreet: '', addressCity: '', addressProvince: '',
         addressPostalCode: '', addressCountry: 'South Africa',
         clubName: '', clubMemberId: '',
@@ -137,6 +139,7 @@ export async function POST(request: Request) {
       lastName:             body.lastName?.trim()       || '',
       email:                body.email?.trim()          || '',
       phone:                body.phone?.trim()          || '',
+      mobile:               body.mobile?.trim()         || '',
       addressStreet:        body.addressStreet?.trim()  || '',
       addressCity:          body.addressCity?.trim()    || '',
       addressProvince:      body.addressProvince?.trim() || '',
@@ -194,6 +197,7 @@ export async function PUT() {
           lastName:             nameParts.slice(1).join(' ') || '',
           email:                order.customerEmail || '',
           phone:                order.customerPhone || '',
+          mobile:               '',
           addressStreet:        '',
           addressCity:          '',
           addressProvince:      '',

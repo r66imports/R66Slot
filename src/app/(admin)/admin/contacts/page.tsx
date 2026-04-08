@@ -11,6 +11,7 @@ interface Contact {
   lastName: string
   email: string
   phone: string
+  mobile: string
   addressStreet: string
   addressCity: string
   addressProvince: string
@@ -38,6 +39,7 @@ const EMPTY_FORM = {
   lastName: '',
   email: '',
   phone: '',
+  mobile: '',
   addressStreet: '',
   addressCity: '',
   addressProvince: '',
@@ -249,6 +251,15 @@ function ContactModal({
                   value={form.phone}
                   onChange={e => str('phone', e.target.value)}
                   placeholder="082 000 0000"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Mobile</label>
+                <input
+                  value={form.mobile}
+                  onChange={e => str('mobile', e.target.value)}
+                  placeholder="083 000 0000"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -649,6 +660,7 @@ export default function ContactsPage() {
         lastName:             editItem.lastName,
         email:                editItem.email,
         phone:                editItem.phone,
+        mobile:               editItem.mobile            || '',
         addressStreet:        editItem.addressStreet   || '',
         addressCity:          editItem.addressCity     || '',
         addressProvince:      editItem.addressProvince || '',
