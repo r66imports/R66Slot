@@ -249,16 +249,7 @@ export default function SiteRulesPage() {
   }
 
   const allCategories = Array.from(new Set(rules.map((r) => r.category || 'Uncategorized')))
-  const orderedCategories = [
-    ...PRESET_CATEGORIES.filter((c) => allCategories.includes(c)),
-    ...allCategories.filter((c) => !PRESET_CATEGORIES.includes(c)),
-  ]
-  const grouped = orderedCategories.map((cat) => ({
-    cat,
-    rules: rules
-      .filter((r) => (r.category || 'Uncategorized') === cat)
-      .sort((a, b) => getRuleNumber(a.name) - getRuleNumber(b.name)),
-  }))
+  const sortedRules = [...rules].sort((a, b) => getRuleNumber(a.name) - getRuleNumber(b.name))
 
   const statusLabel = {
     idle:   null,
@@ -300,21 +291,14 @@ export default function SiteRulesPage() {
       {loading ? (
         <div className="py-16 text-center text-gray-400">Loading…</div>
       ) : (
-        <div className="space-y-4">
-          {grouped.map(({ cat, rules: catRules }) => {
-            const style = getCatStyle(cat)
-            return (
-              <div key={cat} className={`bg-white rounded-2xl border ${style.border} shadow-sm overflow-hidden`}>
-                {/* Category header */}
-                <div className={`${style.header} px-5 py-2.5 border-b ${style.border} flex items-center gap-2`}>
-                  <span className={`w-2.5 h-2.5 rounded-full ${style.dot}`} />
-                  <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600">{cat}</h2>
-                  <span className="text-xs text-gray-400 font-medium ml-1">{catRules.length} rule{catRules.length !== 1 ? 's' : ''}</span>
-                </div>
-
-                {/* Rules list */}
-                <div className="divide-y divide-gray-100">
-                  {catRules.map((rule) => {
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="bg-gray-50 px-5 py-2.5 border-b border-gray-200 flex items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-600">All Rules</span>
+            <span className="text-xs text-gray-400 font-medium ml-1">{sortedRules.length} rules · sorted by number</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+          {sortedRules.map((rule) => {
+                    const style = getCatStyle(rule.category || 'Uncategorized')
                     const enforced = ENFORCED_RULES.has(rule.id)
                     const isExpanded = expanded.has(rule.id)
                     const ruleNum = getRuleNumber(rule.name)
@@ -344,6 +328,10 @@ export default function SiteRulesPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`text-sm font-semibold ${rule.active ? 'text-gray-900' : 'text-gray-400'}`}>{shortName}</span>
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${style.header} ${style.border} text-gray-600`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                                {rule.category || 'Uncategorized'}
+                              </span>
                               {enforced ? (
                                 <span className="inline-flex items-center gap-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-semibold px-1.5 py-0.5 rounded-full">
                                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -471,10 +459,7 @@ export default function SiteRulesPage() {
                       </div>
                     )
                   })}
-                </div>
-              </div>
-            )
-          })}
+          </div>
         </div>
       )}
     </div>

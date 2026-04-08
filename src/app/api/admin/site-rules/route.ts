@@ -303,10 +303,23 @@ export async function GET() {
         category: found.category ?? def.category,
       }
     })
+    // Sort by rule number (extract from name "Rule N — …")
+    const getRuleNum = (name: string) => { const m = name.match(/Rule\s+(\d+)/i); return m ? parseInt(m[1], 10) : 999 }
+    merged.sort((a, b) => getRuleNum(a.name) - getRuleNum(b.name))
+
+    // Deduplicate by rule number — keep first occurrence if any duplicates crept in
+    const seen = new Set<number>()
+    const deduped = merged.filter((r) => {
+      const n = getRuleNum(r.name)
+      if (seen.has(n)) return false
+      seen.add(n)
+      return true
+    })
+
     // Write back if any new rules were added (self-healing)
     const hasNew = DEFAULT_RULES.some((def) => !stored.find((r) => r.id === def.id))
-    if (hasNew) await blobWrite(KEY, merged)
-    return NextResponse.json(merged)
+    if (hasNew) await blobWrite(KEY, deduped)
+    return NextResponse.json(deduped)
   } catch {
     return NextResponse.json(DEFAULT_RULES)
   }
