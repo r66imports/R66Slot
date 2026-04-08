@@ -248,8 +248,17 @@ export default function SiteRulesPage() {
     })
   }
 
+  const [activeCategory, setActiveCategory] = useState<string>('all')
+
   const allCategories = Array.from(new Set(rules.map((r) => r.category || 'Uncategorized')))
-  const sortedRules = [...rules].sort((a, b) => getRuleNumber(a.name) - getRuleNumber(b.name))
+
+  // Build tab list: All + each category that has at least one rule, in preset order
+  const tabCategories = PRESET_CATEGORIES.filter((c) => allCategories.includes(c))
+  if (allCategories.includes('Uncategorized')) tabCategories.push('Uncategorized')
+
+  const sortedRules = [...rules]
+    .sort((a, b) => getRuleNumber(a.name) - getRuleNumber(b.name))
+    .filter((r) => activeCategory === 'all' || (r.category || 'Uncategorized') === activeCategory)
 
   const statusLabel = {
     idle:   null,
@@ -291,10 +300,54 @@ export default function SiteRulesPage() {
       {loading ? (
         <div className="py-16 text-center text-gray-400">Loading…</div>
       ) : (
+        <>
+        {/* Category filter tabs */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setActiveCategory('all')}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+              activeCategory === 'all'
+                ? 'bg-gray-800 text-white border-gray-800'
+                : 'bg-white text-gray-600 border-gray-300 hover:border-gray-500 hover:text-gray-800'
+            }`}
+          >
+            All
+            <span className={`text-[10px] font-bold px-1 py-0.5 rounded-full ${activeCategory === 'all' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'}`}>
+              {rules.length}
+            </span>
+          </button>
+          {tabCategories.map((cat) => {
+            const style = getCatStyle(cat)
+            const count = rules.filter((r) => (r.category || 'Uncategorized') === cat).length
+            const isActive = activeCategory === cat
+            return (
+              <button
+                key={cat}
+                onClick={() => setActiveCategory(cat)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                  isActive
+                    ? `${style.header} ${style.border} text-gray-800`
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                {cat}
+                <span className={`text-[10px] font-bold px-1 py-0.5 rounded-full ${isActive ? 'bg-black/10 text-gray-700' : 'bg-gray-100 text-gray-400'}`}>
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="bg-gray-50 px-5 py-2.5 border-b border-gray-200 flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-gray-600">All Rules</span>
-            <span className="text-xs text-gray-400 font-medium ml-1">{sortedRules.length} rules · sorted by number</span>
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-600">
+              {activeCategory === 'all' ? 'All Rules' : activeCategory}
+            </span>
+            <span className="text-xs text-gray-400 font-medium ml-1">
+              {sortedRules.length} rule{sortedRules.length !== 1 ? 's' : ''} · sorted by number
+            </span>
           </div>
           <div className="divide-y divide-gray-100">
           {sortedRules.map((rule) => {
@@ -461,6 +514,7 @@ export default function SiteRulesPage() {
                   })}
           </div>
         </div>
+        </>
       )}
     </div>
   )
