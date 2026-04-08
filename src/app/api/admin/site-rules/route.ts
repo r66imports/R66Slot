@@ -12,6 +12,7 @@ export interface SiteRule {
   value?: string
   options?: Array<{ label: string; value: string }>
   category?: string
+  sortOrder?: number
 }
 
 const DEFAULT_RULES: SiteRule[] = [
@@ -316,9 +317,22 @@ export async function GET() {
       return true
     })
 
-    // Write back if any new rules were added (self-healing)
+    // Assign initial sortOrder per category if not yet set
+    const catCounters: Record<string, number> = {}
+    for (const rule of deduped) {
+      const cat = rule.category || 'Uncategorized'
+      if (rule.sortOrder === undefined || rule.sortOrder === null) {
+        catCounters[cat] = catCounters[cat] ?? 0
+        rule.sortOrder = catCounters[cat]++
+      } else {
+        catCounters[cat] = Math.max(catCounters[cat] ?? 0, rule.sortOrder + 1)
+      }
+    }
+
+    // Write back if any new rules were added or sortOrders initialised
     const hasNew = DEFAULT_RULES.some((def) => !stored.find((r) => r.id === def.id))
-    if (hasNew) await blobWrite(KEY, deduped)
+    const needsSortInit = deduped.some((r) => stored.find((s) => s.id === r.id && s.sortOrder === undefined))
+    if (hasNew || needsSortInit) await blobWrite(KEY, deduped)
     return NextResponse.json(deduped)
   } catch {
     return NextResponse.json(DEFAULT_RULES)
