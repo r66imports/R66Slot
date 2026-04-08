@@ -33,9 +33,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!/^[a-zA-Z0-9_ ]+$/.test(username)) {
+    if (!/^[a-zA-Z]{3,}$/.test(username)) {
       return NextResponse.json(
-        { error: 'Username can only contain letters, numbers, underscores, and spaces' },
+        { error: 'Username must contain letters only — no spaces, numbers, or special characters' },
         { status: 400 }
       )
     }

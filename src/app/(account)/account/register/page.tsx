@@ -32,6 +32,11 @@ export default function RegisterPage() {
     setError('')
 
     // Validation
+    if (!/^[a-zA-Z]{3,}$/.test(formData.username)) {
+      setError('Username must be at least 3 letters and contain only letters (no spaces, numbers, or special characters)')
+      return
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match')
       return
@@ -141,10 +146,10 @@ export default function RegisterPage() {
                   required
                   autoComplete="username"
                   minLength={3}
-                  pattern="[a-zA-Z0-9_ ]+"
+                  pattern="[a-zA-Z]+"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  3+ characters, letters, numbers, underscores, and spaces
+                  Letters only — no spaces, numbers, or special characters
                 </p>
               </div>
 
