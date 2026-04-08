@@ -36,11 +36,47 @@ export default function AdminLayout({
   const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['Inventory Management', 'Order Network', 'Shipping Network']) // Default expanded
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [newSiteOrders, setNewSiteOrders] = useState(0)
 
   useEffect(() => {
     const saved = localStorage.getItem('adminSidebarOpen')
     if (saved !== null) setSidebarOpen(saved !== 'false')
   }, [])
+
+  // Site Orders alert — fetch count and compare to last seen
+  const checkSiteOrders = async () => {
+    try {
+      const res = await fetch('/api/checkout')
+      if (!res.ok) return
+      const data = await res.json()
+      const orders: any[] = Array.isArray(data) ? data : (data.orders ?? [])
+      const total = orders.filter((o: any) => o.status !== 'archived').length
+      const lastSeen = parseInt(localStorage.getItem('siteOrdersLastSeen') || '0', 10)
+      setNewSiteOrders(Math.max(0, total - lastSeen))
+    } catch {}
+  }
+
+  useEffect(() => {
+    checkSiteOrders()
+    const interval = setInterval(checkSiteOrders, 60_000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Clear alert when admin opens Site Orders page
+  useEffect(() => {
+    if (pathname === '/admin/site-orders') {
+      fetch('/api/checkout')
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (!data) return
+          const orders: any[] = Array.isArray(data) ? data : (data.orders ?? [])
+          const total = orders.filter((o: any) => o.status !== 'archived').length
+          localStorage.setItem('siteOrdersLastSeen', String(total))
+          setNewSiteOrders(0)
+        })
+        .catch(() => {})
+    }
+  }, [pathname])
 
   const toggleSidebar = () => {
     setSidebarOpen(prev => {
@@ -369,9 +405,17 @@ export default function AdminLayout({
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
                             {item.submenu!.map((subItem) => {
                               const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
+                              const isSiteOrders = subItem.name === 'Site Orders'
+                              const hasAlert = isSiteOrders && newSiteOrders > 0
                               return (
-                                <Link key={subItem.name} href={subItem.href} className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play', isSubActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
-                                  <span className="text-sm">{subItem.icon}</span>{subItem.name}
+                                <Link key={subItem.name} href={subItem.href} className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play', isSubActive ? 'bg-blue-50 text-blue-700 font-medium' : hasAlert ? 'text-red-600 hover:bg-red-50 font-bold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
+                                  <span className="text-sm">{subItem.icon}</span>
+                                  <span className={hasAlert ? 'font-bold' : ''}>{subItem.name}</span>
+                                  {hasAlert && (
+                                    <span className="ml-auto inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-none">
+                                      {newSiteOrders}
+                                    </span>
+                                  )}
                                 </Link>
                               )
                             })}
