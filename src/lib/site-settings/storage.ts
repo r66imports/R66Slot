@@ -20,7 +20,7 @@ export async function getSettings(): Promise<SiteSettings> {
       header: { ...settings.header, navItems: CURRENT_NAV },
     }
     await blobWrite(SETTINGS_KEY, updated)
-    return updated
+    return updated as SiteSettings
   }
   return settings
 }
