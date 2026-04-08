@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
 
 export default function AccountLayout({
@@ -10,6 +11,14 @@ export default function AccountLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const [user, setUser] = useState<{ firstName: string; lastName: string; username: string; email: string } | null>(null)
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data && !data.error) setUser(data) })
+      .catch(() => {})
+  }, [])
 
   // Public pages that don't need sidebar
   const isAuthPage = pathname === '/account/login' || pathname === '/account/register'
@@ -40,6 +49,26 @@ export default function AccountLayout({
           {/* Sidebar Navigation */}
           <aside className="w-full md:w-64 flex-shrink-0">
             <nav className="bg-white rounded-lg shadow-sm p-4 space-y-1">
+              {/* Profile summary */}
+              {user && (
+                <div className="mb-4 pb-4 border-b border-gray-100">
+                  <div className="flex items-center gap-3 px-2">
+                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-black font-bold text-lg flex-shrink-0">
+                      {user.firstName.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-gray-900 truncate">
+                        {user.firstName} {user.lastName}
+                      </p>
+                      {user.username && (
+                        <p className="text-xs text-gray-500 truncate">@{user.username}</p>
+                      )}
+                      <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {navigation.map((item) => {
                 const isActive = pathname === item.href
                 return (

@@ -213,10 +213,10 @@ export default function ProfilePage() {
                 disabled={!isEditing}
                 required
                 minLength={3}
-                pattern="[a-zA-Z0-9_]+"
+                pattern="[a-zA-Z]+"
               />
               <p className="text-xs text-gray-500 mt-1">
-                3+ characters, letters, numbers, and underscores only
+                Letters only — no spaces, numbers, or special characters
               </p>
             </div>
 

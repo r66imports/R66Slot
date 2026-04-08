@@ -57,16 +57,9 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 })
     }
 
-    if (username && username.length < 3) {
+    if (username && !/^[a-zA-Z]{3,}$/.test(username)) {
       return NextResponse.json(
-        { error: 'Username must be at least 3 characters' },
-        { status: 400 }
-      )
-    }
-
-    if (username && !/^[a-zA-Z0-9_]+$/.test(username)) {
-      return NextResponse.json(
-        { error: 'Username can only contain letters, numbers, and underscores' },
+        { error: 'Username must contain letters only — no spaces, numbers, or special characters' },
         { status: 400 }
       )
     }
