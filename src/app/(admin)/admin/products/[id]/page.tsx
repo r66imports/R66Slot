@@ -118,6 +118,8 @@ export default function EditProductPage({
   const [sidewaysPartDropdownOpen, setSidewaysPartDropdownOpen] = useState(false)
   const [newSidewaysPartInput, setNewSidewaysPartInput] = useState('')
   const [saveInPlaceSuccess, setSaveInPlaceSuccess] = useState(false)
+  const [taskListSent, setTaskListSent] = useState(false)
+  const [sendingTask, setSendingTask] = useState(false)
   const [isPreOrder, setIsPreOrder] = useState(false)
   const [availablePages, setAvailablePages] = useState<{ id: string; title: string }[]>([])
   const [seoTitle, setSeoTitle] = useState('')
@@ -686,6 +688,29 @@ export default function EditProductPage({
     }
   }
 
+  const handleSendToTaskList = async () => {
+    setSendingTask(true)
+    try {
+      const res = await fetch('/api/admin/task-list', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku,
+          productId: id,
+          productTitle: title,
+          brand,
+          imageUrl: mediaFiles.find((f) => !f.url.startsWith('data:'))?.url || '',
+        }),
+      })
+      if (res.ok) {
+        setTaskListSent(true)
+        setTimeout(() => setTaskListSent(false), 3000)
+      }
+    } finally {
+      setSendingTask(false)
+    }
+  }
+
   const handleExportToWhatsApp = () => {
     const header = isPreOrder
       ? `🎯 *PRE-ORDER – ${title || 'Product'}*`
@@ -744,6 +769,18 @@ export default function EditProductPage({
               <h1 className="text-xl font-semibold text-gray-900">Edit product</h1>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={handleSendToTaskList}
+                disabled={sendingTask}
+                type="button"
+                className={`px-3 py-2 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${
+                  taskListSent
+                    ? 'bg-green-100 text-green-700 border border-green-300'
+                    : 'bg-amber-50 text-amber-700 border border-amber-300 hover:bg-amber-100'
+                }`}
+              >
+                {taskListSent ? '✓ On Task List' : sendingTask ? '…' : '📋 Task List'}
+              </button>
               <button
                 onClick={handleExportToWhatsApp}
                 className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center gap-2"
