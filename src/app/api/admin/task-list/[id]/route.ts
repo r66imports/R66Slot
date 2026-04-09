@@ -17,6 +17,9 @@ export async function PATCH(
     if ('completedAt' in body) {
       tasks[idx].completedAt = body.completedAt
     }
+    if ('note' in body) {
+      tasks[idx].note = body.note
+    }
     await blobWrite(KEY, tasks)
     return NextResponse.json(tasks[idx])
   } catch (error) {
