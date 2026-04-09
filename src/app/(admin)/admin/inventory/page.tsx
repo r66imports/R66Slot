@@ -69,6 +69,7 @@ export default function InventoryPage() {
   const [showOrderModal, setShowOrderModal] = useState(false)
   const [sendingOrders, setSendingOrders] = useState(false)
   const [orderSentDone, setOrderSentDone] = useState(false)
+  const [createdWsId, setCreatedWsId] = useState<string | null>(null)
 
   // Inventory Count — cross-reference only, never updates Shop Inventory
   const [lastStockTakeDate, setLastStockTakeDate] = useState<string | null>(null)
@@ -555,34 +556,49 @@ export default function InventoryPage() {
     setSendingOrders(true)
     try {
       const supplierName = selectedSupplier?.name || ''
-      for (const p of restockItems) {
-        const restock = getRestockQty(p)
-        const price = parseFloat(localPrices[p.sku] ?? '0') || 0
-        await fetch('/api/admin/backorders', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientName: 'INVENTORY RESTOCK',
-            clientEmail: '',
-            clientPhone: '',
-            sku: p.sku,
-            description: p.title,
-            brand: p.brand,
-            qty: restock,
-            price,
-            supplierId: selectedSupplierId,
-            supplierName,
-            notes: 'Auto-created from Inventory restock',
-            status: 'active',
-            source: 'inventory-restock',
-          }),
-        })
+      const wsId = `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      const wsItems = restockItems.map((p) => ({
+        id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        sku: p.sku,
+        skuSearch: p.sku,
+        description: p.title,
+        unit: '',
+        category: '',
+        inStock: p.quantity,
+        retailPrice: p.price ?? 0,
+        preOrderPrice: 0,
+        qty: getRestockQty(p),
+        wholesalePrice: parseFloat(localPrices[p.sku] ?? '0') || 0,
+        retailOverride: '',
+        sentToInventory: false,
+      }))
+      const sheet = {
+        id: wsId,
+        name: `Restock — ${supplierName} — ${new Date().toISOString().slice(0, 10)}`,
+        supplier: selectedSupplierId || '',
+        date: new Date().toISOString().slice(0, 10),
+        archived: false,
+        currency,
+        exchangeRate: 1,
+        markupPct: 0,
+        shippingPct: 0,
+        vatPct: 15,
+        finalCurrency: 'ZAR',
+        finalExRate: 1,
+        finalShippingCost: 0,
+        finalCustomsCost: 0,
+        finalMarkupPct: 0,
+        finalVatPct: 15,
+        items: wsItems,
       }
+      const res = await fetch('/api/admin/worksheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sheet),
+      })
+      if (!res.ok) throw new Error('Failed to create worksheet')
+      setCreatedWsId(wsId)
       setOrderSentDone(true)
-      setTimeout(() => {
-        setOrderSentDone(false)
-        setShowOrderModal(false)
-      }, 2000)
     } finally {
       setSendingOrders(false)
     }
@@ -1178,7 +1194,7 @@ export default function InventoryPage() {
                 </h2>
                 <p className="text-xs text-gray-500 mt-0.5">{restockItems.length} items to restock</p>
               </div>
-              <button onClick={() => setShowOrderModal(false)} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+              <button onClick={() => { setShowOrderModal(false); setOrderSentDone(false); setCreatedWsId(null) }} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
             </div>
 
             <div className="overflow-y-auto flex-1 px-6 py-4">
@@ -1225,7 +1241,7 @@ export default function InventoryPage() {
 
             <div className="flex justify-end gap-3 px-6 py-4 border-t bg-gray-50 rounded-b-xl flex-shrink-0">
               <button
-                onClick={() => setShowOrderModal(false)}
+                onClick={() => { setShowOrderModal(false); setOrderSentDone(false); setCreatedWsId(null) }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
@@ -1236,13 +1252,22 @@ export default function InventoryPage() {
               >
                 Download PDF
               </button>
-              <button
-                onClick={handleSendToOrders}
-                disabled={sendingOrders || orderSentDone}
-                className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-700 disabled:opacity-50 flex items-center gap-1"
-              >
-                {sendingOrders ? 'Sending…' : orderSentDone ? '✓ Sent!' : 'Send to Supplier Orders'}
-              </button>
+              {orderSentDone && createdWsId ? (
+                <a
+                  href="/admin/worksheet"
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 flex items-center gap-1"
+                >
+                  Open Worksheet →
+                </a>
+              ) : (
+                <button
+                  onClick={handleSendToOrders}
+                  disabled={sendingOrders || orderSentDone}
+                  className="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-700 disabled:opacity-50 flex items-center gap-1"
+                >
+                  {sendingOrders ? 'Sending…' : 'Send to Worksheet'}
+                </button>
+              )}
             </div>
           </div>
         </div>
