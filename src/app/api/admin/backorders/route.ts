@@ -15,10 +15,15 @@ async function saveBackorders(backorders: Backorder[]): Promise<void> {
 }
 
 // GET all backorders — excludes pre-order/book-now entries (those live in /admin/preorder-list)
-export async function GET() {
+// Pass ?all=true to include inventory-restock entries (used by supplier orders page)
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const all = searchParams.get('all') === 'true'
     const backorders = await getBackorders()
-    const filtered = backorders.filter((b: any) => b.source !== 'book-now')
+    const filtered = all
+      ? backorders.filter((b: any) => b.source !== 'book-now')
+      : backorders.filter((b: any) => b.source !== 'book-now' && b.source !== 'inventory-restock')
     filtered.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )

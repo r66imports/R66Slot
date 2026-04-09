@@ -128,7 +128,7 @@ export default function SuppliersNetworkPage() {
   const loadBackorders = useCallback(async () => {
     setBackordersLoading(true)
     try {
-      const res = await fetch('/api/admin/backorders')
+      const res = await fetch('/api/admin/backorders?all=true')
       if (res.ok) setBackorders(await res.json())
     } catch (e) {
       console.error('Failed to load backorders', e)

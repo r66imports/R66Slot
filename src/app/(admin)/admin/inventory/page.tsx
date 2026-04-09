@@ -574,6 +574,7 @@ export default function InventoryPage() {
             supplierName,
             notes: 'Auto-created from Inventory restock',
             status: 'active',
+            source: 'inventory-restock',
           }),
         })
       }
