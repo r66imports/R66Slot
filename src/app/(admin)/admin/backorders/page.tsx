@@ -85,6 +85,8 @@ interface ProductRef {
   brand: string
   price: number
   supplier: string
+  quantity: number
+  isPreOrder: boolean
 }
 
 const EMPTY_CLIENT_FIELDS = {
@@ -470,6 +472,7 @@ function SkuSearchDropdown({
   onSelect: (p: ProductRef) => void
 }) {
   const [open, setOpen] = useState(false)
+  const [blockMsg, setBlockMsg] = useState('')
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   const q = value.trim().toLowerCase()
@@ -490,6 +493,13 @@ function SkuSearchDropdown({
   }, [])
 
   const handleSelect = (p: ProductRef) => {
+    // Block in-stock items from backorders — already in inventory, create an invoice instead
+    if (p.quantity > 0 && !p.isPreOrder) {
+      setBlockMsg(`"${p.sku}" is in stock (qty ${p.quantity}) — create an Invoice instead`)
+      setTimeout(() => setBlockMsg(''), 4000)
+      setOpen(false)
+      return
+    }
     setOpen(false)
     onSelect(p)
   }
@@ -498,36 +508,50 @@ function SkuSearchDropdown({
     <div ref={wrapperRef} className="relative">
       <input
         value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true) }}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setBlockMsg('') }}
         onFocus={() => value.trim().length > 0 && setOpen(true)}
         placeholder="NSR-0170-AW"
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
         autoComplete="off"
       />
-      {open && filtered.length > 0 && (
+      {blockMsg && (
+        <div className="absolute left-0 top-full z-50 mt-1 bg-green-700 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2">
+          ✓ {blockMsg}
+          <a href="/admin/orders" className="underline font-semibold hover:text-green-200 ml-1">Open Orders →</a>
+        </div>
+      )}
+      {!blockMsg && open && filtered.length > 0 && (
         <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-56 overflow-y-auto">
-          {filtered.map((p) => (
-            <li
-              key={p.id}
-              onMouseDown={() => handleSelect(p)}
-              className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-blue-50 transition-colors"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
-                    {p.sku}
-                  </span>
-                  {p.brand && (
-                    <span className="text-xs text-gray-400">{p.brand}</span>
-                  )}
+          {filtered.map((p) => {
+            const inStock = p.quantity > 0 && !p.isPreOrder
+            return (
+              <li
+                key={p.id}
+                onMouseDown={() => handleSelect(p)}
+                className={`flex items-center gap-3 px-3 py-2.5 transition-colors ${inStock ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:bg-blue-50'}`}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                      {p.sku}
+                    </span>
+                    {p.brand && (
+                      <span className="text-xs text-gray-400">{p.brand}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5 truncate">{p.title}</p>
                 </div>
-                <p className="text-xs text-gray-600 mt-0.5 truncate">{p.title}</p>
-              </div>
-              {p.price > 0 && (
-                <span className="text-xs font-semibold text-gray-500 flex-shrink-0">R{p.price.toFixed(2)}</span>
-              )}
-            </li>
-          ))}
+                {inStock
+                  ? <span className="text-[10px] font-semibold text-green-700 bg-green-50 px-1.5 py-0.5 rounded flex-shrink-0">IN STOCK ({p.quantity})</span>
+                  : p.isPreOrder
+                    ? <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">PRE-ORDER</span>
+                    : p.price > 0
+                      ? <span className="text-xs font-semibold text-gray-500 flex-shrink-0">R{p.price.toFixed(2)}</span>
+                      : null
+                }
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
@@ -1501,6 +1525,8 @@ export default function BackordersPage() {
           brand: p.brand || '',
           price: p.price || 0,
           supplier: p.supplier || '',
+          quantity: Number(p.quantity) || 0,
+          isPreOrder: Boolean(p.is_pre_order ?? p.isPreOrder),
         })).filter((p) => p.sku))
       }
 
@@ -1665,6 +1691,8 @@ export default function BackordersPage() {
               brand: newProd.brand,
               price: newProd.price,
               supplier: newProd.supplier,
+              quantity: Number(newProd.quantity) || 0,
+              isPreOrder: Boolean(newProd.is_pre_order),
             }].sort((a, b) => a.sku.localeCompare(b.sku)))
           }
         }).catch(() => {}) // Non-fatal

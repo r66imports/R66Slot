@@ -855,11 +855,11 @@ function ClientAutofill({
 function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   value: string
   onChange: (v: string) => void
-  products: Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>
+  products: Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number; isPreOrder?: boolean }>
   onSelectProduct: (sku: string, title: string, price: number, costPerItem: number, preOrderPrice: number, stockQty: number) => void
 }) {
   const [open, setOpen] = useState(false)
-  const [outOfStockMsg, setOutOfStockMsg] = useState('')
+  const [blockMsg, setBlockMsg] = useState<{ text: string; type: 'oos' | 'preorder' } | null>(null)
   const q = value.toLowerCase()
   const filtered = q.length >= 1
     ? products.filter((p) =>
@@ -867,10 +867,14 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
       ).slice(0, 8)
     : []
 
-  function handleSelect(p: { sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }) {
-    if (p.quantity <= 0) {
-      setOutOfStockMsg(`"${p.title}" is out of stock`)
-      setTimeout(() => setOutOfStockMsg(''), 3000)
+  function handleSelect(p: { sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number; isPreOrder?: boolean }) {
+    if (p.isPreOrder || p.quantity <= 0) {
+      const type = p.isPreOrder ? 'preorder' : 'oos'
+      const text = p.isPreOrder
+        ? `"${p.sku}" is a Pre-Order — add to Back Orders instead`
+        : `"${p.sku}" is out of stock`
+      setBlockMsg({ text, type })
+      setTimeout(() => setBlockMsg(null), 4000)
       return
     }
     onSelectProduct(p.sku, p.title, p.price, p.costPerItem, p.preOrderPrice, p.quantity)
@@ -883,32 +887,39 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
         className="w-full px-2 py-1.5 text-sm rounded focus:outline-none focus:bg-blue-50"
         placeholder="SKU or description"
         value={value}
-        onChange={(e) => { onChange(e.target.value); setOpen(true); setOutOfStockMsg('') }}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); setBlockMsg(null) }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
       />
-      {outOfStockMsg && (
-        <div className="absolute left-0 top-full z-50 mt-0.5 bg-red-600 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap">
-          ⚠ {outOfStockMsg}
+      {blockMsg && (
+        <div className={`absolute left-0 top-full z-50 mt-0.5 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
+          ⚠ {blockMsg.text}
+          {blockMsg.type === 'preorder' && (
+            <a href="/admin/backorders" className="underline font-semibold hover:text-amber-200 ml-1">Open Back Orders →</a>
+          )}
         </div>
       )}
-      {!outOfStockMsg && open && filtered.length > 0 && (
+      {!blockMsg && open && filtered.length > 0 && (
         <div className="absolute left-0 top-full z-50 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg w-80 max-h-48 overflow-y-auto">
           {filtered.map((p) => {
             const oos = p.quantity <= 0
+            const isPre = p.isPreOrder
+            const blocked = isPre || oos
             return (
               <button
                 key={p.id}
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelect(p)}
-                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-50 last:border-0 ${oos ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'hover:bg-blue-50'}`}
+                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-50 last:border-0 ${blocked ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'hover:bg-blue-50'}`}
               >
                 <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
-                <span className={oos ? 'text-gray-400' : 'text-gray-800'}>{p.title}</span>
-                {oos
-                  ? <span className="float-right text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
-                  : <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
+                <span className={blocked ? 'text-gray-400' : 'text-gray-800'}>{p.title}</span>
+                {isPre
+                  ? <span className="float-right text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">PRE-ORDER</span>
+                  : oos
+                    ? <span className="float-right text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
+                    : <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
                 }
               </button>
             )
@@ -998,7 +1009,7 @@ function CreateDocumentModal({
     fetch('/api/admin/products')
       .then((r) => r.ok ? r.json() : [])
       .then((data: any[]) => setModalProducts(
-        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0, costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0, preOrderPrice: Number(p.pre_order_price ?? p.preOrderPrice) || 0, quantity: Number(p.quantity) || 0 }))
+        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0, costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0, preOrderPrice: Number(p.pre_order_price ?? p.preOrderPrice) || 0, quantity: Number(p.quantity) || 0, isPreOrder: Boolean(p.is_pre_order ?? p.isPreOrder) }))
       ))
       .catch(() => {})
   }, [])
