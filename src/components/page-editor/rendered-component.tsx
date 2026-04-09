@@ -524,15 +524,15 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
 
     case 'columns': {
       const colCount = (settings.columns as number) || 2
-      const colGridClass =
-        colCount <= 2 ? 'grid-cols-2' :
-        colCount === 3 ? 'grid-cols-2 md:grid-cols-3' :
-        colCount === 4 ? 'grid-cols-2 md:grid-cols-4' :
-        'grid-cols-2 md:grid-cols-3'
+      const colTablet = (settings.columnsTablet as number) || colCount
+      const colMobile = (settings.columnsMobile as number) || Math.min(2, colCount)
+      const colCls = `colg-${colCount}d${colTablet}t${colMobile}m`
+      const colStyle = `.${colCls}{display:grid;grid-template-columns:repeat(${colCount},minmax(0,1fr));gap:1.5rem}@media(max-width:1023px){.${colCls}{grid-template-columns:repeat(${colTablet},minmax(0,1fr))}}@media(max-width:639px){.${colCls}{grid-template-columns:repeat(${colMobile},minmax(0,1fr));gap:0.75rem}}`
       return (
         <section style={containerStyle}>
+          <style>{colStyle}</style>
           <div className="w-full max-w-screen-xl mx-auto px-4">
-            <div className={`grid gap-3 sm:gap-6 ${colGridClass}`}>
+            <div className={colCls}>
               {children?.slice(0, colCount).map((child) => {
                 const imgObjectFit = (child.settings.objectFit as string) || 'cover'
                 const imgWidth = (child.settings.imageWidth as string) || ''

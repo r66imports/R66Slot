@@ -1551,45 +1551,96 @@ function ContentTab({
       {/* Column Content - Visual Editors */}
       {(component.type === 'two-column' || component.type === 'three-column' || component.type === 'columns') && (
         <>
-          {/* Column count selector (for new 'columns' type) */}
+          {/* Column count selector (for new 'columns' type) — per viewport */}
           {component.type === 'columns' && (
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Number of Columns</label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[1, 2, 3, 4].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => {
-                      const currentCols = component.children?.length || 0
-                      let newChildren = [...(component.children || [])]
-                      if (n > currentCols) {
-                        // Add missing columns
-                        for (let i = currentCols; i < n; i++) {
-                          newChildren.push({
-                            id: `col-${i + 1}-${Date.now()}`,
-                            type: 'text',
-                            content: `Column ${i + 1}`,
-                            styles: { padding: '10px' },
-                            settings: {},
-                          })
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-gray-500 font-play">Columns per Row</label>
+
+              {/* Desktop */}
+              <div className={`rounded-lg p-2 border ${viewMode === 'desktop' ? 'border-blue-300 bg-blue-50' : 'border-gray-200 bg-white'}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-[10px] font-bold font-play uppercase tracking-wide ${viewMode === 'desktop' ? 'text-blue-600' : 'text-gray-400'}`}>🖥 Desktop</span>
+                  <span className="text-[10px] font-play text-gray-400">{(component.settings.columns as number) || 2} col</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {[1, 2, 3, 4].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => {
+                        const currentCols = component.children?.length || 0
+                        let newChildren = [...(component.children || [])]
+                        if (n > currentCols) {
+                          for (let i = currentCols; i < n; i++) {
+                            newChildren.push({ id: `col-${i + 1}-${Date.now()}`, type: 'text', content: `Column ${i + 1}`, styles: { padding: '10px' }, settings: {} })
+                          }
+                        } else if (n < currentCols) {
+                          newChildren = newChildren.slice(0, n)
                         }
-                      } else if (n < currentCols) {
-                        // Trim extra columns
-                        newChildren = newChildren.slice(0, n)
-                      }
-                      onUpdate({ settings: { ...component.settings, columns: n }, children: newChildren })
-                    }}
-                    className={`py-2 rounded border text-xs font-bold font-play transition-all ${
-                      (component.settings.columns || 2) === n
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
+                        onUpdate({ settings: { ...component.settings, columns: n }, children: newChildren })
+                      }}
+                      className={`py-1.5 rounded border text-xs font-bold font-play transition-all ${
+                        ((component.settings.columns as number) || 2) === n
+                          ? 'border-blue-500 bg-blue-500 text-white'
+                          : 'border-gray-200 text-gray-600 hover:border-blue-300'
+                      }`}
+                    >{n}</button>
+                  ))}
+                </div>
               </div>
-              <p className="text-[10px] text-gray-400 mt-1 font-play">Select 1 to 4 columns</p>
+
+              {/* Tablet */}
+              <div className={`rounded-lg p-2 border ${viewMode === 'tablet' ? 'border-purple-300 bg-purple-50' : 'border-gray-200 bg-white'}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-[10px] font-bold font-play uppercase tracking-wide ${viewMode === 'tablet' ? 'text-purple-600' : 'text-gray-400'}`}>📱 Tablet</span>
+                  <span className="text-[10px] font-play text-gray-400">
+                    {(component.settings.columnsTablet as number)
+                      ? `${component.settings.columnsTablet} col`
+                      : `${(component.settings.columns as number) || 2} col (same as desktop)`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {[1, 2, 3, 4].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => onUpdate({ settings: { ...component.settings, columnsTablet: n } })}
+                      className={`py-1.5 rounded border text-xs font-bold font-play transition-all ${
+                        ((component.settings.columnsTablet as number) || 0) === n
+                          ? 'border-purple-500 bg-purple-500 text-white'
+                          : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                      }`}
+                    >{n}</button>
+                  ))}
+                </div>
+                {!(component.settings.columnsTablet) && (
+                  <p className="text-[10px] text-purple-400 mt-1 font-play">Not set — inherits desktop value</p>
+                )}
+              </div>
+
+              {/* Mobile */}
+              <div className={`rounded-lg p-2 border ${viewMode === 'mobile' ? 'border-green-300 bg-green-50' : 'border-gray-200 bg-white'}`}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className={`text-[10px] font-bold font-play uppercase tracking-wide ${viewMode === 'mobile' ? 'text-green-600' : 'text-gray-400'}`}>📱 Mobile</span>
+                  <span className="text-[10px] font-play text-gray-400">
+                    {(component.settings.columnsMobile as number)
+                      ? `${component.settings.columnsMobile} col`
+                      : `${Math.min(2, (component.settings.columns as number) || 2)} col (default)`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1">
+                  {[1, 2, 3, 4].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => onUpdate({ settings: { ...component.settings, columnsMobile: n } })}
+                      className={`py-1.5 rounded border text-xs font-bold font-play transition-all ${
+                        ((component.settings.columnsMobile as number) || Math.min(2, (component.settings.columns as number) || 2)) === n
+                          ? 'border-green-500 bg-green-500 text-white'
+                          : 'border-gray-200 text-gray-600 hover:border-green-300'
+                      }`}
+                    >{n}</button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1 font-play">Each view is saved independently</p>
+              </div>
             </div>
           )}
           <VisualColumnEditor component={component} onUpdate={onUpdate} viewMode={viewMode} />
