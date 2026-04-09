@@ -100,6 +100,8 @@ export default function EditProductPage({
   const [pageUrl, setPageUrl] = useState('')
   const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [allCategories, setAllCategories] = useState<{ id: string; name: string }[]>([])
+  const [catBrowseOpen, setCatBrowseOpen] = useState(false)
+  const [catSearch, setCatSearch] = useState('')
   const [units, setUnits] = useState<string[]>([])
   const [newUnitInput, setNewUnitInput] = useState('')
   const [unitSaved, setUnitSaved] = useState(false)
@@ -1287,41 +1289,93 @@ export default function EditProductPage({
             {/* Categories */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
               <h3 className="text-sm font-medium text-gray-700 mb-3">Categories</h3>
-              <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
-                {allCategories.length === 0 ? (
-                  <p className="text-xs text-gray-400 py-4 text-center">No categories yet</p>
-                ) : allCategories.map((cat) => (
-                  <label key={cat.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+
+              {/* Selected pills */}
+              {categoryIds.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {allCategories.filter(c => categoryIds.includes(c.id)).map(cat => (
+                    <span key={cat.id} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                      {cat.name}
+                      <button
+                        type="button"
+                        onClick={() => setCategoryIds(prev => prev.filter(id => id !== cat.id))}
+                        className="text-blue-400 hover:text-blue-700 leading-none text-sm"
+                      >×</button>
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 mb-3">No categories assigned</p>
+              )}
+
+              {/* Browse toggle */}
+              <button
+                type="button"
+                onClick={() => { setCatBrowseOpen(o => !o); setCatSearch('') }}
+                className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 mb-2"
+              >
+                {catBrowseOpen ? '▲ Hide categories' : `▼ Browse categories (${allCategories.length})`}
+              </button>
+
+              {/* Searchable list */}
+              {catBrowseOpen && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden mb-2">
+                  <div className="px-2 py-1.5 border-b border-gray-100">
                     <input
-                      type="checkbox"
-                      checked={categoryIds.includes(cat.id)}
-                      onChange={(e) => setCategoryIds(prev =>
-                        e.target.checked ? [...prev, cat.id] : prev.filter(id => id !== cat.id)
-                      )}
-                      className="rounded accent-blue-500"
+                      type="text"
+                      value={catSearch}
+                      onChange={e => setCatSearch(e.target.value)}
+                      placeholder="Search categories…"
+                      className="w-full text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      autoFocus
                     />
-                    <span className="text-sm text-gray-700">{cat.name}</span>
-                  </label>
-                ))}
-              </div>
-              <div className="mt-2 flex items-center gap-1">
-                <input
-                  type="text"
-                  placeholder="+ Add category..."
-                  className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  onKeyDown={async (e) => {
-                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                      const name = e.currentTarget.value.trim()
-                      e.currentTarget.value = ''
-                      const res = await fetch('/api/admin/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
-                      const cat = await res.json()
-                      setAllCategories(prev => [...prev, cat])
-                      setCategoryIds(prev => [...prev, cat.id])
-                    }
-                  }}
-                />
-              </div>
-              <a href="/admin/categories" className="text-xs text-blue-500 hover:text-blue-700 mt-1 inline-block">Manage Categories →</a>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
+                    {allCategories.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-4 text-center">No categories yet</p>
+                    ) : [...allCategories]
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .filter(cat => !catSearch || cat.name.toLowerCase().includes(catSearch.toLowerCase()))
+                      .map(cat => {
+                        const checked = categoryIds.includes(cat.id)
+                        return (
+                          <label key={cat.id} className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-50 ${checked ? 'bg-blue-50' : ''}`}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => setCategoryIds(prev =>
+                                e.target.checked ? [...prev, cat.id] : prev.filter(id => id !== cat.id)
+                              )}
+                              className="rounded accent-blue-500 flex-shrink-0"
+                            />
+                            <span className="text-sm text-gray-700">{cat.name}</span>
+                          </label>
+                        )
+                      })}
+                    {allCategories.length > 0 && catSearch && allCategories.filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())).length === 0 && (
+                      <p className="text-xs text-gray-400 py-3 text-center">No matches</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick-create + manage link */}
+              <input
+                type="text"
+                placeholder="+ Create new category…"
+                className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400 mb-1"
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                    const name = e.currentTarget.value.trim()
+                    e.currentTarget.value = ''
+                    const res = await fetch('/api/admin/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
+                    const cat = await res.json()
+                    setAllCategories(prev => [...prev, cat])
+                    setCategoryIds(prev => [...prev, cat.id])
+                  }
+                }}
+              />
+              <a href="/admin/categories" className="text-xs text-blue-500 hover:text-blue-700 inline-block">Manage Categories →</a>
             </div>
             {/* Sage Accounts */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
