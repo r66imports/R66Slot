@@ -111,6 +111,7 @@ function SortableRuleRow({
   rule, localNum, isExpanded, allCategories,
   onToggle, onToggleExpand, onSetValue, onCopy, onMoveTo,
   syncPreorder, syncingPreorder, syncPreorderResult,
+  syncMobileCols, syncingMobileCols, syncMobileColsResult,
 }: {
   rule: SiteRule
   localNum: number
@@ -124,6 +125,9 @@ function SortableRuleRow({
   syncPreorder: () => void
   syncingPreorder: boolean
   syncPreorderResult: { set: number; cleared: number } | null
+  syncMobileCols: () => void
+  syncingMobileCols: boolean
+  syncMobileColsResult: { pagesUpdated: number; gridsUpdated: number } | null
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: rule.id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.25 : 1 }
@@ -320,6 +324,27 @@ function SortableRuleRow({
             </div>
           )}
 
+          {rule.id === 'product_grid_mobile_cols' && (
+            <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-xl">
+              <p className="text-xs font-semibold text-green-700 mb-1">Apply to all pages now</p>
+              <p className="text-xs text-green-600 mb-2">Sets mobile columns to 1 on every Product Grid across all pages.</p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={syncMobileCols}
+                  disabled={syncingMobileCols}
+                  className="px-3 py-1.5 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {syncingMobileCols ? '⏳ Updating…' : '📱 Apply to All Pages'}
+                </button>
+                {syncMobileColsResult && (
+                  <span className="text-xs text-green-700 font-semibold">
+                    ✓ {syncMobileColsResult.gridsUpdated} grid{syncMobileColsResult.gridsUpdated !== 1 ? 's' : ''} updated across {syncMobileColsResult.pagesUpdated} page{syncMobileColsResult.pagesUpdated !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center gap-3 mt-2 pt-2 border-t border-gray-100">
             <span className="text-[10px] text-gray-400">Rule #{getRuleNumber(rule.name)}</span>
             <span className="text-gray-200">·</span>
@@ -337,6 +362,7 @@ function CategoryBox({
   category, ruleIds, ruleMap, expanded, copiedRule, allCategories,
   onToggle, onToggleExpand, onSetValue, onCopy, onMoveTo, onPaste,
   syncPreorder, syncingPreorder, syncPreorderResult,
+  syncMobileCols, syncingMobileCols, syncMobileColsResult,
 }: {
   category: string
   ruleIds: string[]
@@ -353,6 +379,9 @@ function CategoryBox({
   syncPreorder: () => void
   syncingPreorder: boolean
   syncPreorderResult: { set: number; cleared: number } | null
+  syncMobileCols: () => void
+  syncingMobileCols: boolean
+  syncMobileColsResult: { pagesUpdated: number; gridsUpdated: number } | null
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `cat-${category}` })
   const style = getCatStyle(category)
@@ -417,6 +446,9 @@ function CategoryBox({
                 syncPreorder={syncPreorder}
                 syncingPreorder={syncingPreorder}
                 syncPreorderResult={syncPreorderResult}
+                syncMobileCols={syncMobileCols}
+                syncingMobileCols={syncingMobileCols}
+                syncMobileColsResult={syncMobileColsResult}
               />
             ))
           )}
@@ -454,6 +486,8 @@ export default function SiteRulesPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [syncingPreorder, setSyncingPreorder] = useState(false)
   const [syncPreorderResult, setSyncPreorderResult] = useState<{ set: number; cleared: number } | null>(null)
+  const [syncingMobileCols, setSyncingMobileCols] = useState(false)
+  const [syncMobileColsResult, setSyncMobileColsResult] = useState<{ pagesUpdated: number; gridsUpdated: number } | null>(null)
   const [copiedRule, setCopiedRule] = useState<SiteRule | null>(null)
 
   // dnd: category → ordered rule IDs
@@ -670,6 +704,19 @@ export default function SiteRulesPage() {
     }
   }
 
+  const syncMobileCols = async () => {
+    setSyncingMobileCols(true)
+    setSyncMobileColsResult(null)
+    try {
+      const res = await fetch('/api/admin/pages/fix-mobile-cols', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cols: 1 }) })
+      setSyncMobileColsResult(await res.json())
+    } catch {
+      // silent
+    } finally {
+      setSyncingMobileCols(false)
+    }
+  }
+
   // ─── Active rule info for overlay ─────────────────────────────────────────
 
   const activeRule = activeId ? ruleMap[activeId] : null
@@ -757,6 +804,9 @@ export default function SiteRulesPage() {
                 syncPreorder={syncPreorder}
                 syncingPreorder={syncingPreorder}
                 syncPreorderResult={syncPreorderResult}
+                syncMobileCols={syncMobileCols}
+                syncingMobileCols={syncingMobileCols}
+                syncMobileColsResult={syncMobileColsResult}
               />
             ))}
           </div>

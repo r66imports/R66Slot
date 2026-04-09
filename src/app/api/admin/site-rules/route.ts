@@ -240,6 +240,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Products',
   },
   {
+    id: 'product_grid_mobile_cols',
+    name: 'Rule 33 \u2014 Product Grid: Mobile = 1 Column',
+    description: 'Forces all Product Grid elements across every page to display 1 column on mobile devices. On desktop, the grid uses its configured column count (e.g. 3 or 4). On tablet, it inherits the desktop value unless overridden. On mobile, this rule locks the column count to 1 so products stack in a single column and are not squeezed into multiple columns on small screens. Use the "Apply to All Pages" button to immediately update every Product Grid on every published and draft page. The setting is saved directly to each page\'s component data — no further page editing is required.',
+    active: true,
+    appliesTo: ['Page Editor', 'Product Grid', 'Online Store'],
+    category: 'Page Editor',
+  },
+  {
     id: 'hero_image_display',
     name: 'Rule 29 — Hero Element: Full-Width Image Display',
     description: 'Hero elements are always rendered full-width (no left/right padding or auto margins) — they bleed edge-to-edge on every screen size. Image Display modes: Fill (cover — crops edges to fill canvas), Fit All (contain — shows complete image), Stretch (100%×100% — distorts to exact canvas size). Image Position: 3×3 grid (top-left to bottom-right) controls background-position. Height is set in px (desktop); on mobile/tablet the browser scales proportionally. The Layout Mode panel (Flow/Freeform) has been removed from Hero — it was non-functional. Text content (title/subtitle/buttons) is stacked and respects the Alignment setting (Left/Center/Right) in the Style tab.',
