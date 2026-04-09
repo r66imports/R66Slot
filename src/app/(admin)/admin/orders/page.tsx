@@ -871,7 +871,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
     if (p.isPreOrder || p.quantity <= 0) {
       const type = p.isPreOrder ? 'preorder' : 'oos'
       const text = p.isPreOrder
-        ? `"${p.sku}" is a Pre-Order — add to Back Orders instead`
+        ? `"${p.sku}" — Book for Next Shipment — add to Back Orders instead`
         : `"${p.sku}" is out of stock`
       setBlockMsg({ text, type })
       setTimeout(() => setBlockMsg(null), 4000)
@@ -916,7 +916,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
                 <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
                 <span className={blocked ? 'text-gray-400' : 'text-gray-800'}>{p.title}</span>
                 {isPre
-                  ? <span className="float-right text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">PRE-ORDER</span>
+                  ? <span className="float-right text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">NEXT SHIPMENT</span>
                   : oos
                     ? <span className="float-right text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
                     : <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
@@ -1164,7 +1164,7 @@ function CreateDocumentModal({
                   {([
                     { key: 'retail', label: 'Retail' },
                     { key: 'cost', label: 'Cost' },
-                    { key: 'preorder', label: 'Pre-Order' },
+                    { key: 'preorder', label: 'Book Now' },
                   ] as const).map(({ key, label }) => (
                     <button
                       key={key}
@@ -1202,7 +1202,7 @@ function CreateDocumentModal({
                         {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
                           <div className="flex gap-1 mt-1 flex-wrap">
                             {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
-                            {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Pre-Order R{li._preOrderPrice.toFixed(2)}</button> : null}
+                            {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Book Now R{li._preOrderPrice.toFixed(2)}</button> : null}
                             {li._costPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
                           </div>
                         )}

@@ -142,7 +142,7 @@ export default function PublicPreOrderPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center font-play">
         <div className="text-center">
           <div className="text-6xl mb-4">😕</div>
-          <h1 className="text-2xl font-bold mb-2">Pre-Order Not Found</h1>
+          <h1 className="text-2xl font-bold mb-2">Booking Not Found</h1>
           <p className="text-gray-600 mb-6">{error}</p>
           <Link
             href="/"
@@ -162,7 +162,7 @@ export default function PublicPreOrderPage() {
           <div className="text-6xl mb-4">✅</div>
           <h1 className="text-2xl font-bold mb-2 font-play">Order Placed Successfully!</h1>
           <p className="text-gray-600 mb-4 font-play">
-            Thank you for your pre-order. We will contact you shortly to confirm your order.
+            Thank you for booking your item. We will contact you shortly to confirm your order.
           </p>
           <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-gray-600 font-play">
@@ -272,7 +272,7 @@ export default function PublicPreOrderPage() {
 
                 {/* Price */}
                 <div className="mb-6">
-                  <p className="text-sm text-gray-500 font-play">Pre-Order Price</p>
+                  <p className="text-sm text-gray-500 font-play">Book for Next Shipment Price</p>
                   <p className="text-4xl font-bold text-primary font-play">
                     R{poster?.preOrderPrice}
                   </p>
@@ -352,9 +352,9 @@ export default function PublicPreOrderPage() {
 
         {/* Info Section */}
         <div className="mt-8 bg-white rounded-lg shadow p-6">
-          <h3 className="font-bold mb-3 font-play">About Pre-Orders</h3>
+          <h3 className="font-bold mb-3 font-play">About Booking for Next Shipment</h3>
           <ul className="space-y-2 text-sm text-gray-600 font-play">
-            <li>• Pre-orders secure your item before it arrives in stock</li>
+            <li>• Booking secures your item before it arrives in stock</li>
             <li>• You will be contacted to confirm your order and payment details</li>
             <li>• Estimated delivery dates are subject to supplier availability</li>
             <li>• Contact us via WhatsApp for any questions</li>

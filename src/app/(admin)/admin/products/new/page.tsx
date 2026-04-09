@@ -727,7 +727,7 @@ export default function NewProductPage() {
                 </p>
               </div>
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Pre Order Price</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Book for Next Shipment Price</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-gray-500">R</span>
                   <input
@@ -739,7 +739,7 @@ export default function NewProductPage() {
                     className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
                 </div>
-                <p className="mt-2 text-xs text-gray-500">Special price for pre-order invoices</p>
+                <p className="mt-2 text-xs text-gray-500">Special price for Book for Next Shipment invoices</p>
               </div>
             </div>
 

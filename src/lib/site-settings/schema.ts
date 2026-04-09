@@ -89,7 +89,7 @@ export const defaultSettings: SiteSettings = {
     textColor: '#111827',
     navItems: [
       { label: 'New Arrivals', href: '/collections/new-arrivals' },
-      { label: 'Pre Order', href: '/book' },
+      { label: 'Book for Next Shipment', href: '/book' },
     ],
     showSearch: true,
     showAccount: true,

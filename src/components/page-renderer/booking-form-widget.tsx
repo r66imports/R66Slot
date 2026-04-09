@@ -27,8 +27,8 @@ interface BookingFormWidgetProps {
 }
 
 export default function BookingFormWidget({
-  title = 'Pre-Order Now',
-  subtitle = 'Browse available items and place your pre-order',
+  title = 'Book for Next Shipment',
+  subtitle = 'Browse available items and secure yours before it arrives',
   accentColor = '#DC2626',
   backgroundColor = '#ffffff',
   textColor = '#1F2937',
@@ -137,7 +137,7 @@ export default function BookingFormWidget({
         <div className="text-6xl mb-4">&#10004;</div>
         <h2 className="text-2xl font-bold mb-2">Order Placed!</h2>
         <p className="mb-4 opacity-80">
-          Thank you for your {selectedItem.orderType === 'pre-order' ? 'pre-order' : 'order'}.
+          Thank you for your {selectedItem.orderType === 'pre-order' ? 'booking' : 'order'}.
           We will contact you shortly to confirm.
         </p>
         <div className="bg-gray-50 rounded-lg p-4 mb-6 inline-block text-left" style={{ minWidth: '280px' }}>
@@ -183,7 +183,7 @@ export default function BookingFormWidget({
             className="py-3 px-4 text-center font-bold text-white text-lg"
             style={{ backgroundColor: selectedItem.orderType === 'pre-order' ? '#F97316' : '#22C55E' }}
           >
-            {selectedItem.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW ORDER'}
+            {selectedItem.orderType === 'pre-order' ? 'BOOK FOR NEXT SHIPMENT' : 'NEW ORDER'}
           </div>
 
           <div className="grid md:grid-cols-2 gap-0">
@@ -401,7 +401,7 @@ export default function BookingFormWidget({
         <div className="text-center py-12">
           <span className="text-5xl block mb-3">&#128230;</span>
           <p className="text-lg font-semibold mb-1">No items available</p>
-          <p className="opacity-70">Check back soon for new pre-order items!</p>
+          <p className="opacity-70">Check back soon for new items to book!</p>
         </div>
       )}
 
@@ -443,7 +443,7 @@ export default function BookingFormWidget({
                     className="px-2 py-0.5 rounded text-xs font-bold text-white"
                     style={{ backgroundColor: item.orderType === 'pre-order' ? '#F97316' : '#22C55E' }}
                   >
-                    {item.orderType === 'pre-order' ? 'PRE-ORDER' : 'NEW'}
+                    {item.orderType === 'pre-order' ? 'BOOK NOW' : 'NEW'}
                   </span>
                   {item.brand && (
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">

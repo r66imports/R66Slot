@@ -36,11 +36,11 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-gray-600">Pre-Orders</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Book for Next Shipment</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{stats.preOrders}</p>
-            <p className="text-xs text-gray-500 mt-1">Total pre-orders placed</p>
+            <p className="text-xs text-gray-500 mt-1">Total bookings placed</p>
           </CardContent>
         </Card>
 

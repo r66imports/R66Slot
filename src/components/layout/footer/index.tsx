@@ -165,7 +165,7 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/pre-orders" className="text-gray-400 hover:text-primary transition-colors">
-                  Pre-Orders
+                  Book for Next Shipment
                 </Link>
               </li>
               <li>

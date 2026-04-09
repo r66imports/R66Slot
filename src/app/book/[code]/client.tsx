@@ -133,7 +133,7 @@ export default function BookingPageClient({ code, initialPoster }: BookingPageCl
             <div className="text-6xl mb-4">✅</div>
             <h1 className="text-2xl font-bold mb-2 font-play">Order Placed!</h1>
             <p className="text-gray-600 mb-4 font-play">
-              Thank you for your {poster.orderType === 'pre-order' ? 'pre-order' : 'order'}. We will contact you shortly to confirm.
+              Thank you for your {poster.orderType === 'pre-order' ? 'booking' : 'order'}. We will contact you shortly to confirm.
             </p>
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
               <p className="text-sm text-gray-600 font-play"><strong>Item:</strong> {poster.itemDescription}</p>
@@ -172,7 +172,7 @@ export default function BookingPageClient({ code, initialPoster }: BookingPageCl
           <div className={`py-3 px-4 text-center font-bold text-white font-play text-lg ${
             poster.orderType === 'pre-order' ? 'bg-orange-500' : 'bg-green-500'
           }`}>
-            {poster.orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'}
+            {poster.orderType === 'pre-order' ? '🎯 BOOK FOR NEXT SHIPMENT' : '✨ NEW ORDER'}
           </div>
 
           <div className="grid md:grid-cols-2 gap-0">

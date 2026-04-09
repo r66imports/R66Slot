@@ -544,7 +544,7 @@ function SkuSearchDropdown({
                 {inStock
                   ? <span className="text-[10px] font-semibold text-green-700 bg-green-50 px-1.5 py-0.5 rounded flex-shrink-0">IN STOCK ({p.quantity})</span>
                   : p.isPreOrder
-                    ? <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">PRE-ORDER</span>
+                    ? <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded flex-shrink-0">NEXT SHIPMENT</span>
                     : p.price > 0
                       ? <span className="text-xs font-semibold text-gray-500 flex-shrink-0">R{p.price.toFixed(2)}</span>
                       : null

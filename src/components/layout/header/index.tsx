@@ -80,7 +80,7 @@ export function Header() {
               href="/book"
               className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
             >
-              Pre Order
+              Book for Next Shipment
             </Link>
 
             {editorEnabled && isAdmin && (
@@ -205,7 +205,7 @@ export function Header() {
                 className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
                 onClick={() => setIsMenuOpen(false)}
               >
-                Pre Order
+                Book for Next Shipment
               </Link>
 
               {editorEnabled && isAdmin && (

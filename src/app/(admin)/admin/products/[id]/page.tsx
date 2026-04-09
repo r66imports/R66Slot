@@ -1012,7 +1012,7 @@ export default function EditProductPage({
                 <p className="mt-2 text-xs text-gray-500">Customers won&apos;t see this</p>
               </div>
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Pre Order Price</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Book for Next Shipment Price</label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-gray-500">R</span>
                   <input
@@ -1212,7 +1212,7 @@ export default function EditProductPage({
               >
                 <span className="flex items-center gap-2">
                   <span className="text-base">{isPreOrder ? '🎯' : '📦'}</span>
-                  Pre Order
+                  Book for Next Shipment
                 </span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isPreOrder ? 'bg-amber-400 text-white' : 'bg-gray-200 text-gray-400'}`}>
                   {isPreOrder ? 'ON' : 'OFF'}

@@ -32,7 +32,7 @@ export function Footer() {
                 New Arrivals
               </Link>
               <Link href="/book" className="text-gray-400 hover:text-primary transition-colors">
-                Pre Order
+                Book for Next Shipment
               </Link>
             </nav>
           </div>

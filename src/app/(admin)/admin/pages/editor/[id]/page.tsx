@@ -255,7 +255,7 @@ const COMPONENT_DEFAULTS: Array<{
     defaultProps: {
       content: '',
       styles: { backgroundColor: '#F9FAFB', textColor: '#DC2626', paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
-      settings: { bookingTitle: 'Pre-Order Now', bookingSubtitle: 'Browse available items and place your pre-order', bookingLayout: 'grid', showBrandFilter: true },
+      settings: { bookingTitle: 'Book for Next Shipment', bookingSubtitle: 'Browse available items and secure yours before it arrives', bookingLayout: 'grid', showBrandFilter: true },
     },
   },
   {

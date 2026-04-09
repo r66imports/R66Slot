@@ -202,7 +202,7 @@ function ProductGridLive({
                           href="/book"
                           className="block w-full text-center font-semibold py-2 px-3 rounded text-sm bg-orange-500 text-white hover:bg-orange-600 transition-colors"
                         >
-                          Pre Order
+                          Book for Next Shipment
                         </a>
                       ) : p.quantity === 0 ? (
                         <button
@@ -1508,8 +1508,8 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     }
 
     case 'booking-form': {
-      const bfTitle = (settings.bookingTitle as string) || 'Pre-Order Now'
-      const bfSubtitle = (settings.bookingSubtitle as string) || 'Browse available items and place your pre-order'
+      const bfTitle = (settings.bookingTitle as string) || 'Book for Next Shipment'
+      const bfSubtitle = (settings.bookingSubtitle as string) || 'Browse available items and secure yours before it arrives'
       const bfAccent = styles.textColor || '#DC2626'
       const bfLayout = (settings.bookingLayout as 'grid' | 'list') || 'grid'
       const bfBrandFilter = settings.showBrandFilter !== false

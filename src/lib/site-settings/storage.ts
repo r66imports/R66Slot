@@ -5,9 +5,9 @@ const SETTINGS_KEY = 'data/site-settings.json'
 
 const CURRENT_NAV = [
   { label: 'New Arrivals', href: '/collections/new-arrivals' },
-  { label: 'Pre Order', href: '/book' },
+  { label: 'Book for Next Shipment', href: '/book' },
 ]
-const STALE_NAV_LABELS = new Set(['Shop All', 'Brands', 'Blog', 'Pre-Orders'])
+const STALE_NAV_LABELS = new Set(['Shop All', 'Brands', 'Blog', 'Pre-Orders', 'Pre Order'])
 
 export async function getSettings(): Promise<SiteSettings> {
   const settings = await blobRead<SiteSettings>(SETTINGS_KEY, defaultSettings)

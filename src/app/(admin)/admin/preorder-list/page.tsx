@@ -511,7 +511,7 @@ export default function PreOrderListPage() {
   if (isLoading) {
     return (
       <div className="font-play flex items-center justify-center min-h-[400px]">
-        <p className="text-lg">Loading pre-orders...</p>
+        <p className="text-lg">Loading bookings...</p>
       </div>
     )
   }
@@ -543,12 +543,12 @@ export default function PreOrderListPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold font-play">
-            {showArchived ? 'Archived Pre-Orders' : 'Pre-Orders'}
+            {showArchived ? 'Archived Bookings' : 'Book for Next Shipment'}
           </h1>
           <p className="text-gray-600 mt-1 font-play">
             {showArchived
-              ? 'Shipped and archived pre-orders'
-              : 'Pre-orders placed by customers through Book Now'}
+              ? 'Shipped and archived bookings'
+              : 'Bookings placed by customers through Book for Next Shipment'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -567,8 +567,8 @@ export default function PreOrderListPage() {
           className="text-sm text-blue-600 hover:text-blue-800 underline font-play"
         >
           {showArchived
-            ? `← Back to Active Pre-Orders (${activeOrders.length})`
-            : `View Archived Pre-Orders (${archivedOrders.length})`}
+            ? `← Back to Active Bookings (${activeOrders.length})`
+            : `View Archived Bookings (${archivedOrders.length})`}
         </button>
       </div>
 
@@ -615,12 +615,12 @@ export default function PreOrderListPage() {
             <div className="space-y-4">
               <div className="text-6xl">📋</div>
               <h3 className="text-xl font-semibold font-play">
-                {showArchived ? 'No Archived Pre-Orders' : 'No Active Pre-Orders'}
+                {showArchived ? 'No Archived Bookings' : 'No Active Bookings'}
               </h3>
               <p className="text-gray-600 font-play">
                 {showArchived
                   ? 'Shipped orders will appear here once archived.'
-                  : 'Pre-orders placed by customers will appear here.'}
+                  : 'Bookings placed by customers will appear here.'}
               </p>
             </div>
           </CardContent>
@@ -629,7 +629,7 @@ export default function PreOrderListPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-play">
-              {showArchived ? 'Archived' : 'Active'} Pre-Orders ({displayedOrders.length})
+              {showArchived ? 'Archived' : 'Active'} Bookings ({displayedOrders.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
