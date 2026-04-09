@@ -240,6 +240,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Products',
   },
   {
+    id: 'columns_per_viewport',
+    name: 'Rule 34 \u2014 Columns Element: Per-Viewport Column Count',
+    description: 'The Columns element supports independent column counts for Desktop, Tablet, and Mobile viewports. Desktop sets the actual number of child columns (1\u20134). Tablet inherits the desktop value if not explicitly set. Mobile defaults to min(2, desktop) if not set. Each setting is saved independently \u2014 changing mobile columns never affects the desktop layout. The renderer injects a scoped CSS \u003cstyle\u003e block with @media queries so the grid collapses correctly on real devices without relying on Tailwind breakpoint classes. Use Case: a 4-column desktop grid can show 2 columns on mobile (2\u00d72 layout) or 1 column (stacked) without any change to the desktop view. Applies to the Columns element in the Page Editor.',
+    active: true,
+    appliesTo: ['Page Editor', 'Columns', 'Online Store'],
+    category: 'Page Editor',
+  },
+  {
     id: 'product_grid_mobile_cols',
     name: 'Rule 33 \u2014 Product Grid: Mobile = 1 Column',
     description: 'Forces all Product Grid elements across every page to display 1 column on mobile devices. On desktop, the grid uses its configured column count (e.g. 3 or 4). On tablet, it inherits the desktop value unless overridden. On mobile, this rule locks the column count to 1 so products stack in a single column and are not squeezed into multiple columns on small screens. Use the "Apply to All Pages" button to immediately update every Product Grid on every published and draft page. The setting is saved directly to each page\'s component data — no further page editing is required.',
