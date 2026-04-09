@@ -14,14 +14,15 @@ async function saveBackorders(backorders: Backorder[]): Promise<void> {
   await blobWrite(BACKORDERS_KEY, backorders)
 }
 
-// GET all backorders
+// GET all backorders — excludes pre-order/book-now entries (those live in /admin/preorder-list)
 export async function GET() {
   try {
     const backorders = await getBackorders()
-    backorders.sort(
+    const filtered = backorders.filter((b: any) => b.source !== 'book-now')
+    filtered.sort(
       (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
-    return NextResponse.json(backorders)
+    return NextResponse.json(filtered)
   } catch (error) {
     console.error('Error fetching backorders:', error)
     return NextResponse.json({ error: 'Failed to fetch backorders' }, { status: 500 })

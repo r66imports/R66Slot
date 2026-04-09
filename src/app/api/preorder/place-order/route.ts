@@ -4,7 +4,6 @@ import { blobRead, blobWrite } from '@/lib/blob-storage'
 const ORDERS_KEY = 'data/preorder-list.json'
 const POSTERS_KEY = 'data/slotcar-orders.json'
 const CONTACTS_KEY = 'data/contacts.json'
-const BACKORDERS_KEY = 'data/backorders.json'
 
 async function getOrders() {
   return await blobRead<any[]>(ORDERS_KEY, [])
@@ -70,40 +69,6 @@ export async function POST(request: Request) {
     // Update poster available quantity
     posters[posterIndex].availableQty -= orderData.quantity
     await savePosters(posters)
-
-    // Save as a backorder so it appears in /admin/backorders (Rule 30)
-    try {
-      const now = new Date().toISOString()
-      const backorders = await blobRead<any[]>(BACKORDERS_KEY, [])
-      const nameParts = (orderData.customerName || '').split(' ')
-      backorders.unshift({
-        id: `bo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        clientName: orderData.customerName || '',
-        clientEmail: orderData.customerEmail || '',
-        clientPhone: orderData.customerPhone || '',
-        sku: orderData.sku || '',
-        description: orderData.itemDescription || '',
-        brand: orderData.brand || '',
-        qty: Number(orderData.quantity) || 1,
-        price: parseFloat(orderData.price) || 0,
-        notes: `Pre-order via website booking${orderData.estimatedDeliveryDate ? ` — ETA: ${new Date(orderData.estimatedDeliveryDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}`,
-        phaseQuote: false,
-        phaseSalesOrder: false,
-        phaseInvoice: false,
-        phaseDepositPaid: false,
-        status: 'active',
-        source: 'book-now',
-        preOrderRef: newOrder.id,
-        createdAt: now,
-        updatedAt: now,
-        // split name for any downstream client-save logic
-        _firstName: nameParts[0] || '',
-        _lastName: nameParts.slice(1).join(' ') || '',
-      })
-      await blobWrite(BACKORDERS_KEY, backorders)
-    } catch {
-      // Don't fail the order if backorder save fails
-    }
 
     // Auto-add customer to contacts if not already there
     try {
