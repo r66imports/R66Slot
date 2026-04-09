@@ -296,6 +296,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Invoices',
   },
   {
+    id: 'product_archive',
+    name: 'Rule 35 — Product Archive',
+    description: 'When a product is set to "Archived" status it is permanently removed from the website storefront, the Inventory page, all SKU dropdowns (Backorders, Worksheet, Orders), and any product grids. Archived products are not deleted — they are stored in a separate Product Archive (/admin/products/archive) where they can be viewed and unarchived if the supplier restocks the item in future. Use archiving when an item is discontinued or no longer available from the supplier. Archived products do NOT appear in stock counts, sales reports SKU lists, or any customer-facing page. To unarchive: go to /admin/products/archive → find the product → click Unarchive → set status back to Draft or Active.',
+    active: true,
+    appliesTo: ['Products', 'Inventory', 'Online Store', 'Back Orders', 'Worksheet'],
+    category: 'Products',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',

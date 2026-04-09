@@ -106,6 +106,7 @@ export default function AdminLayout({
         icon: '📦',
         submenu: [
           { name: 'Products', href: '/admin/products', icon: '🛍️' },
+          { name: 'Product Archive', href: '/admin/products/archive', icon: '🗄️' },
           { name: 'Inventory', href: '/admin/inventory', icon: '📋' },
           { name: 'Categories', href: '/admin/categories', icon: '🏷️' },
           { name: 'POS / Scanner', href: '/admin/pos', icon: '🔍' },

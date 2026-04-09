@@ -28,7 +28,7 @@ export interface Product {
   boxSize: string
   dimensions: { length: number | null; width: number | null; height: number | null }
   eta: string
-  status: 'draft' | 'active'
+  status: 'draft' | 'active' | 'archived'
   imageUrl: string
   images: string[]
   pageId: string
@@ -141,14 +141,21 @@ async function ensureProductColumns() {
 }
 
 // GET /api/admin/products
+// By default excludes archived products. Pass ?includeArchived=true to get only archived.
 export async function GET(request: Request) {
   try {
     await ensureProductColumns()
     const { searchParams } = new URL(request.url)
     const brand = searchParams.get('brand')
-    const result = brand
-      ? await db.query(`SELECT * FROM products WHERE LOWER(brand) = LOWER($1) ORDER BY sku ASC`, [brand])
-      : await db.query(`SELECT * FROM products ORDER BY sku ASC`)
+    const includeArchived = searchParams.get('includeArchived') === 'true'
+    let result
+    if (includeArchived) {
+      result = await db.query(`SELECT * FROM products WHERE status = 'archived' ORDER BY sku ASC`)
+    } else if (brand) {
+      result = await db.query(`SELECT * FROM products WHERE LOWER(brand) = LOWER($1) AND status != 'archived' ORDER BY sku ASC`, [brand])
+    } else {
+      result = await db.query(`SELECT * FROM products WHERE status != 'archived' ORDER BY sku ASC`)
+    }
     return NextResponse.json(result.rows.map(rowToProduct))
   } catch (error) {
     console.error('Error fetching products:', error)

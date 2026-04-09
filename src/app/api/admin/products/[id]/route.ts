@@ -220,6 +220,43 @@ export async function PUT(
   }
 }
 
+// PATCH /api/admin/products/[id] — partial update (e.g. status-only for archive/unarchive)
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const body = await request.json()
+    const allowed = ['status']
+    const updates: string[] = []
+    const values: any[] = []
+    for (const key of allowed) {
+      if (key in body) {
+        updates.push(`${key} = $${values.length + 1}`)
+        values.push(body[key])
+      }
+    }
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    }
+    updates.push(`updated_at = $${values.length + 1}`)
+    values.push(new Date().toISOString())
+    values.push(id)
+    const result = await db.query(
+      `UPDATE products SET ${updates.join(', ')} WHERE id = $${values.length} RETURNING id, status`,
+      values
+    )
+    if (result.rowCount === 0) {
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+    return NextResponse.json(result.rows[0])
+  } catch (error: any) {
+    console.error('Error patching product:', error)
+    return NextResponse.json({ error: `Failed to update: ${error.message}` }, { status: 500 })
+  }
+}
+
 // DELETE /api/admin/products/[id]
 export async function DELETE(
   request: Request,

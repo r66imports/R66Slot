@@ -1228,7 +1228,13 @@ export default function EditProductPage({
               >
                 <option value="draft">Draft</option>
                 <option value="active">Active</option>
+                <option value="archived">Archived</option>
               </select>
+              {status === 'archived' && (
+                <p className="mt-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+                  ⚠ Archived — hidden from website, inventory, and all dropdowns.
+                </p>
+              )}
               <div className="mt-3">
                 <label className="block text-sm font-medium text-gray-700 mb-2">ETA</label>
                 <input
