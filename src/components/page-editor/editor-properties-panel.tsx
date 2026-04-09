@@ -2983,6 +2983,8 @@ function SettingsTab({
   onUpdate: (updates: Partial<PageComponent>) => void
   updateSetting: (key: string, value: any) => void
 }) {
+  const [catBrowseOpen, setCatBrowseOpen] = useState(false)
+  const [catSearch, setCatSearch] = useState('')
   const [carBrandDropdownOpen, setCarBrandDropdownOpen] = useState(false)
   const [carClassDropdownOpen, setCarClassDropdownOpen] = useState(false)
   const [revoPartDropdownOpen, setRevoPartDropdownOpen] = useState(false)
@@ -3263,33 +3265,82 @@ function SettingsTab({
           <div className="space-y-2">
             <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider font-play">Category Filter</p>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Choose Categories</label>
-              <div className="border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
-                {[...categoriesList].sort((a, b) => a.name.localeCompare(b.name)).map((cat) => {
-                  const selected: string[] = Array.isArray(component.settings.assignedCategories) ? (component.settings.assignedCategories as string[]) : []
-                  const checked = selected.includes(cat.id)
-                  return (
-                    <label key={cat.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
-                          const next = checked ? selected.filter(id => id !== cat.id) : [...selected, cat.id]
-                          updateSetting('assignedCategories', next)
-                        }}
-                        className="rounded accent-blue-500"
-                      />
-                      <span className="text-xs font-play text-gray-700">{cat.name}</span>
-                    </label>
-                  )
-                })}
-                {categoriesList.length === 0 && <p className="text-xs text-gray-400 font-play p-3">No categories yet</p>}
-              </div>
-              {Array.isArray(component.settings.assignedCategories) && (component.settings.assignedCategories as string[]).length > 0 && (
-                <p className="text-[10px] text-blue-600 font-play mt-1">
-                  {(component.settings.assignedCategories as string[]).length} categor{(component.settings.assignedCategories as string[]).length === 1 ? 'y' : 'ies'} selected
-                </p>
-              )}
+              {/* Selected pills */}
+              {(() => {
+                const selected: string[] = Array.isArray(component.settings.assignedCategories) ? (component.settings.assignedCategories as string[]) : []
+                const selectedCats = categoriesList.filter(c => selected.includes(c.id))
+                return (
+                  <>
+                    {selectedCats.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {selectedCats.map(cat => (
+                          <span key={cat.id} className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 text-[10px] font-medium px-2 py-0.5 rounded-full font-play">
+                            {cat.name}
+                            <button
+                              type="button"
+                              onClick={() => updateSetting('assignedCategories', selected.filter(id => id !== cat.id))}
+                              className="text-blue-400 hover:text-blue-700 leading-none"
+                            >×</button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-gray-400 font-play mb-2">No categories selected — showing all products</p>
+                    )}
+
+                    {/* Browse toggle */}
+                    <button
+                      type="button"
+                      onClick={() => { setCatBrowseOpen(o => !o); setCatSearch('') }}
+                      className="text-[11px] text-blue-600 hover:text-blue-800 font-medium font-play flex items-center gap-1"
+                    >
+                      {catBrowseOpen ? '▲ Hide categories' : `▼ Browse categories (${categoriesList.length})`}
+                    </button>
+
+                    {/* Searchable list */}
+                    {catBrowseOpen && (
+                      <div className="mt-1.5 border border-gray-200 rounded-lg overflow-hidden">
+                        <div className="px-2 py-1.5 border-b border-gray-100">
+                          <input
+                            type="text"
+                            value={catSearch}
+                            onChange={e => setCatSearch(e.target.value)}
+                            placeholder="Search categories…"
+                            className="w-full text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 font-play"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="max-h-40 overflow-y-auto">
+                          {[...categoriesList]
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .filter(cat => !catSearch || cat.name.toLowerCase().includes(catSearch.toLowerCase()))
+                            .map(cat => {
+                              const checked = selected.includes(cat.id)
+                              return (
+                                <label key={cat.id} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-50 ${checked ? 'bg-blue-50' : ''}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => {
+                                      const next = checked ? selected.filter(id => id !== cat.id) : [...selected, cat.id]
+                                      updateSetting('assignedCategories', next)
+                                    }}
+                                    className="rounded accent-blue-500 flex-shrink-0"
+                                  />
+                                  <span className="text-xs font-play text-gray-700">{cat.name}</span>
+                                </label>
+                              )
+                            })}
+                          {categoriesList.length === 0 && <p className="text-xs text-gray-400 font-play p-3">No categories yet</p>}
+                          {categoriesList.length > 0 && catSearch && [...categoriesList].filter(c => c.name.toLowerCase().includes(catSearch.toLowerCase())).length === 0 && (
+                            <p className="text-xs text-gray-400 font-play p-3">No matches</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
           </div>
           <div className="flex items-center gap-2">
