@@ -5,6 +5,7 @@ import { blobRead, blobWrite } from '@/lib/blob-storage'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 const CUSTOMERS_KEY = 'data/customers.json'
+const CONTACTS_KEY = 'data/contacts.json'
 
 async function getCustomers() {
   return await blobRead<any[]>(CUSTOMERS_KEY, [])
@@ -93,6 +94,28 @@ export async function PUT(request: NextRequest) {
     }
 
     await saveCustomers(customers)
+
+    // Sync updated info to contacts list so admin autofill stays current
+    try {
+      const contacts = await blobRead<any[]>(CONTACTS_KEY, [])
+      const ci = contacts.findIndex(
+        (c: any) => c.email === customers[customerIndex].email ||
+          (decoded.id && c.customerId === decoded.id)
+      )
+      if (ci !== -1) {
+        contacts[ci] = {
+          ...contacts[ci],
+          firstName,
+          lastName,
+          email,
+          phone: phone || contacts[ci].phone || '',
+          updatedAt: new Date().toISOString(),
+        }
+        await blobWrite(CONTACTS_KEY, contacts)
+      }
+    } catch {
+      // Non-fatal — profile is already saved
+    }
 
     const { password, ...customerData } = customers[customerIndex]
     return NextResponse.json(customerData)
