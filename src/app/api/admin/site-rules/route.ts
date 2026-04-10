@@ -296,6 +296,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Invoices',
   },
   {
+    id: 'site_search_live_dropdown',
+    name: 'Rule 36 — Site Search Live SKU Dropdown',
+    description: 'When a customer types in any site search bar (header search, /products page), results appear instantly as a live dropdown. Each result shows: product thumbnail, SKU (indigo mono), brand, title, price, and an orange "NEXT SHIPMENT" badge for pre-order items. Clicking a result navigates directly to the product page. If exactly one result matches, pressing Enter navigates directly. If 8+ results exist, a "See all results" link appears. This behaviour applies to the header search overlay and the /products page search bar.',
+    active: true,
+    appliesTo: ['Online Store', 'Header', 'Products Page'],
+    category: 'Search',
+  },
+  {
     id: 'product_archive',
     name: 'Rule 35 — Product Archive',
     description: 'When a product is set to "Archived" status it is permanently removed from the website storefront, the Inventory page, all SKU dropdowns (Backorders, Worksheet, Orders), and any product grids. Archived products are not deleted — they are stored in a separate Product Archive (/admin/products/archive) where they can be viewed and unarchived if the supplier restocks the item in future. Use archiving when an item is discontinued or no longer available from the supplier. Archived products do NOT appear in stock counts, sales reports SKU lists, or any customer-facing page. To unarchive: go to /admin/products/archive → find the product → click Unarchive → set status back to Draft or Active.',
