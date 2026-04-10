@@ -24,6 +24,7 @@ type PreOrderItem = {
   salesOrderSent?: boolean
   invoiceSent?: boolean
   shipped?: boolean
+  completedAt?: string | null
   archivedAt?: string | null
   createdAt: string
 }
@@ -457,13 +458,60 @@ export default function PreOrderListPage() {
     updateOrderField(activeDoc.order.id, { [field]: true })
   }
 
-  const handleShipped = (order: PreOrderItem) => {
-    updateOrderField(order.id, { shipped: true, archivedAt: new Date().toISOString(), status: 'shipped' })
+  const [sendingDoc, setSendingDoc] = useState<string | null>(null) // `${orderId}-${type}`
+
+  const handleSendDoc = async (order: PreOrderItem, type: DocType) => {
+    const key = `${order.id}-${type}`
+    setSendingDoc(key)
+    try {
+      const price = parseFloat(order.price || '0')
+      const qty = order.quantity || 1
+      const docTypeApi = type === 'sales-order' ? 'salesorder' : type
+      const docNumber = generateDocNumber(type, order.id)
+      const lineItem = {
+        id: `li_${Date.now()}`,
+        description: `${order.sku ? order.sku + ' – ' : ''}${order.itemDescription}`,
+        qty,
+        unitPrice: price,
+      }
+      const res = await fetch('/api/admin/orders/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: docTypeApi,
+          docNumber,
+          date: new Date().toISOString().slice(0, 10),
+          clientName: order.customerName,
+          clientEmail: order.customerEmail,
+          clientPhone: order.customerPhone,
+          clientAddress: '',
+          lineItems: [lineItem],
+          notes: order.estimatedDeliveryDate ? `ETA: ${order.estimatedDeliveryDate}` : '',
+          terms: '',
+          status: 'sent',
+          backorderId: order.id,
+        }),
+      })
+      if (res.ok) {
+        const field = type === 'quote' ? 'quoteSent' : type === 'sales-order' ? 'salesOrderSent' : 'invoiceSent'
+        await updateOrderField(order.id, { [field]: true })
+      } else {
+        alert('Failed to create document. Please try again.')
+      }
+    } catch {
+      alert('Network error. Could not create document.')
+    } finally {
+      setSendingDoc(null)
+    }
+  }
+
+  const handleComplete = (order: PreOrderItem) => {
+    updateOrderField(order.id, { shipped: true, status: 'complete', completedAt: new Date().toISOString() })
   }
 
   const handleExportCSV = () => {
     const csvContent = [
-      ['Order ID', 'Date', 'Client Name', 'Email', 'Phone', 'Brand', 'SKU', 'Item', 'ETA', 'Price', 'Qty', 'Total', 'Type', 'Quote Sent', 'Sales Order', 'Invoice', 'Shipped'],
+      ['Order ID', 'Date', 'Client Name', 'Email', 'Phone', 'Brand', 'SKU', 'Item', 'ETA', 'Price', 'Qty', 'Total', 'Type', 'Quote Sent', 'Sales Order', 'Invoice', 'Complete'],
       ...orders.map(order => [
         order.id,
         new Date(order.createdAt).toLocaleDateString(),
@@ -481,7 +529,7 @@ export default function PreOrderListPage() {
         order.quoteSent ? 'Yes' : 'No',
         order.salesOrderSent ? 'Yes' : 'No',
         order.invoiceSent ? 'Yes' : 'No',
-        order.shipped ? 'Yes' : 'No',
+        order.completedAt ? 'Yes' : 'No',
       ])
     ].map(row => row.join(',')).join('\n')
 
@@ -503,8 +551,11 @@ export default function PreOrderListPage() {
     }
   }
 
-  const activeOrders = orders.filter(o => !o.archivedAt)
-  const archivedOrders = orders.filter(o => !!o.archivedAt)
+  const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000
+  const isAutoArchived = (o: PreOrderItem) =>
+    !!o.completedAt && (Date.now() - new Date(o.completedAt).getTime() > FIVE_DAYS_MS)
+  const activeOrders = orders.filter(o => !o.archivedAt && !isAutoArchived(o))
+  const archivedOrders = orders.filter(o => !!o.archivedAt || isAutoArchived(o))
   const baseOrders = showArchived ? archivedOrders : activeOrders
   const displayedOrders = useMemo(() => sortOrders(baseOrders, sortKey, sortDir), [baseOrders, sortKey, sortDir])
 
@@ -675,52 +726,55 @@ export default function PreOrderListPage() {
                         <div className="flex flex-wrap gap-1.5">
                           {/* Quote */}
                           <button
-                            onClick={() => handleOpenDoc(order, 'quote')}
+                            onClick={() => order.quoteSent ? handleOpenDoc(order, 'quote') : handleSendDoc(order, 'quote')}
+                            disabled={sendingDoc === `${order.id}-quote`}
                             className={`px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors ${
                               order.quoteSent
                                 ? 'bg-green-500 text-white border border-green-600'
                                 : 'bg-white text-black border-2 border-black hover:bg-gray-100'
-                            }`}
+                            } disabled:opacity-60`}
                           >
-                            {order.quoteSent ? '✓ Quote' : 'Quote'}
+                            {sendingDoc === `${order.id}-quote` ? '…' : order.quoteSent ? '✓ Quote' : 'Quote'}
                           </button>
 
                           {/* Sales Order */}
                           <button
-                            onClick={() => handleOpenDoc(order, 'sales-order')}
+                            onClick={() => order.salesOrderSent ? handleOpenDoc(order, 'sales-order') : handleSendDoc(order, 'sales-order')}
+                            disabled={sendingDoc === `${order.id}-sales-order`}
                             className={`px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors ${
                               order.salesOrderSent
                                 ? 'bg-green-500 text-white border border-green-600'
                                 : 'bg-white text-black border-2 border-black hover:bg-gray-100'
-                            }`}
+                            } disabled:opacity-60`}
                           >
-                            {order.salesOrderSent ? '✓ Sales Order' : 'Sales Order'}
+                            {sendingDoc === `${order.id}-sales-order` ? '…' : order.salesOrderSent ? '✓ Sales Order' : 'Sales Order'}
                           </button>
 
                           {/* Invoice */}
                           <button
-                            onClick={() => handleOpenDoc(order, 'invoice')}
+                            onClick={() => order.invoiceSent ? handleOpenDoc(order, 'invoice') : handleSendDoc(order, 'invoice')}
+                            disabled={sendingDoc === `${order.id}-invoice`}
                             className={`px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors ${
                               order.invoiceSent
                                 ? 'bg-green-500 text-white border border-green-600'
                                 : 'bg-white text-black border-2 border-black hover:bg-gray-100'
-                            }`}
+                            } disabled:opacity-60`}
                           >
-                            {order.invoiceSent ? '✓ Invoice' : 'Invoice'}
+                            {sendingDoc === `${order.id}-invoice` ? '…' : order.invoiceSent ? '✓ Invoice' : 'Invoice'}
                           </button>
 
-                          {/* Shipped (active only) */}
+                          {/* Complete (active only) */}
                           {!showArchived && (
                             <button
-                              onClick={() => handleShipped(order)}
-                              disabled={order.shipped}
+                              onClick={() => handleComplete(order)}
+                              disabled={!!order.completedAt}
                               className={`px-2.5 py-1.5 rounded text-xs font-bold font-play transition-colors ${
-                                order.shipped
+                                order.completedAt
                                   ? 'bg-green-500 text-white border border-green-600'
                                   : 'bg-white text-black border-2 border-black hover:bg-gray-100'
-                              }`}
+                              } disabled:cursor-default`}
                             >
-                              {order.shipped ? '✓ Shipped' : 'Shipped'}
+                              {order.completedAt ? '✓ Complete' : 'Complete'}
                             </button>
                           )}
 
