@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+
 import Link from 'next/link'
 
 interface Task {
@@ -174,25 +175,22 @@ function TaskRow({
   const daysOld = daysSince(task.createdAt)
   const disappearsIn = isComplete ? daysUntilGone(task.completedAt!) : null
 
-  const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(task.note || '')
-  const [savingNote, setSavingNote] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [savedIndicator, setSavedIndicator] = useState(false)
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     setNoteValue(task.note || '')
   }, [task.note])
 
-  async function handleSaveNote() {
-    setSavingNote(true)
-    await onSaveNote(noteValue.trim())
-    setSavingNote(false)
-    setEditingNote(false)
-  }
-
-  function handleCancelNote() {
-    setNoteValue(task.note || '')
-    setEditingNote(false)
+  function handleNoteChange(val: string) {
+    setNoteValue(val)
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      await onSaveNote(val.trim())
+      setSavedIndicator(true)
+      setTimeout(() => setSavedIndicator(false), 1500)
+    }, 800)
   }
 
   return (
@@ -234,6 +232,18 @@ function TaskRow({
           <p className={`text-sm font-medium mt-0.5 truncate ${isComplete ? 'line-through text-gray-400' : 'text-gray-800'}`}>
             {task.productTitle || '—'}
           </p>
+          <div className="flex items-center gap-3 mt-1">
+            <input
+              type="text"
+              value={noteValue}
+              onChange={(e) => handleNoteChange(e.target.value)}
+              placeholder="Add a note…"
+              className="flex-1 min-w-0 text-xs px-2 py-1 border border-gray-200 rounded-md bg-white focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 text-gray-700 placeholder-gray-300 transition-colors"
+            />
+            {savedIndicator && (
+              <span className="text-[10px] text-green-500 font-medium flex-shrink-0">Saved ✓</span>
+            )}
+          </div>
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <span className="text-xs text-gray-400">
               Added {daysOld === 0 ? 'today' : `${daysOld}d ago`} · {new Date(task.createdAt).toLocaleDateString('en-ZA')}
@@ -265,58 +275,6 @@ function TaskRow({
             </svg>
           </button>
         </div>
-      </div>
-
-      {/* Note row */}
-      <div className="ml-[88px] mt-2">
-        {editingNote ? (
-          <div className="space-y-1.5">
-            <textarea
-              ref={textareaRef}
-              value={noteValue}
-              onChange={(e) => setNoteValue(e.target.value)}
-              placeholder="Add a note about what needs to be done…"
-              rows={2}
-              autoFocus
-              className="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent text-gray-700"
-            />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSaveNote}
-                disabled={savingNote}
-                className="px-3 py-1 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 transition-colors"
-              >
-                {savingNote ? 'Saving…' : 'Save Note'}
-              </button>
-              <button
-                onClick={handleCancelNote}
-                className="px-3 py-1 text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : noteValue ? (
-          <button
-            onClick={() => setEditingNote(true)}
-            className="group text-left w-full"
-          >
-            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1.5 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors">
-              {noteValue}
-              <span className="ml-2 text-[10px] text-gray-400 group-hover:text-indigo-400">edit</span>
-            </p>
-          </button>
-        ) : (
-          <button
-            onClick={() => setEditingNote(true)}
-            className="text-xs text-gray-400 hover:text-indigo-500 transition-colors flex items-center gap-1"
-          >
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Add note
-          </button>
-        )}
       </div>
     </div>
   )
