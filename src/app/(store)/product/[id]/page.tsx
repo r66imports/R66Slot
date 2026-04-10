@@ -209,7 +209,7 @@ export default function ProductDetailPage() {
                   href="/book"
                   className="w-full text-center font-bold py-3 px-6 rounded-lg text-base bg-orange-500 text-white hover:bg-orange-600 transition-colors"
                 >
-                  Pre Order
+                  Book for Next Shipment
                 </a>
               ) : (
                 <button

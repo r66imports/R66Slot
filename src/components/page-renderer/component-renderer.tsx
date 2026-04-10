@@ -144,7 +144,7 @@ function ProductGridLive({
               >
                 {/* Image — click to open product page; zoom icon opens full-size popup */}
                 <div className="relative flex-shrink-0 group/img">
-                  <a href={productUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
+                  <a href={p.isPreOrder ? '/book' : productUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
                     <div className="relative bg-white flex items-center justify-center overflow-hidden" style={{ height: imgHpx }}>
                       {p.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
