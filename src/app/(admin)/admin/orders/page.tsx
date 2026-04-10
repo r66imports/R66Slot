@@ -1482,7 +1482,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
     return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#9ca3af">${i + 1}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:11px;color:#4f46e5;white-space:nowrap">${liSku || '—'}</td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6">${liTitle}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word">${liTitle}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${li.qty}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${fmtPrice(li.unitPrice)}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600">${fmtPrice(li.qty * li.unitPrice)}</td>
@@ -1529,7 +1529,15 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
     ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
+    <colgroup>
+      <col style="width:28px"/>
+      <col style="width:110px"/>
+      <col/>
+      <col style="width:36px"/>
+      <col style="width:90px"/>
+      <col style="width:90px"/>
+    </colgroup>
     <thead><tr style="background:#1f2937;color:white">
       <th style="padding:8px 12px;text-align:left;font-size:13px">#</th>
       <th style="padding:8px 12px;text-align:left;font-size:13px">SKU</th>
@@ -1754,18 +1762,18 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     }),
     foot: [
       ...((data.discountPct || 0) > 0 || shippingPDF > 0 ? [
-        ['', '', '', 'Subtotal', fmtPrice(subtotal)],
+        ['', '', '', '', 'Subtotal', fmtPrice(subtotal)],
       ] : []),
       ...((data.discountPct || 0) > 0 ? [
-        ['', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`],
+        ['', '', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`],
       ] : []),
       ...(shippingPDF > 0 ? [
-        ['', '', '', `Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF)],
+        ['', '', '', '', `Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF)],
       ] : []),
-      ['', '', '', 'TOTAL', fmtPrice(total)],
+      ['', '', '', '', 'TOTAL', fmtPrice(total)],
       ...((data.depositPaid || 0) > 0 ? [
-        ['', '', '', 'Deposit Paid', `-${fmtPrice(data.depositPaid || 0)}`],
-        ['', '', '', 'BALANCE DUE', fmtPrice(total - (data.depositPaid || 0))],
+        ['', '', '', '', 'Deposit Paid', `-${fmtPrice(data.depositPaid || 0)}`],
+        ['', '', '', '', 'BALANCE DUE', fmtPrice(total - (data.depositPaid || 0))],
       ] : []),
     ],
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
@@ -1774,9 +1782,10 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     alternateRowStyles: { fillColor: [249, 250, 251] },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      2: { halign: 'right', cellWidth: 12 },
-      3: { halign: 'right', cellWidth: 38 },
-      4: { halign: 'right', cellWidth: 38, fontStyle: 'bold' },
+      1: { cellWidth: 30, fontStyle: 'normal' },
+      3: { halign: 'right', cellWidth: 10 },
+      4: { halign: 'right', cellWidth: 28 },
+      5: { halign: 'right', cellWidth: 28, fontStyle: 'bold' },
     },
     margin: { left: margin, right: margin },
     didParseCell(hookData) {
