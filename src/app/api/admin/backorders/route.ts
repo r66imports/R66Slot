@@ -75,6 +75,7 @@ export async function POST(request: Request) {
       supplierId: body.supplierId?.trim() || undefined,
       supplierName: body.supplierName?.trim() || undefined,
       notes: body.notes?.trim() || '',
+      source: body.source?.trim() || undefined,
       status: 'active',
       createdAt: now,
       updatedAt: now,

@@ -46,6 +46,7 @@ export interface Backorder {
   supplierName?: string
   // Meta
   notes?: string
+  source?: string
   status: 'active' | 'complete' | 'cancelled'
   createdAt: string
   updatedAt: string
