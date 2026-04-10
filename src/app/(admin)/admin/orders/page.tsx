@@ -1221,16 +1221,7 @@ function CreateDocumentModal({
                 <tbody>
                   {lineItems.map((li) => {
                     const dashIdx = (li.description || '').indexOf('–')
-                    let liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
-                    // Fallback: match description against known products to find SKU
-                    if (!liSku && modalProducts.length > 0) {
-                      const desc = (li.description || '').toLowerCase()
-                      const match = modalProducts.find(p => {
-                        if (!p.sku || !p.title || p.title.length < 8) return false
-                        return desc.includes(p.title.toLowerCase().slice(0, Math.min(p.title.length, 30)))
-                      })
-                      if (match) liSku = match.sku
-                    }
+                    const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
                     return (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-2 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap align-top pt-3">{liSku || <span className="text-gray-300">—</span>}</td>

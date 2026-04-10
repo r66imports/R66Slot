@@ -129,7 +129,8 @@ export async function POST(request: Request) {
     docs.unshift(doc)
     await saveDocs(docs)
     // Rule 2 — Auto-Create Product: create draft products for unknown SKUs (best-effort)
-    if (await isRuleActive('auto_create_product', true)) {
+    // Skip for pre-orders (stockAlreadyReserved) — items haven't arrived, products already exist
+    if (!stockAlreadyReserved && await isRuleActive('auto_create_product', true)) {
       await autoCreateMissingProducts(lineItems).catch(() => {})
     }
     return NextResponse.json(doc, { status: 201 })
