@@ -36,7 +36,7 @@ export default function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium text-gray-600">Book for Next Shipment</CardTitle>
+            <CardTitle className="text-sm font-medium text-gray-600">Pre Orders</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">{stats.preOrders}</p>

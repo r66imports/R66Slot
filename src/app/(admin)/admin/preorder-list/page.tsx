@@ -543,7 +543,7 @@ export default function PreOrderListPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold font-play">
-            {showArchived ? 'Archived Bookings' : 'Book for Next Shipment'}
+            {showArchived ? 'Archived Bookings' : 'Pre Orders & Next Shipment Orders'}
           </h1>
           <p className="text-gray-600 mt-1 font-play">
             {showArchived

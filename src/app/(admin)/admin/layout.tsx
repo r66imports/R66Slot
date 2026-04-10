@@ -150,7 +150,7 @@ export default function AdminLayout({
         submenu: [
           { name: 'Site Orders', href: '/admin/site-orders', icon: '🛒' },
           { name: 'Orders', href: '/admin/orders', icon: '📦' },
-          { name: 'Book for Next Shipment', href: '/admin/preorder-list', icon: '📋' },
+          { name: 'Pre Orders & Next Shipment', href: '/admin/preorder-list', icon: '📋' },
           { name: 'Back Orders', href: '/admin/backorders', icon: '🔄' },
           { name: 'Suppliers Orders', href: '/admin/suppliers', icon: '📥' },
           { name: 'Work Sheet', href: '/admin/worksheet', icon: '🧮' },
