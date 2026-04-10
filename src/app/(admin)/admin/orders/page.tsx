@@ -1782,10 +1782,11 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     alternateRowStyles: { fillColor: [249, 250, 251] },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 30, fontStyle: 'normal' },
-      3: { halign: 'right', cellWidth: 10 },
-      4: { halign: 'right', cellWidth: 28 },
-      5: { halign: 'right', cellWidth: 28, fontStyle: 'bold' },
+      1: { cellWidth: 22 },
+      2: { cellWidth: 84, halign: 'left' },
+      3: { cellWidth: 8, halign: 'right' },
+      4: { cellWidth: 26, halign: 'right' },
+      5: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
     },
     margin: { left: margin, right: margin },
     didParseCell(hookData) {
