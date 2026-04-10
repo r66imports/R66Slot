@@ -174,6 +174,19 @@ function fmtDateLong(iso: string) {
 function fmtPrice(n: number) {
   return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
+// Extract SKU and description from a line item description string.
+// Handles em-dash: "SKU – Title" and space-hyphen-space: "SKU - Title"
+// Does NOT split on hyphens within SKU codes like "SC-5068" or "SWAX/54.5"
+function splitSkuTitle(description: string): { sku: string; title: string } {
+  if (!description) return { sku: '', title: '' }
+  // Em-dash separator (new format)
+  const emIdx = description.indexOf('–')
+  if (emIdx > -1) return { sku: description.slice(0, emIdx).trim(), title: description.slice(emIdx + 1).trim() }
+  // Space-hyphen-space separator (old format), only the FIRST occurrence
+  const hyphenMatch = description.match(/^(.+?)\s+-\s+(.+)$/)
+  if (hyphenMatch) return { sku: hyphenMatch[1].trim(), title: hyphenMatch[2].trim() }
+  return { sku: '', title: description }
+}
 function newLine(): LineItem {
   return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, description: '', qty: 1, unitPrice: 0 }
 }
@@ -327,9 +340,7 @@ function DocumentBody({
         </thead>
         <tbody>
           {data.lineItems.map((li, i) => {
-            const dashIdx = (li.description || '').indexOf('–')
-            const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
-            const liTitle = dashIdx > -1 ? li.description.slice(dashIdx + 1).trim() : (li.description || '—')
+            const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
             return (
             <tr key={li.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
               <td className="px-3 py-2 text-gray-500 text-xs">{i + 1}</td>
@@ -1220,8 +1231,7 @@ function CreateDocumentModal({
                 </thead>
                 <tbody>
                   {lineItems.map((li) => {
-                    const dashIdx = (li.description || '').indexOf('–')
-                    const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
+                    const { sku: liSku } = splitSkuTitle(li.description || '')
                     return (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-2 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap align-top pt-3">{liSku || <span className="text-gray-300">—</span>}</td>
@@ -1468,9 +1478,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
     : ''
 
   const rowsHTML = data.lineItems.map((li, i) => {
-    const dashIdx = (li.description || '').indexOf('–')
-    const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
-    const liTitle = dashIdx > -1 ? li.description.slice(dashIdx + 1).trim() : (li.description || '—')
+    const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
     return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#9ca3af">${i + 1}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:11px;color:#4f46e5;white-space:nowrap">${liSku || '—'}</td>
@@ -1741,9 +1749,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     startY: y,
     head: [['#', 'SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
     body: data.lineItems.map((li, i) => {
-      const dashIdx = (li.description || '').indexOf('–')
-      const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
-      const liTitle = dashIdx > -1 ? li.description.slice(dashIdx + 1).trim() : (li.description || '—')
+      const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
       return [i + 1, liSku || '—', liTitle, li.qty, fmtPrice(li.unitPrice), fmtPrice(li.qty * li.unitPrice)]
     }),
     foot: [
