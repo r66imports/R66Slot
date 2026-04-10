@@ -296,6 +296,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Invoices',
   },
   {
+    id: 'booking_retail_price',
+    name: 'Rule 37 — Booking Uses Retail Price',
+    description: 'All "Book for Next Shipment" booking pages display and submit the retail price (product.price) — never the cost price, pre-order price, or wholesale price. This applies to the booking confirmation page (/book/product/[id]) and any booking form across the site. The price shown to the customer when booking must always match the retail price displayed on the product page.',
+    active: true,
+    appliesTo: ['Online Store', 'Bookings', 'Products'],
+    category: 'Pricing',
+  },
+  {
     id: 'site_search_live_dropdown',
     name: 'Rule 36 — Site Search Live SKU Dropdown',
     description: 'When a customer types in any site search bar (header search, /products page), results appear instantly as a live dropdown. Each result shows: product thumbnail, SKU (indigo mono), brand, title, price, and an orange "NEXT SHIPMENT" badge for pre-order items. Clicking a result navigates directly to the product page. If exactly one result matches, pressing Enter navigates directly. If 8+ results exist, a "See all results" link appears. This behaviour applies to the header search overlay and the /products page search bar.',

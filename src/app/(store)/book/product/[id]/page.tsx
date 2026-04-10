@@ -60,7 +60,7 @@ export default function BookProductPage() {
           description: product.title || '',
           brand: product.brand || '',
           qty,
-          price: product.preOrderPrice || product.price || 0,
+          price: product.price || 0,
           source: 'book-now',
           notes: '',
         }),
@@ -109,7 +109,7 @@ export default function BookProductPage() {
           <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left space-y-1">
             <p className="text-sm text-gray-600"><span className="font-medium">SKU:</span> {product.sku}</p>
             <p className="text-sm text-gray-600"><span className="font-medium">Qty:</span> {qty}</p>
-            <p className="text-sm text-gray-600"><span className="font-medium">Price:</span> R{((product.preOrderPrice || product.price || 0) * qty).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+            <p className="text-sm text-gray-600"><span className="font-medium">Price:</span> R{((product.price || 0) * qty).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
           </div>
           <Link
             href="/"
@@ -122,7 +122,7 @@ export default function BookProductPage() {
     )
   }
 
-  const price = product.preOrderPrice || product.price || 0
+  const price = product.price || 0
 
   return (
     <div className="min-h-screen bg-gray-50">
