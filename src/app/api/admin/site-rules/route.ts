@@ -296,6 +296,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Invoices',
   },
   {
+    id: 'sku_on_documents',
+    name: 'Rule 38 — SKU Shown on All Documents',
+    description: 'All Quotes, Sales Orders, and Invoices must display the item SKU as a separate column alongside the description. The SKU is extracted from the line item description (format: "SKU – Description"). This applies to: the document preview modal, the printed/emailed HTML document, the jsPDF download, and the create/edit modal line items table. The SKU column appears in indigo monospace font. If a line item has no SKU prefix, a dash is shown.',
+    active: true,
+    appliesTo: ['Quotes', 'Sales Orders', 'Invoices', 'Admin Orders'],
+    category: 'Invoices',
+  },
+  {
     id: 'booking_retail_price',
     name: 'Rule 37 — Booking Uses Retail Price',
     description: 'All "Book for Next Shipment" booking pages display and submit the retail price (product.price) — never the cost price, pre-order price, or wholesale price. This applies to the booking confirmation page (/book/product/[id]) and any booking form across the site. The price shown to the customer when booking must always match the retail price displayed on the product page.',

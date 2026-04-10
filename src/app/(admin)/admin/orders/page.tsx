@@ -318,6 +318,7 @@ function DocumentBody({
         <thead>
           <tr className="bg-gray-800 text-white">
             <th className="text-left px-3 py-2 font-medium">#</th>
+            <th className="text-left px-3 py-2 font-medium">SKU</th>
             <th className="text-left px-3 py-2 font-medium">Description</th>
             <th className="text-right px-3 py-2 font-medium w-14">Qty</th>
             <th className="text-right px-3 py-2 font-medium w-28">Unit Price</th>
@@ -325,15 +326,21 @@ function DocumentBody({
           </tr>
         </thead>
         <tbody>
-          {data.lineItems.map((li, i) => (
+          {data.lineItems.map((li, i) => {
+            const dashIdx = (li.description || '').indexOf('–')
+            const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
+            const liTitle = dashIdx > -1 ? li.description.slice(dashIdx + 1).trim() : (li.description || '—')
+            return (
             <tr key={li.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
               <td className="px-3 py-2 text-gray-500 text-xs">{i + 1}</td>
-              <td className="px-3 py-2">{li.description || '—'}</td>
+              <td className="px-3 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap">{liSku || '—'}</td>
+              <td className="px-3 py-2">{liTitle}</td>
               <td className="px-3 py-2 text-right">{li.qty}</td>
               <td className="px-3 py-2 text-right">{fmtPrice(li.unitPrice)}</td>
               <td className="px-3 py-2 text-right font-medium">{fmtPrice(li.qty * li.unitPrice)}</td>
             </tr>
-          ))}
+            )
+          })}
         </tbody>
       </table>
 
@@ -1203,6 +1210,7 @@ function CreateDocumentModal({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wider">
+                    <th className="text-left px-3 py-2 w-24">SKU</th>
                     <th className="text-left px-3 py-2">Description</th>
                     <th className="text-right px-3 py-2 w-16">Qty</th>
                     <th className="text-right px-3 py-2 w-28">Unit Price</th>
@@ -1211,8 +1219,12 @@ function CreateDocumentModal({
                   </tr>
                 </thead>
                 <tbody>
-                  {lineItems.map((li) => (
+                  {lineItems.map((li) => {
+                    const dashIdx = (li.description || '').indexOf('–')
+                    const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
+                    return (
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
+                      <td className="px-2 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap align-top pt-3">{liSku || <span className="text-gray-300">—</span>}</td>
                       <td className="px-2 py-1">
                         <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); updateLine(li.id, '_stockQty', stockQty) }} />
                         {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
@@ -1244,17 +1256,17 @@ function CreateDocumentModal({
                       <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>
                       <td className="px-2 py-2 text-center">{lineItems.length > 1 && <button onClick={() => removeLine(li.id)} className="text-gray-300 hover:text-red-500 leading-none">✕</button>}</td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
                 <tfoot className="text-sm">
                   <tr className="border-t bg-gray-50">
-                    <td colSpan={3} className="px-3 py-2 text-right text-gray-500">Subtotal</td>
+                    <td colSpan={4} className="px-3 py-2 text-right text-gray-500">Subtotal</td>
                     <td className="px-3 py-2 text-right font-medium">{fmtPrice(subtotal)}</td><td />
                   </tr>
                   {/* Rule 5 — Shipping & Discounts: only shown when rule is active */}
                   {shippingEnabled ? (<>
                     <tr className="bg-gray-50">
-                      <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Discount %</td>
+                      <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Discount %</td>
                       <td className="px-2 py-1">
                         <input type="number" min={0} max={100} step={0.5}
                           className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
@@ -1268,7 +1280,7 @@ function CreateDocumentModal({
                       <td />
                     </tr>
                     <tr className="bg-gray-50">
-                      <td className="px-3 py-1.5 text-right text-gray-500 text-xs">Shipping</td>
+                      <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Shipping</td>
                       <td className="px-2 py-1">
                         <select
                           className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
@@ -1301,7 +1313,7 @@ function CreateDocumentModal({
                     </tr>
                     {shippingMethod && shippingMethod !== 'Collection' && (
                       <tr className="bg-gray-50">
-                        <td className="px-3 py-1.5 text-right text-gray-400 text-xs">Tracking #</td>
+                        <td colSpan={2} className="px-3 py-1.5 text-right text-gray-400 text-xs">Tracking #</td>
                         <td colSpan={2} className="px-2 py-1">
                           <input
                             type="text"
@@ -1319,7 +1331,7 @@ function CreateDocumentModal({
                     )}
                   </>) : (
                     <tr className="bg-amber-50">
-                      <td colSpan={5} className="px-3 py-2 text-xs text-amber-700 font-medium text-center">
+                      <td colSpan={6} className="px-3 py-2 text-xs text-amber-700 font-medium text-center">
                         Rule 5 inactive — Shipping &amp; Discounts are disabled. Enable in Site Rules to add these fields.
                       </td>
                     </tr>
@@ -1327,17 +1339,17 @@ function CreateDocumentModal({
                   {/* Rule 3 — Stock Deduction: show warning when inactive */}
                   {!stockDeductionEnabled && (docType === 'invoice' || docType === 'salesorder') && (
                     <tr className="bg-orange-50">
-                      <td colSpan={5} className="px-3 py-2 text-xs text-orange-700 font-medium text-center">
+                      <td colSpan={6} className="px-3 py-2 text-xs text-orange-700 font-medium text-center">
                         Rule 3 inactive — Stock will NOT be deducted when this document is saved.
                       </td>
                     </tr>
                   )}
                   <tr className="border-t bg-blue-50">
-                    <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
+                    <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
                     <td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(total)}</td><td />
                   </tr>
                   <tr className="bg-gray-50">
-                    <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
+                    <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
                     <td className="px-2 py-1">
                       <input type="number" min={0} step={0.01}
                         className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
@@ -1352,7 +1364,7 @@ function CreateDocumentModal({
                   </tr>
                   {depositPaid > 0 && (
                     <tr className="border-t bg-orange-50">
-                      <td colSpan={3} className="px-3 py-2.5 text-right font-bold text-orange-700">Balance Due</td>
+                      <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-orange-700">Balance Due</td>
                       <td className="px-3 py-2.5 text-right font-bold text-orange-700">{fmtPrice(balanceDue)}</td><td />
                     </tr>
                   )}
@@ -1455,15 +1467,19 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
       ).join('')}</div>`
     : ''
 
-  const rowsHTML = data.lineItems.map((li, i) =>
-    `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
+  const rowsHTML = data.lineItems.map((li, i) => {
+    const dashIdx = (li.description || '').indexOf('–')
+    const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
+    const liTitle = dashIdx > -1 ? li.description.slice(dashIdx + 1).trim() : (li.description || '—')
+    return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#9ca3af">${i + 1}</td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6">${li.description || '—'}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:11px;color:#4f46e5;white-space:nowrap">${liSku || '—'}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6">${liTitle}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${li.qty}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${fmtPrice(li.unitPrice)}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600">${fmtPrice(li.qty * li.unitPrice)}</td>
     </tr>`
-  ).join('')
+  }).join('')
 
   const bankHTML = template.bankName
     ? `<div style="margin-bottom:16px;padding:12px;background:#eff6ff;border-radius:8px;border:1px solid #dbeafe">
@@ -1508,6 +1524,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
     <thead><tr style="background:#1f2937;color:white">
       <th style="padding:8px 12px;text-align:left;font-size:13px">#</th>
+      <th style="padding:8px 12px;text-align:left;font-size:13px">SKU</th>
       <th style="padding:8px 12px;text-align:left;font-size:13px">Description</th>
       <th style="padding:8px 12px;text-align:right;font-size:13px">Qty</th>
       <th style="padding:8px 12px;text-align:right;font-size:13px">Unit Price</th>
@@ -1722,14 +1739,13 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   // ── Line items table ─────────────────────────────────────────────────────────
   autoTable(doc, {
     startY: y,
-    head: [['#', 'Description', 'Qty', 'Unit Price', 'Total']],
-    body: data.lineItems.map((li, i) => [
-      i + 1,
-      li.description || '—',
-      li.qty,
-      fmtPrice(li.unitPrice),
-      fmtPrice(li.qty * li.unitPrice),
-    ]),
+    head: [['#', 'SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
+    body: data.lineItems.map((li, i) => {
+      const dashIdx = (li.description || '').indexOf('–')
+      const liSku = dashIdx > -1 ? li.description.slice(0, dashIdx).trim() : ''
+      const liTitle = dashIdx > -1 ? li.description.slice(dashIdx + 1).trim() : (li.description || '—')
+      return [i + 1, liSku || '—', liTitle, li.qty, fmtPrice(li.unitPrice), fmtPrice(li.qty * li.unitPrice)]
+    }),
     foot: [
       ...((data.discountPct || 0) > 0 || shippingPDF > 0 ? [
         ['', '', '', 'Subtotal', fmtPrice(subtotal)],
