@@ -490,6 +490,7 @@ export default function PreOrderListPage() {
           terms: '',
           status: 'sent',
           backorderId: order.id,
+          stockAlreadyReserved: true,
         }),
       })
       if (res.ok) {
