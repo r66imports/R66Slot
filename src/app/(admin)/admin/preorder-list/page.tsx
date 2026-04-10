@@ -467,7 +467,16 @@ export default function PreOrderListPage() {
       const price = parseFloat(order.price || '0')
       const qty = order.quantity || 1
       const docTypeApi = type === 'sales-order' ? 'salesorder' : type
-      const docNumber = generateDocNumber(type, order.id)
+
+      // For quotes, fetch next QR66 number from the API; for others use local generator
+      let docNumber = generateDocNumber(type, order.id)
+      if (type === 'quote') {
+        const qRes = await fetch('/api/admin/orders/renumber-quotes')
+        if (qRes.ok) {
+          const qData = await qRes.json()
+          if (qData.next) docNumber = qData.next
+        }
+      }
       const lineItem = {
         id: `li_${Date.now()}`,
         description: `${order.sku ? order.sku + ' – ' : ''}${order.itemDescription}`,

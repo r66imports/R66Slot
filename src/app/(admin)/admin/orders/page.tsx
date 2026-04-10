@@ -1035,6 +1035,16 @@ function CreateDocumentModal({
     }))
   }, [modalProducts])
 
+  // Auto-generate next quote number (QR660001 format) for new quotes only
+  useEffect(() => {
+    if (editDoc || docType !== 'quote') return
+    fetch('/api/admin/orders/renumber-quotes')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.next) setForm((f) => ({ ...f, docNumber: data.next })) })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-generate next invoice number (INV000001 format) for new invoices only
   useEffect(() => {
     if (editDoc || docType !== 'invoice') return
@@ -1124,7 +1134,13 @@ function CreateDocumentModal({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">{cfg.singularLabel} Number *</label>
-              <input className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder={`e.g. ${cfg.prefix}-001`} value={form.docNumber} onChange={(e) => setField('docNumber', e.target.value)} />
+              {docType === 'quote' ? (
+                <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 font-mono select-none">
+                  {form.docNumber || 'Auto-generating…'}
+                </div>
+              ) : (
+                <input className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" placeholder={`e.g. ${cfg.prefix}-001`} value={form.docNumber} onChange={(e) => setField('docNumber', e.target.value)} />
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block">Date</label>
@@ -2118,6 +2134,8 @@ export default function OrdersPage() {
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const [renumberingSODocs, setRenumberingSODocs] = useState(false)
   const [renumberSOResult, setRenumberSOResult] = useState<string | null>(null)
+  const [renumberingQuotes, setRenumberingQuotes] = useState(false)
+  const [renumberQuotesResult, setRenumberQuotesResult] = useState<string | null>(null)
   const [shippingEnabled, setShippingEnabled] = useState(true)
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
@@ -2915,6 +2933,31 @@ export default function OrdersPage() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <p className="text-sm text-gray-500">{totalCount} {showArchive ? 'Archived' : ''} {cfg.label}</p>
+              {tab === 'quotes' && !showArchive && (
+                <button
+                  onClick={async () => {
+                    setRenumberingQuotes(true)
+                    setRenumberQuotesResult(null)
+                    try {
+                      const res = await fetch('/api/admin/orders/renumber-quotes', { method: 'POST' })
+                      const data = await res.json()
+                      if (res.ok) {
+                        setRenumberQuotesResult(`✓ Renumbered ${data.renumbered} Quotes`)
+                        await load()
+                      } else {
+                        setRenumberQuotesResult(`Error: ${data.error}`)
+                      }
+                    } finally {
+                      setRenumberingQuotes(false)
+                      setTimeout(() => setRenumberQuotesResult(null), 3000)
+                    }
+                  }}
+                  disabled={renumberingQuotes}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors disabled:opacity-50"
+                >
+                  {renumberingQuotes ? '⏳ Renumbering…' : renumberQuotesResult || '↻ Renumber Quotes'}
+                </button>
+              )}
               {tab === 'salesorders' && !showArchive && (
                 <button
                   onClick={async () => {
