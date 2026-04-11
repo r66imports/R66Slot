@@ -9,7 +9,10 @@ export interface Task {
   productId: string
   productTitle: string
   brand: string
+  supplier: string
   imageUrl: string
+  note: string
+  source: 'manual' | 'auto-no-image'
   createdAt: string
   completedAt: string | null
 }
@@ -69,7 +72,10 @@ export async function POST(request: Request) {
       productId,
       productTitle: productTitle || '',
       brand: brand || '',
+      supplier: body.supplier || '',
       imageUrl: imageUrl || '',
+      note: body.note || '',
+      source: body.source || 'manual',
       createdAt: new Date().toISOString(),
       completedAt: null,
     }

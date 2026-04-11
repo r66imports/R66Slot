@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-
 import Link from 'next/link'
 
 interface Task {
@@ -10,10 +9,17 @@ interface Task {
   productId: string
   productTitle: string
   brand: string
+  supplier: string
   imageUrl: string
   note: string
+  source: 'manual' | 'auto-no-image'
   createdAt: string
   completedAt: string | null
+}
+
+interface Supplier {
+  id: string
+  name: string
 }
 
 function daysSince(iso: string) {
@@ -28,15 +34,80 @@ function daysUntilGone(completedAt: string) {
 export default function TaskListPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [syncCount, setSyncCount] = useState(0)
   const [search, setSearch] = useState('')
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [selectedSupplier, setSelectedSupplier] = useState('')
 
+  // Load tasks + suppliers in parallel, then auto-sync no-image products
   useEffect(() => {
-    fetch('/api/admin/task-list')
-      .then((r) => r.json())
-      .then(setTasks)
-      .finally(() => setLoading(false))
+    Promise.all([
+      fetch('/api/admin/task-list').then(r => r.json()).catch(() => []),
+      fetch('/api/admin/supplier-contacts').then(r => r.json()).catch(() => []),
+    ]).then(([taskData, supplierData]) => {
+      setTasks(taskData)
+      setSuppliers(Array.isArray(supplierData) ? supplierData : [])
+      setLoading(false)
+      // Auto-sync after tasks are loaded so we can dedup
+      autoSyncNoImageProducts(taskData)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  async function autoSyncNoImageProducts(existingTasks: Task[]) {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/admin/products')
+      if (!res.ok) return
+      const products: any[] = await res.json()
+
+      // Only active products with no image
+      const noImage = products.filter((p: any) => {
+        if (p.status !== 'active') return false
+        const hasImage = (p.imageUrl && p.imageUrl.trim()) ||
+          (Array.isArray(p.images) && p.images.length > 0)
+        return !hasImage
+      })
+
+      // Find ones not already pending in task list
+      const existingProductIds = new Set(
+        existingTasks.filter(t => !t.completedAt).map(t => t.productId)
+      )
+      const toAdd = noImage.filter((p: any) => !existingProductIds.has(p.id))
+
+      if (toAdd.length === 0) { setSyncing(false); return }
+
+      // Add them in parallel (best-effort)
+      const results = await Promise.all(
+        toAdd.map((p: any) =>
+          fetch('/api/admin/task-list', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sku: p.sku || '',
+              productId: p.id,
+              productTitle: p.title || '',
+              brand: p.brand || '',
+              supplier: p.supplier || '',
+              imageUrl: '',
+              note: 'Missing product image',
+              source: 'auto-no-image',
+            }),
+          }).then(r => r.ok ? r.json() : null).catch(() => null)
+        )
+      )
+
+      const added = results.filter(r => r?.task && !r.alreadyExists).map(r => r.task)
+      if (added.length > 0) {
+        setTasks(prev => [...added, ...prev])
+        setSyncCount(added.length)
+      }
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   async function toggleComplete(task: Task) {
     setTogglingId(task.id)
@@ -48,8 +119,8 @@ export default function TaskListPage() {
         body: JSON.stringify({ completedAt: newCompletedAt }),
       })
       if (res.ok) {
-        setTasks((prev) =>
-          prev.map((t) => (t.id === task.id ? { ...t, completedAt: newCompletedAt } : t))
+        setTasks(prev =>
+          prev.map(t => t.id === task.id ? { ...t, completedAt: newCompletedAt } : t)
         )
       }
     } finally {
@@ -63,22 +134,29 @@ export default function TaskListPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ note }),
     })
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, note } : t)))
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, note } : t))
   }
 
   async function handleDelete(taskId: string) {
     if (!confirm('Remove this task from the list?')) return
     await fetch(`/api/admin/task-list/${taskId}`, { method: 'DELETE' })
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+    setTasks(prev => prev.filter(t => t.id !== taskId))
   }
 
-  const filtered = tasks.filter((t) => {
+  const filtered = tasks.filter(t => {
     const q = search.toLowerCase()
-    return !q || t.sku?.toLowerCase().includes(q) || t.productTitle?.toLowerCase().includes(q) || t.brand?.toLowerCase().includes(q) || t.note?.toLowerCase().includes(q)
+    const matchSearch = !q ||
+      t.sku?.toLowerCase().includes(q) ||
+      t.productTitle?.toLowerCase().includes(q) ||
+      t.brand?.toLowerCase().includes(q) ||
+      t.note?.toLowerCase().includes(q)
+    const matchSupplier = !selectedSupplier ||
+      (t.supplier || '').toLowerCase() === selectedSupplier.toLowerCase()
+    return matchSearch && matchSupplier
   })
 
-  const pending = filtered.filter((t) => !t.completedAt)
-  const completed = filtered.filter((t) => !!t.completedAt)
+  const pending = filtered.filter(t => !t.completedAt)
+  const completed = filtered.filter(t => !!t.completedAt)
 
   return (
     <div>
@@ -89,19 +167,44 @@ export default function TaskListPage() {
             Products flagged for attention. Completed tasks disappear after 5 days.
           </p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${pending.length > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-          {pending.length} pending
-        </span>
+        <div className="flex items-center gap-3">
+          {syncing && (
+            <span className="text-xs text-indigo-600 font-medium animate-pulse">
+              Scanning for missing images…
+            </span>
+          )}
+          {!syncing && syncCount > 0 && (
+            <span className="text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-full">
+              +{syncCount} auto-added (no image)
+            </span>
+          )}
+          <span className={`px-3 py-1 rounded-full text-sm font-medium ${pending.length > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+            {pending.length} pending
+          </span>
+        </div>
       </div>
 
-      <div className="mb-5">
+      {/* Filters row */}
+      <div className="mb-5 flex flex-wrap gap-3">
         <input
           type="text"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={e => setSearch(e.target.value)}
           placeholder="Search by SKU, title, brand or note…"
-          className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+          className="flex-1 min-w-[200px] max-w-sm px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
         />
+        {suppliers.length > 0 && (
+          <select
+            value={selectedSupplier}
+            onChange={e => setSelectedSupplier(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+          >
+            <option value="">All Suppliers</option>
+            {suppliers.map(s => (
+              <option key={s.id} value={s.name}>{s.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {loading ? (
@@ -110,10 +213,12 @@ export default function TaskListPage() {
         <div className="text-center py-20">
           <div className="text-5xl mb-4">✅</div>
           <h3 className="text-lg font-semibold text-gray-700">
-            {search ? 'No matches found' : 'All clear — no tasks pending'}
+            {search || selectedSupplier ? 'No matches found' : 'All clear — no tasks pending'}
           </h3>
           <p className="text-sm text-gray-400 mt-1">
-            Use the "📋 Task List" button on any product to flag it here.
+            {!search && !selectedSupplier
+              ? 'Products missing images are added automatically. Use "📋 Task List" on any product to flag it manually.'
+              : 'Try clearing the filters.'}
           </p>
         </div>
       ) : (
@@ -123,13 +228,13 @@ export default function TaskListPage() {
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 Pending ({pending.length})
               </div>
-              {pending.map((task) => (
+              {pending.map(task => (
                 <TaskRow
                   key={task.id}
                   task={task}
                   toggling={togglingId === task.id}
                   onToggle={() => toggleComplete(task)}
-                  onSaveNote={(note) => saveNote(task.id, note)}
+                  onSaveNote={note => saveNote(task.id, note)}
                   onDelete={() => handleDelete(task.id)}
                 />
               ))}
@@ -140,13 +245,13 @@ export default function TaskListPage() {
               <div className="px-4 py-3 bg-green-50 border-b border-green-100 text-xs font-semibold text-green-700 uppercase tracking-wide">
                 Completed — auto-removes after 5 days ({completed.length})
               </div>
-              {completed.map((task) => (
+              {completed.map(task => (
                 <TaskRow
                   key={task.id}
                   task={task}
                   toggling={togglingId === task.id}
                   onToggle={() => toggleComplete(task)}
-                  onSaveNote={(note) => saveNote(task.id, note)}
+                  onSaveNote={note => saveNote(task.id, note)}
                   onDelete={() => handleDelete(task.id)}
                 />
               ))}
@@ -174,6 +279,7 @@ function TaskRow({
   const isComplete = !!task.completedAt
   const daysOld = daysSince(task.createdAt)
   const disappearsIn = isComplete ? daysUntilGone(task.completedAt!) : null
+  const isAutoNoImage = task.source === 'auto-no-image'
 
   const [noteValue, setNoteValue] = useState(task.note || '')
   const [savedIndicator, setSavedIndicator] = useState(false)
@@ -199,7 +305,6 @@ function TaskRow({
         isComplete ? 'bg-green-50' : daysOld >= 7 ? 'bg-amber-50' : 'bg-white'
       }`}
     >
-      {/* Top row */}
       <div className="flex items-center gap-4">
         {/* Checkbox */}
         <button
@@ -218,6 +323,7 @@ function TaskRow({
 
         {/* Image */}
         {task.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img src={task.imageUrl} alt={task.productTitle} className="w-12 h-12 object-contain rounded border border-gray-100 flex-shrink-0" />
         ) : (
           <div className="w-12 h-12 bg-gray-100 rounded border border-gray-100 flex-shrink-0 flex items-center justify-center text-gray-300 text-xl">📦</div>
@@ -228,6 +334,14 @@ function TaskRow({
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-mono text-xs font-semibold text-indigo-600">{task.sku}</span>
             {task.brand && <span className="text-xs text-gray-400">{task.brand}</span>}
+            {task.supplier && (
+              <span className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded font-medium">{task.supplier}</span>
+            )}
+            {isAutoNoImage && (
+              <span className="text-[10px] text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide">
+                Auto • No Image
+              </span>
+            )}
           </div>
           <p className={`text-sm font-medium mt-0.5 truncate ${isComplete ? 'line-through text-gray-400' : 'text-gray-800'}`}>
             {task.productTitle || '—'}
@@ -236,7 +350,7 @@ function TaskRow({
             <input
               type="text"
               value={noteValue}
-              onChange={(e) => handleNoteChange(e.target.value)}
+              onChange={e => handleNoteChange(e.target.value)}
               placeholder="Add a note…"
               className="flex-1 min-w-0 text-xs px-2 py-1 border border-gray-200 rounded-md bg-white focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 text-gray-700 placeholder-gray-300 transition-colors"
             />
