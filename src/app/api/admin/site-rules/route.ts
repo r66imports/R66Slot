@@ -328,6 +328,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Products',
   },
   {
+    id: 'media_editor',
+    name: 'Rule 39 — Media Library Image Editor',
+    description: 'Enables the Image Editor panel inside the Media Library (/admin/media). When ON: every image in the library shows an Edit button (hover overlay on grid, inline on list view). Clicking Edit opens a slide-in drawer with: full image preview + pixel dimensions, a link to the Photo Editor (/admin/photo-editor), aspect ratio crop presets (Original / 1:1 / 4:3 / 16:9) using canvas center-crop, custom pixel size inputs (width × height), Apply & Save (canvas crop → upload to R2 → new URL), Where Used scanner (scans Products + Pages and lists every location this image appears), and Sync to Website button (POST /api/admin/media/sync) which replaces the old URL with the new URL across all products (imageUrl + images array) and all pages (components JSONB) simultaneously. Multi-select: when multiple files are selected the toolbar shows a batch Edit Image button. The sync ensures that a single crop/resize operation immediately updates every product image and page component that references the original URL — no manual re-assignment required.',
+    active: true,
+    appliesTo: ['Media Library', 'Products', 'Pages'],
+    category: 'Admin UI',
+  },
+  {
     id: 'category_box_two_line',
     name: 'Rule 18 — Category Box Two-Line Text Display',
     description: 'Category cards on the Categories admin page display the full category name across up to two lines. Previously, long names were truncated with an ellipsis (…) making them unreadable. With this rule active: the label area at the bottom of each card grows to accommodate two lines of text — no name is cut off. Card image height is set to h-28 to compensate. Applies to the Categories grid at /admin/categories.',
