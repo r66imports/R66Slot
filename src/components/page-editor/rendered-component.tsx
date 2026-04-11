@@ -658,15 +658,14 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
         ? ((settings.gridColumnsTablet as number) || (settings.gridColumns as number) || 3)
         : ((settings.gridColumns as number) || 3)
       const pgCount = pgCols * 2
-      const cardSize = (settings.cardSize as string) || 'standard'
-      const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : cardSize === 'xlarge' ? '360px' : '160px'
+      const imageAspect = (settings.imageAspect as string) || '1/1'
       return (
         <div style={containerStyle}>
           <div className="container mx-auto">
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${pgCols}, minmax(0, 1fr))`, gap: '1rem' }}>
               {Array.from({ length: pgCount }).map((_, i) => (
                 <div key={i} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 flex flex-col">
-                  <div className="bg-gray-50 flex items-center justify-center" style={{ height: imgHpx }}>
+                  <div className="bg-gray-50 flex items-center justify-center w-full" style={{ aspectRatio: imageAspect }}>
                     <span className="text-gray-300 text-4xl">🏎️</span>
                   </div>
                   <div className="p-3">

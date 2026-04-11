@@ -123,8 +123,7 @@ function ProductGridLive({
           <style>{`.${pgCls}{display:grid;grid-template-columns:repeat(${deskCols},minmax(0,1fr));gap:${gridGap}}@media(max-width:1023px){.${pgCls}{grid-template-columns:repeat(${tabCols},minmax(0,1fr))}}@media(max-width:639px){.${pgCls}{grid-template-columns:repeat(${mobCols},minmax(0,1fr))}}`}</style>
           <div className={pgCls}>
             {products.map((p) => {
-              const cardSize = (settings.cardSize as string) || 'standard'
-              const imgHpx = cardSize === 'compact' ? '112px' : cardSize === 'large' ? '220px' : cardSize === 'xlarge' ? '360px' : '160px'
+              const imageAspect = (settings.imageAspect as string) || '1/1'
               const imgFit = ((settings.imageFit as string) || 'contain') as React.CSSProperties['objectFit']
               const cardPad = { none: '0', sm: '8px', md: '12px', lg: '16px', xl: '24px' }[(settings.cardPadding as string) || 'md'] || '12px'
               const szMap: Record<string, string> = { xs: '10px', sm: '12px', md: '14px', lg: '16px', xl: '20px' }
@@ -145,7 +144,7 @@ function ProductGridLive({
                 {/* Image — click to open product page; zoom icon opens full-size popup */}
                 <div className="relative flex-shrink-0 group/img">
                   <a href={productUrl} target="_blank" rel="noopener noreferrer" className="block cursor-pointer">
-                    <div className="relative bg-white flex items-center justify-center overflow-hidden" style={{ height: imgHpx }}>
+                    <div className="relative bg-white flex items-center justify-center overflow-hidden w-full" style={{ aspectRatio: imageAspect }}>
                       {p.imageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img

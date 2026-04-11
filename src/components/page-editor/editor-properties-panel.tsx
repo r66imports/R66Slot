@@ -756,17 +756,28 @@ function ContentTab({
             <p className="text-[10px] text-gray-400 font-play">Each view is saved independently — switching views does not change other settings.</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Card Size</label>
-            <select
-              value={(component.settings.cardSize as string) || 'standard'}
-              onChange={(e) => updateSetting('cardSize', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
-            >
-              <option value="compact">Compact (small image)</option>
-              <option value="standard">Standard</option>
-              <option value="large">Large (tall image)</option>
-              <option value="xlarge">Extra Large (portrait 9:16)</option>
-            </select>
+            <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Aspect Ratio</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                { value: '1/1', label: '1:1', sub: 'Square' },
+                { value: '4/3', label: '4:3', sub: 'Landscape' },
+                { value: '16/9', label: '16:9', sub: 'Wide' },
+              ] as const).map(({ value, label, sub }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => updateSetting('imageAspect', value)}
+                  className={`flex flex-col items-center py-2 px-1 rounded-lg border-2 text-xs font-play font-semibold transition-all ${
+                    ((component.settings.imageAspect as string) || '1/1') === value
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="font-bold">{label}</span>
+                  <span className="text-[10px] font-normal opacity-70">{sub}</span>
+                </button>
+              ))}
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Fit</label>
