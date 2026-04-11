@@ -115,9 +115,19 @@ export function DynamicHeader() {
     sticky: true,
   }
 
-  // Render logo with optional split styling
+  // Render logo — image takes priority over text
   const renderLogo = () => {
-    const { logoText, logoStyle } = headerConfig
+    const { logoText, logoStyle, logoImage, logoSize } = headerConfig
+    if (logoImage) {
+      const size = logoSize || 80
+      return (
+        <img
+          src={logoImage}
+          alt={logoText || 'Logo'}
+          style={{ width: size, height: size, objectFit: 'contain' }}
+        />
+      )
+    }
     if (logoStyle === 'split' && logoText.length > 3) {
       return (
         <div className="text-2xl font-bold">

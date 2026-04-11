@@ -96,6 +96,7 @@ export default function AdminLayout({
   const navigation: { [key: string]: NavItem[] } = {
     site: [
       { name: 'Edit Site', href: '/admin/pages', icon: '✏️', highlight: true },
+      { name: 'Edit Header', href: '/admin/header', icon: '🔝' },
       { name: 'Dashboard', href: '/admin', icon: '📊' },
     ],
     content: [
