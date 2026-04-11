@@ -153,35 +153,36 @@ function MediaEditorPanel({
       ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outW, outH)
       URL.revokeObjectURL(objectUrl)
 
-      // Determine mime type
+      // Determine mime type — keep original type
       const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
-      const ext = mime === 'image/png' ? 'png' : 'jpg'
 
       const blob = await new Promise<Blob>((res, rej) => canvas.toBlob(b => b ? res(b) : rej(), mime, 0.92))
 
-      // Upload new version
+      // Extract the R2 key from the existing URL (/api/media/uploads/filename.jpg → uploads/filename.jpg)
+      // This overwrites the same R2 key so the URL stays identical
+      const r2Key = file.url.replace(/^\/api\/media\//, '')
+
       const form = new FormData()
-      const newName = file.name.replace(/\.[^.]+$/, '') + `-edited.${ext}`
-      form.append('file', blob, newName)
+      form.append('file', blob, file.name)
+      form.append('overwriteKey', r2Key)
       const upRes = await fetch('/api/admin/media/upload', { method: 'POST', body: form })
       if (!upRes.ok) throw new Error('Upload failed')
-      const { url: newUrl } = await upRes.json()
 
-      setPreviewUrl(newUrl)
-      setSavedNewUrl(newUrl)
-      setSyncResult('')
+      // URL is unchanged — just bust browser cache on preview with a timestamp param
+      const cacheBustedUrl = file.url + (file.url.includes('?') ? '&' : '?') + 't=' + Date.now()
+      setPreviewUrl(cacheBustedUrl)
+      setSavedNewUrl('')   // no new URL — sync not needed
+      setSyncResult('Saved — same URL, website will show updated image automatically.')
       setNaturalW(outW)
       setNaturalH(outH)
 
-      const newFile: MediaFile = {
+      const updatedFile: MediaFile = {
         ...file,
-        url: newUrl,
-        name: newName,
         size: blob.size,
         type: mime,
         uploadedAt: new Date().toISOString(),
       }
-      onSaved(file.url, newFile)
+      onSaved(file.url, updatedFile)
     } catch (err) {
       alert('Processing failed. Check console.')
       console.error(err)
@@ -335,12 +336,15 @@ function MediaEditorPanel({
                   disabled={processing || (!aspect && !customW && !customH)}
                   className="w-full py-2.5 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-play"
                 >
-                  {processing ? 'Processing…' : '✂ Apply & Save New Version'}
+                  {processing ? 'Processing…' : '✂ Apply & Overwrite'}
                 </button>
+                <p className="text-[10px] text-gray-400 text-center -mt-3 font-play">
+                  Overwrites original file — same URL, website updates automatically
+                </p>
 
-                {savedNewUrl && (
+                {syncResult && !syncing && (
                   <div className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                    ✓ New version saved. Use Sync to update website references.
+                    {syncResult}
                   </div>
                 )}
               </>
@@ -393,9 +397,7 @@ function MediaEditorPanel({
                 {syncing ? 'Synchronizing…' : '↻ Sync Image to Website'}
               </button>
               <p className="text-[10px] text-gray-400 mt-1.5 text-center font-play">
-                {savedNewUrl
-                  ? 'Replaces old URL with new edited version across all products & pages'
-                  : 'Updates all references to this image URL across products & pages'}
+                Force-refreshes all product & page references to this image URL
               </p>
               {syncResult && (
                 <p className={`text-xs mt-2 text-center font-medium font-play ${syncResult.startsWith('✓') ? 'text-green-600' : 'text-red-500'}`}>

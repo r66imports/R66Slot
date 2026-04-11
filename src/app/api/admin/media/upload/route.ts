@@ -39,20 +39,32 @@ export async function POST(request: Request) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
     const fileExtension = file.name.split('.').pop() || 'jpg'
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`
     const contentType = file.type || `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`
 
-    // Upload to Cloudflare R2
-    const publicUrl = await r2Upload(`uploads/${fileName}`, buffer, contentType)
+    // If overwriteKey is provided, upload to that exact R2 key (overwrites original)
+    const overwriteKey = (formData.get('overwriteKey') as string) || null
+    const r2Key = overwriteKey || `uploads/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExtension}`
+    const fileName = r2Key.split('/').pop() || r2Key
+
+    // Upload to Cloudflare R2 (PutObject overwrites existing key)
+    const publicUrl = await r2Upload(r2Key, buffer, contentType)
 
     // Register in media_files table (best-effort)
     try {
-      await db.query(
-        `INSERT INTO media_files (id, name, url, type, size, folder, uploaded_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW())
-         ON CONFLICT (id) DO UPDATE SET url = $3, name = $2`,
-        [fileName, file.name || fileName, publicUrl, contentType, file.size, 'All Files']
-      )
+      if (overwriteKey) {
+        // Update existing record by URL
+        await db.query(
+          `UPDATE media_files SET type = $1, size = $2, uploaded_at = NOW() WHERE url = $3`,
+          [contentType, file.size, publicUrl]
+        )
+      } else {
+        await db.query(
+          `INSERT INTO media_files (id, name, url, type, size, folder, uploaded_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+           ON CONFLICT (id) DO UPDATE SET url = $3, name = $2`,
+          [fileName, file.name || fileName, publicUrl, contentType, file.size, 'All Files']
+        )
+      }
     } catch (dbErr: any) {
       console.error('[media/upload] media_files index failed:', dbErr?.message)
     }
