@@ -1740,6 +1740,8 @@ export default function BackordersPage() {
             brand: p.brand || '',
             price: p.price || 0,
             supplier: p.supplier || '',
+            quantity: p.quantity ?? 0,
+            isPreOrder: !!p.is_pre_order,
           })).filter((p) => p.sku))
         }
       } else {

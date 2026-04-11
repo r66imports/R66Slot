@@ -34,6 +34,12 @@ export async function GET() {
         customerPhone: b.clientPhone || '',
         orderType: 'pre-order' as const,
         status: b.status || 'pending',
+        quoteSent: b.quoteSent ?? false,
+        salesOrderSent: b.salesOrderSent ?? false,
+        invoiceSent: b.invoiceSent ?? false,
+        shipped: b.shipped ?? false,
+        completedAt: b.completedAt ?? null,
+        archivedAt: b.archivedAt ?? null,
         createdAt: b.createdAt,
       }))
 
