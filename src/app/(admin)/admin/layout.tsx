@@ -161,10 +161,10 @@ export default function AdminLayout({
     business: [
       {
         name: 'Social Media',
-        href: '/admin/social-media',
+        href: '/admin/social',
         icon: '📱',
         submenu: [
-          { name: 'Create Poster', href: '/admin/slotcar-orders', icon: '🎨' },
+          { name: 'Flyer Generator', href: '/admin/social', icon: '🎨' },
           { name: 'Media Library', href: '/admin/media', icon: '🖼️' },
         ]
       },
