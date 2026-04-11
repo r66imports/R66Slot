@@ -56,13 +56,12 @@ function MediaEditorPanel({
 
   const isImage = file.type.startsWith('image/')
 
-  // Load image dimensions
+  // Load image dimensions via proxy to avoid CORS issues
   useEffect(() => {
     if (!isImage) return
     const img = new Image()
-    img.crossOrigin = 'anonymous'
     img.onload = () => { setNaturalW(img.naturalWidth); setNaturalH(img.naturalHeight) }
-    img.src = file.url
+    img.src = `/api/admin/media/proxy?url=${encodeURIComponent(file.url)}`
   }, [file.url, isImage])
 
   // Scan usage on open
@@ -102,12 +101,18 @@ function MediaEditorPanel({
     if (!isImage) return
     setProcessing(true)
     try {
+      // Proxy through server to avoid canvas CORS taint on R2 images
+      const proxyUrl = `/api/admin/media/proxy?url=${encodeURIComponent(file.url)}`
+      const fetchRes = await fetch(proxyUrl)
+      if (!fetchRes.ok) throw new Error('Failed to fetch image via proxy')
+      const imageBlob = await fetchRes.blob()
+      const objectUrl = URL.createObjectURL(imageBlob)
+
       const img = new Image()
-      img.crossOrigin = 'anonymous'
       await new Promise<void>((res, rej) => {
         img.onload = () => res()
         img.onerror = rej
-        img.src = file.url + (file.url.includes('?') ? '&' : '?') + '_t=' + Date.now()
+        img.src = objectUrl
       })
 
       const srcW = img.naturalWidth
@@ -146,6 +151,7 @@ function MediaEditorPanel({
       canvas.height = outH
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outW, outH)
+      URL.revokeObjectURL(objectUrl)
 
       // Determine mime type
       const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
