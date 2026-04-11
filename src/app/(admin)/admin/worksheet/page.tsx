@@ -38,6 +38,18 @@ interface WsItem {
   sentToInventory?: boolean
 }
 
+interface NewSkuRow {
+  wsId: string        // original WsItem.id
+  sku: string
+  description: string
+  brand: string
+  category: string
+  unit: string
+  retailPrice: number
+  costPrice: number
+  qty: number
+}
+
 interface WsSheet {
   id: string
   name: string
@@ -296,6 +308,14 @@ function WorksheetEditor({
   const [sendingInventory, setSendingInventory] = useState(false)
   const [inventorySent, setInventorySent] = useState(false)
   const [inventoryMissed, setInventoryMissed] = useState<string[]>([])
+  // ── New SKU modal (first-time inventory upload) ──
+  const [showNewSkuModal, setShowNewSkuModal] = useState(false)
+  const [newSkuModalItems, setNewSkuModalItems] = useState<NewSkuRow[]>([])
+  const [savingNewSkus, setSavingNewSkus] = useState(false)
+  // ── Confirm update dialog (existing SKU, 2nd time) ──
+  const [showConfirmUpdate, setShowConfirmUpdate] = useState(false)
+  const [confirmUpdateItems, setConfirmUpdateItems] = useState<WsItem[]>([])
+  const [confirmingUpdate, setConfirmingUpdate] = useState(false)
 
   function toggleCheck(id: string) {
     setCheckedItems((prev) => {
@@ -308,54 +328,135 @@ function WorksheetEditor({
   async function sendToInventory() {
     const toSend = items.filter((it) => checkedItems.has(it.id) && it.sku && it.qty > 0)
     if (!toSend.length) return
-    setSendingInventory(true)
-    setInventoryMissed([])
-    const missed: string[] = []
-    const sentIds: string[] = []
-    const sentItems: WsItem[] = []
-    try {
-      for (const it of toSend) {
-        const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-        if (!prod) { missed.push(it.sku); continue }
-        const res = await fetch('/api/admin/pos/stock', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: prod.id, mode: 'add', qty: it.qty }),
+
+    const newSkus: NewSkuRow[] = []
+    const existingWsItems: WsItem[] = []
+
+    for (const it of toSend) {
+      const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
+      if (!prod) {
+        // New SKU — pre-fill from worksheet values
+        const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+        const retailZAR = it.retailPrice > 0
+          ? it.retailPrice
+          : Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
+        newSkus.push({
+          wsId: it.id,
+          sku: it.sku,
+          description: it.description,
+          brand: '',
+          category: it.category || '',
+          unit: it.unit || '',
+          retailPrice: retailZAR,
+          costPrice: finalLanded,
+          qty: it.qty,
         })
-        if (!res.ok) missed.push(it.sku)
-        else { sentIds.push(it.id); sentItems.push(it) }
+      } else {
+        existingWsItems.push(it)
+      }
+    }
+
+    if (newSkus.length > 0) {
+      setNewSkuModalItems(newSkus)
+      setShowNewSkuModal(true)
+    }
+    if (existingWsItems.length > 0) {
+      setConfirmUpdateItems(existingWsItems)
+      setShowConfirmUpdate(true)
+    }
+  }
+
+  async function handleSaveNewSkus(rows: NewSkuRow[]) {
+    setSavingNewSkus(true)
+    const sentIds: string[] = []
+    const errors: string[] = []
+    try {
+      for (const row of rows) {
+        const body: Record<string, any> = {
+          sku: row.sku,
+          title: row.description || row.sku,
+          brand: row.brand,
+          description: '',
+          price: row.retailPrice,
+          cost_per_item: row.costPrice,
+          quantity: row.qty,
+          status: 'active',
+          categoryBrands: row.category ? [row.category] : [],
+          itemCategories: row.unit ? [row.unit] : [],
+        }
+        const res = await fetch('/api/admin/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) { errors.push(row.sku); continue }
+        sentIds.push(row.wsId)
       }
 
-      // Save wholesale price (supplier currency) to pricelist so Inventory shows correct value
+      // Save pricelist entries for new products
       const sup = suppliers.find((s) => s.name === supplier)
-      if (sup && sentItems.length > 0) {
-        const pricelistEntries = sentItems
-          .filter((it) => it.wholesalePrice > 0)
-          .map((it) => ({
-            supplierId: sup.id,
-            sku: it.sku,
-            wholesalePrice: it.wholesalePrice,
-            shopQty: it.qty,
-          }))
-        if (pricelistEntries.length > 0) {
+      if (sup && sentIds.length > 0) {
+        const priceEntries = rows
+          .filter((r) => sentIds.includes(r.wsId))
+          .map((r) => {
+            const wsIt = items.find((it) => it.id === r.wsId)
+            return { supplierId: sup.id, sku: r.sku, wholesalePrice: wsIt?.wholesalePrice || 0, shopQty: r.qty }
+          })
+          .filter((e) => e.wholesalePrice > 0)
+        if (priceEntries.length > 0) {
           await fetch('/api/admin/inventory-pricelists', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entries: pricelistEntries }),
+            body: JSON.stringify({ entries: priceEntries }),
           }).catch(() => {})
         }
       }
 
-      // Lock successfully sent items permanently
       if (sentIds.length > 0) {
         setItems((prev) => prev.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it))
+        setCheckedItems((prev) => { const next = new Set(prev); sentIds.forEach((id) => next.delete(id)); return next })
       }
-      setInventorySent(true)
-      setCheckedItems(new Set())
-      if (missed.length > 0) setInventoryMissed(missed)
-      setTimeout(() => { setInventorySent(false); setInventoryMissed([]) }, 8000)
+      if (errors.length > 0) alert(`Failed to create: ${errors.join(', ')}`)
+      setShowNewSkuModal(false)
+      setNewSkuModalItems([])
+      await onRefresh()
     } finally {
-      setSendingInventory(false)
+      setSavingNewSkus(false)
+    }
+  }
+
+  async function handleConfirmUpdate() {
+    setConfirmingUpdate(true)
+    const errors: string[] = []
+    let updated = 0
+    try {
+      for (const it of confirmUpdateItems) {
+        const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
+        if (!prod) { errors.push(it.sku); continue }
+        const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+        const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
+        const preOrderZAR = Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
+        const patch: Record<string, number> = {}
+        if (finalLanded > 0) patch.costPerItem = finalLanded
+        if (retailZAR > 0) patch.price = retailZAR
+        if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
+        if (Object.keys(patch).length === 0) { updated++; continue }
+        const res = await fetch(`/api/admin/products/${prod.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        })
+        if (!res.ok) errors.push(it.sku)
+        else updated++
+      }
+      const sentIds = confirmUpdateItems.map((it) => it.id)
+      setItems((prev) => prev.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it))
+      setCheckedItems((prev) => { const next = new Set(prev); sentIds.forEach((id) => next.delete(id)); return next })
+      if (errors.length > 0) alert(`Updated ${updated}. Failed: ${errors.join(', ')}`)
+      setShowConfirmUpdate(false)
+      setConfirmUpdateItems([])
+    } finally {
+      setConfirmingUpdate(false)
     }
   }
 
@@ -1420,6 +1521,52 @@ function WorksheetEditor({
         />
       )}
 
+      {/* ── New SKU Modal (first-time send to inventory) ── */}
+      {showNewSkuModal && (
+        <NewSkuModal
+          rows={newSkuModalItems}
+          saving={savingNewSkus}
+          onSave={handleSaveNewSkus}
+          onClose={() => { setShowNewSkuModal(false); setNewSkuModalItems([]) }}
+          brandOptions={[...new Set(products.map((p) => p.brand).filter(Boolean))].sort()}
+          categoryOptions={[...new Set(products.map((p) => p.category).filter(Boolean))].sort()}
+          unitOptions={[...new Set(products.map((p) => p.unit).filter(Boolean))].sort()}
+        />
+      )}
+
+      {/* ── Confirm Update Dialog (existing SKU — pricing only, no qty change) ── */}
+      {showConfirmUpdate && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h2 className="text-base font-semibold text-gray-900 mb-2">Update Existing Products?</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              The following <strong>{confirmUpdateItems.length}</strong> SKU{confirmUpdateItems.length !== 1 ? 's' : ''} already exist in inventory.
+              This will update <strong>pricing and cost only</strong> — quantities will not change.
+            </p>
+            <ul className="text-xs text-gray-700 bg-gray-50 rounded-lg p-3 mb-5 max-h-48 overflow-y-auto space-y-1">
+              {confirmUpdateItems.map((it) => (
+                <li key={it.id} className="font-mono">{it.sku}{it.description ? ` — ${it.description}` : ''}</li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setShowConfirmUpdate(false); setConfirmUpdateItems([]) }}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmUpdate}
+                disabled={confirmingUpdate}
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {confirmingUpdate ? 'Updating…' : 'Yes, Update Pricing'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -1839,6 +1986,160 @@ function ProductInfoModal({
             <button onClick={handleSave} disabled={saving || saved}
               className={`px-5 py-2 text-sm font-semibold rounded-xl transition-colors ${saved ? 'bg-green-600 text-white' : 'bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50'}`}>
               {saved ? '✓ Saved!' : saving ? 'Saving…' : 'Save All'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── New SKU Modal (first-time Send to Inventory) ─────────────────────────────
+
+function NewSkuModal({
+  rows: initRows, saving, onSave, onClose, brandOptions, categoryOptions, unitOptions,
+}: {
+  rows: NewSkuRow[]
+  saving: boolean
+  onSave: (rows: NewSkuRow[]) => void
+  onClose: () => void
+  brandOptions: string[]
+  categoryOptions: string[]
+  unitOptions: string[]
+}) {
+  const [rows, setRows] = useState<NewSkuRow[]>(initRows)
+
+  function updateRow(wsId: string, patch: Partial<NewSkuRow>) {
+    setRows((prev) => prev.map((r) => r.wsId === wsId ? { ...r, ...patch } : r))
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl my-6">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Add New Products to Inventory</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {rows.length} new SKU{rows.length !== 1 ? 's' : ''} not found in inventory — confirm details before saving
+            </p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">#</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">SKU</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[200px]">Description</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[140px]">Brand</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[140px]">Category</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide min-w-[120px]">Unit</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Retail (ZAR)</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Cost (ZAR)</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {rows.map((row, i) => (
+                <tr key={row.wsId} className="hover:bg-gray-50/50">
+                  <td className="px-4 py-2.5 text-xs text-gray-400">{i + 1}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{row.sku}</span>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      value={row.description}
+                      onChange={(e) => updateRow(row.wsId, { description: e.target.value })}
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      list={`brand-list-${row.wsId}`}
+                      value={row.brand}
+                      onChange={(e) => updateRow(row.wsId, { brand: e.target.value })}
+                      placeholder="Brand…"
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                    <datalist id={`brand-list-${row.wsId}`}>
+                      {brandOptions.map((b) => <option key={b} value={b} />)}
+                    </datalist>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      list={`cat-list-${row.wsId}`}
+                      value={row.category}
+                      onChange={(e) => updateRow(row.wsId, { category: e.target.value })}
+                      placeholder="Category…"
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                    <datalist id={`cat-list-${row.wsId}`}>
+                      {categoryOptions.map((c) => <option key={c} value={c} />)}
+                    </datalist>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      list={`unit-list-${row.wsId}`}
+                      value={row.unit}
+                      onChange={(e) => updateRow(row.wsId, { unit: e.target.value })}
+                      placeholder="Unit…"
+                      className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                    <datalist id={`unit-list-${row.wsId}`}>
+                      {unitOptions.map((u) => <option key={u} value={u} />)}
+                    </datalist>
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      type="number" min={0} step={0.01}
+                      value={row.retailPrice || ''}
+                      onChange={(e) => updateRow(row.wsId, { retailPrice: parseFloat(e.target.value) || 0 })}
+                      className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      type="number" min={0} step={0.01}
+                      value={row.costPrice || ''}
+                      onChange={(e) => updateRow(row.wsId, { costPrice: parseFloat(e.target.value) || 0 })}
+                      className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <input
+                      type="number" min={0} step={1}
+                      value={row.qty || ''}
+                      onChange={(e) => updateRow(row.wsId, { qty: parseInt(e.target.value) || 0 })}
+                      className="w-16 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <p className="text-xs text-gray-400">
+            Products will be created as <strong>Active</strong> with the quantity set above.
+            Quantities can only be set on first upload.
+          </p>
+          <div className="flex gap-3">
+            <button onClick={onClose} disabled={saving}
+              className="px-4 py-2 text-sm border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50">
+              Cancel
+            </button>
+            <button
+              onClick={() => onSave(rows)}
+              disabled={saving}
+              className="px-5 py-2 text-sm font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : `Add ${rows.length} Product${rows.length !== 1 ? 's' : ''} to Inventory`}
             </button>
           </div>
         </div>
