@@ -42,6 +42,15 @@ export interface SiteSettings {
     logoImage?: string // URL to image logo — overrides text logo when set
     logoSize?: number // px size for image logo (default 80)
     logoPosition?: 'left' | 'center' | 'right' // header logo position (default 'left')
+    headerHeight?: number // header bar height in px (default 64)
+    // Company name shown next to logo
+    showCompanyName?: boolean
+    companyName?: string
+    companyNameSize?: number // font size px (default 20)
+    companyNameBold?: boolean
+    companyNameColor?: string // overall color (default inherits textColor)
+    companyNameOutline?: string // CSS text-stroke color (optional)
+    companyNameLetterColors?: string[] // per-letter colors (optional)
     backgroundColor: string
     textColor: string
     navItems: Array<{

@@ -117,31 +117,51 @@ export function DynamicHeader() {
   }
 
   const logoPosition = headerConfig.logoPosition || 'left'
+  const headerHeight = headerConfig.headerHeight ?? 64
+
+  // Render company name next to logo
+  const renderCompanyName = () => {
+    const { showCompanyName, companyName, companyNameSize, companyNameBold, companyNameColor, companyNameOutline, companyNameLetterColors, textColor } = headerConfig
+    if (!showCompanyName || !companyName) return null
+    const size = companyNameSize || 20
+    const bold = companyNameBold
+    const color = companyNameColor || textColor
+    const outline = companyNameOutline
+    const letterColors = companyNameLetterColors || []
+
+    if (letterColors.length > 0) {
+      return (
+        <span className="ml-2 flex items-center leading-none" style={{ fontSize: size, fontWeight: bold ? 700 : 400 }}>
+          {companyName.split('').map((ch, i) => (
+            <span key={i} style={{ color: letterColors[i] || color, WebkitTextStroke: outline ? `1px ${outline}` : undefined }}>{ch}</span>
+          ))}
+        </span>
+      )
+    }
+    return (
+      <span className="ml-2 leading-none" style={{ fontSize: size, fontWeight: bold ? 700 : 400, color, WebkitTextStroke: outline ? `1px ${outline}` : undefined }}>
+        {companyName}
+      </span>
+    )
+  }
 
   // Render logo — image takes priority over text
   const renderLogo = () => {
     const { logoText, logoStyle, logoImage, logoSize } = headerConfig
-    if (logoImage) {
-      const size = logoSize || 80
-      return (
-        <img
-          src={logoImage}
-          alt={logoText || 'Logo'}
-          style={{ width: size, height: size, objectFit: 'contain' }}
-        />
-      )
-    }
-    if (logoStyle === 'split' && logoText && logoText.length > 3) {
-      return (
-        <div className="text-2xl font-bold">
-          <span style={{ color: headerConfig.textColor }}>{logoText.substring(0, 3)}</span>
-          <span className="text-primary">{logoText.substring(3)}</span>
-        </div>
-      )
-    }
+    const logoEl = logoImage ? (
+      <img src={logoImage} alt={logoText || 'Logo'} style={{ width: logoSize || 80, height: logoSize || 80, objectFit: 'contain' }} />
+    ) : logoStyle === 'split' && logoText && logoText.length > 3 ? (
+      <div className="text-2xl font-bold">
+        <span style={{ color: headerConfig.textColor }}>{logoText.substring(0, 3)}</span>
+        <span className="text-primary">{logoText.substring(3)}</span>
+      </div>
+    ) : (
+      <div className="text-2xl font-bold" style={{ color: headerConfig.textColor }}>{logoText}</div>
+    )
     return (
-      <div className="text-2xl font-bold" style={{ color: headerConfig.textColor }}>
-        {logoText}
+      <div className="flex items-center">
+        {logoEl}
+        {renderCompanyName()}
       </div>
     )
   }
@@ -154,7 +174,7 @@ export function DynamicHeader() {
         style={{ backgroundColor: headerConfig.backgroundColor }}
       >
         <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
+          <div className="flex items-center justify-between" style={{ height: headerHeight }}>
             <div className="text-2xl font-bold animate-pulse bg-gray-200 rounded w-32 h-8" />
           </div>
         </div>
@@ -267,7 +287,7 @@ export function DynamicHeader() {
         )}
 
         <div className="container mx-auto px-4">
-          <div className={`flex h-16 items-center ${logoPosition === 'center' ? 'relative justify-between' : 'justify-between'}`}>
+          <div className={`flex items-center ${logoPosition === 'center' ? 'relative justify-between' : 'justify-between'}`} style={{ height: headerHeight }}>
             {/* Logo — left or center */}
             {logoPosition !== 'right' && (
               <Link
