@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,9 @@ function formatDisplayDate(iso: string): string {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WorksheetPage() {
+  const searchParams = useSearchParams()
+  const initialSheetId = searchParams.get('id') ?? undefined
+
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
     name: '', address: '', city: '', postalCode: '', country: '', phone: '', email: '', vatNumber: '',
   })
@@ -143,6 +147,7 @@ export default function WorksheetPage() {
         products={products}
         suppliers={suppliers}
         onRefresh={load}
+        initialSheetId={initialSheetId}
       />
     </div>
   )
@@ -151,12 +156,13 @@ export default function WorksheetPage() {
 // ─── Worksheet Editor ─────────────────────────────────────────────────────────
 
 function WorksheetEditor({
-  companyInfo, products, suppliers, onRefresh,
+  companyInfo, products, suppliers, onRefresh, initialSheetId,
 }: {
   companyInfo: CompanyInfo
   products: ProductRef[]
   suppliers: SupplierContact[]
   onRefresh: () => void
+  initialSheetId?: string
 }) {
   // ── Worksheet identity ──
   const [worksheetId, setWorksheetId] = useState(newSheetId)
@@ -491,6 +497,18 @@ function WorksheetEditor({
   }, [])
 
   useEffect(() => { refreshSheets() }, [refreshSheets])
+
+  // ── Auto-load sheet from URL ?id= param ──
+  const initialLoadDone = useRef(false)
+  useEffect(() => {
+    if (!initialSheetId || initialLoadDone.current || allWorksheets.length === 0) return
+    const target = allWorksheets.find((s) => s.id === initialSheetId)
+    if (target) {
+      loadWorksheet(target)
+      initialLoadDone.current = true
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allWorksheets, initialSheetId])
 
   // ── Close new menu on outside click ──
   useEffect(() => {

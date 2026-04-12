@@ -99,6 +99,16 @@ export default function SuppliersNetworkPage() {
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
   const [showCreateOrder, setShowCreateOrder] = useState(false)
 
+  // Send to Worksheet
+  const [wsModalSupplier, setWsModalSupplier] = useState<string | null>(null)
+  const [wsModalItems, setWsModalItems] = useState<Backorder[]>([])
+  const [allWorksheets, setAllWorksheets] = useState<{ id: string; name: string; supplier: string; date: string }[]>([])
+  const [wsTargetId, setWsTargetId] = useState<string>('new')
+  const [wsNewName, setWsNewName] = useState('')
+  const [wsSending, setWsSending] = useState(false)
+  const [wsSentResult, setWsSentResult] = useState('')
+  const [wsCreatedId, setWsCreatedId] = useState('')
+
   // ─── Data Loading ──────────────────────────────────────────────────────
 
   const loadSuppliers = useCallback(async () => {
@@ -256,6 +266,92 @@ export default function SuppliersNetworkPage() {
 
   function handlePrint() {
     window.print()
+  }
+
+  async function openWsModal(supplierName: string, items: Backorder[]) {
+    setWsModalSupplier(supplierName)
+    setWsModalItems(items)
+    setWsTargetId('new')
+    setWsNewName(`${supplierName} – ${new Date().toLocaleDateString('en-ZA')}`)
+    setWsSentResult('')
+    setWsCreatedId('')
+    try {
+      const res = await fetch('/api/admin/worksheets')
+      if (res.ok) {
+        const sheets = await res.json()
+        setAllWorksheets(sheets.filter((s: any) => !s.archived).map((s: any) => ({ id: s.id, name: s.name, supplier: s.supplier, date: s.date })))
+      }
+    } catch { setAllWorksheets([]) }
+  }
+
+  async function handleSendToWorksheet() {
+    if (!wsModalSupplier) return
+    setWsSending(true)
+    setWsSentResult('')
+    try {
+      // Build WsItems from backorders
+      const newItems = wsModalItems.map((b) => ({
+        id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        sku: b.sku,
+        skuSearch: '',
+        description: b.description,
+        unit: '',
+        category: b.brand || '',
+        inStock: 0,
+        retailPrice: b.price || 0,
+        preOrderPrice: 0,
+        qty: b.qty,
+        wholesalePrice: 0,
+        retailOverride: '',
+      }))
+
+      let sheet: any
+      if (wsTargetId === 'new') {
+        // Create a fresh worksheet
+        sheet = {
+          id: `ws_${Date.now()}`,
+          name: wsNewName || `${wsModalSupplier} – ${new Date().toISOString().slice(0, 10)}`,
+          supplier: wsModalSupplier,
+          date: new Date().toISOString().slice(0, 10),
+          archived: false,
+          currency: 'ZAR',
+          exchangeRate: 1,
+          markupPct: 0,
+          shippingPct: 0,
+          vatPct: 15,
+          finalCurrency: 'ZAR',
+          finalExRate: 1,
+          finalShippingCost: 0,
+          finalCustomsCost: 0,
+          finalMarkupPct: 0,
+          finalVatPct: 15,
+          items: newItems,
+        }
+      } else {
+        // Load existing and append
+        const res = await fetch('/api/admin/worksheets')
+        const sheets = await res.json()
+        const existing = sheets.find((s: any) => s.id === wsTargetId)
+        if (!existing) throw new Error('Worksheet not found')
+        sheet = { ...existing, items: [...(existing.items || []), ...newItems] }
+      }
+
+      const res = await fetch('/api/admin/worksheets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sheet),
+      })
+      if (!res.ok) throw new Error('Save failed')
+      setWsCreatedId(sheet.id)
+      setWsSentResult(wsTargetId === 'new'
+        ? `✓ Created new worksheet "${sheet.name}" with ${newItems.length} item(s)`
+        : `✓ Added ${newItems.length} item(s) to "${allWorksheets.find(w => w.id === wsTargetId)?.name}"`
+      )
+    } catch (err: any) {
+      setWsSentResult(`Error: ${err.message}`)
+    } finally {
+      setWsSending(false)
+    }
   }
 
   function toggleGroup(name: string) {
@@ -651,17 +747,30 @@ export default function SuppliersNetworkPage() {
                             <span className="font-semibold text-gray-900 text-sm">{supplierName}</span>
                             <span className="text-xs text-gray-400">{items.length} line{items.length !== 1 ? 's' : ''} · {subtotalQty} items</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => downloadSupplierOrder(supplierName, items)}
-                            className="flex items-center gap-1.5 bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-700 transition-colors flex-shrink-0"
-                            title="Download order sheet as PDF"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Download Order
-                          </button>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => openWsModal(supplierName, items)}
+                              className="flex items-center gap-1.5 bg-indigo-600 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
+                              title="Send orders to a worksheet"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              Send to Worksheet
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => downloadSupplierOrder(supplierName, items)}
+                              className="flex items-center gap-1.5 bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-700 transition-colors"
+                              title="Download order sheet as PDF"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                              Download Order
+                            </button>
+                          </div>
                         </div>
                         {/* Collapsible table */}
                         {isOpen && (
@@ -697,6 +806,103 @@ export default function SuppliersNetworkPage() {
           companyInfo={companyInfo}
           onClose={() => setShowCreateOrder(false)}
         />
+      )}
+
+      {/* ── Send to Worksheet Modal ────────────────────────────────────── */}
+      {wsModalSupplier && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Send to Worksheet</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{wsModalItems.length} order{wsModalItems.length !== 1 ? 's' : ''} · {wsModalSupplier}</p>
+              </div>
+              <button onClick={() => { setWsModalSupplier(null); setWsSentResult('') }} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Items preview */}
+              <div className="bg-gray-50 rounded-lg border border-gray-100 divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                {wsModalItems.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                    <div>
+                      <span className="font-mono font-semibold text-gray-700">{b.sku}</span>
+                      <span className="text-gray-500 ml-2 truncate max-w-[200px] inline-block align-bottom">{b.description}</span>
+                    </div>
+                    <span className="text-gray-400 ml-2 flex-shrink-0">×{b.qty}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Worksheet target */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Add to Worksheet</label>
+                <select
+                  value={wsTargetId}
+                  onChange={e => setWsTargetId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="new">＋ New Worksheet</option>
+                  {allWorksheets.map(ws => (
+                    <option key={ws.id} value={ws.id}>
+                      {ws.name}{ws.supplier ? ` · ${ws.supplier}` : ''}{ws.date ? ` · ${ws.date}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* New worksheet name */}
+              {wsTargetId === 'new' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Worksheet Name</label>
+                  <input
+                    type="text"
+                    value={wsNewName}
+                    onChange={e => setWsNewName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder="e.g. Sideways Order June 2026"
+                  />
+                </div>
+              )}
+
+              {/* Result message */}
+              {wsSentResult && (
+                <div className={`text-sm rounded-lg px-3 py-2 ${wsSentResult.startsWith('Error') ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                  {wsSentResult}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => { setWsModalSupplier(null); setWsSentResult('') }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
+                >
+                  {wsSentResult && !wsSentResult.startsWith('Error') ? 'Close' : 'Cancel'}
+                </button>
+                {(!wsSentResult || wsSentResult.startsWith('Error')) && (
+                  <button
+                    onClick={handleSendToWorksheet}
+                    disabled={wsSending || (wsTargetId === 'new' && !wsNewName.trim())}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {wsSending ? 'Sending…' : wsTargetId === 'new' ? 'Create & Send' : 'Add to Worksheet'}
+                  </button>
+                )}
+                {wsSentResult && !wsSentResult.startsWith('Error') && (
+                  <a
+                    href={wsCreatedId ? `/admin/worksheet?id=${wsCreatedId}` : '/admin/worksheet'}
+                    className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 text-center"
+                  >
+                    Open Worksheet →
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Add / Edit Supplier Modal ──────────────────────────────────── */}
