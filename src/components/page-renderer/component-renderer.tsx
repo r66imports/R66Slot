@@ -1188,6 +1188,25 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
     case 'content-block': {
       const imgPos = (settings.imagePosition as string) || 'top'
       const hasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
+
+      // Background image
+      const bgImageUrl = (settings.bgImageUrl as string) || ''
+      const bgImageSize = (settings.bgImageSize as string) || 'cover'
+      const bgImagePosition = (settings.bgImagePosition as string) || 'center center'
+      const bgOverlayOpacity = (settings.bgOverlayOpacity as number) ?? 0
+      const hasBgImage = bgImageUrl.trim() !== ''
+
+      const cbContainerStyle: React.CSSProperties = {
+        ...containerStyle,
+        ...(hasBgImage ? {
+          backgroundImage: `url("${bgImageUrl}")`,
+          backgroundSize: bgImageSize,
+          backgroundPosition: bgImagePosition,
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+        } : {}),
+      }
+
       const blockContent = (
         <div className="flex-1">
           <div dangerouslySetInnerHTML={{ __html: content }} />
@@ -1213,33 +1232,51 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       ) : null
 
+      // Overlay + inner content wrapper
+      const innerWrap = (children: React.ReactNode) => (
+        <>
+          {hasBgImage && bgOverlayOpacity > 0 && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${bgOverlayOpacity})`, borderRadius: cbContainerStyle.borderRadius }} />
+          )}
+          <div style={{ position: hasBgImage ? 'relative' : undefined, zIndex: hasBgImage ? 1 : undefined }}>
+            {children}
+          </div>
+        </>
+      )
+
       if (imgPos === 'left' && blockImage) {
         return (
-          <div style={containerStyle}>
-            <div className="container mx-auto flex flex-col md:flex-row gap-6 items-start">
-              {blockImage}
-              {blockContent}
-            </div>
+          <div style={cbContainerStyle}>
+            {innerWrap(
+              <div className="container mx-auto flex flex-col md:flex-row gap-6 items-start">
+                {blockImage}
+                {blockContent}
+              </div>
+            )}
           </div>
         )
       }
       if (imgPos === 'right' && blockImage) {
         return (
-          <div style={containerStyle}>
-            <div className="container mx-auto flex flex-col md:flex-row gap-6 items-start">
-              {blockContent}
-              {blockImage}
-            </div>
+          <div style={cbContainerStyle}>
+            {innerWrap(
+              <div className="container mx-auto flex flex-col md:flex-row gap-6 items-start">
+                {blockContent}
+                {blockImage}
+              </div>
+            )}
           </div>
         )
       }
       return (
-        <div style={containerStyle}>
-          <div className="container mx-auto">
-            {imgPos === 'top' && blockImage}
-            {blockContent}
-            {imgPos === 'bottom' && blockImage}
-          </div>
+        <div style={cbContainerStyle}>
+          {innerWrap(
+            <div className="container mx-auto">
+              {imgPos === 'top' && blockImage}
+              {blockContent}
+              {imgPos === 'bottom' && blockImage}
+            </div>
+          )}
         </div>
       )
     }
