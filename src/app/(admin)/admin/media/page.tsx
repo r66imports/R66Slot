@@ -42,6 +42,7 @@ function MediaEditorPanel({
   const [aspect, setAspect] = useState<AspectRatio>(null)
   const [customW, setCustomW] = useState('')
   const [customH, setCustomH] = useState('')
+  const [sharpness, setSharpness] = useState(0)
   const [processing, setProcessing] = useState(false)
   const [usage, setUsage] = useState<UsageResult | null>(null)
   const [loadingUsage, setLoadingUsage] = useState(false)
@@ -94,6 +95,31 @@ function MediaEditorPanel({
       setUsage({ products: matchedProducts, pages: matchedPages })
     } catch { setUsage({ products: [], pages: [] }) }
     finally { setLoadingUsage(false) }
+  }
+
+  // Unsharp mask sharpening via 3x3 convolution kernel
+  function applySharpening(ctx: CanvasRenderingContext2D, w: number, h: number, amount: number) {
+    const imageData = ctx.getImageData(0, 0, w, h)
+    const src = imageData.data
+    const out = new Uint8ClampedArray(src)
+    const center = 1 + 4 * amount
+    const edge = -amount
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        for (let c = 0; c < 3; c++) {
+          const i = (y * w + x) * 4 + c
+          out[i] = Math.max(0, Math.min(255, Math.round(
+            center * src[i] +
+            edge * src[i - 4] +
+            edge * src[i + 4] +
+            edge * src[(y - 1) * w * 4 + x * 4 + c] +
+            edge * src[(y + 1) * w * 4 + x * 4 + c]
+          )))
+        }
+      }
+    }
+    imageData.data.set(out)
+    ctx.putImageData(imageData, 0, 0)
   }
 
   // Process image: crop to aspect ratio + resize to custom px
@@ -151,6 +177,7 @@ function MediaEditorPanel({
       canvas.height = outH
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outW, outH)
+      if (sharpness > 0) applySharpening(ctx, outW, outH, sharpness / 10)
       URL.revokeObjectURL(objectUrl)
 
       // Determine mime type — keep original type
@@ -330,10 +357,39 @@ function MediaEditorPanel({
                   <p className="text-[10px] text-gray-400 mt-1 font-play">Leave blank to keep cropped size</p>
                 </div>
 
+                {/* Sharpening */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide font-play">
+                      Sharpening
+                    </label>
+                    <span className="text-xs font-mono text-indigo-600 font-semibold">
+                      {sharpness === 0 ? 'Off' : sharpness <= 3 ? 'Light' : sharpness <= 6 ? 'Medium' : sharpness <= 8 ? 'Strong' : 'Max'}
+                      {sharpness > 0 && ` (${sharpness})`}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={10}
+                    step={1}
+                    value={sharpness}
+                    onChange={e => setSharpness(Number(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-[10px] text-gray-400 font-play mt-0.5">
+                    <span>Off</span>
+                    <span>Light</span>
+                    <span>Medium</span>
+                    <span>Strong</span>
+                    <span>Max</span>
+                  </div>
+                </div>
+
                 {/* Apply */}
                 <button
                   onClick={handleApply}
-                  disabled={processing || (!aspect && !customW && !customH)}
+                  disabled={processing || (!aspect && !customW && !customH && sharpness === 0)}
                   className="w-full py-2.5 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-play"
                 >
                   {processing ? 'Processing…' : '✂ Apply & Overwrite'}
