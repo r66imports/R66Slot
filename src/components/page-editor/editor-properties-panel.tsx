@@ -1655,6 +1655,65 @@ function ContentTab({
             </div>
           )}
           <VisualColumnEditor component={component} onUpdate={onUpdate} viewMode={viewMode} />
+
+          {/* ── Background Image (Columns) ── */}
+          {component.type === 'columns' && (
+            <div className="border-t border-gray-100 pt-3">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">Background Image</p>
+              <ImageField
+                label="Background Image"
+                value={(component.settings.bgImageUrl as string) || ''}
+                onChange={(url) => updateSetting('bgImageUrl', url)}
+              />
+              {(component.settings.bgImageUrl as string) && (
+                <>
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Fit</label>
+                    <select
+                      value={(component.settings.bgImageSize as string) || 'cover'}
+                      onChange={(e) => updateSetting('bgImageSize', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+                    >
+                      <option value="cover">Cover (fill, crop)</option>
+                      <option value="contain">Contain (show all)</option>
+                      <option value="100% 100%">Stretch (distort)</option>
+                      <option value="auto">Original size</option>
+                    </select>
+                  </div>
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Position</label>
+                    <select
+                      value={(component.settings.bgImagePosition as string) || 'center center'}
+                      onChange={(e) => updateSetting('bgImagePosition', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+                    >
+                      <option value="center center">Center</option>
+                      <option value="top center">Top</option>
+                      <option value="bottom center">Bottom</option>
+                      <option value="center left">Left</option>
+                      <option value="center right">Right</option>
+                      <option value="top left">Top Left</option>
+                      <option value="top right">Top Right</option>
+                      <option value="bottom left">Bottom Left</option>
+                      <option value="bottom right">Bottom Right</option>
+                    </select>
+                  </div>
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1 font-play">
+                      Dark Overlay: {Math.round(((component.settings.bgOverlayOpacity as number) ?? 0) * 100)}%
+                    </label>
+                    <input
+                      type="range" min={0} max={1} step={0.05}
+                      value={(component.settings.bgOverlayOpacity as number) ?? 0}
+                      onChange={(e) => updateSetting('bgOverlayOpacity', parseFloat(e.target.value))}
+                      className="w-full accent-indigo-600"
+                    />
+                    <div className="flex justify-between text-xs text-gray-400"><span>None</span><span>50%</span><span>Full</span></div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -3289,7 +3348,7 @@ function SettingsTab({
         </div>
       )}
 
-      {/* Divider settings */}
+      {/* Divider / Rule settings */}
       {component.type === 'divider' && (
         <>
           <div>
@@ -3329,6 +3388,63 @@ function SettingsTab({
                 className="flex-1 px-2 py-1 border border-gray-200 rounded text-xs font-play"
               />
             </div>
+          </div>
+
+          {/* ── Background Image (Divider/Rule) ── */}
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 font-play">Background Image</p>
+            <ImageField
+              label="Background Image"
+              value={(component.settings.bgImageUrl as string) || ''}
+              onChange={(url) => updateSetting('bgImageUrl', url)}
+            />
+            {(component.settings.bgImageUrl as string) && (
+              <>
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Fit</label>
+                  <select
+                    value={(component.settings.bgImageSize as string) || 'cover'}
+                    onChange={(e) => updateSetting('bgImageSize', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+                  >
+                    <option value="cover">Cover (fill, crop)</option>
+                    <option value="contain">Contain (show all)</option>
+                    <option value="100% 100%">Stretch (distort)</option>
+                    <option value="auto">Original size</option>
+                  </select>
+                </div>
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-gray-500 mb-1 font-play">Image Position</label>
+                  <select
+                    value={(component.settings.bgImagePosition as string) || 'center center'}
+                    onChange={(e) => updateSetting('bgImagePosition', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play"
+                  >
+                    <option value="center center">Center</option>
+                    <option value="top center">Top</option>
+                    <option value="bottom center">Bottom</option>
+                    <option value="center left">Left</option>
+                    <option value="center right">Right</option>
+                    <option value="top left">Top Left</option>
+                    <option value="top right">Top Right</option>
+                    <option value="bottom left">Bottom Left</option>
+                    <option value="bottom right">Bottom Right</option>
+                  </select>
+                </div>
+                <div className="mt-2">
+                  <label className="block text-xs font-medium text-gray-500 mb-1 font-play">
+                    Dark Overlay: {Math.round(((component.settings.bgOverlayOpacity as number) ?? 0) * 100)}%
+                  </label>
+                  <input
+                    type="range" min={0} max={1} step={0.05}
+                    value={(component.settings.bgOverlayOpacity as number) ?? 0}
+                    onChange={(e) => updateSetting('bgOverlayOpacity', parseFloat(e.target.value))}
+                    className="w-full accent-indigo-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400"><span>None</span><span>50%</span><span>Full</span></div>
+                </div>
+              </>
+            )}
           </div>
         </>
       )}

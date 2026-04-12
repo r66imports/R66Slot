@@ -343,6 +343,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Categories'],
     category: 'Admin UI',
   },
+  {
+    id: 'element_background_image',
+    name: 'Rule 40 — Page Elements: Background Image',
+    description: 'Enables a Background Image on three Page Editor elements: Content Block, Columns, and Divider/Rule. Each element\'s properties panel shows a "Background Image" section below the existing settings. Controls: Background Image (pick from Media Library or upload directly), Image Fit (Cover — fills and crops, Contain — shows full image, Stretch, Original size), Image Position (9 presets: Centre, Top, Bottom, Left, Right, and all four corners), Dark Overlay slider (0–100%) — a transparent black layer placed above the background image and below the content, ensuring text remains readable over busy photos. The overlay is a position:absolute div; the content is positioned above it via z-index. All three elements use position:relative on the outer container when a background image is set, so the overlay clips correctly to the element bounds (including any border-radius). Applies to: Content Block, Columns, and Divider/Rule elements in the Page Editor.',
+    active: true,
+    appliesTo: ['Page Editor', 'Content Block', 'Columns', 'Divider'],
+    category: 'Page Editor',
+  },
 ]
 
 export async function GET() {

@@ -694,10 +694,28 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
       const colMobile = (settings.columnsMobile as number) || Math.min(2, colCount)
       const colCls = `colg-${colCount}d${colTablet}t${colMobile}m`
       const colStyle = `.${colCls}{display:grid;grid-template-columns:repeat(${colCount},minmax(0,1fr));gap:1.5rem}@media(max-width:1023px){.${colCls}{grid-template-columns:repeat(${colTablet},minmax(0,1fr))}}@media(max-width:639px){.${colCls}{grid-template-columns:repeat(${colMobile},minmax(0,1fr));gap:0.75rem}}`
+      const colBgUrl = (settings.bgImageUrl as string) || ''
+      const colBgSize = (settings.bgImageSize as string) || 'cover'
+      const colBgPos = (settings.bgImagePosition as string) || 'center center'
+      const colOverlay = (settings.bgOverlayOpacity as number) ?? 0
+      const hasColBg = colBgUrl.trim() !== ''
+      const colContainerStyle: React.CSSProperties = {
+        ...containerStyle,
+        ...(hasColBg ? {
+          backgroundImage: `url("${colBgUrl}")`,
+          backgroundSize: colBgSize,
+          backgroundPosition: colBgPos,
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+        } : {}),
+      }
       return (
-        <section style={containerStyle}>
+        <section style={colContainerStyle}>
           <style>{colStyle}</style>
-          <div className="w-full max-w-screen-xl mx-auto px-4">
+          {hasColBg && colOverlay > 0 && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${colOverlay})`, borderRadius: colContainerStyle.borderRadius }} />
+          )}
+          <div className="w-full max-w-screen-xl mx-auto px-4" style={{ position: hasColBg ? 'relative' : undefined, zIndex: hasColBg ? 1 : undefined }}>
             <div className={colCls}>
               {children?.slice(0, colCount).map((child) => {
                 const imgFitCol = (child.settings.objectFit as string) || 'cover'
@@ -787,20 +805,35 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
         </div>
       )
 
-    case 'divider':
+    case 'divider': {
+      const divBgUrl = (settings.bgImageUrl as string) || ''
+      const divOverlay = (settings.bgOverlayOpacity as number) ?? 0
+      const hasDivBg = divBgUrl.trim() !== ''
+      const divContainerStyle: React.CSSProperties = {
+        ...containerStyle,
+        ...(hasDivBg ? {
+          backgroundImage: `url("${divBgUrl}")`,
+          backgroundSize: (settings.bgImageSize as string) || 'cover',
+          backgroundPosition: (settings.bgImagePosition as string) || 'center center',
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+        } : {}),
+      }
       return (
-        <div style={containerStyle}>
-          <div className="container mx-auto">
+        <div style={divContainerStyle}>
+          {hasDivBg && divOverlay > 0 && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${divOverlay})` }} />
+          )}
+          <div className="container mx-auto" style={{ position: hasDivBg ? 'relative' : undefined, zIndex: hasDivBg ? 1 : undefined }}>
             <hr
               style={{
-                borderTop: `${settings.thickness || '1px'} ${settings.style || 'solid'} ${
-                  settings.color || '#e5e7eb'
-                }`,
+                borderTop: `${settings.thickness || '1px'} ${settings.style || 'solid'} ${settings.color || '#e5e7eb'}`,
               }}
             />
           </div>
         </div>
       )
+    }
 
     case 'video':
       return (
