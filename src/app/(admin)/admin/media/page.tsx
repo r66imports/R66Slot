@@ -42,7 +42,9 @@ function MediaEditorPanel({
   const [aspect, setAspect] = useState<AspectRatio>(null)
   const [customW, setCustomW] = useState('')
   const [customH, setCustomH] = useState('')
-  const [sharpness, setSharpness] = useState(0)
+  const [brightness, setBrightness] = useState(0)
+  const [contrast, setContrast] = useState(0)
+  const [saturation, setSaturation] = useState(0)
   const [processing, setProcessing] = useState(false)
   const [usage, setUsage] = useState<UsageResult | null>(null)
   const [loadingUsage, setLoadingUsage] = useState(false)
@@ -97,28 +99,35 @@ function MediaEditorPanel({
     finally { setLoadingUsage(false) }
   }
 
-  // Unsharp mask sharpening via 3x3 convolution kernel
-  function applySharpening(ctx: CanvasRenderingContext2D, w: number, h: number, amount: number) {
+  // Apply brightness / contrast / saturation adjustments to canvas pixels
+  function applyEnhancements(
+    ctx: CanvasRenderingContext2D, w: number, h: number,
+    bri: number, con: number, sat: number
+  ) {
     const imageData = ctx.getImageData(0, 0, w, h)
-    const src = imageData.data
-    const out = new Uint8ClampedArray(src)
-    const center = 1 + 4 * amount
-    const edge = -amount
-    for (let y = 1; y < h - 1; y++) {
-      for (let x = 1; x < w - 1; x++) {
-        for (let c = 0; c < 3; c++) {
-          const i = (y * w + x) * 4 + c
-          out[i] = Math.max(0, Math.min(255, Math.round(
-            center * src[i] +
-            edge * src[i - 4] +
-            edge * src[i + 4] +
-            edge * src[(y - 1) * w * 4 + x * 4 + c] +
-            edge * src[(y + 1) * w * 4 + x * 4 + c]
-          )))
-        }
-      }
+    const d = imageData.data
+    // Contrast factor: 0 = no change; ±127 = strong
+    const cf = (259 * (con + 255)) / (255 * (259 - con))
+    // Saturation multiplier: 0 = no change
+    const sf = 1 + sat / 100
+
+    for (let i = 0; i < d.length; i += 4) {
+      let r = d[i], g = d[i + 1], b = d[i + 2]
+      // Brightness
+      r += bri; g += bri; b += bri
+      // Contrast (scale around midpoint 128)
+      r = cf * (r - 128) + 128
+      g = cf * (g - 128) + 128
+      b = cf * (b - 128) + 128
+      // Saturation via perceived luminance
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b
+      r = lum + (r - lum) * sf
+      g = lum + (g - lum) * sf
+      b = lum + (b - lum) * sf
+      d[i]     = Math.max(0, Math.min(255, Math.round(r)))
+      d[i + 1] = Math.max(0, Math.min(255, Math.round(g)))
+      d[i + 2] = Math.max(0, Math.min(255, Math.round(b)))
     }
-    imageData.data.set(out)
     ctx.putImageData(imageData, 0, 0)
   }
 
@@ -177,17 +186,35 @@ function MediaEditorPanel({
       canvas.height = outH
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outW, outH)
-      if (sharpness > 0) applySharpening(ctx, outW, outH, sharpness / 10)
+      if (brightness !== 0 || contrast !== 0 || saturation !== 0) {
+        applyEnhancements(ctx, outW, outH, brightness, contrast, saturation)
+      }
       URL.revokeObjectURL(objectUrl)
 
       // Determine mime type — keep original type
       const mime = file.type === 'image/png' ? 'image/png' : 'image/jpeg'
 
-      const blob = await new Promise<Blob>((res, rej) => canvas.toBlob(b => b ? res(b) : rej(), mime, 0.92))
+      let blob: Blob
+      try {
+        blob = await new Promise<Blob>((res, rej) =>
+          canvas.toBlob(b => b ? res(b) : rej(new Error('canvas.toBlob returned null')), mime, 0.92)
+        )
+      } catch (blobErr: any) {
+        throw new Error(`Canvas export failed — ${blobErr?.message || blobErr}. This can happen if the image failed to load via proxy.`)
+      }
 
-      // Extract the R2 key from the existing URL (/api/media/uploads/filename.jpg → uploads/filename.jpg)
-      // This overwrites the same R2 key so the URL stays identical
-      const r2Key = file.url.replace(/^\/api\/media\//, '')
+      // Extract R2 key — handles both /api/media/... and absolute R2 public URLs
+      let r2Key: string
+      const apiMatch = file.url.match(/\/api\/media\/([^?]+)/)
+      if (apiMatch) {
+        r2Key = apiMatch[1]
+      } else {
+        try {
+          r2Key = new URL(file.url).pathname.replace(/^\//, '')
+        } catch {
+          r2Key = file.url.replace(/^\//, '')
+        }
+      }
 
       const form = new FormData()
       form.append('file', blob, file.name)
@@ -357,39 +384,62 @@ function MediaEditorPanel({
                   <p className="text-[10px] text-gray-400 mt-1 font-play">Leave blank to keep cropped size</p>
                 </div>
 
-                {/* Sharpening */}
+                {/* Image Enhancer */}
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-3">
                     <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide font-play">
-                      Sharpening
+                      Image Enhancer
                     </label>
-                    <span className="text-xs font-mono text-indigo-600 font-semibold">
-                      {sharpness === 0 ? 'Off' : sharpness <= 3 ? 'Light' : sharpness <= 6 ? 'Medium' : sharpness <= 8 ? 'Strong' : 'Max'}
-                      {sharpness > 0 && ` (${sharpness})`}
-                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setBrightness(8); setContrast(25); setSaturation(20) }}
+                        className="text-[10px] font-semibold px-2 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 font-play"
+                      >
+                        ✨ Auto Enhance
+                      </button>
+                      {(brightness !== 0 || contrast !== 0 || saturation !== 0) && (
+                        <button
+                          type="button"
+                          onClick={() => { setBrightness(0); setContrast(0); setSaturation(0) }}
+                          className="text-[10px] font-semibold px-2 py-1 rounded bg-gray-200 text-gray-600 hover:bg-gray-300 font-play"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={10}
-                    step={1}
-                    value={sharpness}
-                    onChange={e => setSharpness(Number(e.target.value))}
-                    className="w-full accent-indigo-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-gray-400 font-play mt-0.5">
-                    <span>Off</span>
-                    <span>Light</span>
-                    <span>Medium</span>
-                    <span>Strong</span>
-                    <span>Max</span>
+                  <div className="space-y-3">
+                    {([
+                      { label: 'Brightness', value: brightness, set: setBrightness },
+                      { label: 'Contrast',   value: contrast,   set: setContrast   },
+                      { label: 'Saturation', value: saturation, set: setSaturation },
+                    ] as { label: string; value: number; set: (v: number) => void }[]).map(({ label, value, set }) => (
+                      <div key={label}>
+                        <div className="flex justify-between text-[11px] text-gray-500 font-play mb-1">
+                          <span>{label}</span>
+                          <span className={`font-mono font-semibold ${value !== 0 ? 'text-indigo-600' : 'text-gray-400'}`}>
+                            {value > 0 ? `+${value}` : value}
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-100}
+                          max={100}
+                          step={1}
+                          value={value}
+                          onChange={e => set(Number(e.target.value))}
+                          className="w-full accent-indigo-600 h-1.5"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
 
                 {/* Apply */}
                 <button
                   onClick={handleApply}
-                  disabled={processing || (!aspect && !customW && !customH && sharpness === 0)}
+                  disabled={processing || (!aspect && !customW && !customH && brightness === 0 && contrast === 0 && saturation === 0)}
                   className="w-full py-2.5 bg-gray-900 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-play"
                 >
                   {processing ? 'Processing…' : '✂ Apply & Overwrite'}
