@@ -1817,6 +1817,7 @@ interface ProdOptions {
   categories: string[]
   salesAccounts: string[]
   purchaseAccounts: string[]
+  brandAccountMap: Record<string, { salesAccount: string[]; purchaseAccount: string[] }>
 }
 
 function ProductInfoModal({
@@ -1830,19 +1831,30 @@ function ProductInfoModal({
 }) {
   const skuItems = items.filter((it) => it.sku.trim())
   const [rows, setRows] = useState<ProdInfoRow[]>([])
-  const [opts, setOpts] = useState<ProdOptions>({ brands: [], categories: [], salesAccounts: [], purchaseAccounts: [] })
+  const [opts, setOpts] = useState<ProdOptions>({ brands: [], categories: [], salesAccounts: [], purchaseAccounts: [], brandAccountMap: {} })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [openDrop, setOpenDrop] = useState<string | null>(null)
+  const [showSetup, setShowSetup] = useState(false)
+  // Brand account setup state
+  const [setupMap, setSetupMap] = useState<Record<string, { salesAccount: string[]; purchaseAccount: string[] }>>({})
+  const [setupSaving, setSetupSaving] = useState(false)
+  const [setupSaved, setSetupSaved] = useState(false)
+  const [newBrandInput, setNewBrandInput] = useState('')
+  const [localBrands, setLocalBrands] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/admin/product-options').then(r => r.json()).then((o: any) => {
+      const map = o.brandAccountMap || {}
       setOpts({
         brands: o.brands || [],
         categories: o.categories || [],
         salesAccounts: o.salesAccounts || [],
         purchaseAccounts: o.purchaseAccounts || [],
+        brandAccountMap: map,
       })
+      setLocalBrands(o.brands || [])
+      setSetupMap(map)
     }).catch(() => {})
 
     const built: ProdInfoRow[] = skuItems.map((it) => {
@@ -1862,6 +1874,20 @@ function ProductInfoModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Auto-fill accounts when categoryBrands changes for a row
+  function applyBrandAccounts(idx: number, brands: string[], map: typeof opts.brandAccountMap) {
+    const brand = brands[0]
+    if (!brand) return
+    const entry = map[brand]
+    if (!entry) return
+    setRows(prev => prev.map((r, i) => i === idx ? {
+      ...r,
+      categoryBrands: brands,
+      salesAccount: entry.salesAccount,
+      purchaseAccount: entry.purchaseAccount,
+    } : r))
+  }
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       const target = e.target as HTMLElement
@@ -1875,9 +1901,29 @@ function ProductInfoModal({
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
   }
 
-  function toggleVal(idx: number, field: keyof ProdInfoRow, val: string) {
-    const arr = rows[idx][field] as string[]
-    updateRow(idx, { [field]: arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val] } as any)
+  function toggleBrand(idx: number, brand: string) {
+    const current = rows[idx]?.categoryBrands || []
+    const next = current.includes(brand) ? current.filter(v => v !== brand) : [...current, brand]
+    applyBrandAccounts(idx, next, opts.brandAccountMap)
+    if (!next[0] || !opts.brandAccountMap[next[0]]) {
+      updateRow(idx, { categoryBrands: next })
+    }
+  }
+
+  function addNewBrand(rawVal: string) {
+    const val = rawVal.trim()
+    if (!val) return
+    if (!localBrands.includes(val)) {
+      const next = [...localBrands, val]
+      setLocalBrands(next)
+      setOpts(prev => ({ ...prev, brands: next }))
+      fetch('/api/admin/product-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brands: next }),
+      }).catch(() => {})
+    }
+    setNewBrandInput('')
   }
 
   async function handleSave() {
@@ -1885,7 +1931,7 @@ function ProductInfoModal({
     let savedCount = 0
     const failed: string[] = []
     for (const row of rows) {
-      if (!row.prodId) continue // skip "Not in DB" silently
+      if (!row.prodId) continue
       const res = await fetch(`/api/admin/products/${row.prodId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -1908,6 +1954,69 @@ function ProductInfoModal({
     }
   }
 
+  async function saveSetup() {
+    setSetupSaving(true)
+    try {
+      await fetch('/api/admin/product-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brandAccountMap: setupMap }),
+      })
+      setOpts(prev => ({ ...prev, brandAccountMap: setupMap }))
+      setSetupSaved(true)
+      setTimeout(() => setSetupSaved(false), 2000)
+    } finally {
+      setSetupSaving(false)
+    }
+  }
+
+  // MultiSelect for brand column — with add-new input
+  function BrandSelect({ rowIdx }: { rowIdx: number }) {
+    const key = `${rowIdx}-categoryBrands`
+    const selected = rows[rowIdx]?.categoryBrands || []
+    const isOpen = openDrop === key
+    return (
+      <div className="relative" data-multiselect="true">
+        <button type="button" onClick={() => setOpenDrop(isOpen ? null : key)}
+          className="w-full min-w-[160px] px-3 py-2 border border-gray-200 rounded-lg text-left text-xs flex items-center justify-between bg-white hover:border-gray-400 focus:outline-none">
+          <span className={`truncate max-w-[130px] ${selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>
+            {selected.length === 0 ? '— Brand —' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
+          </span>
+          <svg className="w-3 h-3 text-gray-400 flex-shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {isOpen && (
+          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[220px] max-h-72 flex flex-col">
+            <div className="overflow-y-auto flex-1">
+              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                <input type="checkbox" checked={selected.length === 0} onChange={() => updateRow(rowIdx, { categoryBrands: [] })} className="rounded" readOnly />
+                <span className="text-xs text-gray-400 italic">— None —</span>
+              </label>
+              {localBrands.map(b => (
+                <label key={b} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+                  <input type="checkbox" checked={selected.includes(b)} onChange={() => toggleBrand(rowIdx, b)} className="rounded" />
+                  <span className="text-xs text-gray-800">{b}</span>
+                  {opts.brandAccountMap[b] && <span className="ml-auto text-[10px] text-green-500" title="Auto-fill configured">●</span>}
+                </label>
+              ))}
+            </div>
+            <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+              <input
+                type="text"
+                value={newBrandInput}
+                onChange={e => setNewBrandInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { addNewBrand(newBrandInput) } }}
+                placeholder="+ Add brand…"
+                className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400"
+              />
+              <button type="button" onClick={() => addNewBrand(newBrandInput)} className="px-2 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-600">Add</button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Simple MultiSelect without add-new (for Item Category)
   function MultiSelect({ rowIdx, field, options, label }: {
     rowIdx: number; field: keyof ProdInfoRow; options: string[]; label: string
   }) {
@@ -1930,10 +2039,13 @@ function ProductInfoModal({
               <span className="text-xs text-gray-400 italic">— None —</span>
             </label>
             {options.length === 0
-              ? <p className="px-3 py-2 text-xs text-gray-400 italic">No options — add from Product edit page</p>
+              ? <p className="px-3 py-2 text-xs text-gray-400 italic">No options configured</p>
               : options.map(opt => (
                 <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                  <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggleVal(rowIdx, field, opt)} className="rounded" />
+                  <input type="checkbox" checked={selected.includes(opt)} onChange={() => {
+                    const arr = selected
+                    updateRow(rowIdx, { [field]: arr.includes(opt) ? arr.filter(v => v !== opt) : [...arr, opt] } as any)
+                  }} className="rounded" />
                   <span className="text-xs text-gray-800">{opt}</span>
                 </label>
               ))
@@ -1944,18 +2056,79 @@ function ProductInfoModal({
     )
   }
 
+  const hasMap = Object.keys(opts.brandAccountMap).length > 0
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] max-h-[92vh] flex flex-col" onMouseDown={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
             <h2 className="text-lg font-bold text-gray-900">Update Product Information</h2>
-            <p className="text-xs text-gray-500 mt-0.5">{rows.length} items — Sage Accounts &amp; Categories</p>
+            <p className="text-xs text-gray-500 mt-0.5">{rows.length} items — Category Brand &amp; Item Category &middot; Sage Accounts auto-filled from brand</p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSetup(!showSetup)}
+              title="Configure brand → Sage account mapping"
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-colors ${showSetup ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-200 text-gray-600 hover:border-gray-400'}`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+              Brand Accounts
+              {hasMap && <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />}
+            </button>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
         </div>
+
+        {/* Brand Account Setup Panel */}
+        {showSetup && (
+          <div className="px-6 py-4 bg-indigo-50 border-b border-indigo-100">
+            <p className="text-xs font-semibold text-indigo-700 mb-3">Configure Brand → Sage Accounts</p>
+            <p className="text-xs text-indigo-500 mb-4">Selecting a brand in the table below will auto-fill its Sales &amp; Purchase accounts. Green dots indicate configured brands.</p>
+            <div className="space-y-2 max-h-52 overflow-y-auto">
+              {localBrands.map(brand => {
+                const entry = setupMap[brand] || { salesAccount: [], purchaseAccount: [] }
+                return (
+                  <div key={brand} className="flex items-center gap-3 bg-white rounded-lg px-3 py-2 border border-indigo-100">
+                    <span className="text-xs font-semibold text-gray-800 w-32 flex-shrink-0">{brand}</span>
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <select
+                        value={entry.salesAccount[0] || ''}
+                        onChange={e => setSetupMap(prev => ({ ...prev, [brand]: { ...entry, salesAccount: e.target.value ? [e.target.value] : [] } }))}
+                        className="text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400"
+                      >
+                        <option value="">— Sales Account —</option>
+                        {opts.salesAccounts.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                      <select
+                        value={entry.purchaseAccount[0] || ''}
+                        onChange={e => setSetupMap(prev => ({ ...prev, [brand]: { ...entry, purchaseAccount: e.target.value ? [e.target.value] : [] } }))}
+                        className="text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400"
+                      >
+                        <option value="">— Purchase Account —</option>
+                        {opts.purchaseAccounts.map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                    </div>
+                    {(entry.salesAccount.length > 0 || entry.purchaseAccount.length > 0) && (
+                      <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <div className="flex justify-end mt-3">
+              <button
+                onClick={saveSetup}
+                disabled={setupSaving || setupSaved}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-lg ${setupSaved ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50'}`}
+              >
+                {setupSaved ? '✓ Saved' : setupSaving ? 'Saving…' : 'Save Configuration'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="overflow-auto flex-1 px-6 py-4">
           <table className="w-full text-sm">
@@ -1964,41 +2137,52 @@ function ProductInfoModal({
                 <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">SKU</th>
                 <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
                 <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Category (Brand)</th>
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Item Category (Unit)</th>
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Sales Account</th>
-                <th className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Purchase Account</th>
+                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Item Category</th>
+                <th className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Sage Accounts</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, idx) => (
-                <tr key={row.wsId} className={`border-b border-gray-50 ${!row.prodId ? 'opacity-50' : ''}`}>
-                  <td className="py-2 pr-4">
-                    <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{row.sku}</span>
-                    {!row.prodId && <span className="block text-[10px] text-red-400 mt-0.5">Not in DB</span>}
-                  </td>
-                  <td className="py-2 pr-4 text-xs text-gray-600 max-w-[260px]">
-                    <span className="truncate block">{row.description || '—'}</span>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <MultiSelect rowIdx={idx} field="categoryBrands" options={opts.brands} label="Brand" />
-                  </td>
-                  <td className="py-2 pr-3">
-                    <MultiSelect rowIdx={idx} field="itemCategories" options={opts.categories} label="Unit" />
-                  </td>
-                  <td className="py-2 pr-3">
-                    <MultiSelect rowIdx={idx} field="salesAccount" options={opts.salesAccounts} label="Sales" />
-                  </td>
-                  <td className="py-2">
-                    <MultiSelect rowIdx={idx} field="purchaseAccount" options={opts.purchaseAccounts} label="Purchase" />
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row, idx) => {
+                const brand = row.categoryBrands[0]
+                const brandMap = brand ? opts.brandAccountMap[brand] : null
+                return (
+                  <tr key={row.wsId} className={`border-b border-gray-50 ${!row.prodId ? 'opacity-50' : ''}`}>
+                    <td className="py-2 pr-4">
+                      <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{row.sku}</span>
+                      {!row.prodId && <span className="block text-[10px] text-red-400 mt-0.5">Not in DB</span>}
+                    </td>
+                    <td className="py-2 pr-4 text-xs text-gray-600 max-w-[220px]">
+                      <span className="truncate block">{row.description || '—'}</span>
+                    </td>
+                    <td className="py-2 pr-3">
+                      <BrandSelect rowIdx={idx} />
+                    </td>
+                    <td className="py-2 pr-3">
+                      {/* Item Category uses the brands list — same vocabulary as Sage Category */}
+                      <MultiSelect rowIdx={idx} field="itemCategories" options={opts.brands} label="Item Category" />
+                    </td>
+                    <td className="py-2">
+                      {brandMap ? (
+                        <div className="flex flex-wrap gap-1">
+                          {row.salesAccount.map(a => <span key={a} className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded">{a}</span>)}
+                          {row.purchaseAccount.map(a => <span key={a} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded">{a}</span>)}
+                          {row.salesAccount.length === 0 && row.purchaseAccount.length === 0 && (
+                            <span className="text-[10px] text-gray-400 italic">no accounts mapped</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-400 italic">select brand to auto-fill</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-          <p className="text-xs text-gray-400">Saves directly to each product record in the database</p>
+          <p className="text-xs text-gray-400">Saves Category Brand, Item Category &amp; auto-filled Sage accounts to each product record</p>
           <div className="flex gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50">Cancel</button>
             <button onClick={handleSave} disabled={saving || saved}

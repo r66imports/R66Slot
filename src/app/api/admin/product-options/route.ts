@@ -28,9 +28,12 @@ export async function GET() {
       sidewaysParts: Array.from(new Set([...DEFAULTS.sidewaysParts, ...((saved as any).sidewaysParts || [])])),
       customOrgCards: (saved as any).customOrgCards || [],
       customOrgBrands: (saved as any).customOrgBrands || {},
+      salesAccounts: (saved as any).salesAccounts || [],
+      purchaseAccounts: (saved as any).purchaseAccounts || [],
+      brandAccountMap: (saved as any).brandAccountMap || {},
     })
   } catch {
-    return NextResponse.json({ ...DEFAULTS, customOrgCards: [], customOrgBrands: {} })
+    return NextResponse.json({ ...DEFAULTS, customOrgCards: [], customOrgBrands: {}, salesAccounts: [], purchaseAccounts: [], brandAccountMap: {} })
   }
 }
 

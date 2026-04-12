@@ -201,6 +201,9 @@ export default function EditProductPage({
   const [purchaseAccountDropdownOpen, setPurchaseAccountDropdownOpen] = useState(false)
   const [newSalesAccountInput, setNewSalesAccountInput] = useState('')
   const [newPurchaseAccountInput, setNewPurchaseAccountInput] = useState('')
+  const [brandAccountMap, setBrandAccountMap] = useState<Record<string, { salesAccount: string[]; purchaseAccount: string[] }>>({})
+  const [accountsAutoFilled, setAccountsAutoFilled] = useState(false)
+  const [accountsOverride, setAccountsOverride] = useState(false)
 
   // Dropdown open states for Product Organization
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false)
@@ -282,6 +285,7 @@ export default function EditProductPage({
         if (opts.sidewaysParts?.length) setSidewaysPartOptions(opts.sidewaysParts)
         if (opts.customOrgCards?.length) setCustomOrgCards(opts.customOrgCards)
         if (opts.customOrgBrands) setCustomOrgBrands(opts.customOrgBrands)
+        if (opts.brandAccountMap) setBrandAccountMap(opts.brandAccountMap)
       })
       .catch(() => {})
     fetch('/api/admin/pages')
@@ -517,6 +521,19 @@ export default function EditProductPage({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quantity])
+
+  // Auto-fill Sage accounts when Category Brand changes
+  useEffect(() => {
+    if (!isLoaded.current || accountsOverride) return
+    const brand = categoryBrands[0]
+    if (!brand) return
+    const entry = brandAccountMap[brand]
+    if (!entry) { setAccountsAutoFilled(false); return }
+    if (entry.salesAccount?.length) setSalesAccount(entry.salesAccount)
+    if (entry.purchaseAccount?.length) setPurchaseAccount(entry.purchaseAccount)
+    setAccountsAutoFilled(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryBrands, brandAccountMap])
 
   // Autosave effect — debounced 1500ms after any field change (skips during initial load)
   useEffect(() => {
@@ -1478,10 +1495,30 @@ export default function EditProductPage({
                   )}
                 </div>
 
+                {/* Sage Accounts — auto-filled from brand mapping, manual override available */}
+                {(accountsAutoFilled && !accountsOverride) ? (
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-green-700">Sage Accounts — auto-filled from brand</span>
+                      <button type="button" onClick={() => setAccountsOverride(true)} className="text-xs text-green-600 underline hover:text-green-800">Override</button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {salesAccount.map(a => <span key={a} className="text-xs px-2 py-0.5 bg-white text-green-800 border border-green-300 rounded-full font-medium">Sales: {a}</span>)}
+                      {purchaseAccount.map(a => <span key={a} className="text-xs px-2 py-0.5 bg-white text-blue-800 border border-blue-300 rounded-full font-medium">Purchase: {a}</span>)}
+                      {salesAccount.length === 0 && purchaseAccount.length === 0 && <span className="text-xs text-green-500 italic">No accounts mapped for this brand</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 {/* Sales Account */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sales Account</label>
-                  <p className="text-xs text-gray-400 mb-2">For Sage accounting &amp; CSV imports/exports</p>
+                  {accountsOverride && (
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-700">Sales Account</label>
+                      <button type="button" onClick={() => { setAccountsOverride(false); setAccountsAutoFilled(true) }} className="text-xs text-indigo-600 underline hover:text-indigo-800">Use auto-fill</button>
+                    </div>
+                  )}
+                  {!accountsOverride && <label className="block text-sm font-medium text-gray-700 mb-1">Sales Account</label>}
                   <div className="relative" ref={salesAccountRef}>
                     <button type="button" onClick={() => setSalesAccountDropdownOpen(!salesAccountDropdownOpen)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
@@ -1528,7 +1565,6 @@ export default function EditProductPage({
                 {/* Purchase Account */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Account</label>
-                  <p className="text-xs text-gray-400 mb-2">For Sage accounting &amp; CSV imports/exports</p>
                   <div className="relative" ref={purchaseAccountRef}>
                     <button type="button" onClick={() => setPurchaseAccountDropdownOpen(!purchaseAccountDropdownOpen)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg text-left text-sm flex items-center justify-between focus:ring-2 focus:ring-gray-900 bg-white">
@@ -1571,6 +1607,8 @@ export default function EditProductPage({
                     </div>
                   )}
                 </div>
+                  </>
+                )}
 
               </div>}
             </div>
