@@ -124,7 +124,7 @@ export default function HeaderEditorPage() {
   const [mediaLoading, setMediaLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/settings')
+    fetch('/api/admin/settings')
       .then((r) => r.json())
       .then((data: SiteSettings) => {
         if (data.header) setConfig({ ...DEFAULT_HEADER, ...data.header })
@@ -149,17 +149,18 @@ export default function HeaderEditorPage() {
     setSaving(true)
     setSaved(false)
     try {
-      const settingsRes = await fetch('/api/settings')
+      const settingsRes = await fetch('/api/admin/settings')
       const current: SiteSettings = await settingsRes.json()
-      await fetch('/api/settings', {
-        method: 'PUT',
+      const res = await fetch('/api/admin/settings', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...current, header: config }),
       })
+      if (!res.ok) throw new Error(`Save failed: ${res.status}`)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-    } catch {
-      alert('Save failed')
+    } catch (e: any) {
+      alert(e.message || 'Save failed')
     } finally {
       setSaving(false)
     }
