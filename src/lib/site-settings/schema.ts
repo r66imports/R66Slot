@@ -41,6 +41,7 @@ export interface SiteSettings {
     logoStyle: 'split' | 'solid' // split = first 3 chars different color
     logoImage?: string // URL to image logo — overrides text logo when set
     logoSize?: number // px size for image logo (default 80)
+    logoPosition?: 'left' | 'center' | 'right' // header logo position (default 'left')
     backgroundColor: string
     textColor: string
     navItems: Array<{

@@ -13,6 +13,7 @@ const DEFAULT_HEADER: HeaderConfig = {
   logoStyle: 'split',
   logoImage: '',
   logoSize: 80,
+  logoPosition: 'left',
   backgroundColor: '#ffffff',
   textColor: '#111827',
   navItems: [
@@ -27,7 +28,7 @@ const DEFAULT_HEADER: HeaderConfig = {
 
 // ─── Live Header Preview ───────────────────────────────────────────────────────
 function HeaderPreview({ config }: { config: HeaderConfig }) {
-  const renderLogo = () => {
+  const logoEl = () => {
     if (config.logoImage) {
       const size = config.logoSize || 80
       return (
@@ -53,56 +54,61 @@ function HeaderPreview({ config }: { config: HeaderConfig }) {
     )
   }
 
+  const pos = config.logoPosition || 'left'
+
   return (
     <div
       className="w-full border border-gray-200 rounded-xl overflow-hidden shadow-sm"
       style={{ backgroundColor: config.backgroundColor }}
     >
       <div className="px-6">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center">
-            {renderLogo()}
+        {pos === 'center' ? (
+          <div className="relative flex h-16 items-center justify-between">
+            {/* Nav left */}
+            <nav className="hidden md:flex items-center gap-4">
+              {config.navItems.slice(0, 2).map((item, i) => (
+                <span key={i} className="text-sm font-medium" style={{ color: config.textColor }}>{item.label}</span>
+              ))}
+            </nav>
+            {/* Logo absolutely centered */}
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+              {logoEl()}
+            </div>
+            {/* Actions right */}
+            <div className="flex items-center gap-1">
+              {config.showSearch && <div className="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></div>}
+              {config.showCart && <div className="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg></div>}
+            </div>
           </div>
-
-          {/* Nav */}
-          <nav className="hidden md:flex items-center gap-6">
-            {config.navItems.map((item, i) => (
-              <span
-                key={i}
-                className="text-sm font-medium cursor-default"
-                style={{ color: config.textColor }}
-              >
-                {item.label}
-              </span>
-            ))}
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-1">
-            {config.showSearch && (
-              <div className="p-2 rounded-md">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            )}
-            {config.showAccount && (
-              <div className="p-2 rounded-md">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
-            )}
-            {config.showCart && (
-              <div className="p-2 rounded-md relative">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                </svg>
-              </div>
-            )}
+        ) : pos === 'right' ? (
+          <div className="flex h-16 items-center justify-between">
+            <nav className="hidden md:flex items-center gap-4">
+              {config.navItems.map((item, i) => (
+                <span key={i} className="text-sm font-medium" style={{ color: config.textColor }}>{item.label}</span>
+              ))}
+            </nav>
+            <div className="flex items-center gap-3">
+              {config.showSearch && <div className="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></div>}
+              {config.showCart && <div className="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg></div>}
+              {logoEl()}
+            </div>
           </div>
-        </div>
+        ) : (
+          /* left (default) */
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center">{logoEl()}</div>
+            <nav className="hidden md:flex items-center gap-6">
+              {config.navItems.map((item, i) => (
+                <span key={i} className="text-sm font-medium" style={{ color: config.textColor }}>{item.label}</span>
+              ))}
+            </nav>
+            <div className="flex items-center gap-1">
+              {config.showSearch && <div className="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></div>}
+              {config.showAccount && <div className="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>}
+              {config.showCart && <div className="p-2 rounded-md"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={config.textColor}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg></div>}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -115,6 +121,7 @@ export default function HeaderEditorPage() {
   const [saved, setSaved] = useState(false)
   const [mediaFiles, setMediaFiles] = useState<{ id: string; url: string; name: string }[]>([])
   const [showMediaPicker, setShowMediaPicker] = useState(false)
+  const [mediaLoading, setMediaLoading] = useState(false)
 
   useEffect(() => {
     fetch('/api/settings')
@@ -123,12 +130,20 @@ export default function HeaderEditorPage() {
         if (data.header) setConfig({ ...DEFAULT_HEADER, ...data.header })
       })
       .catch(() => {})
+  }, [])
 
+  const loadMedia = () => {
+    if (mediaFiles.length > 0) return // already loaded
+    setMediaLoading(true)
     fetch('/api/admin/media')
       .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setMediaFiles(data.slice(0, 60)) })
+      .then((data) => {
+        const files = Array.isArray(data) ? data : (data.files ?? [])
+        setMediaFiles(files.slice(0, 120))
+      })
       .catch(() => {})
-  }, [])
+      .finally(() => setMediaLoading(false))
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -143,7 +158,7 @@ export default function HeaderEditorPage() {
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
-    } catch (e) {
+    } catch {
       alert('Save failed')
     } finally {
       setSaving(false)
@@ -164,6 +179,8 @@ export default function HeaderEditorPage() {
 
   const addNavItem = () =>
     updateConfig({ navItems: [...config.navItems, { label: '', href: '/' }] })
+
+  const logoSize = config.logoSize ?? 80
 
   return (
     <div>
@@ -198,12 +215,12 @@ export default function HeaderEditorPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Logo Image</label>
               <div className="flex gap-2 items-center">
                 {config.logoImage && (
-                  <img src={config.logoImage} alt="Logo" className="h-12 w-12 object-contain border rounded" />
+                  <img src={config.logoImage} alt="Logo" className="h-12 w-12 object-contain border rounded bg-gray-50" />
                 )}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowMediaPicker(true)}
+                  onClick={() => { setShowMediaPicker(true); loadMedia() }}
                 >
                   {config.logoImage ? 'Change Image' : 'Pick from Media Library'}
                 </Button>
@@ -221,25 +238,61 @@ export default function HeaderEditorPage() {
               <p className="text-xs text-gray-400 mt-1">When an image is set, text logo is hidden.</p>
             </div>
 
-            {/* Logo Size */}
+            {/* Logo Size — only when image set */}
             {config.logoImage && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Logo Size: {config.logoSize || 80}px
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-sm font-medium text-gray-700">Logo Size (1:1)</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateConfig({ logoSize: Math.max(20, logoSize - 1) })}
+                      className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm font-bold"
+                    >−</button>
+                    <span className="text-sm font-mono text-gray-700 w-20 text-center">
+                      {logoSize} × {logoSize} px
+                    </span>
+                    <button
+                      onClick={() => updateConfig({ logoSize: Math.min(200, logoSize + 1) })}
+                      className="w-7 h-7 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-sm font-bold"
+                    >+</button>
+                  </div>
+                </div>
                 <input
                   type="range"
-                  min={24}
-                  max={160}
-                  value={config.logoSize || 80}
+                  min={20}
+                  max={200}
+                  step={1}
+                  value={logoSize}
                   onChange={(e) => updateConfig({ logoSize: Number(e.target.value) })}
                   className="w-full accent-red-600"
                 />
                 <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                  <span>24px</span><span>80px</span><span>160px</span>
+                  <span>20px</span><span>100px</span><span>200px</span>
                 </div>
               </div>
             )}
+
+            {/* Logo Position */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Logo Position</label>
+              <div className="flex gap-2">
+                {(['left', 'center', 'right'] as const).map((pos) => (
+                  <button
+                    key={pos}
+                    onClick={() => updateConfig({ logoPosition: pos })}
+                    className={`flex-1 py-2 rounded-lg border text-sm font-medium transition-colors capitalize ${
+                      (config.logoPosition || 'left') === pos
+                        ? 'bg-gray-900 text-white border-gray-900'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'
+                    }`}
+                  >
+                    {pos === 'left' && <span>◀ Left</span>}
+                    {pos === 'center' && <span>● Center</span>}
+                    {pos === 'right' && <span>Right ▶</span>}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Text Logo fallback */}
             {!config.logoImage && (
@@ -402,8 +455,17 @@ export default function HeaderEditorPage() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6">
-              {mediaFiles.length === 0 ? (
-                <p className="text-gray-400 text-center py-12">No media files found. Upload images in Media Library first.</p>
+              {mediaLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : mediaFiles.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-400 mb-3">No media files found.</p>
+                  <a href="/admin/media" target="_blank" className="text-sm text-red-600 hover:underline">
+                    Upload images in Media Library →
+                  </a>
+                </div>
               ) : (
                 <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
                   {mediaFiles.map((file) => (

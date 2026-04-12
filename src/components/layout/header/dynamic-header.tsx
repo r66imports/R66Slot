@@ -103,6 +103,7 @@ export function DynamicHeader() {
   const headerConfig = settings?.header || {
     logoText: 'R66SLOT',
     logoStyle: 'split' as const,
+    logoPosition: 'left' as const,
     backgroundColor: '#ffffff',
     textColor: '#111827',
     navItems: [
@@ -114,6 +115,8 @@ export function DynamicHeader() {
     showCart: true,
     sticky: true,
   }
+
+  const logoPosition = headerConfig.logoPosition || 'left'
 
   // Render logo — image takes priority over text
   const renderLogo = () => {
@@ -128,7 +131,7 @@ export function DynamicHeader() {
         />
       )
     }
-    if (logoStyle === 'split' && logoText.length > 3) {
+    if (logoStyle === 'split' && logoText && logoText.length > 3) {
       return (
         <div className="text-2xl font-bold">
           <span style={{ color: headerConfig.textColor }}>{logoText.substring(0, 3)}</span>
@@ -264,40 +267,84 @@ export function DynamicHeader() {
         )}
 
         <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
-            {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
-              {renderLogo()}
-            </Link>
+          <div className={`flex h-16 items-center ${logoPosition === 'center' ? 'relative justify-between' : 'justify-between'}`}>
+            {/* Logo — left or center */}
+            {logoPosition !== 'right' && (
+              <Link
+                href="/"
+                className={`flex items-center space-x-2 flex-shrink-0 ${logoPosition === 'center' ? 'absolute left-1/2 -translate-x-1/2 z-10' : ''}`}
+              >
+                {renderLogo()}
+              </Link>
+            )}
 
             {/* Desktop Navigation - Dynamic from settings */}
-            <nav className="hidden md:flex items-center space-x-8">
-              {headerConfig.navItems.map((item, index) => (
-                <Link
-                  key={index}
-                  href={item.href}
-                  target={item.isExternal ? '_blank' : undefined}
-                  rel={item.isExternal ? 'noopener noreferrer' : undefined}
-                  className="text-sm font-medium hover:text-primary transition-colors"
-                  style={{ color: headerConfig.textColor }}
-                >
-                  {item.label}
-                </Link>
-              ))}
+            {logoPosition === 'center' ? (
+              /* Center layout: nav on left side */
+              <nav className="hidden md:flex items-center space-x-8">
+                {headerConfig.navItems.map((item, index) => (
+                  <Link
+                    key={index}
+                    href={item.href}
+                    target={item.isExternal ? '_blank' : undefined}
+                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
+                    className="text-sm font-medium hover:text-primary transition-colors"
+                    style={{ color: headerConfig.textColor }}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                {editorEnabled && isAdmin && (
+                  <Link href="/r66-editor" className="text-sm font-medium hover:text-primary transition-colors" style={{ color: headerConfig.textColor }}>
+                    Editor
+                  </Link>
+                )}
+              </nav>
+            ) : logoPosition === 'right' ? (
+              /* Right layout: nav on left side */
+              <nav className="hidden md:flex items-center space-x-8">
+                {headerConfig.navItems.map((item, index) => (
+                  <Link
+                    key={index}
+                    href={item.href}
+                    target={item.isExternal ? '_blank' : undefined}
+                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
+                    className="text-sm font-medium hover:text-primary transition-colors"
+                    style={{ color: headerConfig.textColor }}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                {editorEnabled && isAdmin && (
+                  <Link href="/r66-editor" className="text-sm font-medium hover:text-primary transition-colors" style={{ color: headerConfig.textColor }}>
+                    Editor
+                  </Link>
+                )}
+              </nav>
+            ) : (
+              /* Left layout (default): nav in center */
+              <nav className="hidden md:flex items-center space-x-8">
+                {headerConfig.navItems.map((item, index) => (
+                  <Link
+                    key={index}
+                    href={item.href}
+                    target={item.isExternal ? '_blank' : undefined}
+                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
+                    className="text-sm font-medium hover:text-primary transition-colors"
+                    style={{ color: headerConfig.textColor }}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                {editorEnabled && isAdmin && (
+                  <Link href="/r66-editor" className="text-sm font-medium hover:text-primary transition-colors" style={{ color: headerConfig.textColor }}>
+                    Editor
+                  </Link>
+                )}
+              </nav>
+            )}
 
-              {/* Admin Editor Link (only for authenticated admins) */}
-              {editorEnabled && isAdmin && (
-                <Link
-                  href="/r66-editor"
-                  className="text-sm font-medium hover:text-primary transition-colors"
-                  style={{ color: headerConfig.textColor }}
-                >
-                  Editor
-                </Link>
-              )}
-            </nav>
-
-            {/* Right Actions */}
+            {/* Right Actions (+ logo when position = right) */}
             <div className="flex items-center space-x-1">
               {/* Search Icon */}
               {headerConfig.showSearch && (
@@ -374,6 +421,13 @@ export function DynamicHeader() {
                     </span>
                   )}
                 </button>
+              )}
+
+              {/* Logo — right position */}
+              {logoPosition === 'right' && (
+                <Link href="/" className="hidden md:flex items-center ml-2 flex-shrink-0">
+                  {renderLogo()}
+                </Link>
               )}
 
               {/* Mobile Menu Button */}
