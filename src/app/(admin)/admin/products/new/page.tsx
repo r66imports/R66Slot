@@ -306,6 +306,30 @@ export default function NewProductPage() {
   const carBrandRef = useRef<HTMLDivElement>(null)
   const carTypeRef = useRef<HTMLDivElement>(null)
 
+  // Paste-to-upload: Ctrl+V anywhere on the page adds clipboard images to mediaFiles
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      Array.from(items).forEach((item) => {
+        if (!item.type.startsWith('image/')) return
+        const file = item.getAsFile()
+        if (!file) return
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setMediaFiles(prev => [...prev, {
+            name: `pasted-${Date.now()}.png`,
+            url: reader.result as string,
+            type: file.type,
+          }])
+        }
+        reader.readAsDataURL(file)
+      })
+    }
+    document.addEventListener('paste', handler)
+    return () => document.removeEventListener('paste', handler)
+  }, [])
+
   // Upload base64 images to server and return real URLs
   const uploadPendingImages = async (): Promise<string[]> => {
     const uploadedUrls: string[] = []
@@ -644,7 +668,7 @@ export default function NewProductPage() {
                     </span>
                     {' '}or drop files to upload
                   </div>
-                  <p className="text-xs text-gray-400">Images, PDFs, documents</p>
+                  <p className="text-xs text-gray-400">Images, PDFs, documents &middot; or <kbd className="px-1 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Ctrl+V</kbd> to paste</p>
                 </div>
                 <input
                   type="file"
