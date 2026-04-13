@@ -431,7 +431,7 @@ function WorksheetEditor({
     }
   }
 
-  async function handleConfirmUpdate() {
+  async function handleConfirmUpdate(addQty: boolean) {
     setConfirmingUpdate(true)
     const errors: string[] = []
     let updated = 0
@@ -446,6 +446,9 @@ function WorksheetEditor({
         if (finalLanded > 0) patch.costPerItem = finalLanded
         if (retailZAR > 0) patch.price = retailZAR
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
+        if (addQty && it.qty > 0) {
+          patch.quantity = (prod.quantity ?? 0) + it.qty
+        }
         if (Object.keys(patch).length === 0) { updated++; continue }
         const res = await fetch(`/api/admin/products/${prod.id}`, {
           method: 'PUT',
@@ -1559,11 +1562,11 @@ function WorksheetEditor({
             <h2 className="text-base font-semibold text-gray-900 mb-2">Update Existing Products?</h2>
             <p className="text-sm text-gray-600 mb-4">
               The following <strong>{confirmUpdateItems.length}</strong> SKU{confirmUpdateItems.length !== 1 ? 's' : ''} already exist in inventory.
-              This will update <strong>pricing and cost only</strong> — quantities will not change.
+              Choose whether to also add the worksheet quantities on top of current stock.
             </p>
             <ul className="text-xs text-gray-700 bg-gray-50 rounded-lg p-3 mb-5 max-h-48 overflow-y-auto space-y-1">
               {confirmUpdateItems.map((it) => (
-                <li key={it.id} className="font-mono">{it.sku}{it.description ? ` — ${it.description}` : ''}</li>
+                <li key={it.id} className="font-mono">{it.sku}{it.description ? ` — ${it.description}` : ''}{it.qty > 0 ? ` (+${it.qty})` : ''}</li>
               ))}
             </ul>
             <div className="flex justify-end gap-3">
@@ -1574,11 +1577,18 @@ function WorksheetEditor({
                 Cancel
               </button>
               <button
-                onClick={handleConfirmUpdate}
+                onClick={() => handleConfirmUpdate(false)}
                 disabled={confirmingUpdate}
-                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                className="px-4 py-2 text-sm rounded-lg bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50"
               >
-                {confirmingUpdate ? 'Updating…' : 'Yes, Update Pricing'}
+                {confirmingUpdate ? 'Updating…' : "Don't update quantities"}
+              </button>
+              <button
+                onClick={() => handleConfirmUpdate(true)}
+                disabled={confirmingUpdate}
+                className="px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
+              >
+                {confirmingUpdate ? 'Updating…' : 'Yes, update Qty'}
               </button>
             </div>
           </div>
