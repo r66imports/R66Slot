@@ -37,7 +37,10 @@ export default async function DynamicPage({
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 'var(--r66-header-height, 64px)',
+            left: 0,
+            right: 0,
+            bottom: 0,
             backgroundImage: `url("${ps.backgroundImage}")`,
             backgroundSize: ps.backgroundSize || 'cover',
             backgroundPosition: ps.backgroundPosition || 'center',

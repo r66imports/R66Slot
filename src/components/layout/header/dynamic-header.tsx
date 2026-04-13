@@ -175,6 +175,11 @@ export function DynamicHeader() {
     if (headerConfig.navFontFamily) loadGoogleFont(headerConfig.navFontFamily)
   }, [headerConfig.navFontFamily])
 
+  // Keep CSS variable in sync with actual header height so page content can offset correctly
+  useEffect(() => {
+    document.documentElement.style.setProperty('--r66-header-height', `${headerHeight}px`)
+  }, [headerHeight])
+
   // Render company name next to logo
   const renderCompanyName = () => {
     const { showCompanyName, companyName, companyNameSize, companyNameBold, companyNameColor, companyNameOutline, companyNameLetterColors, textColor } = headerConfig
