@@ -55,6 +55,7 @@ interface OrderTemplate {
   companyPhone: string
   companyEmail: string
   logoUrl: string
+  logoSize: number
   imageBlock: string[]
   imageBlockHeight: number
   bankName: string
@@ -104,6 +105,7 @@ const DEFAULT_TEMPLATE: OrderTemplate = {
   companyPhone: '',
   companyEmail: '',
   logoUrl: '',
+  logoSize: 64,
   imageBlock: ['', '', '', '', '', ''],
   imageBlockHeight: 80,
   bankName: '',
@@ -284,7 +286,7 @@ function DocumentBody({
       <div className="flex items-start justify-between mb-4">
         <div>
           {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="h-16 w-auto object-contain mb-1" />
+            <img src={logoUrl} alt="Logo" style={{ height: `${template.logoSize ?? 64}px` }} className="w-auto object-contain mb-1" />
           )}
           <div className="text-xs text-gray-700 font-semibold">{template.companyName || ''}</div>
           {template.companyAddress && <div className="text-xs text-gray-500 whitespace-pre-line">{template.companyAddress}</div>}
@@ -662,6 +664,22 @@ function TemplateModal({
             <section>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Logo</h3>
               <ImageUpload value={form.logoUrl} onChange={(url) => set('logoUrl', url)} placeholder="Paste logo URL or upload" size="md" />
+              {form.logoUrl && (
+                <div className="flex items-center gap-3 mt-3 bg-gray-50 rounded-lg px-3 py-2">
+                  <label className="text-xs text-gray-500 whitespace-nowrap">Logo Size</label>
+                  <input
+                    type="range" min={20} max={200} step={4}
+                    value={form.logoSize ?? 64}
+                    onChange={e => set('logoSize', Number(e.target.value))}
+                    className="flex-1 h-1.5 accent-indigo-600"
+                  />
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => set('logoSize', Math.max(20, (form.logoSize ?? 64) - 4))} className="w-6 h-6 rounded border border-gray-300 text-xs hover:bg-gray-100 flex items-center justify-center">−</button>
+                    <span className="text-xs font-mono text-gray-700 w-14 text-center">{form.logoSize ?? 64}px</span>
+                    <button onClick={() => set('logoSize', Math.min(200, (form.logoSize ?? 64) + 4))} className="w-6 h-6 rounded border border-gray-300 text-xs hover:bg-gray-100 flex items-center justify-center">+</button>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Image Block */}
@@ -1507,7 +1525,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   </head><body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
     <div>
-      ${logoUrlHTML ? `<img src="${logoUrlHTML}" style="height:64px;width:auto;object-fit:contain;display:block;margin-bottom:4px"/>` : ''}
+      ${logoUrlHTML ? `<img src="${logoUrlHTML}" style="height:${template.logoSize ?? 64}px;width:auto;object-fit:contain;display:block;margin-bottom:4px"/>` : ''}
       ${template.companyName ? `<div style="font-size:12px;font-weight:600;color:#374151">${template.companyName}</div>` : ''}
       ${template.companyAddress ? `<div style="font-size:11px;color:#6b7280;white-space:pre-line">${template.companyAddress}</div>` : ''}
       ${template.companyVAT ? `<div style="font-size:11px;color:#6b7280">VAT: ${template.companyVAT}</div>` : ''}
@@ -1653,12 +1671,14 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
       })
       const ext = (pdfLogoUrl.split('.').pop() ?? 'png').toUpperCase()
       const fmt = ext === 'JPG' ? 'JPEG' : ['PNG', 'JPEG', 'WEBP'].includes(ext) ? ext : 'PNG'
-      doc.addImage(dataUrl, fmt as 'PNG', margin, y, 0, 16)
+      const logoH = Math.round((template.logoSize ?? 64) / 3.78)
+      doc.addImage(dataUrl, fmt as 'PNG', margin, y, 0, logoH)
     } catch { /* logo optional */ }
   }
 
   // ── Company info below logo (left) ────────────────────────────────────────────
-  let logoTextY = y + 20
+  const logoHeightMm = Math.round((template.logoSize ?? 64) / 3.78)
+  let logoTextY = y + logoHeightMm + 2
   if (template.companyName) {
     doc.setFontSize(8.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(55)
     doc.text(template.companyName, margin, logoTextY); logoTextY += 4.5
