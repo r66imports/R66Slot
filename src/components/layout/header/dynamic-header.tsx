@@ -7,6 +7,57 @@ import { useLocalCart } from '@/context/local-cart-context'
 import { CartDrawer } from '@/components/cart/cart-drawer'
 import type { SiteSettings } from '@/lib/site-settings/schema'
 
+// ─── Google Font loader ───────────────────────────────────────────────────────
+function loadGoogleFont(fontFamily: string) {
+  const match = fontFamily.match(/'([^']+)'/)
+  if (!match) return
+  const fontName = match[1]
+  const id = `gfont-${fontName.replace(/\s+/g, '-').toLowerCase()}`
+  if (document.getElementById(id)) return
+  const link = document.createElement('link')
+  link.id = id
+  link.rel = 'stylesheet'
+  link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+  document.head.appendChild(link)
+}
+
+// ─── NavLink with hover support ───────────────────────────────────────────────
+function NavLink({ item, hConfig, onClick }: {
+  item: { label: string; href: string; isExternal?: boolean }
+  hConfig: NonNullable<SiteSettings['header']>
+  onClick?: () => void
+}) {
+  const [hovered, setHovered] = useState(false)
+  const { textColor, navFontFamily, navFontSize = 14, navFontWeight = 500, navHoverColor, navHoverEffect = 'color' } = hConfig
+  const hoverColor = navHoverColor || '#ef4444'
+
+  const style: React.CSSProperties = {
+    color: hovered && (navHoverEffect === 'color' || navHoverEffect === 'background' || navHoverEffect === 'underline' || navHoverEffect === 'bold') ? hoverColor : textColor,
+    fontFamily: navFontFamily || undefined,
+    fontSize: navFontSize,
+    fontWeight: hovered && navHoverEffect === 'bold' ? 700 : navFontWeight,
+    textDecoration: hovered && navHoverEffect === 'underline' ? `underline 2px ${hoverColor}` : 'none',
+    backgroundColor: hovered && navHoverEffect === 'background' ? `${hoverColor}22` : undefined,
+    padding: navHoverEffect === 'background' ? '3px 8px' : undefined,
+    borderRadius: navHoverEffect === 'background' ? '5px' : undefined,
+    transition: 'all 0.15s ease',
+  }
+
+  return (
+    <Link
+      href={item.href}
+      target={item.isExternal ? '_blank' : undefined}
+      rel={item.isExternal ? 'noopener noreferrer' : undefined}
+      style={style}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={onClick}
+    >
+      {item.label}
+    </Link>
+  )
+}
+
 export function DynamicHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)
@@ -118,6 +169,11 @@ export function DynamicHeader() {
 
   const logoPosition = headerConfig.logoPosition || 'left'
   const headerHeight = headerConfig.headerHeight ?? 64
+
+  // Load Google Font when navFontFamily changes
+  useEffect(() => {
+    if (headerConfig.navFontFamily) loadGoogleFont(headerConfig.navFontFamily)
+  }, [headerConfig.navFontFamily])
 
   // Render company name next to logo
   const renderCompanyName = () => {
@@ -303,63 +359,30 @@ export function DynamicHeader() {
               /* Center layout: nav on left side */
               <nav className="hidden md:flex items-center space-x-8">
                 {headerConfig.navItems.map((item, index) => (
-                  <Link
-                    key={index}
-                    href={item.href}
-                    target={item.isExternal ? '_blank' : undefined}
-                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
-                    className="text-sm font-medium hover:text-primary transition-colors"
-                    style={{ color: headerConfig.textColor }}
-                  >
-                    {item.label}
-                  </Link>
+                  <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
                 {editorEnabled && isAdmin && (
-                  <Link href="/r66-editor" className="text-sm font-medium hover:text-primary transition-colors" style={{ color: headerConfig.textColor }}>
-                    Editor
-                  </Link>
+                  <NavLink item={{ label: 'Editor', href: '/r66-editor' }} hConfig={headerConfig as any} />
                 )}
               </nav>
             ) : logoPosition === 'right' ? (
               /* Right layout: nav on left side */
               <nav className="hidden md:flex items-center space-x-8">
                 {headerConfig.navItems.map((item, index) => (
-                  <Link
-                    key={index}
-                    href={item.href}
-                    target={item.isExternal ? '_blank' : undefined}
-                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
-                    className="text-sm font-medium hover:text-primary transition-colors"
-                    style={{ color: headerConfig.textColor }}
-                  >
-                    {item.label}
-                  </Link>
+                  <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
                 {editorEnabled && isAdmin && (
-                  <Link href="/r66-editor" className="text-sm font-medium hover:text-primary transition-colors" style={{ color: headerConfig.textColor }}>
-                    Editor
-                  </Link>
+                  <NavLink item={{ label: 'Editor', href: '/r66-editor' }} hConfig={headerConfig as any} />
                 )}
               </nav>
             ) : (
               /* Left layout (default): nav in center */
               <nav className="hidden md:flex items-center space-x-8">
                 {headerConfig.navItems.map((item, index) => (
-                  <Link
-                    key={index}
-                    href={item.href}
-                    target={item.isExternal ? '_blank' : undefined}
-                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
-                    className="text-sm font-medium hover:text-primary transition-colors"
-                    style={{ color: headerConfig.textColor }}
-                  >
-                    {item.label}
-                  </Link>
+                  <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
                 {editorEnabled && isAdmin && (
-                  <Link href="/r66-editor" className="text-sm font-medium hover:text-primary transition-colors" style={{ color: headerConfig.textColor }}>
-                    Editor
-                  </Link>
+                  <NavLink item={{ label: 'Editor', href: '/r66-editor' }} hConfig={headerConfig as any} />
                 )}
               </nav>
             )}
@@ -479,28 +502,11 @@ export function DynamicHeader() {
             <nav className="md:hidden py-4 border-t border-gray-200">
               <div className="flex flex-col space-y-4">
                 {headerConfig.navItems.map((item, index) => (
-                  <Link
-                    key={index}
-                    href={item.href}
-                    target={item.isExternal ? '_blank' : undefined}
-                    rel={item.isExternal ? 'noopener noreferrer' : undefined}
-                    className="text-sm font-medium hover:text-primary transition-colors"
-                    style={{ color: headerConfig.textColor }}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    {item.label}
-                  </Link>
+                  <NavLink key={index} item={item} hConfig={headerConfig as any} onClick={() => setIsMenuOpen(false)} />
                 ))}
 
                 {editorEnabled && isAdmin && (
-                  <Link
-                    href="/r66-editor"
-                    className="text-sm font-medium hover:text-primary transition-colors"
-                    style={{ color: headerConfig.textColor }}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    Editor
-                  </Link>
+                  <NavLink item={{ label: 'Editor', href: '/r66-editor' }} hConfig={headerConfig as any} onClick={() => setIsMenuOpen(false)} />
                 )}
 
                 {headerConfig.showAccount && (

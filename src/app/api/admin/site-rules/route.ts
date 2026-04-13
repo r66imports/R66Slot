@@ -360,6 +360,14 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'Products',
   },
   {
+    id: 'header_typography',
+    name: 'Rule 43 — Header Typography & Fonts',
+    description: 'Full font customisation for the site header navigation. Settings are configured in Edit Header → Typography card. Nav Font Family: choose from 21 fonts including system defaults (System Default, Arial, Georgia), Google Sans-Serif fonts (Inter, Roboto, Open Sans, Lato, Montserrat, Poppins, Nunito, Raleway, Work Sans, Oswald), Serif fonts (Playfair Display, Merriweather, Lora), and Display/Handwritten fonts (Bebas Neue, Anton, Dancing Script, Pacifico, Lobster). Google Fonts are loaded on-demand via the Google Fonts API (display=swap). Font Size: 10–32px slider (default 14px). Font Weight: Regular (400), Medium (500), Semi-Bold (600), Bold (700). Hover Color: any color picker value (default brand red #ef4444). Hover Effect: Color Change (text switches to hover color), Underline (colored underline), Background (translucent highlight behind link), Bold (text weight becomes 700 + hover color). All settings stored in the header object in site-settings.json under navFontFamily, navFontSize, navFontWeight, navHoverColor, navHoverEffect. Applied to all desktop nav links, mobile nav links, and the Editor link if admin is logged in.',
+    active: true,
+    appliesTo: ['Header', 'Navigation', 'Typography'],
+    category: 'Header',
+  },
+  {
     id: 'item_category_unit',
     name: 'Rule 42 — Item Category (Unit)',
     description: 'Defines how Item Category (Unit) is used across the system. Item Category (Unit) is the Sage item category that represents the product\'s unit type (e.g. Accessories, Axle, Body Kit, Brushings, Controllers, Decals, Gear). It maps to the Sage Unit field in CSV exports. In the Worksheet "Update Product Information" modal, the Item Category (Unit) column is populated from the inventory item categories list — the same options available on the Products admin page under Sage Accounts → Item Categories (Unit). Selecting an item category here updates the product\'s itemCategories JSONB column. On the Products admin Edit page, Item Categories (Unit) appears in the Sage Accounts card.',

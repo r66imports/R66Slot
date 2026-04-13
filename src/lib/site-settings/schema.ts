@@ -53,6 +53,12 @@ export interface SiteSettings {
     companyNameLetterColors?: string[] // per-letter colors (optional)
     backgroundColor: string
     textColor: string
+    // Navigation typography
+    navFontFamily?: string // CSS font-family value (default system-ui)
+    navFontSize?: number   // px (default 14)
+    navFontWeight?: number // 400 | 500 | 600 | 700 (default 500)
+    navHoverColor?: string // color on hover (default brand red)
+    navHoverEffect?: 'color' | 'underline' | 'background' | 'bold' // hover behaviour
     navItems: Array<{
       label: string
       href: string

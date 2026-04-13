@@ -8,6 +8,44 @@ import type { SiteSettings } from '@/lib/site-settings/schema'
 
 type HeaderConfig = NonNullable<SiteSettings['header']>
 
+// ─── Font list ─────────────────────────────────────────────────────────────────
+const FONT_LIST = [
+  { name: 'System Default', value: 'system-ui, sans-serif', google: false },
+  { name: 'Arial', value: 'Arial, sans-serif', google: false },
+  { name: 'Georgia', value: 'Georgia, serif', google: false },
+  { name: 'Inter', value: "'Inter', sans-serif", google: true },
+  { name: 'Roboto', value: "'Roboto', sans-serif", google: true },
+  { name: 'Open Sans', value: "'Open Sans', sans-serif", google: true },
+  { name: 'Lato', value: "'Lato', sans-serif", google: true },
+  { name: 'Montserrat', value: "'Montserrat', sans-serif", google: true },
+  { name: 'Poppins', value: "'Poppins', sans-serif", google: true },
+  { name: 'Nunito', value: "'Nunito', sans-serif", google: true },
+  { name: 'Raleway', value: "'Raleway', sans-serif", google: true },
+  { name: 'Work Sans', value: "'Work Sans', sans-serif", google: true },
+  { name: 'Oswald', value: "'Oswald', sans-serif", google: true },
+  { name: 'Playfair Display', value: "'Playfair Display', serif", google: true },
+  { name: 'Merriweather', value: "'Merriweather', serif", google: true },
+  { name: 'Lora', value: "'Lora', serif", google: true },
+  { name: 'Bebas Neue', value: "'Bebas Neue', sans-serif", google: true },
+  { name: 'Anton', value: "'Anton', sans-serif", google: true },
+  { name: 'Dancing Script', value: "'Dancing Script', cursive", google: true },
+  { name: 'Pacifico', value: "'Pacifico', cursive", google: true },
+  { name: 'Lobster', value: "'Lobster', cursive", google: true },
+]
+
+function loadGoogleFont(fontFamily: string) {
+  const match = fontFamily.match(/'([^']+)'/)
+  if (!match) return
+  const fontName = match[1]
+  const id = `gfont-${fontName.replace(/\s+/g, '-').toLowerCase()}`
+  if (document.getElementById(id)) return
+  const link = document.createElement('link')
+  link.id = id
+  link.rel = 'stylesheet'
+  link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}:wght@400;500;600;700&display=swap`
+  document.head.appendChild(link)
+}
+
 const DEFAULT_HEADER: HeaderConfig = {
   logoText: 'R66SLOT',
   logoStyle: 'split',
@@ -104,7 +142,7 @@ function HeaderPreview({ config }: { config: HeaderConfig }) {
   const navEl = (
     <nav className="hidden md:flex items-center gap-6">
       {config.navItems.map((item, i) => (
-        <span key={i} className="text-sm font-medium" style={{ color: config.textColor }}>{item.label}</span>
+        <span key={i} style={{ color: config.textColor, fontFamily: config.navFontFamily || undefined, fontSize: config.navFontSize || 14, fontWeight: config.navFontWeight || 500 }}>{item.label}</span>
       ))}
     </nav>
   )
@@ -462,6 +500,98 @@ export default function HeaderEditorPage() {
                     <span className="text-sm text-gray-700">{label}</span>
                   </label>
                 ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* ── Typography ── */}
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle>Typography</CardTitle></CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Font Family picker */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nav Font Family</label>
+                <div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-1 border border-gray-200 rounded-xl p-2 bg-gray-50">
+                  {FONT_LIST.map((f) => {
+                    if (f.google) loadGoogleFont(f.value)
+                    const isSelected = (config.navFontFamily || '') === f.value
+                    return (
+                      <button
+                        key={f.name}
+                        onClick={() => updateConfig({ navFontFamily: f.value })}
+                        style={{ fontFamily: f.value }}
+                        className={`px-3 py-2 rounded-lg border text-sm text-left truncate transition-colors ${isSelected ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}
+                      >
+                        {f.name}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div style={{ fontFamily: config.navFontFamily || 'system-ui', fontSize: config.navFontSize || 14, fontWeight: config.navFontWeight || 500 }} className="mt-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 text-gray-700">
+                  Aa — The quick brown fox jumps over the lazy dog
+                </div>
+              </div>
+
+              {/* Size, weight, hover options */}
+              <div className="space-y-5">
+                {/* Font Size */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium text-gray-700">Font Size</label>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => updateConfig({ navFontSize: Math.max(10, (config.navFontSize || 14) - 1) })} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-xs font-bold">−</button>
+                      <span className="text-xs font-mono w-10 text-center">{config.navFontSize || 14}px</span>
+                      <button onClick={() => updateConfig({ navFontSize: Math.min(32, (config.navFontSize || 14) + 1) })} className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 flex items-center justify-center text-xs font-bold">+</button>
+                    </div>
+                  </div>
+                  <input type="range" min={10} max={32} step={1} value={config.navFontSize || 14} onChange={(e) => updateConfig({ navFontSize: Number(e.target.value) })} className="w-full accent-red-600" />
+                  <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>10px</span><span>14px (default)</span><span>32px</span></div>
+                </div>
+
+                {/* Font Weight */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Font Weight</label>
+                  <div className="flex gap-2">
+                    {[{ label: 'Regular', value: 400 }, { label: 'Medium', value: 500 }, { label: 'Semi-Bold', value: 600 }, { label: 'Bold', value: 700 }].map((w) => (
+                      <button key={w.value} onClick={() => updateConfig({ navFontWeight: w.value })}
+                        style={{ fontWeight: w.value }}
+                        className={`flex-1 py-1.5 rounded-lg border text-xs transition-colors ${(config.navFontWeight || 500) === w.value ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:border-gray-500'}`}
+                      >{w.label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hover Color */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Hover Color</label>
+                  <div className="flex gap-2 items-center">
+                    <input type="color" value={config.navHoverColor || '#ef4444'} onChange={(e) => updateConfig({ navHoverColor: e.target.value })} className="w-10 h-9 border border-gray-300 rounded cursor-pointer" />
+                    <input type="text" value={config.navHoverColor || '#ef4444'} onChange={(e) => updateConfig({ navHoverColor: e.target.value })} className="flex-1 text-sm font-mono border border-gray-300 rounded-lg px-2 py-1.5" />
+                    <button onClick={() => updateConfig({ navHoverColor: '#ef4444' })} className="text-xs text-gray-400 hover:text-gray-600 border border-gray-200 rounded px-2 py-1.5">Reset</button>
+                  </div>
+                </div>
+
+                {/* Hover Effect */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Hover Effect</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'color', label: 'Color Change', desc: 'Text changes to hover color' },
+                      { value: 'underline', label: 'Underline', desc: 'Colored underline appears' },
+                      { value: 'background', label: 'Background', desc: 'Soft background highlight' },
+                      { value: 'bold', label: 'Bold', desc: 'Text becomes bold + color' },
+                    ].map((e) => (
+                      <button key={e.value} onClick={() => updateConfig({ navHoverEffect: e.value as HeaderConfig['navHoverEffect'] })}
+                        className={`px-3 py-2 rounded-lg border text-left transition-colors ${(config.navHoverEffect || 'color') === e.value ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-200 hover:border-gray-400'}`}
+                      >
+                        <div className="text-xs font-semibold">{e.label}</div>
+                        <div className={`text-[10px] mt-0.5 ${(config.navHoverEffect || 'color') === e.value ? 'text-gray-300' : 'text-gray-400'}`}>{e.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
