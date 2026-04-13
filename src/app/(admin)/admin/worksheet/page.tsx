@@ -1875,32 +1875,41 @@ function ProductInfoModal({
 
     const built: ProdInfoRow[] = skuItems.map((it) => {
       const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()) as any
+      const categoryBrands = Array.isArray(prod?.categoryBrands) ? prod.categoryBrands : []
+      const existingSales = Array.isArray(prod?.salesAccount) ? prod.salesAccount : []
+      const existingPurchase = Array.isArray(prod?.purchaseAccount) ? prod.purchaseAccount : []
+      const brand = categoryBrands[0]
+      // If product has a brand but no accounts saved yet, default accounts to brand name
+      const salesAccount = existingSales.length > 0 ? existingSales : (brand ? [brand] : [])
+      const purchaseAccount = existingPurchase.length > 0 ? existingPurchase : (brand ? [brand] : [])
       return {
         wsId: it.id,
         sku: it.sku.trim(),
         description: it.description,
         prodId: prod?.id ?? null,
-        categoryBrands: Array.isArray(prod?.categoryBrands) ? prod.categoryBrands : [],
+        categoryBrands,
         itemCategories: Array.isArray(prod?.itemCategories) ? prod.itemCategories : [],
-        salesAccount: Array.isArray(prod?.salesAccount) ? prod.salesAccount : [],
-        purchaseAccount: Array.isArray(prod?.purchaseAccount) ? prod.purchaseAccount : [],
+        salesAccount,
+        purchaseAccount,
       }
     })
     setRows(built)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-fill accounts when categoryBrands changes for a row
+  // Auto-fill accounts when categoryBrands changes for a row.
+  // Uses configured brandAccountMap entry if available; falls back to [brand] for both accounts.
   function applyBrandAccounts(idx: number, brands: string[], map: typeof opts.brandAccountMap) {
     const brand = brands[0]
     if (!brand) return
     const entry = map[brand]
-    if (!entry) return
+    const salesAccount = entry?.salesAccount?.length > 0 ? entry.salesAccount : [brand]
+    const purchaseAccount = entry?.purchaseAccount?.length > 0 ? entry.purchaseAccount : [brand]
     setRows(prev => prev.map((r, i) => i === idx ? {
       ...r,
       categoryBrands: brands,
-      salesAccount: entry.salesAccount,
-      purchaseAccount: entry.purchaseAccount,
+      salesAccount,
+      purchaseAccount,
     } : r))
   }
 
@@ -2177,12 +2186,12 @@ function ProductInfoModal({
                       <MultiSelect rowIdx={idx} field="itemCategories" options={opts.categories} label="Item Category (Unit)" />
                     </td>
                     <td className="py-2">
-                      {brandMap ? (
+                      {brand ? (
                         <div className="flex flex-wrap gap-1">
                           {row.salesAccount.map(a => <span key={a} className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded">{a}</span>)}
                           {row.purchaseAccount.map(a => <span key={a} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded">{a}</span>)}
-                          {row.salesAccount.length === 0 && row.purchaseAccount.length === 0 && (
-                            <span className="text-[10px] text-gray-400 italic">no accounts mapped</span>
+                          {!brandMap && row.salesAccount.length > 0 && (
+                            <span className="text-[10px] text-amber-500 italic ml-1">brand default</span>
                           )}
                         </div>
                       ) : (
