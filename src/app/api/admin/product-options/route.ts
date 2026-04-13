@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { db } from '@/lib/db'
 
 const OPTIONS_KEY = 'data/product-options.json'
 
@@ -18,9 +19,28 @@ const DEFAULTS = {
 export async function GET() {
   try {
     const saved = await blobRead<typeof DEFAULTS>(OPTIONS_KEY, DEFAULTS)
+
+    // Pull all distinct category_brands and item_categories values from the products table
+    const [brandsResult, icResult] = await Promise.all([
+      db.query<{ val: string }>(
+        `SELECT DISTINCT jsonb_array_elements_text(category_brands) AS val
+         FROM products
+         WHERE category_brands IS NOT NULL AND category_brands != '[]'::jsonb
+         ORDER BY 1`
+      ),
+      db.query<{ val: string }>(
+        `SELECT DISTINCT jsonb_array_elements_text(item_categories) AS val
+         FROM products
+         WHERE item_categories IS NOT NULL AND item_categories != '[]'::jsonb
+         ORDER BY 1`
+      ),
+    ])
+    const dbBrands = brandsResult.rows.map((r) => r.val).filter(Boolean)
+    const dbCategories = icResult.rows.map((r) => r.val).filter(Boolean)
+
     return NextResponse.json({
-      brands: Array.from(new Set([...DEFAULTS.brands, ...(saved.brands || [])])),
-      categories: Array.from(new Set([...(saved.categories || [])])),
+      brands: Array.from(new Set([...DEFAULTS.brands, ...(saved.brands || []), ...dbBrands])).sort(),
+      categories: Array.from(new Set([...dbCategories, ...(saved.categories || [])])).sort(),
       scales: Array.from(new Set([...DEFAULTS.scales, ...(saved.scales || [])])),
       carClasses: Array.from(new Set([...DEFAULTS.carClasses, ...(saved.carClasses || [])])),
       revoParts: Array.from(new Set([...DEFAULTS.revoParts, ...(saved.revoParts || [])])),
