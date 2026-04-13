@@ -660,13 +660,27 @@ export default function MediaLibraryPage() {
     await saveLibrary(updated)
   }
 
+  // Persist a single file's folder to the DB
+  const patchFileFolder = async (url: string, folder: string) => {
+    await fetch('/api/admin/media', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, folder }),
+    })
+  }
+
   const handleBulkMove = async (targetFolder: string) => {
     const ids = Array.from(selectedFiles)
+    const filesToMove = library.files.filter(f => ids.includes(f.id))
     const updated = { ...library, files: library.files.map(f => ids.includes(f.id) ? { ...f, folder: targetFolder } : f) }
     setLibrary(updated)
     setSelectedFiles(new Set())
     setMoveTarget(null)
-    await saveLibrary(updated)
+    // Save folder list + persist each file's folder to DB
+    await Promise.all([
+      saveLibrary(updated),
+      ...filesToMove.map(f => patchFileFolder(f.url, targetFolder)),
+    ])
   }
 
   const handleCopyUrl = (url: string) => navigator.clipboard.writeText(url)
@@ -676,7 +690,11 @@ export default function MediaLibraryPage() {
     if (!file || file.folder === targetFolder) return
     const updated = { ...library, files: library.files.map(f => f.id === fileId ? { ...f, folder: targetFolder } : f) }
     setLibrary(updated)
-    await saveLibrary(updated)
+    // Persist folder assignment to DB
+    await Promise.all([
+      saveLibrary(updated),
+      patchFileFolder(file.url, targetFolder),
+    ])
   }
 
   const moveFolder = async (srcPath: string, destParent: string) => {
@@ -696,7 +714,12 @@ export default function MediaLibraryPage() {
     })
     const updated = { ...library, folders: newFolders, files: newFiles }
     setLibrary(updated)
-    await saveLibrary(updated)
+    // Persist each moved file's new folder to DB
+    const movedFiles = newFiles.filter(f => f.folder === newPath || f.folder.startsWith(newPath + '/'))
+    await Promise.all([
+      saveLibrary(updated),
+      ...movedFiles.map(f => patchFileFolder(f.url, f.folder)),
+    ])
   }
 
   const handleCreateFolder = () => {
@@ -711,8 +734,9 @@ export default function MediaLibraryPage() {
     saveLibrary(updated)
   }
 
-  const handleDeleteFolder = (folderPath: string) => {
+  const handleDeleteFolder = async (folderPath: string) => {
     if (!confirm(`Delete folder "${folderPath.split('/').pop()}"? Files inside will be moved to root.`)) return
+    const affectedFiles = library.files.filter(f => f.folder === folderPath || f.folder.startsWith(folderPath + '/'))
     const newFolders = library.folders.filter(f => f !== folderPath && !f.startsWith(folderPath + '/'))
     const newFiles = library.files.map(f =>
       (f.folder === folderPath || f.folder.startsWith(folderPath + '/')) ? { ...f, folder: '' } : f
@@ -720,7 +744,11 @@ export default function MediaLibraryPage() {
     const updated = { ...library, folders: newFolders, files: newFiles }
     setLibrary(updated)
     if (currentPath === folderPath || currentPath.startsWith(folderPath + '/')) setCurrentPath('')
-    saveLibrary(updated)
+    // Persist each affected file's folder reset to DB
+    await Promise.all([
+      saveLibrary(updated),
+      ...affectedFiles.map(f => patchFileFolder(f.url, '')),
+    ])
   }
 
   const toggleFileSelect = (id: string) => {
