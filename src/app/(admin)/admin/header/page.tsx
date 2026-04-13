@@ -600,21 +600,69 @@ export default function HeaderEditorPage() {
         {/* ── Navigation ── */}
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle>Navigation Items</CardTitle></CardHeader>
-          <CardContent className="space-y-3">
-            {config.navItems.map((item, index) => (
-              <div key={index} className="flex gap-2 items-center bg-gray-50 rounded-lg px-3 py-2">
-                <span className="text-gray-400 text-sm font-mono w-5 text-center">{index + 1}</span>
-                <Input value={item.label} onChange={(e) => updateNavItem(index, { label: e.target.value })} placeholder="Label" className="flex-1" />
-                <Input value={item.href} onChange={(e) => updateNavItem(index, { href: e.target.value })} placeholder="/path or https://..." className="flex-1 font-mono text-sm" />
-                <label className="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap cursor-pointer">
-                  <input type="checkbox" checked={item.isExternal || false} onChange={(e) => updateNavItem(index, { isExternal: e.target.checked })} className="accent-red-600" />
-                  External
-                </label>
-                <button onClick={() => updateConfig({ navItems: config.navItems.filter((_, i) => i !== index) })} className="text-gray-400 hover:text-red-600 transition-colors p-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-            ))}
+          <CardContent className="space-y-4">
+            {config.navItems.map((item, index) => {
+              const hasDropdown = Array.isArray(item.dropdown)
+              const addDropdown = () => updateNavItem(index, { dropdown: [] })
+              const removeDropdown = () => { const { dropdown: _d, ...rest } = item; const items = [...config.navItems]; items[index] = rest as any; updateConfig({ navItems: items }) }
+              const addDropdownItem = () => updateNavItem(index, { dropdown: [...(item.dropdown || []), { label: '', href: '/' }] })
+              const updateDropdownItem = (di: number, patch: { label?: string; href?: string; isExternal?: boolean }) => {
+                const dd = [...(item.dropdown || [])]
+                dd[di] = { ...dd[di], ...patch }
+                updateNavItem(index, { dropdown: dd })
+              }
+              const removeDropdownItem = (di: number) => updateNavItem(index, { dropdown: (item.dropdown || []).filter((_, i) => i !== di) })
+
+              return (
+                <div key={index} className="border border-gray-200 rounded-xl overflow-hidden">
+                  {/* Main nav item row */}
+                  <div className="flex gap-2 items-center bg-gray-50 px-3 py-2">
+                    <span className="text-gray-400 text-sm font-mono w-5 text-center">{index + 1}</span>
+                    <Input value={item.label} onChange={(e) => updateNavItem(index, { label: e.target.value })} placeholder="Label" className="flex-1" />
+                    <Input value={item.href} onChange={(e) => updateNavItem(index, { href: e.target.value })} placeholder="/path or https://..." className="flex-1 font-mono text-sm" />
+                    <label className="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap cursor-pointer">
+                      <input type="checkbox" checked={item.isExternal || false} onChange={(e) => updateNavItem(index, { isExternal: e.target.checked })} className="accent-red-600" />
+                      External
+                    </label>
+                    {/* Dropdown toggle */}
+                    <button
+                      onClick={hasDropdown ? removeDropdown : addDropdown}
+                      title={hasDropdown ? 'Remove dropdown' : 'Add dropdown menu'}
+                      className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap transition-colors ${hasDropdown ? 'bg-indigo-100 text-indigo-700 hover:bg-red-100 hover:text-red-600' : 'bg-gray-200 text-gray-500 hover:bg-indigo-100 hover:text-indigo-700'}`}
+                    >
+                      {hasDropdown ? '▾ Dropdown' : '+ Dropdown'}
+                    </button>
+                    <button onClick={() => updateConfig({ navItems: config.navItems.filter((_, i) => i !== index) })} className="text-gray-400 hover:text-red-600 transition-colors p-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+
+                  {/* Dropdown items editor */}
+                  {hasDropdown && (
+                    <div className="bg-white px-4 py-3 border-t border-gray-100 space-y-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dropdown Items</p>
+                      {(item.dropdown || []).map((dd, di) => (
+                        <div key={di} className="flex gap-2 items-center pl-4 border-l-2 border-indigo-200">
+                          <span className="text-gray-300 text-xs font-mono w-4 text-center">{di + 1}</span>
+                          <Input value={dd.label} onChange={(e) => updateDropdownItem(di, { label: e.target.value })} placeholder="Brand / Label" className="flex-1 h-8 text-sm" />
+                          <Input value={dd.href} onChange={(e) => updateDropdownItem(di, { href: e.target.value })} placeholder="/brands/acme" className="flex-1 font-mono text-xs h-8" />
+                          <label className="flex items-center gap-1 text-xs text-gray-400 whitespace-nowrap cursor-pointer">
+                            <input type="checkbox" checked={dd.isExternal || false} onChange={(e) => updateDropdownItem(di, { isExternal: e.target.checked })} className="accent-red-600" />
+                            Ext
+                          </label>
+                          <button onClick={() => removeDropdownItem(di)} className="text-gray-300 hover:text-red-500 transition-colors p-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </div>
+                      ))}
+                      <button onClick={addDropdownItem} className="ml-6 text-xs text-indigo-600 hover:text-indigo-800 font-medium py-1">
+                        + Add item
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
             <button onClick={() => updateConfig({ navItems: [...config.navItems, { label: '', href: '/' }] })} className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors">
               + Add Navigation Item
             </button>

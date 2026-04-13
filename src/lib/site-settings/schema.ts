@@ -63,6 +63,11 @@ export interface SiteSettings {
       label: string
       href: string
       isExternal?: boolean
+      dropdown?: Array<{
+        label: string
+        href: string
+        isExternal?: boolean
+      }>
     }>
     showSearch: boolean
     showAccount: boolean

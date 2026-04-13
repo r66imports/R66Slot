@@ -21,26 +21,82 @@ function loadGoogleFont(fontFamily: string) {
   document.head.appendChild(link)
 }
 
-// ─── NavLink with hover support ───────────────────────────────────────────────
+// ─── NavLink with hover support + optional dropdown ──────────────────────────
 function NavLink({ item, hConfig, onClick }: {
-  item: { label: string; href: string; isExternal?: boolean }
+  item: NonNullable<SiteSettings['header']>['navItems'][0]
   hConfig: NonNullable<SiteSettings['header']>
   onClick?: () => void
 }) {
   const [hovered, setHovered] = useState(false)
-  const { textColor, navFontFamily, navFontSize = 14, navFontWeight = 500, navHoverColor, navHoverEffect = 'color' } = hConfig
+  const [dropOpen, setDropOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const { textColor, navFontFamily, navFontSize = 14, navFontWeight = 500, navHoverColor, navHoverEffect = 'color', backgroundColor } = hConfig
   const hoverColor = navHoverColor || '#ef4444'
+  const hasDropdown = Array.isArray(item.dropdown) && item.dropdown.length > 0
 
-  const style: React.CSSProperties = {
-    color: hovered && (navHoverEffect === 'color' || navHoverEffect === 'background' || navHoverEffect === 'underline' || navHoverEffect === 'bold') ? hoverColor : textColor,
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropOpen) return
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setDropOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [dropOpen])
+
+  const linkStyle: React.CSSProperties = {
+    color: (hovered || dropOpen) && (navHoverEffect === 'color' || navHoverEffect === 'background' || navHoverEffect === 'underline' || navHoverEffect === 'bold') ? hoverColor : textColor,
     fontFamily: navFontFamily || undefined,
     fontSize: navFontSize,
-    fontWeight: hovered && navHoverEffect === 'bold' ? 700 : navFontWeight,
-    textDecoration: hovered && navHoverEffect === 'underline' ? `underline 2px ${hoverColor}` : 'none',
-    backgroundColor: hovered && navHoverEffect === 'background' ? `${hoverColor}22` : undefined,
+    fontWeight: (hovered || dropOpen) && navHoverEffect === 'bold' ? 700 : navFontWeight,
+    textDecoration: (hovered || dropOpen) && navHoverEffect === 'underline' ? `underline 2px ${hoverColor}` : 'none',
+    backgroundColor: (hovered || dropOpen) && navHoverEffect === 'background' ? `${hoverColor}22` : undefined,
     padding: navHoverEffect === 'background' ? '3px 8px' : undefined,
     borderRadius: navHoverEffect === 'background' ? '5px' : undefined,
     transition: 'all 0.15s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: hasDropdown ? 4 : undefined,
+  }
+
+  if (hasDropdown) {
+    return (
+      <div ref={wrapRef} className="relative" onMouseEnter={() => setDropOpen(true)} onMouseLeave={() => setDropOpen(false)}>
+        <button
+          style={linkStyle}
+          onClick={() => { setDropOpen(v => !v); onClick?.() }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        >
+          {item.label}
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transition-transform" style={{ transform: dropOpen ? 'rotate(180deg)' : 'none', color: 'inherit' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {/* Dropdown panel */}
+        {dropOpen && (
+          <div
+            className="absolute top-full left-0 mt-1 min-w-[180px] rounded-xl border border-gray-200 shadow-xl overflow-hidden z-50"
+            style={{ backgroundColor: backgroundColor || '#ffffff' }}
+          >
+            {item.dropdown!.map((dd, i) => (
+              <Link
+                key={i}
+                href={dd.href}
+                target={dd.isExternal ? '_blank' : undefined}
+                rel={dd.isExternal ? 'noopener noreferrer' : undefined}
+                onClick={() => { setDropOpen(false); onClick?.() }}
+                className="block px-4 py-2.5 text-sm transition-colors hover:opacity-80"
+                style={{ color: textColor, fontFamily: navFontFamily || undefined, fontWeight: navFontWeight, borderBottom: i < item.dropdown!.length - 1 ? '1px solid rgba(0,0,0,0.06)' : undefined }}
+              >
+                {dd.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -48,7 +104,7 @@ function NavLink({ item, hConfig, onClick }: {
       href={item.href}
       target={item.isExternal ? '_blank' : undefined}
       rel={item.isExternal ? 'noopener noreferrer' : undefined}
-      style={style}
+      style={linkStyle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={onClick}
