@@ -13,6 +13,8 @@ interface CompanyInfo {
 interface ProductRef {
   id: string; sku: string; title: string; brand: string; price: number; quantity: number
   unit: string; category: string; preOrderPrice?: number | null
+  categoryBrands: string[]; itemCategories: string[]
+  salesAccount: string[]; purchaseAccount: string[]
 }
 
 interface PricelistEntry {
@@ -129,6 +131,10 @@ export default function WorksheetPage() {
           quantity: Number(p.quantity) || 0,
           unit: Array.isArray(p.itemCategories) ? p.itemCategories.join(' / ') : (p.itemCategories || ''),
           category: Array.isArray(p.categoryBrands) ? p.categoryBrands.join(' / ') : (p.categoryBrands || ''),
+          categoryBrands: Array.isArray(p.categoryBrands) ? p.categoryBrands : [],
+          itemCategories: Array.isArray(p.itemCategories) ? p.itemCategories : [],
+          salesAccount: Array.isArray(p.salesAccount) ? p.salesAccount : [],
+          purchaseAccount: Array.isArray(p.purchaseAccount) ? p.purchaseAccount : [],
         })).filter((p) => p.sku || p.title))
       }
 
@@ -1946,10 +1952,10 @@ function ProductInfoModal({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          categoryBrands: row.categoryBrands,
-          itemCategories: row.itemCategories,
-          salesAccount: row.salesAccount,
-          purchaseAccount: row.purchaseAccount,
+          categoryBrands: row.categoryBrands.length > 0 ? row.categoryBrands : null,
+          itemCategories: row.itemCategories.length > 0 ? row.itemCategories : null,
+          salesAccount: row.salesAccount.length > 0 ? row.salesAccount : null,
+          purchaseAccount: row.purchaseAccount.length > 0 ? row.purchaseAccount : null,
         }),
       })
       if (res.ok) savedCount++
