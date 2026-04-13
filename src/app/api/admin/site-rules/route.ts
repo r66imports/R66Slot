@@ -351,6 +351,22 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Page Editor', 'Content Block', 'Columns', 'Divider'],
     category: 'Page Editor',
   },
+  {
+    id: 'item_category_brand',
+    name: 'Rule 41 — Item Category (Brand)',
+    description: 'Defines how Category (Brand) is used across the system. Category (Brand) is the Sage accounting category linked to a product\'s brand name (e.g. NSR, Carrera, Slot.it). It maps directly to the Sage Category field in CSV exports. In the Worksheet "Update Product Information" modal, selecting a Category (Brand) automatically auto-fills the Sage Sales Account and Sage Purchase Account for that product row — these mappings are configured via the "Brand Accounts" button in the modal header. Category (Brand) is stored in the products table as the categoryBrands JSONB column and appears in the Sage Accounts card on the Edit Product page.',
+    active: true,
+    appliesTo: ['Worksheet', 'Products', 'Sage Accounts', 'CSV Export'],
+    category: 'Products',
+  },
+  {
+    id: 'item_category_unit',
+    name: 'Rule 42 — Item Category (Unit)',
+    description: 'Defines how Item Category (Unit) is used across the system. Item Category (Unit) is the Sage item category that represents the product\'s unit type (e.g. Accessories, Axle, Body Kit, Brushings, Controllers, Decals, Gear). It maps to the Sage Unit field in CSV exports. In the Worksheet "Update Product Information" modal, the Item Category (Unit) column is populated from the inventory item categories list — the same options available on the Products admin page under Sage Accounts → Item Categories (Unit). Selecting an item category here updates the product\'s itemCategories JSONB column. On the Products admin Edit page, Item Categories (Unit) appears in the Sage Accounts card.',
+    active: true,
+    appliesTo: ['Worksheet', 'Products', 'Sage Accounts', 'CSV Export'],
+    category: 'Products',
+  },
 ]
 
 export async function GET() {
