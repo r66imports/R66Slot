@@ -191,9 +191,7 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
     case 'header': {
       const logoText = (settings.logoText as string) || 'R66SLOT'
       const menuItemsStr = (settings.menuItems as string) || 'Products,Brands,About,Contact'
-      const menuLinksStr = (settings.menuLinks as string) || '/products,/brands,/about,/contact'
       const menuItems = menuItemsStr.split(',').map(s => s.trim())
-      const menuLinks = menuLinksStr.split(',').map(s => s.trim())
       const bgColor = styles.backgroundColor || '#1F2937'
       return (
         <header style={{
@@ -528,10 +526,28 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
       const colMobile = (settings.columnsMobile as number) || Math.min(2, colCount)
       const colCls = `colg-${colCount}d${colTablet}t${colMobile}m`
       const colStyle = `.${colCls}{display:grid;grid-template-columns:repeat(${colCount},minmax(0,1fr));gap:1.5rem}@media(max-width:1023px){.${colCls}{grid-template-columns:repeat(${colTablet},minmax(0,1fr))}}@media(max-width:639px){.${colCls}{grid-template-columns:repeat(${colMobile},minmax(0,1fr));gap:0.75rem}}`
+      const colBgUrl = (settings.bgImageUrl as string) || ''
+      const colBgSize = (settings.bgImageSize as string) || 'cover'
+      const colBgPos = (settings.bgImagePosition as string) || 'center center'
+      const colOverlay = (settings.bgOverlayOpacity as number) ?? 0
+      const hasColBg = colBgUrl.trim() !== ''
+      const colSectionStyle: React.CSSProperties = {
+        ...containerStyle,
+        ...(hasColBg ? {
+          backgroundImage: `url("${colBgUrl}")`,
+          backgroundSize: colBgSize,
+          backgroundPosition: colBgPos,
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+        } : {}),
+      }
       return (
-        <section style={containerStyle}>
+        <section style={colSectionStyle}>
           <style>{colStyle}</style>
-          <div className="w-full max-w-screen-xl mx-auto px-4">
+          {hasColBg && colOverlay > 0 && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${colOverlay})`, borderRadius: colSectionStyle.borderRadius }} />
+          )}
+          <div className="w-full max-w-screen-xl mx-auto px-4" style={{ position: hasColBg ? 'relative' : undefined, zIndex: hasColBg ? 1 : undefined }}>
             <div className={colCls}>
               {children?.slice(0, colCount).map((child) => {
                 const imgObjectFit = (child.settings.objectFit as string) || 'cover'
@@ -640,16 +656,31 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
         </div>
       )
 
-    case 'divider':
+    case 'divider': {
+      const divBgUrl = (settings.bgImageUrl as string) || ''
+      const divOverlay = (settings.bgOverlayOpacity as number) ?? 0
+      const hasDivBg = divBgUrl.trim() !== ''
+      const divStyle: React.CSSProperties = {
+        ...containerStyle,
+        ...(hasDivBg ? {
+          backgroundImage: `url("${divBgUrl}")`,
+          backgroundSize: (settings.bgImageSize as string) || 'cover',
+          backgroundPosition: (settings.bgImagePosition as string) || 'center center',
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+        } : {}),
+      }
       return (
-        <div style={containerStyle}>
-          <div className="container mx-auto">
-            <hr style={{
-              borderTop: `${settings.thickness || '1px'} ${settings.style || 'solid'} ${settings.color || '#e5e7eb'}`,
-            }} />
+        <div style={divStyle}>
+          {hasDivBg && divOverlay > 0 && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${divOverlay})` }} />
+          )}
+          <div className="container mx-auto" style={{ position: hasDivBg ? 'relative' : undefined, zIndex: hasDivBg ? 1 : undefined }}>
+            <hr style={{ borderTop: `${settings.thickness || '1px'} ${settings.style || 'solid'} ${settings.color || '#e5e7eb'}` }} />
           </div>
         </div>
       )
+    }
 
     case 'product-grid': {
       const pgCols = viewMode === 'mobile'
@@ -840,6 +871,19 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
     case 'content-block': {
       const imgPos = (settings.imagePosition as string) || 'top'
       const hasImage = settings.imageUrl && (settings.imageUrl as string).trim() !== ''
+      const cbBgUrl = (settings.bgImageUrl as string) || ''
+      const cbOverlay = (settings.bgOverlayOpacity as number) ?? 0
+      const hasCbBg = cbBgUrl.trim() !== ''
+      const cbStyle: React.CSSProperties = {
+        ...containerStyle,
+        ...(hasCbBg ? {
+          backgroundImage: `url("${cbBgUrl}")`,
+          backgroundSize: (settings.bgImageSize as string) || 'cover',
+          backgroundPosition: (settings.bgImagePosition as string) || 'center center',
+          backgroundRepeat: 'no-repeat',
+          position: 'relative',
+        } : {}),
+      }
       const blockContent = (
         <div className="flex-1">
           <div dangerouslySetInnerHTML={{ __html: content }} />
@@ -852,42 +896,40 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
       )
       const blockImage = hasImage ? (
         <div className={imgPos === 'top' || imgPos === 'bottom' ? 'w-full' : 'w-1/2 flex-shrink-0'}>
-          <img
-            src={settings.imageUrl as string}
-            alt={(settings.alt as string) || ''}
-            className="w-full h-auto rounded-lg object-cover"
-            style={{ maxHeight: imgPos === 'top' || imgPos === 'bottom' ? '300px' : undefined }}
-          />
+          <img src={settings.imageUrl as string} alt={(settings.alt as string) || ''} className="w-full h-auto rounded-lg object-cover" style={{ maxHeight: imgPos === 'top' || imgPos === 'bottom' ? '300px' : undefined }} />
         </div>
       ) : null
-
+      const cbInner = (children: React.ReactNode) => (
+        <>
+          {hasCbBg && cbOverlay > 0 && (
+            <div style={{ position: 'absolute', inset: 0, backgroundColor: `rgba(0,0,0,${cbOverlay})`, borderRadius: cbStyle.borderRadius }} />
+          )}
+          <div style={{ position: hasCbBg ? 'relative' : undefined, zIndex: hasCbBg ? 1 : undefined }}>{children}</div>
+        </>
+      )
       if (imgPos === 'left' && blockImage) {
         return (
-          <div style={containerStyle}>
-            <div className="container mx-auto flex gap-6 items-start">
-              {blockImage}
-              {blockContent}
-            </div>
+          <div style={cbStyle}>
+            {cbInner(<div className="container mx-auto flex gap-6 items-start">{blockImage}{blockContent}</div>)}
           </div>
         )
       }
       if (imgPos === 'right' && blockImage) {
         return (
-          <div style={containerStyle}>
-            <div className="container mx-auto flex gap-6 items-start">
-              {blockContent}
-              {blockImage}
-            </div>
+          <div style={cbStyle}>
+            {cbInner(<div className="container mx-auto flex gap-6 items-start">{blockContent}{blockImage}</div>)}
           </div>
         )
       }
       return (
-        <div style={containerStyle}>
-          <div className="container mx-auto">
-            {imgPos === 'top' && blockImage}
-            {blockContent}
-            {imgPos === 'bottom' && blockImage}
-          </div>
+        <div style={cbStyle}>
+          {cbInner(
+            <div className="container mx-auto">
+              {imgPos === 'top' && blockImage}
+              {blockContent}
+              {imgPos === 'bottom' && blockImage}
+            </div>
+          )}
         </div>
       )
     }
