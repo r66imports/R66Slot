@@ -175,7 +175,7 @@ async function buildPDFDoc(
   lineItems: { description: string; qty: number; unitPrice: number }[],
   template: OrderTemplate
 ) {
-  const { default: jsPDF } = await import('jspdf')
+  const { jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useColumnResize } from '@/hooks/use-column-resize'
-import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -523,7 +523,7 @@ export default function InventoryPage() {
       return sum + restock * price
     }, 0)
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: 70,
       head: [['SKU', 'Description', 'Qty', `Unit Price (${currency})`, `Total (${currency})`]],
       body: rows,
