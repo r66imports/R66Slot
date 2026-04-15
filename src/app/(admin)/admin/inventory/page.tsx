@@ -21,6 +21,7 @@ interface Product {
 interface SupplierContact {
   id: string
   name: string
+  companyName?: string
   code: string
   email?: string
   phone?: string
@@ -515,6 +516,7 @@ export default function InventoryPage() {
     doc.setTextColor(100)
     doc.text(supplierName, 22, supplierY)
     supplierY += 5
+    if (selectedSupplier?.companyName) { doc.text(selectedSupplier.companyName, 22, supplierY); supplierY += 5 }
     if (selectedSupplier?.address) { doc.text(selectedSupplier.address, 22, supplierY); supplierY += 5 }
     if (selectedSupplier?.country) { doc.text(selectedSupplier.country, 22, supplierY); supplierY += 5 }
     if (selectedSupplier?.email) { doc.text(selectedSupplier.email, 22, supplierY); supplierY += 5 }
@@ -1232,6 +1234,7 @@ export default function InventoryPage() {
                 <p className="text-xs text-gray-500 mt-1">{restockItems.length} items to restock</p>
                 {/* Supplier details */}
                 <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-gray-500">
+                  {selectedSupplier.companyName && <span className="font-medium text-gray-700">{selectedSupplier.companyName}</span>}
                   {selectedSupplier.address && <span>📍 {selectedSupplier.address}</span>}
                   {selectedSupplier.country && !selectedSupplier.address && <span>📍 {selectedSupplier.country}</span>}
                   {selectedSupplier.email && <span>✉ {selectedSupplier.email}</span>}

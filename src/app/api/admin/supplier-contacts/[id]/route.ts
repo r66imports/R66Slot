@@ -7,6 +7,7 @@ interface SupplierContact {
   id: string
   name: string
   code: string
+  companyName?: string
   email: string
   phone: string
   address?: string

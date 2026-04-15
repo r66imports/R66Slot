@@ -6,6 +6,7 @@ const KEY = 'data/supplier-contacts.json'
 export interface SupplierContact {
   id: string
   name: string
+  companyName?: string
   code: string
   email: string
   phone: string
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
     const newSupplier: SupplierContact = {
       id: `sc-${Date.now()}`,
       name: body.name?.trim() || '',
+      companyName: body.companyName?.trim() || '',
       code: body.code?.trim() || '',
       email: body.email?.trim() || '',
       phone: body.phone?.trim() || '',

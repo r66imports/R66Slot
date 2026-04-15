@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 interface Supplier {
   id: string
   name: string
+  companyName?: string
   code: string
   email: string
   phone: string
@@ -52,6 +53,7 @@ interface Backorder {
 
 const EMPTY_SUPPLIER: Omit<Supplier, 'id' | 'isActive' | 'createdAt'> = {
   name: '',
+  companyName: '',
   code: '',
   email: '',
   phone: '',
@@ -926,14 +928,23 @@ export default function SuppliersNetworkPage() {
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+                <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Supplier Name *</label>
                   <input
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={supplierForm.name}
                     onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                    placeholder="e.g. Revo Slot"
+                    placeholder="e.g. Sideways"
                     autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Company Name</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={supplierForm.companyName || ''}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, companyName: e.target.value })}
+                    placeholder="e.g. Sideways Slot Cars SRL"
                   />
                 </div>
                 <div>
