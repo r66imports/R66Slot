@@ -488,46 +488,74 @@ export default function InventoryPage() {
     const supplierName = selectedSupplier?.name || 'Supplier'
     const dateStr = new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })
 
-    // Header
-    doc.setFontSize(16)
-    doc.setFont('helvetica', 'bold')
-    doc.text(companyInfo.name || 'Route 66 Slot Cars', 14, 20)
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100)
-    if (companyInfo.address) doc.text(companyInfo.address, 14, 27)
-    if (companyInfo.email) doc.text(companyInfo.email, 14, 32)
-    if (companyInfo.phone) doc.text(companyInfo.phone, 14, 37)
-    doc.setTextColor(0)
+    const isInvoice = docType === 'Invoice'
+
+    if (isInvoice) {
+      // Invoice: Supplier is the sender (header), Route 66 is the Bill To
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.text(selectedSupplier?.companyName || supplierName, 14, 20)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100)
+      if (selectedSupplier?.address) doc.text(selectedSupplier.address, 14, 27)
+      if (selectedSupplier?.country) doc.text(selectedSupplier.country, 14, 32)
+      if (selectedSupplier?.email) doc.text(selectedSupplier.email, 14, 37)
+      if (selectedSupplier?.phone) doc.text(selectedSupplier.phone, 14, 42)
+      doc.setTextColor(0)
+    } else {
+      // Purchase Order: Route 66 is the sender (header)
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.text(companyInfo.name || 'Route 66 Slot Cars', 14, 20)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100)
+      if (companyInfo.address) doc.text(companyInfo.address, 14, 27)
+      if (companyInfo.email) doc.text(companyInfo.email, 14, 32)
+      if (companyInfo.phone) doc.text(companyInfo.phone, 14, 37)
+      doc.setTextColor(0)
+    }
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
-    const docHeading = docType === 'Invoice' && invoiceNumber
+    const docHeading = isInvoice && invoiceNumber
       ? `${docType} #${invoiceNumber}`
       : docType
-    doc.text(docHeading, 14, 50)
+    doc.text(docHeading, 14, 53)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(100)
-    doc.text(`Date: ${dateStr}`, 14, 57)
+    doc.text(`Date: ${dateStr}`, 14, 60)
 
-    // Supplier / TO block
-    let supplierY = 62
+    // TO block
+    let toY = 66
     doc.setTextColor(0)
     doc.setFont('helvetica', 'bold')
-    doc.text('To:', 14, supplierY)
+    doc.text('To:', 14, toY)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100)
-    doc.text(supplierName, 22, supplierY)
-    supplierY += 5
-    if (selectedSupplier?.companyName) { doc.text(selectedSupplier.companyName, 22, supplierY); supplierY += 5 }
-    if (selectedSupplier?.address) { doc.text(selectedSupplier.address, 22, supplierY); supplierY += 5 }
-    if (selectedSupplier?.country) { doc.text(selectedSupplier.country, 22, supplierY); supplierY += 5 }
-    if (selectedSupplier?.email) { doc.text(selectedSupplier.email, 22, supplierY); supplierY += 5 }
-    if (selectedSupplier?.phone) { doc.text(selectedSupplier.phone, 22, supplierY); supplierY += 5 }
+
+    if (isInvoice) {
+      // Invoice: Route 66 is the recipient
+      doc.text(companyInfo.name || 'Route 66 Slot Cars', 22, toY)
+      toY += 5
+      if (companyInfo.address) { doc.text(companyInfo.address, 22, toY); toY += 5 }
+      if (companyInfo.email) { doc.text(companyInfo.email, 22, toY); toY += 5 }
+      if (companyInfo.phone) { doc.text(companyInfo.phone, 22, toY); toY += 5 }
+    } else {
+      // Purchase Order: Supplier is the recipient
+      doc.text(supplierName, 22, toY)
+      toY += 5
+      if (selectedSupplier?.companyName) { doc.text(selectedSupplier.companyName, 22, toY); toY += 5 }
+      if (selectedSupplier?.address) { doc.text(selectedSupplier.address, 22, toY); toY += 5 }
+      if (selectedSupplier?.country) { doc.text(selectedSupplier.country, 22, toY); toY += 5 }
+      if (selectedSupplier?.email) { doc.text(selectedSupplier.email, 22, toY); toY += 5 }
+      if (selectedSupplier?.phone) { doc.text(selectedSupplier.phone, 22, toY); toY += 5 }
+    }
     doc.setTextColor(0)
 
-    const tableStartY = Math.max(70, supplierY + 3)
+    const tableStartY = Math.max(75, toY + 3)
 
     // Table rows
     const rows = restockItems.map((p) => {
