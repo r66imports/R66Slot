@@ -180,9 +180,11 @@ export default function SuppliersNetworkPage() {
     setEditingSupplier(s)
     setSupplierForm({
       name: s.name,
+      companyName: s.companyName || '',
       code: s.code,
       email: s.email,
       phone: s.phone,
+      address: s.address || '',
       country: s.country,
       website: s.website,
       notes: s.notes,
