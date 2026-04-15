@@ -76,6 +76,7 @@ export default function InventoryPage() {
   const [orderSentDone, setOrderSentDone] = useState(false)
   const [createdWsId, setCreatedWsId] = useState<string | null>(null)
   const [docType, setDocType] = useState<'Purchase Order' | 'Invoice'>('Purchase Order')
+  const [invoiceNumber, setInvoiceNumber] = useState('')
 
   // Inventory Count — cross-reference only, never updates Shop Inventory
   const [lastStockTakeDate, setLastStockTakeDate] = useState<string | null>(null)
@@ -501,7 +502,10 @@ export default function InventoryPage() {
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
-    doc.text(docType, 14, 50)
+    const docHeading = docType === 'Invoice' && invoiceNumber
+      ? `${docType} #${invoiceNumber}`
+      : docType
+    doc.text(docHeading, 14, 50)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(100)
@@ -568,7 +572,8 @@ export default function InventoryPage() {
   async function handleDownloadPDF() {
     const doc = await generateOrderPDF()
     const supplierName = selectedSupplier?.name || 'Supplier'
-    doc.save(`${docType.replace(' ', '-')}-${supplierName}-${new Date().toISOString().slice(0, 10)}.pdf`)
+    const numSuffix = docType === 'Invoice' && invoiceNumber ? `-${invoiceNumber}` : ''
+    doc.save(`${docType.replace(' ', '-')}${numSuffix}-${supplierName}-${new Date().toISOString().slice(0, 10)}.pdf`)
   }
 
   // ─── Send to Supplier Orders ────────────────────────────────────────────────
@@ -1230,6 +1235,16 @@ export default function InventoryPage() {
                       Invoice
                     </button>
                   </div>
+                  {/* Invoice number — only shown when Invoice is selected */}
+                  {docType === 'Invoice' && (
+                    <input
+                      type="text"
+                      value={invoiceNumber}
+                      onChange={(e) => setInvoiceNumber(e.target.value)}
+                      placeholder="Invoice # (optional)"
+                      className="px-2.5 py-1 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent w-36"
+                    />
+                  )}
                 </div>
                 <p className="text-xs text-gray-500 mt-1">{restockItems.length} items to restock</p>
                 {/* Supplier details */}
