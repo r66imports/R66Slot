@@ -7,9 +7,11 @@ import { useState, useEffect, useRef } from 'react'
 interface SupplierContact {
   id: string
   name: string
+  companyName?: string
   code: string
   email: string
   phone: string
+  address?: string
   country: string
   website: string
   notes: string
@@ -19,9 +21,11 @@ interface SupplierContact {
 
 const EMPTY_FORM: Omit<SupplierContact, 'id'> = {
   name: '',
+  companyName: '',
   code: '',
   email: '',
   phone: '',
+  address: '',
   country: '',
   website: '',
   notes: '',
@@ -76,9 +80,11 @@ export default function SupplierContactsPage() {
     setEditingId(s.id)
     setForm({
       name: s.name,
+      companyName: s.companyName || '',
       code: s.code,
       email: s.email,
       phone: s.phone,
+      address: s.address || '',
       country: s.country,
       website: s.website,
       notes: s.notes,
@@ -165,9 +171,11 @@ export default function SupplierContactsPage() {
             <thead>
               <tr className="border-b bg-gray-50">
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Company Name</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Code</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Address</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Country</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Website</th>
                 <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Notes</th>
@@ -179,6 +187,7 @@ export default function SupplierContactsPage() {
               {filtered.map((s) => (
                 <tr key={s.id} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium text-gray-900">{s.name}</td>
+                  <td className="py-3 px-4 text-gray-700 text-xs">{s.companyName || '—'}</td>
                   <td className="py-3 px-4 font-mono text-xs text-gray-600">{s.code || '—'}</td>
                   <td className="py-3 px-4 text-gray-700">
                     {s.email ? (
@@ -186,6 +195,7 @@ export default function SupplierContactsPage() {
                     ) : '—'}
                   </td>
                   <td className="py-3 px-4 text-gray-700">{s.phone || '—'}</td>
+                  <td className="py-3 px-4 text-gray-600 text-xs">{s.address || '—'}</td>
                   <td className="py-3 px-4 text-gray-700">{s.country || '—'}</td>
                   <td className="py-3 px-4">
                     {s.website ? (
@@ -254,7 +264,7 @@ export default function SupplierContactsPage() {
                     type="text"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="e.g. NSR"
+                    placeholder="e.g. Sideways"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
                 </div>
@@ -264,7 +274,17 @@ export default function SupplierContactsPage() {
                     type="text"
                     value={form.code}
                     onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
-                    placeholder="e.g. NSR"
+                    placeholder="e.g. SW"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Company Name</label>
+                  <input
+                    type="text"
+                    value={form.companyName || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, companyName: e.target.value }))}
+                    placeholder="e.g. S.A.R.L. Sideways International by Racer"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
                 </div>
@@ -288,6 +308,16 @@ export default function SupplierContactsPage() {
                     value={form.phone}
                     onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                     placeholder="+39 02 123 4567"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+                  <input
+                    type="text"
+                    value={form.address || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                    placeholder="Street address, city, postal code"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
                 </div>
