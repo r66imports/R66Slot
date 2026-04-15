@@ -10,6 +10,7 @@ interface Supplier {
   code: string
   email: string
   phone: string
+  address?: string
   country: string
   website: string
   notes: string
@@ -54,6 +55,7 @@ const EMPTY_SUPPLIER: Omit<Supplier, 'id' | 'isActive' | 'createdAt'> = {
   code: '',
   email: '',
   phone: '',
+  address: '',
   country: '',
   website: '',
   notes: '',
@@ -969,6 +971,15 @@ export default function SuppliersNetworkPage() {
                     value={supplierForm.phone}
                     onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })}
                     placeholder="+34 ..."
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={supplierForm.address || ''}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })}
+                    placeholder="Street address, city, postal code"
                   />
                 </div>
                 <div className="col-span-2">

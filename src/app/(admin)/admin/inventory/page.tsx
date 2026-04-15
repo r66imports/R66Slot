@@ -22,6 +22,10 @@ interface SupplierContact {
   id: string
   name: string
   code: string
+  email?: string
+  phone?: string
+  address?: string
+  country?: string
   preferredCurrency?: string
 }
 
@@ -70,6 +74,7 @@ export default function InventoryPage() {
   const [sendingOrders, setSendingOrders] = useState(false)
   const [orderSentDone, setOrderSentDone] = useState(false)
   const [createdWsId, setCreatedWsId] = useState<string | null>(null)
+  const [docType, setDocType] = useState<'Purchase Order' | 'Invoice'>('Purchase Order')
 
   // Inventory Count — cross-reference only, never updates Shop Inventory
   const [lastStockTakeDate, setLastStockTakeDate] = useState<string | null>(null)
@@ -495,13 +500,28 @@ export default function InventoryPage() {
 
     doc.setFontSize(11)
     doc.setFont('helvetica', 'bold')
-    doc.text(`Purchase Order`, 14, 50)
+    doc.text(docType, 14, 50)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(9)
     doc.setTextColor(100)
     doc.text(`Date: ${dateStr}`, 14, 57)
-    doc.text(`Order to: ${supplierName}`, 14, 62)
+
+    // Supplier / TO block
+    let supplierY = 62
     doc.setTextColor(0)
+    doc.setFont('helvetica', 'bold')
+    doc.text('To:', 14, supplierY)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100)
+    doc.text(supplierName, 22, supplierY)
+    supplierY += 5
+    if (selectedSupplier?.address) { doc.text(selectedSupplier.address, 22, supplierY); supplierY += 5 }
+    if (selectedSupplier?.country) { doc.text(selectedSupplier.country, 22, supplierY); supplierY += 5 }
+    if (selectedSupplier?.email) { doc.text(selectedSupplier.email, 22, supplierY); supplierY += 5 }
+    if (selectedSupplier?.phone) { doc.text(selectedSupplier.phone, 22, supplierY); supplierY += 5 }
+    doc.setTextColor(0)
+
+    const tableStartY = Math.max(70, supplierY + 3)
 
     // Table rows
     const rows = restockItems.map((p) => {
@@ -524,7 +544,7 @@ export default function InventoryPage() {
     }, 0)
 
     autoTable(doc, {
-      startY: 70,
+      startY: tableStartY,
       head: [['SKU', 'Description', 'Qty', `Unit Price (${currency})`, `Total (${currency})`]],
       body: rows,
       foot: [['', '', '', 'Grand Total', `${currency} ${grandTotal.toFixed(2)}`]],
@@ -546,7 +566,7 @@ export default function InventoryPage() {
   async function handleDownloadPDF() {
     const doc = await generateOrderPDF()
     const supplierName = selectedSupplier?.name || 'Supplier'
-    doc.save(`Purchase-Order-${supplierName}-${new Date().toISOString().slice(0, 10)}.pdf`)
+    doc.save(`${docType.replace(' ', '-')}-${supplierName}-${new Date().toISOString().slice(0, 10)}.pdf`)
   }
 
   // ─── Send to Supplier Orders ────────────────────────────────────────────────
@@ -1188,13 +1208,37 @@ export default function InventoryPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
-              <div>
-                <h2 className="text-base font-semibold text-gray-900">
-                  Purchase Order — {selectedSupplier.name}
-                </h2>
-                <p className="text-xs text-gray-500 mt-0.5">{restockItems.length} items to restock</p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-base font-semibold text-gray-900">
+                    {docType} — {selectedSupplier.name}
+                  </h2>
+                  {/* Doc type toggle */}
+                  <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+                    <button
+                      onClick={() => setDocType('Purchase Order')}
+                      className={`px-2.5 py-1 transition-colors ${docType === 'Purchase Order' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      Purchase Order
+                    </button>
+                    <button
+                      onClick={() => setDocType('Invoice')}
+                      className={`px-2.5 py-1 transition-colors ${docType === 'Invoice' ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      Invoice
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{restockItems.length} items to restock</p>
+                {/* Supplier details */}
+                <div className="flex items-center gap-3 mt-1 flex-wrap text-xs text-gray-500">
+                  {selectedSupplier.address && <span>📍 {selectedSupplier.address}</span>}
+                  {selectedSupplier.country && !selectedSupplier.address && <span>📍 {selectedSupplier.country}</span>}
+                  {selectedSupplier.email && <span>✉ {selectedSupplier.email}</span>}
+                  {selectedSupplier.phone && <span>📞 {selectedSupplier.phone}</span>}
+                </div>
               </div>
-              <button onClick={() => { setShowOrderModal(false); setOrderSentDone(false); setCreatedWsId(null) }} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
+              <button onClick={() => { setShowOrderModal(false); setOrderSentDone(false); setCreatedWsId(null) }} className="text-gray-400 hover:text-gray-700 text-xl leading-none ml-4">×</button>
             </div>
 
             <div className="overflow-y-auto flex-1 px-6 py-4">

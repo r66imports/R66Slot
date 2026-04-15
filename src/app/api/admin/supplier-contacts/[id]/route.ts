@@ -9,6 +9,7 @@ interface SupplierContact {
   code: string
   email: string
   phone: string
+  address?: string
   country: string
   website: string
   notes: string

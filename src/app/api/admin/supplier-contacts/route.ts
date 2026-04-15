@@ -9,6 +9,7 @@ export interface SupplierContact {
   code: string
   email: string
   phone: string
+  address?: string
   country: string
   website: string
   notes: string
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
       code: body.code?.trim() || '',
       email: body.email?.trim() || '',
       phone: body.phone?.trim() || '',
+      address: body.address?.trim() || '',
       country: body.country?.trim() || '',
       website: body.website?.trim() || '',
       notes: body.notes?.trim() || '',
