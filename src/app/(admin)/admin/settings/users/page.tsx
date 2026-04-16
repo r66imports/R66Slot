@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ALL_PERMISSIONS, DEFAULT_PERMISSIONS } from '@/lib/admin-permissions'
+import { useAdminAuth } from '@/lib/admin-auth-context'
 
 interface UserForm {
   username: string
@@ -47,8 +49,17 @@ const PERMISSION_GROUPS = ALL_PERMISSIONS.reduce<Record<string, { name: string; 
 )
 
 export default function UserAccountsPage() {
+  const { role } = useAdminAuth()
+  const router = useRouter()
   const [users, setUsers] = useState<AdminUserPublic[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Block staff accounts from accessing this page
+  useEffect(() => {
+    if (role === 'staff') {
+      router.replace('/admin')
+    }
+  }, [role, router])
   const [showModal, setShowModal] = useState(false)
   const [editUser, setEditUser] = useState<AdminUserPublic | null>(null)
   const [form, setForm] = useState<UserForm>(EMPTY_FORM)
