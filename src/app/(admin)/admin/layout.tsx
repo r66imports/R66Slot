@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils/cn'
 import { AuthGuard } from '@/components/admin/auth-guard'
 import { useState, useEffect } from 'react'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
+import { useAdminAuth } from '@/lib/admin-auth-context'
 
 // Submenu item type
 interface NavItem {
@@ -24,7 +25,14 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
+  const { role, permissions } = useAdminAuth()
   const [currentBrand, setCurrentBrand] = useState('')
+
+  // Returns true if the current user can see this nav item
+  const canAccess = (href: string) => {
+    if (role !== 'staff') return true // admin or dev bypass
+    return permissions.includes(href) || permissions.some((p) => href.startsWith(p + '/'))
+  }
 
   // Read brand param from URL on client (avoids useSearchParams Suspense requirement)
   useEffect(() => {
@@ -186,6 +194,7 @@ export default function AdminLayout({
     settings: [
       { name: 'Site Settings', href: '/admin/settings', icon: '⚙️' },
       { name: 'Site Rules', href: '/admin/settings/site-rules', icon: '📏' },
+      { name: 'User Accounts', href: '/admin/settings/users', icon: '👥' },
       { name: 'My Account', href: '/admin/account', icon: '👤' },
     ],
   }
@@ -275,7 +284,7 @@ export default function AdminLayout({
           <nav className={cn('flex-1 p-3 space-y-6 overflow-y-auto', !sidebarOpen && 'hidden')}>
             {/* Site Section */}
             <div>
-              {navigation.site.map((item) => {
+              {navigation.site.filter((item) => canAccess(item.href)).map((item) => {
                 const isActive = pathname === item.href || (item.href === '/admin/pages' && pathname.startsWith('/admin/pages'))
                 return (
                   <Link
@@ -306,8 +315,10 @@ export default function AdminLayout({
               </p>
               <div className="space-y-1">
                 {navigation.content.map((item) => {
+                  const visibleSub = item.submenu?.filter((s) => canAccess(s.href))
+                  if (item.submenu && visibleSub?.length === 0) return null
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const hasSubmenu = visibleSub && visibleSub.length > 0
                   const isExpanded = expandedMenus.includes(item.name)
 
                   if (hasSubmenu) {
@@ -339,7 +350,7 @@ export default function AdminLayout({
                         {/* Submenu items */}
                         {isExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
-                            {item.submenu!.map((subItem) => {
+                            {visibleSub!.map((subItem) => {
                               const subBrandMatch = subItem.href.match(/\?brand=(.+)/)
                               const subBrand = subBrandMatch ? decodeURIComponent(subBrandMatch[1]) : ''
                               const isSubActive = subBrand
@@ -368,6 +379,7 @@ export default function AdminLayout({
                     )
                   }
 
+                  if (!canAccess(item.href)) return null
                   return (
                     <Link
                       key={item.name}
@@ -394,8 +406,10 @@ export default function AdminLayout({
               </p>
               <div className="space-y-1">
                 {navigation.orderNetwork.map((item) => {
+                  const visibleSub = item.submenu?.filter((s) => canAccess(s.href))
+                  if (item.submenu && visibleSub?.length === 0) return null
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const hasSubmenu = visibleSub && visibleSub.length > 0
                   const isExpanded = expandedMenus.includes(item.name)
                   if (hasSubmenu) {
                     return (
@@ -406,7 +420,7 @@ export default function AdminLayout({
                         </button>
                         {isExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
-                            {item.submenu!.map((subItem) => {
+                            {visibleSub!.map((subItem) => {
                               const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
                               const isSiteOrders = subItem.name === 'Site Orders'
                               const hasAlert = isSiteOrders && newSiteOrders > 0
@@ -443,8 +457,11 @@ export default function AdminLayout({
               </p>
               <div className="space-y-1">
                 {navigation.business.map((item) => {
+                  const visibleSub = item.submenu?.filter((s) => canAccess(s.href))
+                  if (item.submenu && visibleSub?.length === 0) return null
+                  if (!item.submenu && !item.isModal && !canAccess(item.href)) return null
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const hasSubmenu = visibleSub && visibleSub.length > 0
                   const isExpanded = expandedMenus.includes(item.name)
 
                   // Handle submenu items (like Social Media)
@@ -475,7 +492,7 @@ export default function AdminLayout({
                         </button>
                         {isExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
-                            {item.submenu!.map((subItem) => {
+                            {visibleSub!.map((subItem) => {
                               const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
                               return (
                                 <Link
@@ -543,8 +560,10 @@ export default function AdminLayout({
               </p>
               <div className="space-y-1">
                 {navigation.shippingNetwork.map((item) => {
+                  const visibleSub = item.submenu?.filter((s) => canAccess(s.href))
+                  if (item.submenu && visibleSub?.length === 0) return null
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const hasSubmenu = visibleSub && visibleSub.length > 0
                   const isExpanded = expandedMenus.includes(item.name)
                   if (hasSubmenu) {
                     return (
@@ -555,7 +574,7 @@ export default function AdminLayout({
                         </button>
                         {isExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
-                            {item.submenu!.map((subItem) => {
+                            {visibleSub!.map((subItem) => {
                               const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
                               return (
                                 <Link key={subItem.name} href={subItem.href} className={cn('flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors font-play', isSubActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900')}>
@@ -584,8 +603,10 @@ export default function AdminLayout({
               </p>
               <div className="space-y-1">
                 {navigation.auctions.map((item) => {
+                  const visibleSub = item.submenu?.filter((s) => canAccess(s.href))
+                  if (item.submenu && visibleSub?.length === 0) return null
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                  const hasSubmenu = item.submenu && item.submenu.length > 0
+                  const hasSubmenu = visibleSub && visibleSub.length > 0
                   const isExpanded = expandedMenus.includes(item.name)
 
                   if (hasSubmenu) {
@@ -615,7 +636,7 @@ export default function AdminLayout({
                         </button>
                         {isExpanded && (
                           <div className="ml-6 mt-1 space-y-1 border-l-2 border-gray-200 pl-3">
-                            {item.submenu!.map((subItem) => {
+                            {visibleSub!.map((subItem) => {
                               const isSubActive = pathname === subItem.href || pathname.startsWith(subItem.href + '/')
                               return (
                                 <Link
@@ -664,7 +685,7 @@ export default function AdminLayout({
                 Blog
               </p>
               <div className="space-y-1">
-                {navigation.blog.map((item) => {
+                {navigation.blog.filter((item) => canAccess(item.href)).map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
                   return (
                     <Link
@@ -691,7 +712,11 @@ export default function AdminLayout({
                 Settings
               </p>
               <div className="space-y-1">
-                {navigation.settings.map((item) => {
+                {navigation.settings.filter((item) => {
+                  // User Accounts is admin-only
+                  if (item.href === '/admin/settings/users') return role !== 'staff'
+                  return true
+                }).map((item) => {
                   const isActive = pathname === item.href
                   return (
                     <Link
