@@ -208,7 +208,7 @@ function ItemCard({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
       {/* Card header */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pre-Order Item</span>
@@ -248,7 +248,7 @@ function ItemCard({
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="text-xs px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+                className="text-xs px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary-dark disabled:opacity-60 font-semibold"
               >
                 {saving ? 'Saving…' : isNew ? 'Add' : 'Save'}
               </button>
@@ -510,24 +510,24 @@ export default function PreOrderDashboardPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-screen-xl mx-auto">
+    <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Pre-Order Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900 font-play">Pre-Order Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">Track upcoming pre-order items and interested customers</p>
         </div>
         <button
           onClick={startNew}
           disabled={showNew}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-2 bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-sm"
         >
           <span className="text-base leading-none">+</span> New Item
         </button>
       </div>
 
       {loading && (
-        <div className="text-center py-16 text-gray-400">Loading…</div>
+        <div className="text-center py-16 text-gray-400 font-play">Loading…</div>
       )}
 
       {!loading && (
