@@ -114,13 +114,15 @@ export default function WorksheetPage() {
   })
   const [products, setProducts] = useState<ProductRef[]>([])
   const [suppliers, setSuppliers] = useState<SupplierContact[]>([])
+  const [trackingUrlTemplate, setTrackingUrlTemplate] = useState('https://www.fedex.com/fedextrack/?trknbr={tracking}')
 
   const load = useCallback(async () => {
     try {
-      const [tmplRes, prodRes, supRes] = await Promise.all([
+      const [tmplRes, prodRes, supRes, rulesRes] = await Promise.all([
         fetch('/api/admin/company-info'),
         fetch('/api/admin/products'),
         fetch('/api/admin/supplier-contacts'),
+        fetch('/api/admin/site-rules'),
       ])
       if (tmplRes.ok) setCompanyInfo(await tmplRes.json())
 
@@ -140,6 +142,12 @@ export default function WorksheetPage() {
       }
 
       if (supRes.ok) setSuppliers(await supRes.json())
+
+      if (rulesRes.ok) {
+        const rules: any[] = await rulesRes.json()
+        const trackingRule = rules.find((r: any) => r.id === 'worksheet_tracking_url')
+        if (trackingRule?.value) setTrackingUrlTemplate(trackingRule.value)
+      }
     } catch (e) {
       console.error('Worksheet load error', e)
     }
@@ -155,6 +163,7 @@ export default function WorksheetPage() {
         suppliers={suppliers}
         onRefresh={load}
         initialSheetId={initialSheetId}
+        trackingUrlTemplate={trackingUrlTemplate}
       />
     </div>
   )
@@ -163,13 +172,14 @@ export default function WorksheetPage() {
 // ─── Worksheet Editor ─────────────────────────────────────────────────────────
 
 function WorksheetEditor({
-  companyInfo, products, suppliers, onRefresh, initialSheetId,
+  companyInfo, products, suppliers, onRefresh, initialSheetId, trackingUrlTemplate,
 }: {
   companyInfo: CompanyInfo
   products: ProductRef[]
   suppliers: SupplierContact[]
   onRefresh: () => void
   initialSheetId?: string
+  trackingUrlTemplate: string
 }) {
   // ── Worksheet identity ──
   const [worksheetId, setWorksheetId] = useState(newSheetId)
@@ -178,6 +188,14 @@ function WorksheetEditor({
 
   // ── Tracking number ──
   const [trackingNumber, setTrackingNumber] = useState('')
+  const [trackingEditMode, setTrackingEditMode] = useState(false)
+
+  function getTrackingUrl(tracking: string): string {
+    if (!tracking) return ''
+    if (tracking.startsWith('http://') || tracking.startsWith('https://')) return tracking
+    if (!trackingUrlTemplate) return ''
+    return trackingUrlTemplate.replace('{tracking}', encodeURIComponent(tracking))
+  }
 
   // ── Costing Calculator ──
   const [currency, setCurrency] = useState('USD')
@@ -644,6 +662,7 @@ function WorksheetEditor({
     setFinalMarkupPct(sheet.finalMarkupPct)
     setFinalVatPct(sheet.finalVatPct)
     setTrackingNumber(sheet.trackingNumber ?? '')
+    setTrackingEditMode(false)
     setItems(sheet.items.length > 0 ? sheet.items.map((it) => {
       const prod = products.find((p) => p.sku === it.sku)
       return {
@@ -676,6 +695,7 @@ function WorksheetEditor({
     setFinalMarkupPct(30)
     setFinalVatPct(0)
     setTrackingNumber('')
+    setTrackingEditMode(false)
     setItems([newWsItem()])
   }
 
@@ -1279,13 +1299,32 @@ function WorksheetEditor({
         {/* Tracking number */}
         <div className="px-5 pt-3 pb-1 flex items-center gap-2">
           <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Tracking #</label>
-          <input
-            type="text"
-            value={trackingNumber}
-            onChange={(e) => setTrackingNumber(e.target.value)}
-            placeholder="Enter tracking number…"
-            className="border border-gray-200 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-64"
-          />
+          {trackingEditMode || !trackingNumber ? (
+            <input
+              type="text"
+              value={trackingNumber}
+              onChange={(e) => setTrackingNumber(e.target.value)}
+              onBlur={() => setTrackingEditMode(false)}
+              onKeyDown={(e) => { if (e.key === 'Enter') setTrackingEditMode(false) }}
+              placeholder="Enter tracking number or URL…"
+              autoFocus={trackingEditMode}
+              className="border border-gray-200 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-72"
+            />
+          ) : (
+            <a
+              href={getTrackingUrl(trackingNumber)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onDoubleClick={(e) => { e.preventDefault(); setTrackingEditMode(true) }}
+              title="Click to open tracking • Double-click to edit"
+              className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium max-w-xs truncate"
+            >
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              {trackingNumber}
+            </a>
+          )}
         </div>
 
         {/* Date display */}

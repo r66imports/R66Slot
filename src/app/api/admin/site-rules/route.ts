@@ -130,6 +130,15 @@ const DEFAULT_RULES: SiteRule[] = [
     category: 'System',
   },
   {
+    id: 'worksheet_tracking_url',
+    name: 'Rule 16 \u2014 Worksheet Tracking URL',
+    description: 'URL template used to turn a tracking number on the Worksheet into a clickable link. Use {tracking} as the placeholder for the tracking number — e.g. https://www.fedex.com/fedextrack/?trknbr={tracking}. If the tracking field already contains a full URL (starts with http) it is used as-is. Leave value blank to disable link generation for bare tracking numbers.',
+    active: true,
+    appliesTo: ['Worksheet'],
+    value: 'https://www.fedex.com/fedextrack/?trknbr={tracking}',
+    category: 'Inventory',
+  },
+  {
     id: 'products_supplier_filter',
     name: 'Rule 15 \u2014 Products Page Supplier Filter',
     description: 'A Supplier dropdown on the Products page filters the product list to show only items belonging to the selected supplier. The supplier-to-SKU mapping is sourced from the inventory pricelist (written by worksheets via Send to Inventory). Flow: Products page loads \u2192 fetches all suppliers and inventory pricelist entries \u2192 Supplier dropdown appears in the filter bar \u2192 select a supplier \u2192 only products whose SKU appears in that supplier\u2019s pricelist are shown. Selecting \u201cAll Suppliers\u201d removes the filter. The supplier filter combines with existing search, brand, category, and Revo filters. Products not yet assigned to any supplier via a worksheet will not appear under any supplier filter \u2014 they are visible under All Suppliers only.',
