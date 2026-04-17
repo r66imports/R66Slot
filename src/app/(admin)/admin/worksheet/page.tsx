@@ -70,6 +70,7 @@ interface WsSheet {
   finalCustomsCost: number
   finalMarkupPct: number
   finalVatPct: number
+  trackingNumber?: string
   items: WsItem[]
 }
 
@@ -174,6 +175,9 @@ function WorksheetEditor({
   const [worksheetId, setWorksheetId] = useState(newSheetId)
   const [supplier, setSupplier] = useState('')
   const [worksheetDate, setWorksheetDate] = useState(() => new Date().toISOString().slice(0, 10))
+
+  // ── Tracking number ──
+  const [trackingNumber, setTrackingNumber] = useState('')
 
   // ── Costing Calculator ──
   const [currency, setCurrency] = useState('USD')
@@ -592,6 +596,7 @@ function WorksheetEditor({
       archived: false,
       currency, exchangeRate, markupPct, shippingPct, vatPct,
       finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct,
+      trackingNumber,
       items: items.map((it) => ({ ...it, skuSearch: '' })),
     }
   }
@@ -638,6 +643,7 @@ function WorksheetEditor({
     setFinalCustomsCost(sheet.finalCustomsCost ?? 0)
     setFinalMarkupPct(sheet.finalMarkupPct)
     setFinalVatPct(sheet.finalVatPct)
+    setTrackingNumber(sheet.trackingNumber ?? '')
     setItems(sheet.items.length > 0 ? sheet.items.map((it) => {
       const prod = products.find((p) => p.sku === it.sku)
       return {
@@ -669,6 +675,7 @@ function WorksheetEditor({
     setFinalCustomsCost(0)
     setFinalMarkupPct(30)
     setFinalVatPct(0)
+    setTrackingNumber('')
     setItems([newWsItem()])
   }
 
@@ -1269,9 +1276,21 @@ function WorksheetEditor({
           />
         )}
 
+        {/* Tracking number */}
+        <div className="px-5 pt-3 pb-1 flex items-center gap-2">
+          <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Tracking #</label>
+          <input
+            type="text"
+            value={trackingNumber}
+            onChange={(e) => setTrackingNumber(e.target.value)}
+            placeholder="Enter tracking number…"
+            className="border border-gray-200 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-64"
+          />
+        </div>
+
         {/* Date display */}
         {displayDate && (
-          <div className="px-5 pt-3 pb-1">
+          <div className="px-5 pt-1 pb-1">
             <p className="text-sm font-semibold text-gray-700">{displayDate}</p>
           </div>
         )}
