@@ -160,6 +160,7 @@ export default function AdminLayout({
           { name: 'Site Orders', href: '/admin/site-orders', icon: '🛒' },
           { name: 'Orders', href: '/admin/orders', icon: '📦' },
           { name: 'Pre Orders & Next Shipment', href: '/admin/preorder-list', icon: '📋' },
+          { name: 'Pre Order Dashboard', href: '/admin/preorder-dashboard', icon: '🗂️' },
           { name: 'Back Orders', href: '/admin/backorders', icon: '🔄' },
           { name: 'Suppliers Orders', href: '/admin/suppliers', icon: '📥' },
           { name: 'Work Sheet', href: '/admin/worksheet', icon: '🧮' },
