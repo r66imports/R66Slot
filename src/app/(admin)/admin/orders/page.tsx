@@ -2191,6 +2191,7 @@ export default function OrdersPage() {
   const [shippingEnabled, setShippingEnabled] = useState(true)
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
+  const [clientSearch, setClientSearch] = useState('')
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
   const [soToInvoiceResult, setSoToInvoiceResult] = useState<string | null>(null)
   const [paymentModal, setPaymentModal] = useState<OrderDocument | null>(null)
@@ -2514,9 +2515,11 @@ export default function OrdersPage() {
   const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders
 
   const boRows = tab !== 'backorders' ? backorders.filter(cfg.boPhase) : []
+  const searchLower = clientSearch.trim().toLowerCase()
   const docRows = tab !== 'backorders'
     ? documents
         .filter((d) => d.type === cfg.docType && (showArchive ? d.status === 'archived' : d.status !== 'archived'))
+        .filter((d) => !searchLower || d.clientName?.toLowerCase().includes(searchLower) || d.clientEmail?.toLowerCase().includes(searchLower))
         .sort((a, b) => {
           let av: string | number = ''
           let bv: string | number = ''
@@ -2755,7 +2758,7 @@ export default function OrdersPage() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setShowArchive(false) }}
+              onClick={() => { setTab(t.key); setShowArchive(false); setClientSearch('') }}
               className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                 tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
@@ -2776,6 +2779,25 @@ export default function OrdersPage() {
         </div>
       </div>
 
+      {/* Client search — shown for all tabs */}
+      <div className="mb-4">
+        <div className="relative max-w-xs">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+          </svg>
+          <input
+            type="text"
+            value={clientSearch}
+            onChange={(e) => setClientSearch(e.target.value)}
+            placeholder="Search by client name…"
+            className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+          />
+          {clientSearch && (
+            <button onClick={() => setClientSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+          )}
+        </div>
+      </div>
+
       {/* ── Back Orders Tab ── */}
       {tab === 'backorders' && !loading && (
         <div className="space-y-4">
@@ -2787,6 +2809,7 @@ export default function OrdersPage() {
             </div>
           ) : (
             Object.entries(backordersByClient)
+              .filter(([, g]) => !searchLower || g.displayName.toLowerCase().includes(searchLower) || g.email?.toLowerCase().includes(searchLower))
               .sort(([, a], [, b]) => a.displayName.localeCompare(b.displayName))
               .map(([key, group]) => {
                 const { displayName, email, items } = group
