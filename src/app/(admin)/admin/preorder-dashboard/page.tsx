@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface Contact {
   id: string
@@ -141,8 +141,17 @@ function ItemCard({
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [supplierOpen, setSupplierOpen] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const [imageSize, setImageSize] = useState<'sm' | 'md' | 'lg'>('sm')
   const supplierRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const imageZoneRef = useRef<HTMLDivElement>(null)
+
+  const IMAGE_HEIGHTS: Record<typeof imageSize, string> = {
+    sm: 'h-36',
+    md: 'h-52',
+    lg: 'h-72',
+  }
 
   // Close supplier dropdown on outside click
   useEffect(() => {
@@ -162,14 +171,42 @@ function ItemCard({
     reader.readAsDataURL(file)
   }
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+  const handlePaste = (e: React.ClipboardEvent) => {
     const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith('image/'))
     if (item) {
       e.preventDefault()
       const file = item.getAsFile()
       if (file) handleImageFile(file)
     }
-  }, [])
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    const file = Array.from(e.dataTransfer.files).find((f) => f.type.startsWith('image/'))
+    if (file) { handleImageFile(file); return }
+    // Also handle image URL drops (e.g. dragging from browser)
+    const url = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain')
+    if (url && (url.startsWith('http') || url.startsWith('data:image'))) {
+      set('imageUrl', url)
+    }
+  }
 
   const addCustomer = (c: Contact) => {
     const already = form.customers.find((cu) => cu.id === c.id)
@@ -208,9 +245,9 @@ function ItemCard({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col">
       {/* Card header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100">
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100 rounded-t-2xl">
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pre-Order Item</span>
         <div className="flex gap-2">
           {confirmDelete ? (
@@ -261,28 +298,70 @@ function ItemCard({
       <div className="flex flex-col md:flex-row flex-1">
         {/* Left — item details */}
         <div className="flex-1 p-4 space-y-3 border-b md:border-b-0 md:border-r border-gray-100">
-          {/* Image paste zone */}
+          {/* Image zone — click to browse, Ctrl+V to paste, drag & drop */}
+          <div className="relative group">
+            {/* Size toggle — top-right corner */}
+            <div className="absolute top-1.5 right-1.5 z-10 flex gap-0.5 bg-white/80 backdrop-blur-sm rounded-md px-1 py-0.5 shadow-sm border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity">
+              {(['sm', 'md', 'lg'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={(e) => { e.stopPropagation(); setImageSize(s) }}
+                  className={`text-[10px] px-1.5 py-0.5 rounded font-semibold transition-colors ${imageSize === s ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                >
+                  {s.toUpperCase()}
+                </button>
+              ))}
+            </div>
           <div
+            ref={imageZoneRef}
+            tabIndex={0}
             onPaste={handlePaste}
-            onClick={() => imageInputRef.current?.click()}
-            className="relative w-full h-36 border-2 border-dashed border-gray-200 rounded-lg overflow-hidden cursor-pointer hover:border-indigo-300 transition-colors flex items-center justify-center bg-gray-50"
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            onMouseEnter={() => imageZoneRef.current?.focus()}
+            onClick={() => { if (!form.imageUrl) imageInputRef.current?.click() }}
+            className={`relative w-full ${IMAGE_HEIGHTS[imageSize]} border-2 border-dashed rounded-lg overflow-hidden cursor-pointer transition-all flex items-center justify-center focus:outline-none
+              ${isDragging
+                ? 'border-indigo-500 bg-indigo-50 scale-[1.01]'
+                : form.imageUrl
+                  ? 'border-gray-200 bg-gray-50 hover:border-indigo-300'
+                  : 'border-gray-200 bg-gray-50 hover:border-indigo-300'
+              }`}
           >
             {form.imageUrl ? (
               <>
                 <img src={form.imageUrl} alt="product" className="object-contain h-full w-full" />
-                <button
-                  onClick={(e) => { e.stopPropagation(); set('imageUrl', undefined) }}
-                  className="absolute top-1 right-1 bg-white rounded-full p-0.5 text-gray-500 hover:text-red-500 shadow text-xs leading-none"
-                  title="Remove image"
-                >✕</button>
+                <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); imageInputRef.current?.click() }}
+                    className="bg-white rounded-lg px-2 py-1 text-xs font-medium text-gray-700 shadow hover:bg-gray-100"
+                  >Replace</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); set('imageUrl', undefined) }}
+                    className="bg-white rounded-lg px-2 py-1 text-xs font-medium text-red-600 shadow hover:bg-red-50"
+                  >Remove</button>
+                </div>
               </>
             ) : (
-              <div className="text-center text-gray-400 text-xs select-none">
-                <div className="text-2xl mb-1">📷</div>
-                <div>Paste or click to add image</div>
+              <div className="text-center text-gray-400 text-xs select-none pointer-events-none">
+                {isDragging ? (
+                  <>
+                    <div className="text-2xl mb-1">⬇️</div>
+                    <div className="font-medium text-indigo-600">Drop image here</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-2xl mb-1">📷</div>
+                    <div className="font-medium">Click to browse</div>
+                    <div className="mt-0.5 text-gray-300">or hover &amp; Ctrl+V · drag &amp; drop</div>
+                  </>
+                )}
               </div>
             )}
           </div>
+          </div>{/* end size wrapper */}
           <input ref={imageInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleImageFile(e.target.files[0]) }} />
 
           {/* Fields grid */}

@@ -384,6 +384,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Worksheet', 'Products', 'Sage Accounts', 'CSV Export'],
     category: 'Products',
   },
+  {
+    id: 'preorder_dashboard_image_upload',
+    name: 'Rule 43 — Pre-Order Dashboard: Image Upload',
+    description: 'Controls image upload behaviour on the Pre-Order Dashboard cards. Three methods are supported: (1) Click the image zone to open a file browser. (2) Hover over the image zone and press Ctrl+V to paste an image from clipboard. (3) Drag an image file or URL from anywhere and drop it onto the image zone. Size toggle (S / M / L) appears on hover to resize the image zone — S = compact (144px), M = medium (208px), L = large (288px). Hover over an existing image to reveal Replace and Remove buttons.',
+    active: true,
+    appliesTo: ['Pre-Order Dashboard'],
+    category: 'Admin UI',
+  },
 ]
 
 export async function GET() {
