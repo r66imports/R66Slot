@@ -2424,63 +2424,58 @@ export default function OrdersPage() {
 
   const [plProducts, setPlProducts] = useState<Array<{ sku: string; costPerItem: number }>>([])
 
-  const load = useCallback(async () => {
+  const lastLoadRef = useRef<number>(0)
+
+  const load = useCallback(async (opts?: { force?: boolean }) => {
+    // Rate-limit focus-triggered reloads to once every 30 seconds
+    const now = Date.now()
+    if (!opts?.force && now - lastLoadRef.current < 30_000) return
+    lastLoadRef.current = now
+
     setLoading(true)
     try {
-      const [boRes, docRes, tmplRes, clRes, rulesRes] = await Promise.all([
-        fetch('/api/admin/backorders'),
-        fetch('/api/admin/orders/documents'),
-        fetch('/api/admin/orders/template'),
-        fetch('/api/admin/clients'),
-        fetch('/api/admin/site-rules'),
-      ])
-      if (boRes.ok) {
-        const bos: Backorder[] = await boRes.json()
-        setBackorders(bos)
-        // openGroups is intentionally NOT reset here — preserves user's open/closed state across focus reloads
-      }
-      if (docRes.ok) {
-        const docs: OrderDocument[] = await docRes.json()
-        setDocuments(docs)
-        // Background sync — fire-and-forget, does not block initial render
-        fetch('/api/admin/shipment-log').then(async (plRes) => {
-          if (!plRes.ok) return
-          const plEntries: { invoiceNumber: string }[] = await plRes.json()
-          const plNums = new Set(plEntries.map((e) => e.invoiceNumber?.trim()).filter(Boolean))
-          const unflagged = docs.filter((d) => d.type === 'invoice' && plNums.has(d.docNumber) && !(d as any).sentToPackingList)
-          for (const d of unflagged) {
-            fetch(`/api/admin/orders/documents/${d.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sentToPackingList: true }),
-            }).catch(() => {})
-          }
-          if (unflagged.length > 0) {
-            setDocuments(docs.map((d) =>
-              unflagged.some((u) => u.id === d.id) ? { ...d, sentToPackingList: true } as any : d
-            ))
-          }
-        }).catch(() => {})
-      }
-      if (tmplRes.ok) {
-        const t = await tmplRes.json()
-        const ib = Array.isArray(t.imageBlock) ? t.imageBlock : []
-        const padded = [...ib, '', '', '', '', '', ''].slice(0, 6)
-        setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: padded, imageBlockHeight: t.imageBlockHeight ?? 80 })
-      }
-      // Load clients immediately (small list, needed for autofill)
-      const clList: ClientContact[] = clRes.ok ? await clRes.json() : []
-      clList.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
-      setClients(clList)
+      // Single request — server reads all 5 blobs in parallel, returns bundled JSON
+      const res = await fetch('/api/admin/orders/bootstrap')
+      if (!res.ok) throw new Error('bootstrap failed')
+      const data = await res.json()
 
-      // Defer contacts + products — fire-and-forget after initial render
+      const { documents: docs, template: t, clients: clList, backorders: bos, rules } = data
+
+      setBackorders(bos ?? [])
+      setDocuments(docs ?? [])
+      setTemplate({ ...DEFAULT_TEMPLATE, ...(t ?? {}), imageBlock: t?.imageBlock ?? ['', '', '', '', '', ''], imageBlockHeight: t?.imageBlockHeight ?? 80 })
+      setClients(clList ?? [])
+      setShippingEnabled(rules?.shippingEnabled ?? true)
+      setStockDeductionEnabled(rules?.stockDeductionEnabled ?? true)
+
+      // Shipment-log packing-list badge sync — fire-and-forget
+      fetch('/api/admin/shipment-log').then(async (plRes) => {
+        if (!plRes.ok) return
+        const plEntries: { invoiceNumber: string }[] = await plRes.json()
+        const plNums = new Set(plEntries.map((e) => e.invoiceNumber?.trim()).filter(Boolean))
+        const unflagged = (docs ?? []).filter((d: any) => d.type === 'invoice' && plNums.has(d.docNumber) && !d.sentToPackingList)
+        for (const d of unflagged) {
+          fetch(`/api/admin/orders/documents/${d.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sentToPackingList: true }),
+          }).catch(() => {})
+        }
+        if (unflagged.length > 0) {
+          setDocuments((prev: any[]) => prev.map((d) =>
+            unflagged.some((u: any) => u.id === d.id) ? { ...d, sentToPackingList: true } : d
+          ))
+        }
+      }).catch(() => {})
+
+      // Contacts + products — deferred, don't block render
       Promise.all([
         fetch('/api/admin/contacts').then(r => r.ok ? r.json() : []),
         fetch('/api/admin/products?fields=sku,cost_per_item').then(r => r.ok ? r.json() : []),
       ]).then(([ctList, prods]) => {
-        // Merge contacts into client autofill list
-        const emailSet = new Set(clList.map((c) => c.email?.toLowerCase()).filter(Boolean))
-        const merged = [...clList]
+        const base: ClientContact[] = clList ?? []
+        const emailSet = new Set(base.map((c: any) => c.email?.toLowerCase()).filter(Boolean))
+        const merged = [...base]
         for (const ct of ctList) {
           if (!ct.firstName && !ct.lastName) continue
           if (ct.email && emailSet.has(ct.email.toLowerCase())) continue
@@ -2489,19 +2484,12 @@ export default function OrdersPage() {
         }
         merged.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
         setClients(merged)
-        // Products → P&L cost lookup
         if (Array.isArray(prods)) {
           setPlProducts(prods.filter((p: any) => p.sku).map((p: any) => ({ sku: p.sku || '', costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0 })))
         }
       }).catch(() => {})
-      if (rulesRes.ok) {
-        const rules: any[] = await rulesRes.json()
-        const shipRule = rules.find((r: any) => r.id === 'document_shipping')
-        const stockRule = rules.find((r: any) => r.id === 'invoice_stock_deduction')
-        setShippingEnabled(shipRule ? shipRule.active !== false : true)
-        setStockDeductionEnabled(stockRule ? stockRule.active !== false : true)
-      }
-      // Load credit balances for badge display
+
+      // Credit balances — deferred
       fetch('/api/admin/customer-credits')
         .then(r => r.ok ? r.json() : {})
         .then((store: Record<string, { balance: number }>) => {
@@ -2514,10 +2502,11 @@ export default function OrdersPage() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load({ force: true }) }, [load])
   useEffect(() => {
-    window.addEventListener('focus', load)
-    return () => window.removeEventListener('focus', load)
+    const onFocus = () => load() // rate-limited inside load()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [load])
 
   const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders

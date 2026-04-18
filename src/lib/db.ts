@@ -13,9 +13,9 @@ function buildPool(): Pool {
   const pool = new Pool({
     connectionString,
     ssl,
-    max: 5,
+    max: 10,
     connectionTimeoutMillis: 8000,
-    idleTimeoutMillis: 30000,
+    idleTimeoutMillis: 60000,
     statement_timeout: 30000,
   })
 
