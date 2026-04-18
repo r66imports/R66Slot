@@ -2427,13 +2427,11 @@ export default function OrdersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [boRes, docRes, tmplRes, clRes, contactRes, prodRes, rulesRes] = await Promise.all([
+      const [boRes, docRes, tmplRes, clRes, rulesRes] = await Promise.all([
         fetch('/api/admin/backorders'),
         fetch('/api/admin/orders/documents'),
         fetch('/api/admin/orders/template'),
         fetch('/api/admin/clients'),
-        fetch('/api/admin/contacts'),
-        fetch('/api/admin/products'),
         fetch('/api/admin/site-rules'),
       ])
       if (boRes.ok) {
@@ -2444,9 +2442,9 @@ export default function OrdersPage() {
       if (docRes.ok) {
         const docs: OrderDocument[] = await docRes.json()
         setDocuments(docs)
-        // Background sync — flag any invoices already in the packing list that aren't marked yet
-        const plRes = await fetch('/api/admin/shipment-log').catch(() => null)
-        if (plRes?.ok) {
+        // Background sync — fire-and-forget, does not block initial render
+        fetch('/api/admin/shipment-log').then(async (plRes) => {
+          if (!plRes.ok) return
           const plEntries: { invoiceNumber: string }[] = await plRes.json()
           const plNums = new Set(plEntries.map((e) => e.invoiceNumber?.trim()).filter(Boolean))
           const unflagged = docs.filter((d) => d.type === 'invoice' && plNums.has(d.docNumber) && !(d as any).sentToPackingList)
@@ -2462,7 +2460,7 @@ export default function OrdersPage() {
               unflagged.some((u) => u.id === d.id) ? { ...d, sentToPackingList: true } as any : d
             ))
           }
-        }
+        }).catch(() => {})
       }
       if (tmplRes.ok) {
         const t = await tmplRes.json()
@@ -2470,22 +2468,32 @@ export default function OrdersPage() {
         const padded = [...ib, '', '', '', '', '', ''].slice(0, 6)
         setTemplate({ ...DEFAULT_TEMPLATE, ...t, imageBlock: padded, imageBlockHeight: t.imageBlockHeight ?? 80 })
       }
-      // Merge clients + contacts for autofill
+      // Load clients immediately (small list, needed for autofill)
       const clList: ClientContact[] = clRes.ok ? await clRes.json() : []
-      const ctList: any[] = contactRes.ok ? await contactRes.json() : []
-      const emailSet = new Set(clList.map((c) => c.email?.toLowerCase()).filter(Boolean))
-      for (const ct of ctList) {
-        if (!ct.firstName && !ct.lastName) continue
-        if (ct.email && emailSet.has(ct.email.toLowerCase())) continue
-        clList.push({ id: ct.id, firstName: ct.firstName || '', lastName: ct.lastName || '', email: ct.email || '', phone: ct.phone || '', companyName: ct.companyName || '', companyAddress: ct.companyAddress || '' })
-        if (ct.email) emailSet.add(ct.email.toLowerCase())
-      }
       clList.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
       setClients(clList)
-      if (prodRes.ok) {
-        const prods: any[] = await prodRes.json()
-        setPlProducts(prods.filter((p) => p.sku).map((p) => ({ sku: p.sku || '', costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0 })))
-      }
+
+      // Defer contacts + products — fire-and-forget after initial render
+      Promise.all([
+        fetch('/api/admin/contacts').then(r => r.ok ? r.json() : []),
+        fetch('/api/admin/products?fields=sku,cost_per_item').then(r => r.ok ? r.json() : []),
+      ]).then(([ctList, prods]) => {
+        // Merge contacts into client autofill list
+        const emailSet = new Set(clList.map((c) => c.email?.toLowerCase()).filter(Boolean))
+        const merged = [...clList]
+        for (const ct of ctList) {
+          if (!ct.firstName && !ct.lastName) continue
+          if (ct.email && emailSet.has(ct.email.toLowerCase())) continue
+          merged.push({ id: ct.id, firstName: ct.firstName || '', lastName: ct.lastName || '', email: ct.email || '', phone: ct.phone || '', companyName: ct.companyName || '', companyAddress: ct.companyAddress || '' })
+          if (ct.email) emailSet.add(ct.email.toLowerCase())
+        }
+        merged.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))
+        setClients(merged)
+        // Products → P&L cost lookup
+        if (Array.isArray(prods)) {
+          setPlProducts(prods.filter((p: any) => p.sku).map((p: any) => ({ sku: p.sku || '', costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0 })))
+        }
+      }).catch(() => {})
       if (rulesRes.ok) {
         const rules: any[] = await rulesRes.json()
         const shipRule = rules.find((r: any) => r.id === 'document_shipping')

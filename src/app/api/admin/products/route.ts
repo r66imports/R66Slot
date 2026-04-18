@@ -142,12 +142,25 @@ async function ensureProductColumns() {
 
 // GET /api/admin/products
 // By default excludes archived products. Pass ?includeArchived=true to get only archived.
+// Pass ?fields=sku,cost_per_item for a lightweight response (used by Orders P&L)
 export async function GET(request: Request) {
   try {
     await ensureProductColumns()
     const { searchParams } = new URL(request.url)
     const brand = searchParams.get('brand')
     const includeArchived = searchParams.get('includeArchived') === 'true'
+    const fields = searchParams.get('fields')
+
+    // Lightweight mode — only return requested columns (avoids SELECT * on large tables)
+    if (fields) {
+      const allowed = new Set(['sku', 'cost_per_item', 'id', 'title', 'price', 'quantity', 'status', 'brand'])
+      const cols = fields.split(',').map(f => f.trim()).filter(f => allowed.has(f))
+      if (cols.length > 0) {
+        const result = await db.query(`SELECT ${cols.join(', ')} FROM products WHERE status != 'archived' ORDER BY sku ASC`)
+        return NextResponse.json(result.rows)
+      }
+    }
+
     let result
     if (includeArchived) {
       result = await db.query(`SELECT * FROM products WHERE status = 'archived' ORDER BY sku ASC`)
