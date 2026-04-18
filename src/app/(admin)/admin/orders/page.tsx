@@ -2413,7 +2413,7 @@ export default function OrdersPage() {
       const data = await res.json()
       setSyncResult(data.message || 'Done')
       setTimeout(() => setSyncResult(null), 5000)
-      load()
+      load({ force: true })
     } catch {
       setSyncResult('Sync failed — please try again')
       setTimeout(() => setSyncResult(null), 4000)
@@ -2503,11 +2503,6 @@ export default function OrdersPage() {
   }, [])
 
   useEffect(() => { load({ force: true }) }, [load])
-  useEffect(() => {
-    const onFocus = () => load() // rate-limited inside load()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [load])
 
   const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders
 
