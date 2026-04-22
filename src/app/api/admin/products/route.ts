@@ -151,25 +151,29 @@ export async function GET(request: Request) {
     const includeArchived = searchParams.get('includeArchived') === 'true'
     const fields = searchParams.get('fields')
 
+    const cache = { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } }
+
     // Lightweight mode — only return requested columns (avoids SELECT * on large tables)
     if (fields) {
       const allowed = new Set(['sku', 'cost_per_item', 'id', 'title', 'price', 'quantity', 'status', 'brand'])
       const cols = fields.split(',').map(f => f.trim()).filter(f => allowed.has(f))
       if (cols.length > 0) {
         const result = await db.query(`SELECT ${cols.join(', ')} FROM products WHERE status != 'archived' ORDER BY sku ASC`)
-        return NextResponse.json(result.rows)
+        return NextResponse.json(result.rows, cache)
       }
     }
 
     let result
     if (includeArchived) {
       result = await db.query(`SELECT * FROM products WHERE status = 'archived' ORDER BY sku ASC`)
+      return NextResponse.json(result.rows.map(rowToProduct))
     } else if (brand) {
       result = await db.query(`SELECT * FROM products WHERE LOWER(brand) = LOWER($1) AND status != 'archived' ORDER BY sku ASC`, [brand])
+      return NextResponse.json(result.rows.map(rowToProduct), cache)
     } else {
       result = await db.query(`SELECT * FROM products WHERE status != 'archived' ORDER BY sku ASC`)
+      return NextResponse.json(result.rows.map(rowToProduct), cache)
     }
-    return NextResponse.json(result.rows.map(rowToProduct))
   } catch (error) {
     console.error('Error fetching products:', error)
     return NextResponse.json([], { status: 200 })
