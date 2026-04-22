@@ -2443,18 +2443,51 @@ export default function OrdersPage() {
 
   const lastLoadRef = useRef<number>(0)
 
+  const CACHE_KEY = 'r66slot-orders-bootstrap-v1'
+  const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+  function applyBootstrapData(data: any) {
+    const { documents: docs, template: t, clients: clList, backorders: bos, rules } = data
+    setBackorders(bos ?? [])
+    setDocuments(docs ?? [])
+    setTemplate({ ...DEFAULT_TEMPLATE, ...(t ?? {}), imageBlock: t?.imageBlock ?? ['', '', '', '', '', ''], imageBlockHeight: t?.imageBlockHeight ?? 80 })
+    setClients(clList ?? [])
+    setShippingEnabled(rules?.shippingEnabled ?? true)
+    setStockDeductionEnabled(rules?.stockDeductionEnabled ?? true)
+    return data
+  }
+
   const load = useCallback(async (opts?: { force?: boolean }) => {
     // Rate-limit focus-triggered reloads to once every 30 seconds
     const now = Date.now()
     if (!opts?.force && now - lastLoadRef.current < 30_000) return
     lastLoadRef.current = now
 
-    setLoading(true)
+    // Show cached data immediately so page renders without waiting for network
+    let hasCachedData = false
+    if (!opts?.force) {
+      try {
+        const raw = localStorage.getItem(CACHE_KEY)
+        if (raw) {
+          const { data, ts } = JSON.parse(raw)
+          if (now - ts < CACHE_TTL) {
+            applyBootstrapData(data)
+            setLoading(false)
+            hasCachedData = true
+          }
+        }
+      } catch {}
+    }
+
+    if (!hasCachedData) setLoading(true)
     try {
       // Single request — server reads all 5 blobs in parallel, returns bundled JSON
       const res = await fetch('/api/admin/orders/bootstrap')
       if (!res.ok) throw new Error('bootstrap failed')
       const data = await res.json()
+
+      // Persist to localStorage for instant next load
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: now })) } catch {}
 
       const { documents: docs, template: t, clients: clList, backorders: bos, rules } = data
 
