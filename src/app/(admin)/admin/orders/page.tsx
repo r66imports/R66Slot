@@ -897,12 +897,22 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   const [open, setOpen] = useState(false)
   const [blockMsg, setBlockMsg] = useState<{ text: string; type: 'oos' | 'preorder' } | null>(null)
   const [searchQ, setSearchQ] = useState('')
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const q = searchQ.toLowerCase()
   const filtered = q.length >= 1
     ? products.filter((p) =>
         p.sku.toLowerCase().includes(q) || p.title.toLowerCase().includes(q)
       ).slice(0, 20)
     : []
+
+  function openDropdown() {
+    if (inputRef.current) {
+      const r = inputRef.current.getBoundingClientRect()
+      setDropdownPos({ top: r.bottom + window.scrollY + 2, left: r.left + window.scrollX, width: Math.max(r.width, 320) })
+    }
+    setOpen(true)
+  }
 
   function handleSelect(p: { sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number; isPreOrder?: boolean }) {
     if (p.isPreOrder || p.quantity <= 0) {
@@ -922,27 +932,28 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         className="w-full px-2 py-1.5 text-sm rounded focus:outline-none focus:bg-blue-50"
         placeholder="SKU or description"
         value={value}
-        onChange={(e) => { onChange(e.target.value); setSearchQ(e.target.value); setOpen(true); setBlockMsg(null) }}
+        onChange={(e) => { onChange(e.target.value); setSearchQ(e.target.value); openDropdown(); setBlockMsg(null) }}
         onFocus={() => {
           const skuPart = value.split(/\s*[–\-]\s*/)[0] || ''
           setSearchQ(skuPart)
-          setOpen(true)
+          openDropdown()
         }}
         onBlur={() => setTimeout(() => { setOpen(false); setSearchQ('') }, 150)}
       />
-      {blockMsg && (
-        <div className={`absolute left-0 top-full z-50 mt-0.5 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
+      {blockMsg && dropdownPos && (
+        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }} className={`text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
           ⚠ {blockMsg.text}
           {blockMsg.type === 'preorder' && (
             <a href="/admin/backorders" className="underline font-semibold hover:text-amber-200 ml-1">Open Back Orders →</a>
           )}
         </div>
       )}
-      {!blockMsg && open && filtered.length > 0 && (
-        <div className="absolute left-0 top-full z-50 mt-0.5 bg-white border border-gray-200 rounded-lg shadow-lg w-80 max-h-48 overflow-y-auto">
+      {!blockMsg && open && filtered.length > 0 && dropdownPos && (
+        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {filtered.map((p) => {
             const oos = p.quantity <= 0
             const isPre = p.isPreOrder
