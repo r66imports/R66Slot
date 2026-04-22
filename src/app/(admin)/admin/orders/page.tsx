@@ -909,7 +909,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   function openDropdown() {
     if (inputRef.current) {
       const r = inputRef.current.getBoundingClientRect()
-      setDropdownPos({ top: r.bottom + window.scrollY + 2, left: r.left + window.scrollX, width: Math.max(r.width, 320) })
+      setDropdownPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 320) })
     }
     setOpen(true)
   }
