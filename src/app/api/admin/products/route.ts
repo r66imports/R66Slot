@@ -112,40 +112,12 @@ function rowToProduct(row: any): Product {
   }
 }
 
-let _productColumnsMigrated = false
-async function ensureProductColumns() {
-  if (_productColumnsMigrated) return
-  try {
-    await db.query(`
-      ALTER TABLE products
-        ADD COLUMN IF NOT EXISTS page_ids JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS car_brands JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS is_pre_order BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS revo_parts JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT 'Each',
-        ADD COLUMN IF NOT EXISTS units JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS sales_account TEXT DEFAULT '',
-        ADD COLUMN IF NOT EXISTS purchase_account TEXT DEFAULT '',
-        ADD COLUMN IF NOT EXISTS category_brands JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS item_categories JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS sideways_brands JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS sideways_parts JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS sideways_car_type JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS sideways_car_classes JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS custom_orgs JSONB DEFAULT '{}'::jsonb,
-        ADD COLUMN IF NOT EXISTS category_ids JSONB DEFAULT '[]'::jsonb,
-        ADD COLUMN IF NOT EXISTS pre_order_price NUMERIC(10,2) DEFAULT NULL
-    `)
-  } catch { /* ignore */ }
-  _productColumnsMigrated = true
-}
 
 // GET /api/admin/products
 // By default excludes archived products. Pass ?includeArchived=true to get only archived.
 // Pass ?fields=sku,cost_per_item for a lightweight response (used by Orders P&L)
 export async function GET(request: Request) {
   try {
-    await ensureProductColumns()
     const { searchParams } = new URL(request.url)
     const brand = searchParams.get('brand')
     const includeArchived = searchParams.get('includeArchived') === 'true'
@@ -193,7 +165,6 @@ export async function POST(request: Request) {
 
     const id = `prod-${Date.now()}`
     const now = new Date().toISOString()
-    await ensureProductColumns()
     const pageIds: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : [])
     const primaryPageId = pageIds[0] || ''
     const carBrands: string[] = Array.isArray(body.carBrands) ? body.carBrands : []
@@ -250,7 +221,6 @@ export async function POST(request: Request) {
 // PATCH /api/admin/products — deduplicate products by SKU
 export async function PATCH() {
   try {
-    await ensureProductColumns()
 
     // Find all SKUs that have more than one row
     const dupeSkus = await db.query(`
