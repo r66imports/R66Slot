@@ -2554,6 +2554,24 @@ export default function OrdersPage() {
 
   useEffect(() => { load() }, [load])
 
+  // Pick up compile intent from backorders page (sessionStorage handoff)
+  useEffect(() => {
+    if (loading) return
+    const raw = sessionStorage.getItem('r66slot-pending-compile')
+    if (!raw) return
+    try {
+      const data = JSON.parse(raw)
+      sessionStorage.removeItem('r66slot-pending-compile')
+      setCompileDocType(data.docType)
+      setCompileClient(data.client)
+      if (data.docType === 'invoice' && data.backorderIds?.length > 0) {
+        setPendingInvoiceBoIds(data.backorderIds)
+      }
+      setTab('backorders')
+      setShowCreate(true)
+    } catch {}
+  }, [loading])
+
   const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders
 
   const boRows = tab !== 'backorders' ? backorders.filter(cfg.boPhase) : []

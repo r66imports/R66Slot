@@ -1891,6 +1891,35 @@ export default function BackordersPage() {
     setSelectedIds([])
   }
 
+  const handleCompileSelected = (docType: 'quote' | 'salesorder' | 'invoice') => {
+    if (selectedIds.length === 0) return
+    const selected = filtered.filter((b) => selectedIds.includes(b.id))
+    const clientNames = new Set(selected.map((b) => b.clientName.trim()))
+    if (clientNames.size > 1) {
+      alert('Please select backorders from the same client to compile a document.')
+      return
+    }
+    const first = selected[0]
+    const compileData = {
+      docType,
+      client: {
+        name: first.clientName,
+        email: first.clientEmail || '',
+        phone: first.clientPhone || '',
+        address: first.companyAddress || first.address || '',
+        items: selected.map((b) => ({
+          id: `li_${b.id}`,
+          description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`,
+          qty: b.qty,
+          unitPrice: b.price,
+        })),
+      },
+      backorderIds: selectedIds,
+    }
+    sessionStorage.setItem('r66slot-pending-compile', JSON.stringify(compileData))
+    window.location.href = '/admin/orders'
+  }
+
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return
     await Promise.all(
@@ -2110,6 +2139,26 @@ export default function BackordersPage() {
             <option value="yes">Yes</option>
             <option value="no">No</option>
           </select>
+          <div className="w-px h-5 bg-blue-400" />
+          <button
+            onClick={() => handleCompileSelected('quote')}
+            className="text-xs bg-white text-blue-700 hover:bg-blue-50 rounded-lg px-3 py-1.5 font-semibold transition-colors border border-blue-300"
+          >
+            Quote
+          </button>
+          <button
+            onClick={() => handleCompileSelected('salesorder')}
+            className="text-xs bg-white text-blue-700 hover:bg-blue-50 rounded-lg px-3 py-1.5 font-semibold transition-colors border border-blue-300"
+          >
+            Sales Order
+          </button>
+          <button
+            onClick={() => handleCompileSelected('invoice')}
+            className="text-xs bg-white text-blue-700 hover:bg-blue-50 rounded-lg px-3 py-1.5 font-semibold transition-colors border border-blue-300"
+          >
+            Invoice
+          </button>
+          <div className="w-px h-5 bg-blue-400" />
           <button
             onClick={handleBulkDelete}
             className="text-xs bg-red-500 hover:bg-red-600 text-white rounded-lg px-3 py-1.5 font-semibold transition-colors"
