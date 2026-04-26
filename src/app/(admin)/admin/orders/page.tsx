@@ -2638,35 +2638,19 @@ export default function OrdersPage() {
   const handleCompile = (groupKey: string, docType: DocType) => {
     const group = backordersByClient[groupKey]
     if (!group) return
+    // Use checked items within this group if any are ticked, otherwise all items
+    const groupChecked = group.items.filter((b) => checkedBoIds.has(b.id))
+    const sourceItems = groupChecked.length > 0 ? groupChecked : group.items
+    if (docType === 'invoice' && groupChecked.length > 0) {
+      setPendingInvoiceBoIds(groupChecked.map((b) => b.id))
+    }
     setCompileDocType(docType)
     setCompileClient({
       name: group.displayName,
       email: group.email,
       phone: group.phone,
       address: group.items[0]?.companyAddress || '',
-      items: group.items.map((b) => ({
-        id: `li_${b.id}`,
-        description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`,
-        qty: b.qty,
-        unitPrice: b.price,
-      })),
-    })
-    setShowCreate(true)
-  }
-
-  const handleSendToInvoice = (groupKey: string) => {
-    const group = backordersByClient[groupKey]
-    if (!group) return
-    const checked = group.items.filter((b) => checkedBoIds.has(b.id))
-    if (checked.length === 0) return
-    setPendingInvoiceBoIds(checked.map((b) => b.id))
-    setCompileDocType('invoice')
-    setCompileClient({
-      name: group.displayName,
-      email: group.email,
-      phone: group.phone,
-      address: group.items[0]?.companyAddress || '',
-      items: checked.map((b) => ({
+      items: sourceItems.map((b) => ({
         id: `li_${b.id}`,
         description: `${b.sku ? b.sku + ' – ' : ''}${b.description}`,
         qty: b.qty,
@@ -2878,30 +2862,42 @@ export default function OrdersPage() {
                         {email && <span className="text-xs text-gray-400 hidden sm:inline">{email}</span>}
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {groupCheckedCount > 0 && (
+                          <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg">
+                            {groupCheckedCount} selected
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-400">→</span>
                         <button
-                          onClick={() => handleSendToInvoice(key)}
-                          disabled={groupCheckedCount === 0}
+                          onClick={() => handleCompile(key, 'quote')}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                            groupCheckedCount > 0
+                              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                              : 'bg-white border-gray-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
+                          }`}
+                        >
+                          Quote{groupCheckedCount > 0 ? ` (${groupCheckedCount})` : ''}
+                        </button>
+                        <button
+                          onClick={() => handleCompile(key, 'salesorder')}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                            groupCheckedCount > 0
+                              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700'
+                              : 'bg-white border-gray-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
+                          }`}
+                        >
+                          Sales Order{groupCheckedCount > 0 ? ` (${groupCheckedCount})` : ''}
+                        </button>
+                        <button
+                          onClick={() => handleCompile(key, 'invoice')}
                           className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
                             groupCheckedCount > 0
                               ? 'bg-indigo-600 text-white border-indigo-600 hover:bg-indigo-700'
-                              : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                              : 'bg-white border-gray-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700'
                           }`}
                         >
-                          {groupCheckedCount > 0 ? `Send to Invoice (${groupCheckedCount})` : 'Send to Invoice'}
+                          Invoice{groupCheckedCount > 0 ? ` (${groupCheckedCount})` : ''}
                         </button>
-                        <span className="text-xs text-gray-400 mr-1">Compile →</span>
-                        <button
-                          onClick={() => handleCompile(key, 'quote')}
-                          className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
-                        >Quote</button>
-                        <button
-                          onClick={() => handleCompile(key, 'salesorder')}
-                          className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
-                        >Sales Order</button>
-                        <button
-                          onClick={() => handleCompile(key, 'invoice')}
-                          className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-300 rounded-lg hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors"
-                        >Invoice</button>
                       </div>
                     </div>
                     {/* Line items — only when open */}
@@ -2915,7 +2911,25 @@ export default function OrdersPage() {
                             <th className="text-center px-5 py-2">Qty</th>
                             <th className="text-right px-5 py-2">Price</th>
                             <th className="text-right px-5 py-2">Total</th>
-                            <th className="text-center px-2 py-2 w-8">☑</th>
+                            <th className="text-center px-2 py-2 w-8" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                title={groupCheckedCount === items.length ? 'Deselect all' : 'Select all'}
+                                checked={groupCheckedCount === items.length && items.length > 0}
+                                onChange={() => {
+                                  setCheckedBoIds((prev) => {
+                                    const next = new Set(prev)
+                                    if (groupCheckedCount === items.length) {
+                                      items.forEach((b) => next.delete(b.id))
+                                    } else {
+                                      items.forEach((b) => next.add(b.id))
+                                    }
+                                    return next
+                                  })
+                                }}
+                                className="w-4 h-4 rounded accent-indigo-600 cursor-pointer"
+                              />
+                            </th>
                             <th className="text-center px-5 py-2">Status</th>
                             <th className="w-8"></th>
                           </tr>
