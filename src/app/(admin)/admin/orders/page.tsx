@@ -3060,7 +3060,7 @@ export default function OrdersPage() {
                       const data = await res.json()
                       if (res.ok) {
                         setRenumberQuotesResult(`✓ Renumbered ${data.renumbered} Quotes`)
-                        await load()
+                        await load({ force: true })
                       } else {
                         setRenumberQuotesResult(`Error: ${data.error}`)
                       }
@@ -3085,7 +3085,7 @@ export default function OrdersPage() {
                       const data = await res.json()
                       if (res.ok) {
                         setRenumberSOResult(`✓ Renumbered ${data.renumbered} Sales Orders`)
-                        await load()
+                        await load({ force: true })
                       } else {
                         setRenumberSOResult(`Error: ${data.error}`)
                       }
