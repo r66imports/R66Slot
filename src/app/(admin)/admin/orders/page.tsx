@@ -888,11 +888,12 @@ function ClientAutofill({
 
 // ─── SKU Line Input ────────────────────────────────────────────────────────────
 
-function SkuLineInput({ value, onChange, products, onSelectProduct }: {
+function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = false }: {
   value: string
   onChange: (v: string) => void
   products: Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number; isPreOrder?: boolean }>
   onSelectProduct: (sku: string, title: string, price: number, costPerItem: number, preOrderPrice: number, stockQty: number) => void
+  isQuote?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [blockMsg, setBlockMsg] = useState<{ text: string; type: 'oos' | 'preorder' } | null>(null)
@@ -915,7 +916,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
   }
 
   function handleSelect(p: { sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number; isPreOrder?: boolean }) {
-    if (p.isPreOrder || p.quantity <= 0) {
+    if (!isQuote && (p.isPreOrder || p.quantity <= 0)) {
       const type = p.isPreOrder ? 'preorder' : 'oos'
       const text = p.isPreOrder
         ? `"${p.sku}" — Book for Next Shipment — add to Back Orders instead`
@@ -928,6 +929,17 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
     setSearchQ('')
     setOpen(false)
   }
+
+  function handleCustomItem() {
+    if (!searchQ.trim()) return
+    onSelectProduct('', searchQ.trim(), 0, 0, 0, 0)
+    setSearchQ('')
+    setOpen(false)
+  }
+
+  const showDropdown = open && dropdownPos && (
+    isQuote ? (filtered.length > 0 || searchQ.length >= 1) : (filtered.length > 0 && !blockMsg)
+  )
 
   return (
     <div className="relative">
@@ -952,12 +964,12 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
           )}
         </div>
       )}
-      {!blockMsg && open && filtered.length > 0 && dropdownPos && (
-        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }} className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+      {showDropdown && (
+        <div style={{ position: 'fixed', top: dropdownPos!.top, left: dropdownPos!.left, width: dropdownPos!.width, zIndex: 9999 }} className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {filtered.map((p) => {
             const oos = p.quantity <= 0
             const isPre = p.isPreOrder
-            const blocked = isPre || oos
+            const blocked = !isQuote && (isPre || oos)
             return (
               <button
                 key={p.id}
@@ -969,7 +981,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
                 <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
                 <span className={blocked ? 'text-gray-400' : 'text-gray-800'}>{p.title}</span>
                 {isPre
-                  ? <span className="float-right text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">NEXT SHIPMENT</span>
+                  ? <span className={`float-right text-[10px] font-semibold px-1.5 py-0.5 rounded ${isQuote ? 'text-amber-600 bg-amber-50' : 'text-amber-600 bg-amber-50'}`}>NEXT SHIPMENT</span>
                   : oos
                     ? <span className="float-right text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
                     : <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
@@ -977,6 +989,17 @@ function SkuLineInput({ value, onChange, products, onSelectProduct }: {
               </button>
             )
           })}
+          {isQuote && searchQ.trim().length >= 1 && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleCustomItem}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 border-t border-gray-100 text-green-700 font-medium flex items-center gap-2"
+            >
+              <span className="text-green-500 text-base leading-none">+</span>
+              <span>Add &ldquo;{searchQ.trim()}&rdquo; as custom item</span>
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1009,6 +1032,7 @@ function CreateDocumentModal({
   onClose: () => void
 }) {
   const cfg = TAB_CFG[docType === 'quote' ? 'quotes' : docType === 'salesorder' ? 'salesorders' : 'invoices']
+  const isQuote = docType === 'quote'
 
   const [form, setForm] = useState({
     docNumber: editDoc?.docNumber || '',
@@ -1271,7 +1295,7 @@ function CreateDocumentModal({
                     <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
                       <td className="px-2 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap align-top pt-3">{liSku || <span className="text-gray-300">—</span>}</td>
                       <td className="px-2 py-1">
-                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); updateLine(li.id, '_stockQty', stockQty) }} />
+                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} isQuote={isQuote} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); if (sku) updateLine(li.id, '_stockQty', stockQty) }} />
                         {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
                           <div className="flex gap-1 mt-1 flex-wrap">
                             {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
@@ -1284,16 +1308,16 @@ function CreateDocumentModal({
                         <input
                           type="number"
                           min={1}
-                          max={enforceStockLimit && li._stockQty !== undefined ? li._stockQty : undefined}
-                          className={`w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50 ${enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty ? 'text-red-600 bg-red-50' : ''}`}
+                          max={!isQuote && enforceStockLimit && li._stockQty !== undefined ? li._stockQty : undefined}
+                          className={`w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50 ${!isQuote && enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty ? 'text-red-600 bg-red-50' : ''}`}
                           value={li.qty}
                           onChange={(e) => {
                             const v = Number(e.target.value)
-                            const max = enforceStockLimit && li._stockQty !== undefined ? li._stockQty : Infinity
+                            const max = !isQuote && enforceStockLimit && li._stockQty !== undefined ? li._stockQty : Infinity
                             updateLine(li.id, 'qty', Math.min(v, max))
                           }}
                         />
-                        {enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty && (
+                        {!isQuote && enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty && (
                           <div className="text-[10px] text-red-500 font-medium mt-0.5 text-right">{li._stockQty} in stock</div>
                         )}
                       </td>
