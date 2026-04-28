@@ -28,6 +28,8 @@ interface LineItem {
   _costPrice?: number
   _preOrderPrice?: number
   _stockQty?: number
+  _backorder?: boolean
+  _backorderSent?: boolean
 }
 
 interface OrderDocument {
@@ -1158,7 +1160,7 @@ function CreateDocumentModal({
   const setField = (k: string, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
   const addLine = () => setLineItems((p) => [...p, newLine()])
   const removeLine = (id: string) => setLineItems((p) => p.filter((l) => l.id !== id))
-  const updateLine = (id: string, k: keyof LineItem, v: string | number) =>
+  const updateLine = (id: string, k: keyof LineItem, v: string | number | boolean) =>
     setLineItems((p) => p.map((l) => (l.id === id ? { ...l, [k]: v } : l)))
 
   const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.discountPct || 0)
@@ -1177,6 +1179,10 @@ function CreateDocumentModal({
     setSaving(true)
     setError('')
     try {
+      const toSendBO = isQuote ? lineItems.filter(li => li._backorder && !li._backorderSent) : []
+      const savedLineItems = isQuote
+        ? lineItems.map(li => (li._backorder && !li._backorderSent) ? { ...li, _backorderSent: true } : li)
+        : lineItems
       const url = editDoc
         ? `/api/admin/orders/documents/${editDoc.id}`
         : '/api/admin/orders/documents'
@@ -1184,10 +1190,23 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems, discountPct, shippingCost, shippingMethod, trackingNumber, depositPaid, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct, shippingCost, shippingMethod, trackingNumber, depositPaid, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
       })
-      if (res.ok) { onCreated(await res.json()); onClose() }
-      else {
+      if (res.ok) {
+        const savedDoc = await res.json()
+        if (toSendBO.length > 0) {
+          Promise.allSettled(toSendBO.map(li => {
+            const { sku } = splitSkuTitle(li.description || '')
+            return fetch('/api/admin/backorders', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ clientName: form.clientName, clientEmail: form.clientEmail, clientPhone: form.clientPhone, sku: sku || '', description: li.description, qty: li.qty, price: li.unitPrice, source: 'quote' }),
+            })
+          }))
+        }
+        onCreated(savedDoc)
+        onClose()
+      } else {
         const body = await res.json().catch(() => null)
         setError(body?.error ? `Error: ${body.error}` : `Failed to save (${res.status}) — please try again`)
       }
@@ -1289,6 +1308,7 @@ function CreateDocumentModal({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 border-b text-xs text-gray-500 uppercase tracking-wider">
+                    {isQuote && <th className="px-2 py-2 w-8" title="Send to Backorders">BO</th>}
                     <th className="text-left px-3 py-2 w-24">SKU</th>
                     <th className="text-left px-3 py-2">Description</th>
                     <th className="text-right px-3 py-2 w-16">Qty</th>
@@ -1300,8 +1320,22 @@ function CreateDocumentModal({
                 <tbody>
                   {lineItems.map((li) => {
                     const { sku: liSku } = splitSkuTitle(li.description || '')
+                    const boHighlight = isQuote && (li._backorder || li._backorderSent)
                     return (
-                    <tr key={li.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <tr key={li.id} className={`border-b last:border-0 ${boHighlight ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                      {isQuote && (
+                        <td className="px-2 py-2 text-center align-top pt-3">
+                          <input
+                            type="checkbox"
+                            checked={!!(li._backorder || li._backorderSent)}
+                            disabled={!!li._backorderSent}
+                            title={li._backorderSent ? 'Sent to Backorders' : 'Queue for Backorders'}
+                            onChange={(e) => updateLine(li.id, '_backorder', e.target.checked)}
+                            className={`w-4 h-4 rounded ${li._backorderSent ? 'accent-green-600 cursor-not-allowed opacity-70' : 'accent-amber-500 cursor-pointer'}`}
+                          />
+                          {li._backorderSent && <div className="text-[9px] text-green-600 font-semibold mt-0.5 leading-none">Sent</div>}
+                        </td>
+                      )}
                       <td className="px-2 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap align-top pt-3">{liSku || <span className="text-gray-300">—</span>}</td>
                       <td className="px-2 py-1">
                         <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} isQuote={isQuote} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); if (sku) updateLine(li.id, '_stockQty', stockQty) }} />
