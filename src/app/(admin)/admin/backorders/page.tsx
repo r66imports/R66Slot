@@ -865,6 +865,7 @@ function BackorderModal({
   const [showAddBrand, setShowAddBrand] = useState(false)
   const [newBrandName, setNewBrandName] = useState('')
   const [savingBrand, setSavingBrand] = useState(false)
+  const [fullScreen, setFullScreen] = useState(false)
 
   const handleCreateSupplier = async () => {
     if (!newSupplier.name.trim()) return
@@ -1008,11 +1009,11 @@ function BackorderModal({
   const clientIsSelected = !!form.clientId || !!form.clientName
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[92vh] overflow-y-auto">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm`}>
+      <div className={`bg-white flex flex-col ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[92vh]'} overflow-y-auto`}>
 
         {/* Modal Header */}
-        <div className="sticky top-0 bg-white border-b z-10 flex items-center justify-between px-6 py-4 rounded-t-2xl">
+        <div className={`sticky top-0 bg-white border-b z-10 flex items-center justify-between px-6 py-4 flex-shrink-0 ${fullScreen ? '' : 'rounded-t-2xl'}`}>
           <div>
             <h2 className="text-lg font-bold text-gray-900 font-play">
               {isEditing ? '✏️ Edit Backorder' : '➕ Create Backorder'}
@@ -1021,13 +1022,21 @@ function BackorderModal({
               {isEditing ? 'Update backorder details' : 'Search for a client or add a new one'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors text-xl leading-none"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setFullScreen(f => !f)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors" title={fullScreen ? 'Restore' : 'Full screen'}>
+              {fullScreen
+                ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5M15 15l5.25 5.25" /></svg>
+                : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+              }
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors text-xl leading-none"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
