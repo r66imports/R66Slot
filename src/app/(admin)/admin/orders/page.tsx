@@ -2265,7 +2265,7 @@ export default function OrdersPage() {
   const [editDocState, setEditDocState] = useState<OrderDocument | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [checkedBoIds, setCheckedBoIds] = useState<Set<string>>(new Set())
-  const [pendingInvoiceBoIds, setPendingInvoiceBoIds] = useState<string[]>([])
+  const [pendingCompile, setPendingCompile] = useState<{ ids: string[]; docType: DocType } | null>(null)
   const [syncingInventory, setSyncingInventory] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const [renumberingSODocs, setRenumberingSODocs] = useState(false)
@@ -2631,8 +2631,8 @@ export default function OrdersPage() {
       sessionStorage.removeItem('r66slot-pending-compile')
       setCompileDocType(data.docType)
       setCompileClient(data.client)
-      if (data.docType === 'invoice' && data.backorderIds?.length > 0) {
-        setPendingInvoiceBoIds(data.backorderIds)
+      if (data.backorderIds?.length > 0) {
+        setPendingCompile({ ids: data.backorderIds, docType: data.docType })
       }
       setTab('backorders')
       setShowCreate(true)
@@ -2723,12 +2723,9 @@ export default function OrdersPage() {
   const handleCompile = (groupKey: string, docType: DocType) => {
     const group = backordersByClient[groupKey]
     if (!group) return
-    // Use checked items within this group if any are ticked, otherwise all items
     const groupChecked = group.items.filter((b) => checkedBoIds.has(b.id))
     const sourceItems = groupChecked.length > 0 ? groupChecked : group.items
-    if (docType === 'invoice' && groupChecked.length > 0) {
-      setPendingInvoiceBoIds(groupChecked.map((b) => b.id))
-    }
+    setPendingCompile({ ids: sourceItems.map((b) => b.id), docType })
     setCompileDocType(docType)
     setCompileClient({
       name: group.displayName,
@@ -3465,20 +3462,30 @@ export default function OrdersPage() {
           onCreated={async (doc) => {
             setDocuments((prev) => [doc, ...prev])
             setCompileClient(null)
-            if (pendingInvoiceBoIds.length > 0) {
-              await Promise.all(
-                pendingInvoiceBoIds.map((id) =>
+            if (pendingCompile) {
+              const { ids, docType: ct } = pendingCompile
+              const phaseUpdate: Record<string, unknown> = {}
+              if (ct === 'quote') { phaseUpdate.phaseQuote = true; phaseUpdate.quoteNumber = doc.docNumber }
+              else if (ct === 'salesorder') { phaseUpdate.phaseSalesOrder = true; phaseUpdate.salesOrderNumber = doc.docNumber }
+              else if (ct === 'invoice') { phaseUpdate.phaseInvoice = true; phaseUpdate.invoiceNumber = doc.docNumber }
+              const patched = await Promise.all(
+                ids.map((id) =>
                   fetch(`/api/admin/backorders/${id}`, {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: 'complete' }),
-                  })
+                    body: JSON.stringify(phaseUpdate),
+                  }).then((r) => r.ok ? r.json() : null)
                 )
               )
-              const completed = new Set(pendingInvoiceBoIds)
-              setBackorders((prev) => prev.filter((b) => !completed.has(b.id)))
-              setCheckedBoIds((prev) => { const next = new Set(prev); completed.forEach((id) => next.delete(id)); return next })
-              setPendingInvoiceBoIds([])
+              if (ct === 'invoice') {
+                const done = new Set(ids)
+                setBackorders((prev) => prev.filter((b) => !done.has(b.id)))
+                setCheckedBoIds((prev) => { const next = new Set(prev); done.forEach((id) => next.delete(id)); return next })
+              } else {
+                const updMap = new Map(patched.filter(Boolean).map((b: any) => [b.id, b]))
+                setBackorders((prev) => prev.map((b) => updMap.has(b.id) ? updMap.get(b.id) as Backorder : b))
+              }
+              setPendingCompile(null)
             }
           }}
           onClose={() => { setShowCreate(false); setCompileClient(null) }}

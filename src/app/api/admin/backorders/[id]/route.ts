@@ -67,13 +67,8 @@ export async function PATCH(
       updates.phaseDepositPaidDate = now
     }
 
-    // Auto-complete when all phases done
-    if (
-      (updates.phaseDepositPaid === true || backorders[idx].phaseDepositPaid) &&
-      (updates.phaseInvoice === true || backorders[idx].phaseInvoice) &&
-      (updates.phaseSalesOrder === true || backorders[idx].phaseSalesOrder) &&
-      (updates.phaseQuote === true || backorders[idx].phaseQuote)
-    ) {
+    // Auto-archive when Invoice phase is set
+    if (updates.phaseInvoice === true || backorders[idx].phaseInvoice) {
       updates.status = 'complete'
     }
 

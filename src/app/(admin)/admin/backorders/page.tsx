@@ -1390,40 +1390,49 @@ function PhaseCheckbox({
   date,
   onChange,
   loading,
+  skipped = false,
 }: {
   label: string
   checked: boolean
   date?: string
   onChange: () => void
   loading: boolean
+  skipped?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onChange}
       disabled={loading}
-      title={date ? `${label}: ${new Date(date).toLocaleDateString('en-ZA')}` : label}
+      title={skipped ? `${label}: skipped` : date ? `${label}: ${new Date(date).toLocaleDateString('en-ZA')}` : label}
       className={`flex flex-col items-center gap-0.5 min-w-[60px] group transition-opacity ${
         loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
       }`}
     >
       <div
         className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
-          checked
-            ? 'bg-green-500 border-green-500 text-white shadow-sm'
-            : 'border-gray-300 bg-white group-hover:border-green-400'
+          skipped
+            ? 'bg-red-500 border-red-500 text-white shadow-sm'
+            : checked
+              ? 'bg-green-500 border-green-500 text-white shadow-sm'
+              : 'border-gray-300 bg-white group-hover:border-green-400'
         }`}
       >
-        {checked && (
+        {skipped && (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        )}
+        {checked && !skipped && (
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         )}
       </div>
-      <span className={`text-[10px] font-semibold leading-tight text-center ${checked ? 'text-green-600' : 'text-gray-400'}`}>
+      <span className={`text-[10px] font-semibold leading-tight text-center ${skipped ? 'text-red-500' : checked ? 'text-green-600' : 'text-gray-400'}`}>
         {label}
       </span>
-      {date && (
+      {date && !skipped && (
         <span className="text-[9px] text-gray-400 leading-none">
           {new Date(date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })}
         </span>
@@ -2372,12 +2381,13 @@ export default function BackordersPage() {
                               />
                             )}
                           </div>
-                          <div className={`flex-1 h-px mt-[13px] ${bo.phaseSalesOrder ? 'bg-green-400' : 'bg-gray-200'}`} />
+                          <div className={`flex-1 h-px mt-[13px] ${bo.phaseSalesOrder ? 'bg-green-400' : (bo.phaseInvoice && !bo.phaseSalesOrder ? 'bg-red-300' : 'bg-gray-200')}`} />
                           <div className="flex flex-col items-center">
                             <PhaseCheckbox
                               label="Sales Order"
                               checked={bo.phaseSalesOrder}
                               date={bo.phaseSalesOrderDate}
+                              skipped={bo.phaseInvoice && !bo.phaseSalesOrder}
                               onChange={() => togglePhase(bo.id, 'phaseSalesOrder', bo.phaseSalesOrder)}
                               loading={isPatching}
                             />
