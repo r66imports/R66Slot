@@ -24,6 +24,8 @@ export interface SlotEvent {
   location: string
   dateFrom: string
   dateTo: string
+  timeFrom?: string
+  timeTo?: string
   notes: string
   expenses: EventExpense[]
   salesItems: EventSalesItem[]
@@ -67,6 +69,8 @@ export async function POST(request: Request) {
       location: body.location?.trim() || '',
       dateFrom: body.dateFrom,
       dateTo: body.dateTo,
+      timeFrom: body.timeFrom || '',
+      timeTo: body.timeTo || '',
       notes: body.notes?.trim() || '',
       expenses: body.expenses || [],
       salesItems: body.salesItems || [],

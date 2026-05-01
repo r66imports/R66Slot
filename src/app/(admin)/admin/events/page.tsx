@@ -26,6 +26,8 @@ interface SlotEvent {
   location: string
   dateFrom: string
   dateTo: string
+  timeFrom?: string
+  timeTo?: string
   notes: string
   expenses: EventExpense[]
   salesItems: EventSalesItem[]
@@ -142,21 +144,9 @@ function EventCompareChart({ events }: { events: SlotEvent[] }) {
   )
 }
 
-// ─── Create Event Modal ────────────────────────────────────────────────────────
+// ─── Shared: build sales items from invoices in a date range ──────────────────
 
-function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: (e: SlotEvent) => void }) {
-  const [name, setName] = useState('')
-  const [location, setLocation] = useState('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [previewing, setPreviewing] = useState(false)
-  const [preview, setPreview] = useState<EventSalesItem[]>([])
-  const [previewRevenue, setPreviewRevenue] = useState(0)
-  const [error, setError] = useState('')
-
-  async function buildSalesItems(from: string, to: string): Promise<{ items: EventSalesItem[]; revenue: number; cogs: number }> {
+async function buildSalesItems(from: string, to: string): Promise<{ items: EventSalesItem[]; revenue: number; cogs: number }> {
     const [docsRes, prodsRes] = await Promise.all([
       fetch('/api/admin/orders/documents?type=invoice'),
       fetch('/api/admin/products'),
@@ -200,7 +190,23 @@ function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     const revenue = items.reduce((s, i) => s + i.totalRevenue, 0)
     const cogs = items.reduce((s, i) => s + i.totalCogs, 0)
     return { items, revenue, cogs }
-  }
+}
+
+// ─── Create Event Modal ────────────────────────────────────────────────────────
+
+function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: (e: SlotEvent) => void }) {
+  const [name, setName] = useState('')
+  const [location, setLocation] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [timeFrom, setTimeFrom] = useState('')
+  const [timeTo, setTimeTo] = useState('')
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [previewing, setPreviewing] = useState(false)
+  const [preview, setPreview] = useState<EventSalesItem[]>([])
+  const [previewRevenue, setPreviewRevenue] = useState(0)
+  const [error, setError] = useState('')
 
   async function handlePreview() {
     if (!dateFrom || !dateTo) return setError('Select date range first')
@@ -223,7 +229,7 @@ function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: name.trim(), location, dateFrom, dateTo, notes,
+          name: name.trim(), location, dateFrom, dateTo, timeFrom, timeTo, notes,
           salesItems: items, expenses: [],
           totalRevenue: revenue, totalCogs: cogs,
           totalExpenses: 0, grossProfit, netProfit: grossProfit,
@@ -265,6 +271,16 @@ function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             <div>
               <label className="block text-xs font-semibold text-gray-600 mb-1.5">Date To *</label>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Start Time</label>
+              <input type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">End Time</label>
+              <input type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
             </div>
           </div>
@@ -499,8 +515,11 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
   const [expenses, setExpenses] = useState<EventExpense[]>(initialEvent.expenses || [])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [tab, setTab] = useState<'sales' | 'expenses' | 'charts'>('sales')
   const [notes, setNotes] = useState(initialEvent.notes || '')
+  const [timeFrom, setTimeFrom] = useState(initialEvent.timeFrom || '')
+  const [timeTo, setTimeTo] = useState(initialEvent.timeTo || '')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [salesSearch, setSalesSearch] = useState('')
   const [selectedSkuItem, setSelectedSkuItem] = useState<EventSalesItem | null>(null)
@@ -525,7 +544,7 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
       const res = await fetch(`/api/admin/events/${event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expenses, notes, totalExpenses, netProfit }),
+        body: JSON.stringify({ expenses, notes, timeFrom, timeTo, totalExpenses, netProfit }),
       })
       if (res.ok) {
         const updated = await res.json()
@@ -533,6 +552,23 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
         setSaved(true); setTimeout(() => setSaved(false), 2000)
       }
     } finally { setSaving(false) }
+  }
+
+  async function syncSales() {
+    setSyncing(true)
+    try {
+      const { items, revenue, cogs } = await buildSalesItems(event.dateFrom, event.dateTo)
+      const grossProfit = revenue - cogs
+      const res = await fetch(`/api/admin/events/${event.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ salesItems: items, totalRevenue: revenue, totalCogs: cogs, grossProfit, netProfit: grossProfit - totalExpenses }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setEvent(updated); onUpdate(updated)
+      }
+    } finally { setSyncing(false) }
   }
 
   async function archive() {
@@ -558,13 +594,26 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
           <h1 className="text-2xl font-bold text-gray-900">{event.name}</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {event.location && <span className="mr-3">📍 {event.location}</span>}
-            📅 {fmtDate(event.dateFrom)} — {fmtDate(event.dateTo)}
+            📅 {fmtDate(event.dateFrom)}{event.timeFrom ? ` ${event.timeFrom}` : ''} — {fmtDate(event.dateTo)}{event.timeTo ? ` ${event.timeTo}` : ''}
           </p>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="text-xs text-gray-400">Start:</span>
+            <input type="time" value={timeFrom} onChange={(e) => setTimeFrom(e.target.value)}
+              className="text-xs px-2 py-1 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+            <span className="text-xs text-gray-400">End:</span>
+            <input type="time" value={timeTo} onChange={(e) => setTimeTo(e.target.value)}
+              className="text-xs px-2 py-1 border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${event.status === 'archived' ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
             {event.status === 'archived' ? 'Archived' : 'Active'}
           </span>
+          <button onClick={syncSales} disabled={syncing}
+            className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700 transition-colors disabled:opacity-50"
+            title="Re-fetch all invoices in this date range and update sales">
+            {syncing ? '⟳ Syncing…' : '↺ Sync Sales'}
+          </button>
           <button onClick={archive}
             className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">
             {event.status === 'archived' ? 'Restore' : 'Archive'}
