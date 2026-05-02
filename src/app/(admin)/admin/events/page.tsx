@@ -535,6 +535,27 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
       .catch(() => {})
   }, [])
 
+  // Auto-sync sales from invoices whenever this event is opened
+  useEffect(() => {
+    let cancelled = false
+    const currentExpenses = initialEvent.expenses.reduce((s, e) => s + (e.amount || 0), 0)
+    buildSalesItems(initialEvent.dateFrom, initialEvent.dateTo)
+      .then(({ items, revenue, cogs }) => {
+        if (cancelled) return
+        const grossProfit = revenue - cogs
+        return fetch(`/api/admin/events/${initialEvent.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ salesItems: items, totalRevenue: revenue, totalCogs: cogs, grossProfit, netProfit: grossProfit - currentExpenses }),
+        }).then((r) => r.ok ? r.json() : null).then((updated) => {
+          if (!cancelled && updated) { setEvent(updated); onUpdate(updated) }
+        })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEvent.id])
+
   const totalExpenses = expenses.reduce((s, e) => s + (e.amount || 0), 0)
   const netProfit = event.grossProfit - totalExpenses
 
