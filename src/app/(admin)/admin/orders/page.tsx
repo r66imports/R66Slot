@@ -2278,6 +2278,7 @@ export default function OrdersPage() {
   const [clientSearch, setClientSearch] = useState('')
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
   const [soToInvoiceResult, setSoToInvoiceResult] = useState<string | null>(null)
+  const [inventoryMsg, setInventoryMsg] = useState<string | null>(null)
   const [paymentModal, setPaymentModal] = useState<OrderDocument | null>(null)
   const [clientCreditBalance, setClientCreditBalance] = useState(0)
   const [creditBalances, setCreditBalances] = useState<Record<string, number>>({})
@@ -2808,10 +2809,15 @@ export default function OrdersPage() {
 
   // Delete a standalone document
   const deleteDocument = async (id: string) => {
+    const docToDelete = documents.find((d) => d.id === id)
     const res = await fetch(`/api/admin/orders/documents/${id}`, { method: 'DELETE' })
     if (res.ok) {
       setDocuments((prev) => prev.filter((d) => d.id !== id))
       setDeleteConfirm(null)
+      if (docToDelete && (docToDelete.type === 'invoice' || docToDelete.type === 'salesorder')) {
+        setInventoryMsg(`↩ Stock restored for ${docToDelete.docNumber}`)
+        setTimeout(() => setInventoryMsg(null), 4000)
+      }
     }
   }
 
@@ -2844,6 +2850,11 @@ export default function OrdersPage() {
           {soToInvoiceResult && (
             <span className={`text-xs font-medium px-3 py-1.5 rounded-lg border ${soToInvoiceResult.startsWith('✓') ? 'text-green-700 bg-green-50 border-green-200' : 'text-red-700 bg-red-50 border-red-200'}`}>
               {soToInvoiceResult}
+            </span>
+          )}
+          {inventoryMsg && (
+            <span className="text-xs font-medium px-3 py-1.5 rounded-lg border text-amber-700 bg-amber-50 border-amber-200">
+              {inventoryMsg}
             </span>
           )}
           <button
@@ -3417,7 +3428,14 @@ export default function OrdersPage() {
                               className: 'text-gray-500',
                               onClick: async () => {
                                 const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
-                                if (res.ok) setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'archived' } : d))
+                                if (res.ok) {
+                                  const updated = await res.json()
+                                  setDocuments((prev) => prev.map((d) => d.id === doc.id ? updated : d))
+                                  if (doc.type === 'invoice' || doc.type === 'salesorder') {
+                                    setInventoryMsg(`↩ Stock restored for ${doc.docNumber}`)
+                                    setTimeout(() => setInventoryMsg(null), 4000)
+                                  }
+                                }
                               },
                             },
                             { label: 'Push to Sage', onClick: () => {}, disabled: true, className: 'text-gray-400' },

@@ -46,8 +46,8 @@ export async function PATCH(
 
     // Rule 3 — Stock Deduction: only adjust stock if the rule is active
     if (stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
-      if (prev.stockDeducted && isCancelled && !wasCancelled) {
-        // Being cancelled/archived — restore stock from previous committed items
+      if (prev.stockDeducted !== false && wasStockable && isCancelled && !wasCancelled) {
+        // Being cancelled/archived — restore stock (handles both stockDeducted:true and legacy undefined)
         await adjustStock(prev.lineItems, 'add')
         body.stockDeducted = false
       } else if (prev.stockDeducted && !isCancelled && body.lineItems) {
@@ -86,8 +86,8 @@ export async function DELETE(
     const doc = docs.find((d) => d.id === id)
     if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    // Restore stock if this document had stock deducted
-    if (doc.stockDeducted && isStockable(doc.type)) {
+    // Restore stock on delete (handles both stockDeducted:true and legacy undefined)
+    if (doc.stockDeducted !== false && isStockable(doc.type)) {
       await adjustStock(doc.lineItems, 'add')
     }
 
