@@ -7,6 +7,8 @@ export interface EventExpense {
   id: string
   description: string
   amount: number
+  paidBy?: string
+  paymentMethod?: string
 }
 
 export interface EventSalesItem {
@@ -27,6 +29,7 @@ export interface SlotEvent {
   timeFrom?: string
   timeTo?: string
   notes: string
+  paymentTotals?: { cash: number; card: number; eft: number; other: number }
   expenses: EventExpense[]
   salesItems: EventSalesItem[]
   totalRevenue: number
@@ -71,6 +74,7 @@ export async function POST(request: Request) {
       dateTo: body.dateTo,
       timeFrom: body.timeFrom || '',
       timeTo: body.timeTo || '',
+      paymentTotals: body.paymentTotals || { cash: 0, card: 0, eft: 0, other: 0 },
       notes: body.notes?.trim() || '',
       expenses: body.expenses || [],
       salesItems: body.salesItems || [],

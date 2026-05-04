@@ -9,6 +9,7 @@ interface EventExpense {
   description: string
   amount: number
   paidBy?: string
+  paymentMethod?: string
 }
 
 interface EventSalesItem {
@@ -29,6 +30,7 @@ interface SlotEvent {
   timeFrom?: string
   timeTo?: string
   notes: string
+  paymentTotals?: { cash: number; card: number; eft: number; other: number }
   expenses: EventExpense[]
   salesItems: EventSalesItem[]
   totalRevenue: number
@@ -48,6 +50,12 @@ interface RawInvoice {
   date: string
   clientName: string
   lineItems: Array<{ description: string; qty: number; unitPrice: number }>
+  paymentMethod?: string
+  paymentMethod2?: string
+  paymentMethod1Amount?: number
+  paymentMethod2Amount?: number
+  discountPct?: number
+  shippingCost?: number
 }
 
 interface RawProduct {
@@ -146,7 +154,15 @@ function EventCompareChart({ events }: { events: SlotEvent[] }) {
 
 // ─── Shared: build sales items from invoices in a date range ──────────────────
 
-async function buildSalesItems(from: string, to: string): Promise<{ items: EventSalesItem[]; revenue: number; cogs: number }> {
+function categorizePM(method: string): 'cash' | 'card' | 'eft' | 'other' {
+  const m = method.toLowerCase().trim()
+  if (m.includes('cash')) return 'cash'
+  if (m.includes('card')) return 'card'
+  if (m.includes('eft') || m.includes('transfer') || m.includes('bank')) return 'eft'
+  return 'other'
+}
+
+async function buildSalesItems(from: string, to: string): Promise<{ items: EventSalesItem[]; revenue: number; cogs: number; paymentTotals: { cash: number; card: number; eft: number; other: number } }> {
     const [docsRes, prodsRes] = await Promise.all([
       fetch('/api/admin/orders/documents?type=invoice'),
       fetch('/api/admin/products'),
@@ -164,10 +180,25 @@ async function buildSalesItems(from: string, to: string): Promise<{ items: Event
     toDate.setHours(23, 59, 59, 999)
 
     const map = new Map<string, EventSalesItem>()
+    const paymentTotals = { cash: 0, card: 0, eft: 0, other: 0 }
+
     for (const doc of docs) {
       if (doc.status === 'archived' || doc.status === 'rejected') continue
       const d = new Date(doc.date || '')
       if (d < fromDate || d > toDate) continue
+
+      // Track payment method totals
+      const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+      const discountAmt = subtotal * (doc.discountPct || 0) / 100
+      const docTotal = subtotal - discountAmt + (doc.shippingCost || 0)
+      const pm1 = doc.paymentMethod || ''
+      const pm2 = doc.paymentMethod2 || ''
+      const pm2Amt = Number(doc.paymentMethod2Amount) || 0
+      const pm1Amt = pm2 && pm2Amt > 0 ? docTotal - pm2Amt : docTotal
+      if (pm1) paymentTotals[categorizePM(pm1)] += pm1Amt
+      if (pm2 && pm2Amt > 0) paymentTotals[categorizePM(pm2)] += pm2Amt
+      if (!pm1 && !pm2) paymentTotals.other += docTotal
+
       for (const li of doc.lineItems) {
         if (!li.description) continue
         const { sku, title } = parseSku(li.description)
@@ -189,7 +220,7 @@ async function buildSalesItems(from: string, to: string): Promise<{ items: Event
     const items = Array.from(map.values()).sort((a, b) => b.totalQty - a.totalQty)
     const revenue = items.reduce((s, i) => s + i.totalRevenue, 0)
     const cogs = items.reduce((s, i) => s + i.totalCogs, 0)
-    return { items, revenue, cogs }
+    return { items, revenue, cogs, paymentTotals }
 }
 
 // ─── Create Event Modal ────────────────────────────────────────────────────────
@@ -223,14 +254,14 @@ function CreateEventModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     if (!dateFrom || !dateTo) return setError('Date range is required')
     setLoading(true); setError('')
     try {
-      const { items, revenue, cogs } = await buildSalesItems(dateFrom, dateTo)
+      const { items, revenue, cogs, paymentTotals } = await buildSalesItems(dateFrom, dateTo)
       const grossProfit = revenue - cogs
       const res = await fetch('/api/admin/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(), location, dateFrom, dateTo, timeFrom, timeTo, notes,
-          salesItems: items, expenses: [],
+          salesItems: items, expenses: [], paymentTotals,
           totalRevenue: revenue, totalCogs: cogs,
           totalExpenses: 0, grossProfit, netProfit: grossProfit,
         }),
@@ -472,6 +503,7 @@ function SkuDetailModal({ item, event, onClose }: {
 // ─── Expense Row ───────────────────────────────────────────────────────────────
 
 const PAID_BY_OPTIONS = ['', 'Route 66 Imports', 'Self']
+const PAYMENT_METHOD_OPTIONS = ['', 'Cash', 'Card', 'EFT']
 
 function ExpenseRow({ exp, onChange, onRemove }: {
   exp: EventExpense
@@ -479,16 +511,26 @@ function ExpenseRow({ exp, onChange, onRemove }: {
   onRemove: () => void
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 flex-wrap">
       <input value={exp.description} onChange={(e) => onChange({ ...exp, description: e.target.value })}
         placeholder="Description (e.g. Table fee, Fuel)"
-        className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+        className="flex-1 min-w-[160px] px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" />
       <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
         <span className="px-2 text-xs text-gray-400 bg-gray-50 border-r border-gray-200 py-1.5">R</span>
         <input type="number" min={0} step={0.01} value={exp.amount || ''}
           onChange={(e) => onChange({ ...exp, amount: Number(e.target.value) })}
           className="w-24 px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-1 focus:ring-indigo-500" />
       </div>
+      <select
+        value={exp.paymentMethod || ''}
+        onChange={(e) => onChange({ ...exp, paymentMethod: e.target.value })}
+        className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
+        title="Payment method"
+      >
+        {PAYMENT_METHOD_OPTIONS.map((o) => (
+          <option key={o} value={o}>{o || 'Method…'}</option>
+        ))}
+      </select>
       <select
         value={exp.paidBy || ''}
         onChange={(e) => onChange({ ...exp, paidBy: e.target.value })}
@@ -540,13 +582,13 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
     let cancelled = false
     const currentExpenses = initialEvent.expenses.reduce((s, e) => s + (e.amount || 0), 0)
     buildSalesItems(initialEvent.dateFrom, initialEvent.dateTo)
-      .then(({ items, revenue, cogs }) => {
+      .then(({ items, revenue, cogs, paymentTotals }) => {
         if (cancelled) return
         const grossProfit = revenue - cogs
         return fetch(`/api/admin/events/${initialEvent.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ salesItems: items, totalRevenue: revenue, totalCogs: cogs, grossProfit, netProfit: grossProfit - currentExpenses }),
+          body: JSON.stringify({ salesItems: items, totalRevenue: revenue, totalCogs: cogs, grossProfit, netProfit: grossProfit - currentExpenses, paymentTotals }),
         }).then((r) => r.ok ? r.json() : null).then((updated) => {
           if (!cancelled && updated) { setEvent(updated); onUpdate(updated) }
         })
@@ -578,12 +620,12 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
   async function syncSales() {
     setSyncing(true)
     try {
-      const { items, revenue, cogs } = await buildSalesItems(event.dateFrom, event.dateTo)
+      const { items, revenue, cogs, paymentTotals } = await buildSalesItems(event.dateFrom, event.dateTo)
       const grossProfit = revenue - cogs
       const res = await fetch(`/api/admin/events/${event.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ salesItems: items, totalRevenue: revenue, totalCogs: cogs, grossProfit, netProfit: grossProfit - totalExpenses }),
+        body: JSON.stringify({ salesItems: items, totalRevenue: revenue, totalCogs: cogs, grossProfit, netProfit: grossProfit - totalExpenses, paymentTotals }),
       })
       if (res.ok) {
         const updated = await res.json()
@@ -772,6 +814,50 @@ function EventDetail({ event: initialEvent, onBack, onUpdate }: {
               )}
             </tbody>
           </table>
+          {/* Payment Method Totals */}
+          {event.paymentTotals && (event.paymentTotals.cash > 0 || event.paymentTotals.card > 0 || event.paymentTotals.eft > 0 || event.paymentTotals.other > 0) && (
+            <div className="px-4 py-4 border-t border-gray-100 bg-gray-50">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Sales by Payment Method</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {event.paymentTotals.cash > 0 && (
+                  <div className="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-base">💵</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cash</span>
+                    </div>
+                    <div className="text-sm font-bold text-gray-900">{fmtPrice(event.paymentTotals.cash)}</div>
+                  </div>
+                )}
+                {event.paymentTotals.card > 0 && (
+                  <div className="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-base">💳</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Card</span>
+                    </div>
+                    <div className="text-sm font-bold text-gray-900">{fmtPrice(event.paymentTotals.card)}</div>
+                  </div>
+                )}
+                {event.paymentTotals.eft > 0 && (
+                  <div className="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-base">🏦</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">EFT</span>
+                    </div>
+                    <div className="text-sm font-bold text-gray-900">{fmtPrice(event.paymentTotals.eft)}</div>
+                  </div>
+                )}
+                {event.paymentTotals.other > 0 && (
+                  <div className="bg-white rounded-lg border border-gray-200 px-3 py-2.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="text-base">📋</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Other</span>
+                    </div>
+                    <div className="text-sm font-bold text-gray-900">{fmtPrice(event.paymentTotals.other)}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
