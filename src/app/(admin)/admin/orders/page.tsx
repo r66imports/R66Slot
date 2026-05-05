@@ -2475,6 +2475,7 @@ export default function OrdersPage() {
         paymentMethod: result.paymentMethod,
         notes: result.notes || (paymentModal as any).notes || '',
         ...(fullySettled ? { status: 'paid' } : {}),
+        ...((paymentModal as any).status === 'complete' ? { autoArchiveAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() } : {}),
       }),
     })
     if (patchRes.ok) {
@@ -2565,6 +2566,17 @@ export default function OrdersPage() {
       setClients(clList ?? [])
       setShippingEnabled(rules?.shippingEnabled ?? true)
       setStockDeductionEnabled(rules?.stockDeductionEnabled ?? true)
+
+      // Auto-archive invoices whose 12-hour post-payment timer has expired
+      const toAutoArchive = (docs ?? []).filter((d: any) => d.autoArchiveAt && new Date(d.autoArchiveAt).getTime() <= now && d.status !== 'archived')
+      if (toAutoArchive.length > 0) {
+        Promise.all(toAutoArchive.map((d: any) =>
+          fetch(`/api/admin/orders/documents/${d.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
+        )).then(() => {
+          const ids = new Set(toAutoArchive.map((d: any) => d.id))
+          setDocuments(prev => prev.map(d => ids.has(d.id) ? { ...d, status: 'archived' } : d))
+        }).catch(() => {})
+      }
 
       // Shipment-log packing-list badge sync — fire-and-forget
       fetch('/api/admin/shipment-log').then(async (plRes) => {
@@ -3373,7 +3385,7 @@ export default function OrdersPage() {
                             ...(doc.type === 'invoice' ? [{
                               label: 'Record Payment',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
-                              className: 'text-blue-600',
+                              className: (doc as any).amountPaid > 0 || doc.status === 'paid' ? 'text-green-600 font-semibold' : 'text-blue-600',
                               onClick: () => handleRecordPayment(doc),
                             }] : []),
                             ...(doc.type === 'invoice' && doc.status !== 'paid' ? [{
