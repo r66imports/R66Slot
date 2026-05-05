@@ -1916,6 +1916,11 @@ function ProductInfoModal({
   const [setupSaved, setSetupSaved] = useState(false)
   const [newBrandInput, setNewBrandInput] = useState('')
   const [localBrands, setLocalBrands] = useState<string[]>([])
+  const [newCategoryInput, setNewCategoryInput] = useState('')
+  const [newSalesInput, setNewSalesInput] = useState('')
+  const [newPurchaseInput, setNewPurchaseInput] = useState('')
+  const [showManageBrands, setShowManageBrands] = useState(false)
+  const [showManageCategories, setShowManageCategories] = useState(false)
 
   useEffect(() => {
     fetch('/api/admin/product-options').then(r => r.json()).then((o: any) => {
@@ -1993,6 +1998,14 @@ function ProductInfoModal({
     }
   }
 
+  function saveOption(key: string, value: unknown) {
+    fetch('/api/admin/product-options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value }),
+    }).catch(() => {})
+  }
+
   function addNewBrand(rawVal: string) {
     const val = rawVal.trim()
     if (!val) return
@@ -2000,13 +2013,61 @@ function ProductInfoModal({
       const next = [...localBrands, val]
       setLocalBrands(next)
       setOpts(prev => ({ ...prev, brands: next }))
-      fetch('/api/admin/product-options', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brands: next }),
-      }).catch(() => {})
+      saveOption('brands', next)
     }
     setNewBrandInput('')
+  }
+
+  function deleteBrand(brand: string) {
+    const next = localBrands.filter(b => b !== brand)
+    setLocalBrands(next)
+    setOpts(prev => ({ ...prev, brands: next }))
+    saveOption('brands', next)
+  }
+
+  function addCategory(val: string) {
+    const v = val.trim()
+    if (!v || opts.categories.includes(v)) { setNewCategoryInput(''); return }
+    const next = [...opts.categories, v]
+    setOpts(prev => ({ ...prev, categories: next }))
+    setNewCategoryInput('')
+    saveOption('categories', next)
+  }
+
+  function deleteCategory(cat: string) {
+    const next = opts.categories.filter(c => c !== cat)
+    setOpts(prev => ({ ...prev, categories: next }))
+    saveOption('categories', next)
+  }
+
+  function addSalesAccount(val: string) {
+    const v = val.trim()
+    if (!v || opts.salesAccounts.includes(v)) { setNewSalesInput(''); return }
+    const next = [...opts.salesAccounts, v]
+    setOpts(prev => ({ ...prev, salesAccounts: next }))
+    setNewSalesInput('')
+    saveOption('salesAccounts', next)
+  }
+
+  function deleteSalesAccount(acc: string) {
+    const next = opts.salesAccounts.filter(a => a !== acc)
+    setOpts(prev => ({ ...prev, salesAccounts: next }))
+    saveOption('salesAccounts', next)
+  }
+
+  function addPurchaseAccount(val: string) {
+    const v = val.trim()
+    if (!v || opts.purchaseAccounts.includes(v)) { setNewPurchaseInput(''); return }
+    const next = [...opts.purchaseAccounts, v]
+    setOpts(prev => ({ ...prev, purchaseAccounts: next }))
+    setNewPurchaseInput('')
+    saveOption('purchaseAccounts', next)
+  }
+
+  function deletePurchaseAccount(acc: string) {
+    const next = opts.purchaseAccounts.filter(a => a !== acc)
+    setOpts(prev => ({ ...prev, purchaseAccounts: next }))
+    saveOption('purchaseAccounts', next)
   }
 
   async function handleSave() {
@@ -2075,11 +2136,15 @@ function ProductInfoModal({
                 <span className="text-xs text-gray-400 italic">— None —</span>
               </label>
               {localBrands.map(b => (
-                <label key={b} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                  <input type="checkbox" checked={selected.includes(b)} onChange={() => toggleBrand(rowIdx, b)} className="rounded" />
-                  <span className="text-xs text-gray-800">{b}</span>
-                  {opts.brandAccountMap[b] && <span className="ml-auto text-[10px] text-green-500" title="Auto-fill configured">●</span>}
-                </label>
+                <div key={b} className="flex items-center px-3 py-2 hover:bg-gray-50">
+                  <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                    <input type="checkbox" checked={selected.includes(b)} onChange={() => toggleBrand(rowIdx, b)} className="rounded" />
+                    <span className="text-xs text-gray-800">{b}</span>
+                    {opts.brandAccountMap[b] && <span className="text-[10px] text-green-500" title="Auto-fill configured">●</span>}
+                  </label>
+                  <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); deleteBrand(b) }}
+                    className="text-gray-300 hover:text-red-500 text-sm leading-none ml-1 flex-shrink-0" title="Remove brand">✕</button>
+                </div>
               ))}
             </div>
             <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
@@ -2116,23 +2181,37 @@ function ProductInfoModal({
           <svg className="w-3 h-3 text-gray-400 flex-shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
         </button>
         {isOpen && (
-          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[200px] max-h-60 overflow-y-auto">
-            <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
-              <input type="checkbox" checked={selected.length === 0} onChange={() => updateRow(rowIdx, { [field]: [] } as any)} className="rounded" readOnly />
-              <span className="text-xs text-gray-400 italic">— None —</span>
-            </label>
-            {options.length === 0
-              ? <p className="px-3 py-2 text-xs text-gray-400 italic">No options configured</p>
-              : options.map(opt => (
-                <label key={opt} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer">
-                  <input type="checkbox" checked={selected.includes(opt)} onChange={() => {
-                    const arr = selected
-                    updateRow(rowIdx, { [field]: arr.includes(opt) ? arr.filter(v => v !== opt) : [...arr, opt] } as any)
-                  }} className="rounded" />
-                  <span className="text-xs text-gray-800">{opt}</span>
-                </label>
-              ))
-            }
+          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[200px] max-h-72 flex flex-col">
+            <div className="overflow-y-auto flex-1">
+              <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
+                <input type="checkbox" checked={selected.length === 0} onChange={() => updateRow(rowIdx, { [field]: [] } as any)} className="rounded" readOnly />
+                <span className="text-xs text-gray-400 italic">— None —</span>
+              </label>
+              {options.length === 0
+                ? <p className="px-3 py-2 text-xs text-gray-400 italic">No options — add one below</p>
+                : options.map(opt => (
+                  <div key={opt} className="flex items-center px-3 py-2 hover:bg-gray-50">
+                    <label className="flex items-center gap-2 flex-1 cursor-pointer">
+                      <input type="checkbox" checked={selected.includes(opt)} onChange={() => {
+                        const arr = selected
+                        updateRow(rowIdx, { [field]: arr.includes(opt) ? arr.filter(v => v !== opt) : [...arr, opt] } as any)
+                      }} className="rounded" />
+                      <span className="text-xs text-gray-800">{opt}</span>
+                    </label>
+                    <button type="button" onClick={e => { e.preventDefault(); e.stopPropagation(); if (field === 'itemCategories') deleteCategory(opt) }}
+                      className="text-gray-300 hover:text-red-500 text-sm leading-none ml-1 flex-shrink-0" title="Remove option">✕</button>
+                  </div>
+                ))
+              }
+            </div>
+            {field === 'itemCategories' && (
+              <div className="border-t border-gray-100 px-3 py-2 flex gap-2">
+                <input type="text" value={newCategoryInput} onChange={e => setNewCategoryInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') addCategory(newCategoryInput) }}
+                  placeholder="+ Add category…" className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400" />
+                <button type="button" onClick={() => addCategory(newCategoryInput)} className="px-2 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-600">Add</button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -2167,48 +2246,117 @@ function ProductInfoModal({
 
         {/* Brand Account Setup Panel */}
         {showSetup && (
-          <div className="px-6 py-4 bg-indigo-50 border-b border-indigo-100">
-            <p className="text-xs font-semibold text-indigo-700 mb-3">Configure Brand → Sage Accounts</p>
-            <p className="text-xs text-indigo-500 mb-4">Selecting a brand in the table below will auto-fill its Sales &amp; Purchase accounts. Green dots indicate configured brands.</p>
-            <div className="space-y-2 max-h-52 overflow-y-auto">
-              {localBrands.map(brand => {
-                const entry = setupMap[brand] || { salesAccount: [], purchaseAccount: [] }
-                return (
-                  <div key={brand} className="flex items-center gap-3 bg-white rounded-lg px-3 py-2 border border-indigo-100">
-                    <span className="text-xs font-semibold text-gray-800 w-32 flex-shrink-0">{brand}</span>
-                    <div className="flex-1 grid grid-cols-2 gap-2">
-                      <select
-                        value={entry.salesAccount[0] || ''}
-                        onChange={e => setSetupMap(prev => ({ ...prev, [brand]: { ...entry, salesAccount: e.target.value ? [e.target.value] : [] } }))}
-                        className="text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400"
-                      >
-                        <option value="">— Sales Account —</option>
-                        {opts.salesAccounts.map(a => <option key={a} value={a}>{a}</option>)}
-                      </select>
-                      <select
-                        value={entry.purchaseAccount[0] || ''}
-                        onChange={e => setSetupMap(prev => ({ ...prev, [brand]: { ...entry, purchaseAccount: e.target.value ? [e.target.value] : [] } }))}
-                        className="text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400"
-                      >
-                        <option value="">— Purchase Account —</option>
-                        {opts.purchaseAccounts.map(a => <option key={a} value={a}>{a}</option>)}
-                      </select>
+          <div className="px-6 py-4 bg-indigo-50 border-b border-indigo-100 space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-indigo-700 mb-1">Configure Brand → Sage Accounts</p>
+              <p className="text-xs text-indigo-500 mb-3">Selecting a brand in the table below will auto-fill its Sales &amp; Purchase accounts. Green dots indicate configured brands.</p>
+              <div className="space-y-2 max-h-52 overflow-y-auto">
+                {localBrands.map(brand => {
+                  const entry = setupMap[brand] || { salesAccount: [], purchaseAccount: [] }
+                  return (
+                    <div key={brand} className="flex items-center gap-3 bg-white rounded-lg px-3 py-2 border border-indigo-100">
+                      <span className="text-xs font-semibold text-gray-800 w-32 flex-shrink-0">{brand}</span>
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <select value={entry.salesAccount[0] || ''} onChange={e => setSetupMap(prev => ({ ...prev, [brand]: { ...entry, salesAccount: e.target.value ? [e.target.value] : [] } }))} className="text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400">
+                          <option value="">— Sales Account —</option>
+                          {opts.salesAccounts.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                        <select value={entry.purchaseAccount[0] || ''} onChange={e => setSetupMap(prev => ({ ...prev, [brand]: { ...entry, purchaseAccount: e.target.value ? [e.target.value] : [] } }))} className="text-xs px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-indigo-400">
+                          <option value="">— Purchase Account —</option>
+                          {opts.purchaseAccounts.map(a => <option key={a} value={a}>{a}</option>)}
+                        </select>
+                      </div>
+                      {(entry.salesAccount.length > 0 || entry.purchaseAccount.length > 0) && <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />}
+                      <button type="button" onClick={() => deleteBrand(brand)} title="Remove brand" className="text-gray-300 hover:text-red-500 text-sm leading-none flex-shrink-0">✕</button>
                     </div>
-                    {(entry.salesAccount.length > 0 || entry.purchaseAccount.length > 0) && (
-                      <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                    )}
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+              <div className="flex gap-2 mt-2">
+                <input value={newBrandInput} onChange={e => setNewBrandInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNewBrand(newBrandInput)}
+                  placeholder="Add new brand…" className="flex-1 text-xs px-2.5 py-1.5 border border-indigo-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                <button type="button" onClick={() => addNewBrand(newBrandInput)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 font-semibold">+ Add</button>
+              </div>
             </div>
-            <div className="flex justify-end mt-3">
-              <button
-                onClick={saveSetup}
-                disabled={setupSaving || setupSaved}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-lg ${setupSaved ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50'}`}
-              >
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg border border-indigo-100 p-3">
+                <p className="text-xs font-semibold text-gray-600 mb-2">Sales Accounts</p>
+                <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
+                  {opts.salesAccounts.map(a => (
+                    <div key={a} className="flex items-center justify-between text-xs text-gray-700 bg-gray-50 rounded px-2 py-1">
+                      <span>{a}</span>
+                      <button type="button" onClick={() => deleteSalesAccount(a)} className="text-gray-300 hover:text-red-500 leading-none">✕</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <input value={newSalesInput} onChange={e => setNewSalesInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSalesAccount(newSalesInput)}
+                    placeholder="New sales account…" className="flex-1 text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  <button type="button" onClick={() => addSalesAccount(newSalesInput)} className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 font-bold">+</button>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg border border-indigo-100 p-3">
+                <p className="text-xs font-semibold text-gray-600 mb-2">Purchase Accounts</p>
+                <div className="space-y-1 mb-2 max-h-28 overflow-y-auto">
+                  {opts.purchaseAccounts.map(a => (
+                    <div key={a} className="flex items-center justify-between text-xs text-gray-700 bg-gray-50 rounded px-2 py-1">
+                      <span>{a}</span>
+                      <button type="button" onClick={() => deletePurchaseAccount(a)} className="text-gray-300 hover:text-red-500 leading-none">✕</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-1">
+                  <input value={newPurchaseInput} onChange={e => setNewPurchaseInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addPurchaseAccount(newPurchaseInput)}
+                    placeholder="New purchase account…" className="flex-1 text-xs px-2 py-1 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  <button type="button" onClick={() => addPurchaseAccount(newPurchaseInput)} className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 font-bold">+</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={saveSetup} disabled={setupSaving || setupSaved}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-lg ${setupSaved ? 'bg-green-600 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50'}`}>
                 {setupSaved ? '✓ Saved' : setupSaving ? 'Saving…' : 'Save Configuration'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Manage Brands panel (from table header + button) */}
+        {showManageBrands && (
+          <div className="px-6 py-3 bg-blue-50 border-b border-blue-100">
+            <p className="text-xs font-semibold text-blue-700 mb-2">Manage Brands</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {localBrands.map(b => (
+                <span key={b} className="flex items-center gap-1 bg-white border border-blue-200 rounded-full px-2.5 py-0.5 text-xs text-gray-700">
+                  {b}<button type="button" onClick={() => deleteBrand(b)} className="text-red-400 hover:text-red-600 leading-none ml-0.5">×</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input value={newBrandInput} onChange={e => setNewBrandInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNewBrand(newBrandInput)}
+                placeholder="New brand name…" className="flex-1 text-xs px-2.5 py-1.5 border border-blue-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <button type="button" onClick={() => addNewBrand(newBrandInput)} className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 font-semibold">Add</button>
+            </div>
+          </div>
+        )}
+
+        {/* Manage Categories panel */}
+        {showManageCategories && (
+          <div className="px-6 py-3 bg-emerald-50 border-b border-emerald-100">
+            <p className="text-xs font-semibold text-emerald-700 mb-2">Manage Item Categories (Unit)</p>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {opts.categories.map(c => (
+                <span key={c} className="flex items-center gap-1 bg-white border border-emerald-200 rounded-full px-2.5 py-0.5 text-xs text-gray-700">
+                  {c}<button type="button" onClick={() => deleteCategory(c)} className="text-red-400 hover:text-red-600 leading-none ml-0.5">×</button>
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input value={newCategoryInput} onChange={e => setNewCategoryInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCategory(newCategoryInput)}
+                placeholder="New category / unit…" className="flex-1 text-xs px-2.5 py-1.5 border border-emerald-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+              <button type="button" onClick={() => addCategory(newCategoryInput)} className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 font-semibold">Add</button>
             </div>
           </div>
         )}
@@ -2219,8 +2367,20 @@ function ProductInfoModal({
               <tr className="text-left border-b border-gray-100">
                 <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">SKU</th>
                 <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Category (Brand)</th>
-                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Item Category (Unit)</th>
+                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    Category (Brand)
+                    <button type="button" onClick={() => { setShowManageBrands(v => !v); setShowManageCategories(false) }}
+                      title="Manage brands" className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold transition-colors ${showManageBrands ? 'bg-blue-600' : 'bg-gray-400 hover:bg-blue-500'}`}>+</button>
+                  </div>
+                </th>
+                <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                  <div className="flex items-center gap-1.5">
+                    Item Category (Unit)
+                    <button type="button" onClick={() => { setShowManageCategories(v => !v); setShowManageBrands(false) }}
+                      title="Manage categories" className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold transition-colors ${showManageCategories ? 'bg-emerald-600' : 'bg-gray-400 hover:bg-emerald-500'}`}>+</button>
+                  </div>
+                </th>
                 <th className="pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Sage Accounts</th>
               </tr>
             </thead>
