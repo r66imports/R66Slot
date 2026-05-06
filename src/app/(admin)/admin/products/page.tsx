@@ -831,11 +831,13 @@ export default function ProductsPage() {
 
   const filtered = products
     .filter((p) => {
+      if (!p.brand?.trim() && p.status === 'draft') return false
       const matchBrand = !brandFilter || p.brand?.toLowerCase() === brandFilter.toLowerCase()
       const matchCat = categoryFilters.length === 0 || categoryFilters.some((f) => (p.collections || []).includes(f) || (p.categories || []).includes(f))
       const matchRevo = !revoFilter || (p.itemCategories || []).includes(revoFilter)
       const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
-      const matchSupplier = !supplierFilter || (supplierSkus[supplierFilter]?.has((p.sku || '').trim().toLowerCase()) ?? false)
+      const supplierName = supplierFilter ? (suppliers.find(s => s.id === supplierFilter)?.name || '') : ''
+      const matchSupplier = !supplierFilter || (!!p.brand && p.brand.toLowerCase() === supplierName.toLowerCase())
       return matchBrand && matchCat && matchRevo && matchSearch && matchSupplier
     })
     .sort((a, b) => {
