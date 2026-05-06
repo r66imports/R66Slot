@@ -2072,23 +2072,61 @@ function ProductInfoModal({
 
   async function handleSave() {
     setSaving(true)
-    let savedCount = 0
     const failed: string[] = []
-    for (const row of rows) {
-      if (!row.prodId) continue
-      const res = await fetch(`/api/admin/products/${row.prodId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          categoryBrands: row.categoryBrands.length > 0 ? row.categoryBrands : null,
-          itemCategories: row.itemCategories.length > 0 ? row.itemCategories : null,
-          salesAccount: row.salesAccount.length > 0 ? row.salesAccount : null,
-          purchaseAccount: row.purchaseAccount.length > 0 ? row.purchaseAccount : null,
-        }),
-      })
-      if (res.ok) savedCount++
-      else failed.push(row.sku)
+
+    // Re-fetch all products to resolve stale prodIds and find newly-created items
+    let freshById: Record<string, string> = {}
+    try {
+      const r = await fetch('/api/admin/products')
+      if (r.ok) {
+        const data: any[] = await r.json()
+        for (const p of data) {
+          if (p.sku) freshById[p.sku.trim().toLowerCase()] = p.id
+        }
+      }
+    } catch {}
+
+    // Resolve prodIds using fresh data
+    const resolvedRows = rows.map(row => ({
+      ...row,
+      prodId: row.prodId ?? freshById[row.sku.trim().toLowerCase()] ?? null,
+    }))
+
+    for (const row of resolvedRows) {
+      const payload = {
+        categoryBrands: row.categoryBrands.length > 0 ? row.categoryBrands : null,
+        itemCategories: row.itemCategories.length > 0 ? row.itemCategories : null,
+        salesAccount: row.salesAccount.length > 0 ? row.salesAccount : null,
+        purchaseAccount: row.purchaseAccount.length > 0 ? row.purchaseAccount : null,
+      }
+      if (row.prodId) {
+        const res = await fetch(`/api/admin/products/${row.prodId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) failed.push(row.sku)
+      } else {
+        // Product not yet in DB — create as draft with category info
+        const res = await fetch('/api/admin/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sku: row.sku,
+            title: row.description || row.sku,
+            status: 'draft',
+            ...payload,
+          }),
+        })
+        if (res.ok) {
+          const created = await res.json()
+          setRows(prev => prev.map(r => r.wsId === row.wsId ? { ...r, prodId: created.id } : r))
+        } else {
+          failed.push(row.sku)
+        }
+      }
     }
+
     setSaving(false)
     if (failed.length) {
       alert(`Save failed for: ${failed.join(', ')}`)
