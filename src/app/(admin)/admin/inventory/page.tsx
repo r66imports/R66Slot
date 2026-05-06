@@ -228,9 +228,11 @@ export default function InventoryPage() {
   const currency = selectedSupplier?.preferredCurrency || 'EUR'
 
   const filtered = products.filter((p) => {
+    if (!p.brand.trim() && p.status === 'draft') return false
     // When a supplier is selected, only show products whose brand matches that supplier
     if (selectedSupplier) {
-      const pb = p.brand.toLowerCase()
+      const pb = p.brand.trim().toLowerCase()
+      if (!pb) return false
       const sn = selectedSupplier.name.toLowerCase()
       const sc = selectedSupplier.code.toLowerCase()
       const matches = pb === sn || pb === sc || sn.includes(pb) || pb.includes(sn) || (sc.length > 2 && pb.includes(sc))
