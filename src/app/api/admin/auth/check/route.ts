@@ -47,7 +47,7 @@ export async function GET() {
       authenticated: true,
       role: 'staff',
       username: staffUser.username,
-      permissions: [...ALWAYS_ALLOWED, ...staffUser.permissions],
+      permissions: staffUser.permissions,
     })
   } catch (error) {
     console.error('Auth check error:', error)

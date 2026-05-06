@@ -20,8 +20,14 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json() as CountRecord
-    await blobWrite(KEY, body)
-    return NextResponse.json(body)
+    // Merge incoming counts over existing — prevents concurrent saves from overwriting each other
+    const existing = await blobRead<CountRecord>(KEY, { counts: {}, date: '' })
+    const merged: CountRecord = {
+      counts: { ...existing.counts, ...body.counts },
+      date: body.date || existing.date,
+    }
+    await blobWrite(KEY, merged)
+    return NextResponse.json(merged)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

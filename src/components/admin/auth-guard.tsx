@@ -46,9 +46,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           if (role === 'staff') {
             const allowed = permissions
             const canAccess =
+              ALWAYS_ALLOWED.includes(pathname) ||
               allowed.includes(pathname) ||
-              allowed.some((p) => pathname.startsWith(p + '/')) ||
-              ALWAYS_ALLOWED.some((p) => pathname === p || pathname.startsWith(p + '/'))
+              allowed.some((p) => p !== '/admin' && pathname.startsWith(p + '/'))
 
             if (!canAccess) {
               // Redirect to first permitted page

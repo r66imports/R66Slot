@@ -7,6 +7,7 @@ import { AuthGuard } from '@/components/admin/auth-guard'
 import { useState, useEffect } from 'react'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
 import { useAdminAuth } from '@/lib/admin-auth-context'
+import { ALWAYS_ALLOWED } from '@/lib/admin-permissions'
 
 // Submenu item type
 interface NavItem {
@@ -31,7 +32,8 @@ export default function AdminLayout({
   // Returns true if the current user can see this nav item
   const canAccess = (href: string) => {
     if (role !== 'staff') return true // admin or dev bypass
-    return permissions.includes(href) || permissions.some((p) => href.startsWith(p + '/'))
+    if (ALWAYS_ALLOWED.includes(href)) return true
+    return permissions.includes(href) || permissions.some((p) => p !== '/admin' && href.startsWith(p + '/'))
   }
 
   // Read brand param from URL on client (avoids useSearchParams Suspense requirement)
