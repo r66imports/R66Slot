@@ -57,6 +57,7 @@ export default function InventoryPage() {
   const [saved, setSaved] = useState<Record<string, boolean>>({})
   const [saveAllLoading, setSaveAllLoading] = useState(false)
   const [saveAllDone, setSaveAllDone] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   // Supplier + pricelist state
   const [suppliers, setSuppliers] = useState<SupplierContact[]>([])
@@ -105,13 +106,17 @@ export default function InventoryPage() {
           const n = parseInt(v, 10)
           if (!isNaN(n)) allCounts[k] = n
         })
-        await fetch('/api/admin/inventory-counts', {
+        const r = await fetch('/api/admin/inventory-counts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ counts: allCounts, date: now }),
         })
-        setSavedCounts(Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])))
-        setLastStockTakeDate(now)
+        if (r.ok) {
+          setSavedCounts(Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])))
+          setLastStockTakeDate(now)
+        } else {
+          setSaveError(`Auto-save failed (${r.status}) — click Save to retry`)
+        }
       } finally {
         setAutoSaving(false)
       }
@@ -267,6 +272,7 @@ export default function InventoryPage() {
     const val = parseInt(counts[id] ?? '0', 10)
     if (isNaN(val)) return
     setSaving((s) => ({ ...s, [id]: true }))
+    setSaveError('')
     try {
       // Save inventory count to cross-reference store (never updates Shop Inventory)
       const now = new Date().toISOString()
@@ -275,11 +281,12 @@ export default function InventoryPage() {
         const n = parseInt(v, 10)
         if (!isNaN(n)) allCounts[k] = n
       })
-      await fetch('/api/admin/inventory-counts', {
+      const res = await fetch('/api/admin/inventory-counts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ counts: allCounts, date: now }),
       })
+      if (!res.ok) { setSaveError(`Save failed (${res.status}) — try refreshing the page`); return }
       setSavedCounts((prev) => ({ ...prev, [id]: String(val) }))
       setLastStockTakeDate(now)
 
@@ -339,32 +346,32 @@ export default function InventoryPage() {
     if (!hasChangedCounts && !dirtyPricelist.length && !hasDirtyQtys) return
 
     setSaveAllLoading(true)
+    setSaveError('')
     try {
       if (hasChangedCounts) {
-        // Save all inventory counts as cross-reference (never updates Shop Inventory)
         const now = new Date().toISOString()
         const allCounts: Record<string, number> = {}
         Object.entries(counts).forEach(([k, v]) => {
           const n = parseInt(v, 10)
           if (!isNaN(n)) allCounts[k] = n
         })
-        await fetch('/api/admin/inventory-counts', {
+        const r = await fetch('/api/admin/inventory-counts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ counts: allCounts, date: now }),
         })
+        if (!r.ok) { setSaveError(`Failed to save counts (${r.status})`); return }
         setSavedCounts(Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])))
         setLastStockTakeDate(now)
       }
       if (dirtyPricelist.length > 0) {
-        await fetch('/api/admin/inventory-pricelists', {
+        const r = await fetch('/api/admin/inventory-pricelists', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entries: dirtyPricelist }),
         })
-        // Refresh pricelist
-        const res = await fetch(`/api/admin/inventory-pricelists?supplierId=${selectedSupplierId}`)
-        const updated: PricelistEntry[] = await res.json()
+        if (!r.ok) { setSaveError(`Failed to save pricelist (${r.status})`); return }
+        const updated: PricelistEntry[] = await r.json()
         setPricelist(Array.isArray(updated) ? updated : [])
       }
       // Save any manually-edited Shop Inventory quantities
@@ -375,11 +382,12 @@ export default function InventoryPage() {
       for (const p of dirtyQtys) {
         const newQty = parseInt(localQuantities[p.id], 10)
         if (!isNaN(newQty)) {
-          await fetch(`/api/admin/products/${p.id}`, {
+          const r = await fetch(`/api/admin/products/${p.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ quantity: newQty }),
           })
+          if (!r.ok) { setSaveError(`Failed to save quantity for ${p.sku} (${r.status})`); return }
           setProducts((prev) => prev.map((x) => x.id === p.id ? { ...x, quantity: newQty } : x))
         }
       }
@@ -713,7 +721,7 @@ export default function InventoryPage() {
 
           {/* Save All */}
           <button
-            onClick={saveAll}
+            onClick={() => { setSaveError(''); saveAll() }}
             disabled={saveAllLoading || !saveAllDirty}
             className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
@@ -726,6 +734,12 @@ export default function InventoryPage() {
             )}
           </button>
         </div>
+        {saveError && (
+          <div className="mt-2 px-4 py-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center justify-between gap-3">
+            <span>⚠ {saveError}</span>
+            <button onClick={() => setSaveError('')} className="text-red-400 hover:text-red-600 font-bold leading-none">×</button>
+          </div>
+        )}
       </div>
 
       {/* Search */}
