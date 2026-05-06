@@ -350,6 +350,10 @@ function WorksheetEditor({
   const [showConfirmUpdate, setShowConfirmUpdate] = useState(false)
   const [confirmUpdateItems, setConfirmUpdateItems] = useState<WsItem[]>([])
   const [confirmingUpdate, setConfirmingUpdate] = useState(false)
+  // ── Add to Database (no stock update) ──
+  const [showAddToDbModal, setShowAddToDbModal] = useState(false)
+  const [addToDbItems, setAddToDbItems] = useState<NewSkuRow[]>([])
+  const [savingAddToDb, setSavingAddToDb] = useState(false)
 
   function toggleCheck(id: string) {
     setCheckedItems((prev) => {
@@ -456,6 +460,66 @@ function WorksheetEditor({
       await onRefresh()
     } finally {
       setSavingNewSkus(false)
+    }
+  }
+
+  // ── Add to Database (creates product record, no stock update) ──────────────
+  function addToDatabase() {
+    const newSkus: NewSkuRow[] = []
+    for (const it of items) {
+      if (!it.sku) continue
+      const inDb = products.some((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
+      if (inDb) continue
+      const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+      const retailZAR = it.retailPrice > 0
+        ? it.retailPrice
+        : Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
+      newSkus.push({
+        wsId: it.id,
+        sku: it.sku,
+        description: it.description,
+        brand: '',
+        category: it.category || '',
+        unit: it.unit || '',
+        retailPrice: retailZAR,
+        costPrice: finalLanded,
+        qty: 0,
+      })
+    }
+    if (!newSkus.length) { alert('All items in this worksheet are already in the database.'); return }
+    setAddToDbItems(newSkus)
+    setShowAddToDbModal(true)
+  }
+
+  async function handleSaveAddToDb(rows: NewSkuRow[]) {
+    setSavingAddToDb(true)
+    const errors: string[] = []
+    try {
+      for (const row of rows) {
+        const res = await fetch('/api/admin/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sku: row.sku,
+            title: row.description || row.sku,
+            brand: row.brand,
+            description: '',
+            price: row.retailPrice,
+            cost_per_item: row.costPrice,
+            quantity: 0,
+            status: 'active',
+            categoryBrands: row.category ? [row.category] : [],
+            itemCategories: row.unit ? [row.unit] : [],
+          }),
+        })
+        if (!res.ok) errors.push(row.sku)
+      }
+      if (errors.length > 0) alert(`Failed to add: ${errors.join(', ')}`)
+      setShowAddToDbModal(false)
+      setAddToDbItems([])
+      await onRefresh()
+    } finally {
+      setSavingAddToDb(false)
     }
   }
 
@@ -1279,6 +1343,14 @@ function WorksheetEditor({
               {costsUpdated ? '✓ Updated!' : updatingCosts ? 'Updating…' : 'Update Costing'}
             </button>
             <button
+              onClick={addToDatabase}
+              disabled={!items.some((it) => it.sku && !products.some((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()))}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
+              Add to Database
+            </button>
+            <button
               onClick={() => setShowProductInfo(true)}
               disabled={!items.some((it) => it.sku)}
               className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40"
@@ -1616,6 +1688,22 @@ function WorksheetEditor({
           brandOptions={[...new Set(products.map((p) => p.brand).filter(Boolean))].sort()}
           categoryOptions={[...new Set(products.map((p) => p.category).filter(Boolean))].sort()}
           unitOptions={[...new Set(products.map((p) => p.unit).filter(Boolean))].sort()}
+        />
+      )}
+
+      {/* ── Add to Database Modal (no stock update) ── */}
+      {showAddToDbModal && (
+        <NewSkuModal
+          rows={addToDbItems}
+          saving={savingAddToDb}
+          onSave={handleSaveAddToDb}
+          onClose={() => { setShowAddToDbModal(false); setAddToDbItems([]) }}
+          brandOptions={[...new Set(products.map((p) => p.brand).filter(Boolean))].sort()}
+          categoryOptions={[...new Set(products.map((p) => p.category).filter(Boolean))].sort()}
+          unitOptions={[...new Set(products.map((p) => p.unit).filter(Boolean))].sort()}
+          title="Add to Database"
+          subtitle="Creates product records without updating stock quantities"
+          saveLabel="Add to Database"
         />
       )}
 
@@ -2480,6 +2568,7 @@ function ProductInfoModal({
 
 function NewSkuModal({
   rows: initRows, saving, onSave, onClose, brandOptions, categoryOptions, unitOptions,
+  title, subtitle, saveLabel,
 }: {
   rows: NewSkuRow[]
   saving: boolean
@@ -2488,6 +2577,9 @@ function NewSkuModal({
   brandOptions: string[]
   categoryOptions: string[]
   unitOptions: string[]
+  title?: string
+  subtitle?: string
+  saveLabel?: string
 }) {
   const [rows, setRows] = useState<NewSkuRow[]>(initRows)
 
@@ -2501,9 +2593,9 @@ function NewSkuModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Add New Products to Inventory</h2>
+            <h2 className="text-base font-semibold text-gray-900">{title ?? 'Add New Products to Inventory'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              {rows.length} new SKU{rows.length !== 1 ? 's' : ''} not found in inventory — confirm details before saving
+              {subtitle ?? `${rows.length} new SKU${rows.length !== 1 ? 's' : ''} not found in inventory — confirm details before saving`}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
@@ -2621,7 +2713,7 @@ function NewSkuModal({
               disabled={saving}
               className="px-5 py-2 text-sm font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
             >
-              {saving ? 'Saving…' : `Add ${rows.length} Product${rows.length !== 1 ? 's' : ''} to Inventory`}
+              {saving ? 'Saving…' : saveLabel ? `${saveLabel} (${rows.length})` : `Add ${rows.length} Product${rows.length !== 1 ? 's' : ''} to Inventory`}
             </button>
           </div>
         </div>
