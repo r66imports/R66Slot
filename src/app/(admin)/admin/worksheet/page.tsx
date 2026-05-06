@@ -350,6 +350,8 @@ function WorksheetEditor({
   const [showConfirmUpdate, setShowConfirmUpdate] = useState(false)
   const [confirmUpdateItems, setConfirmUpdateItems] = useState<WsItem[]>([])
   const [confirmingUpdate, setConfirmingUpdate] = useState(false)
+  // ── Send to Supplier Order ──
+  const [showSupplierOrderModal, setShowSupplierOrderModal] = useState(false)
   // ── Add to Database (no stock update) ──
   const [showAddToDbModal, setShowAddToDbModal] = useState(false)
   const [addToDbItems, setAddToDbItems] = useState<NewSkuRow[]>([])
@@ -1343,6 +1345,15 @@ function WorksheetEditor({
               {costsUpdated ? '✓ Updated!' : updatingCosts ? 'Updating…' : 'Update Costing'}
             </button>
             <button
+              onClick={() => setShowSupplierOrderModal(true)}
+              disabled={!hasItems || !supplier}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-40"
+              title={!supplier ? 'Set a supplier on this worksheet first' : ''}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Supplier Order
+            </button>
+            <button
               onClick={addToDatabase}
               disabled={!items.some((it) => it.sku && !products.some((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()))}
               className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"
@@ -1688,6 +1699,18 @@ function WorksheetEditor({
           brandOptions={[...new Set(products.map((p) => p.brand).filter(Boolean))].sort()}
           categoryOptions={[...new Set(products.map((p) => p.category).filter(Boolean))].sort()}
           unitOptions={[...new Set(products.map((p) => p.unit).filter(Boolean))].sort()}
+        />
+      )}
+
+      {/* ── Supplier Order Modal ── */}
+      {showSupplierOrderModal && (
+        <WorksheetSupplierOrderModal
+          supplierName={supplier}
+          suppliers={suppliers}
+          companyInfo={companyInfo}
+          orderDate={worksheetDate}
+          items={items.filter((it) => it.sku).map((it) => ({ sku: it.sku, description: it.description, qty: it.qty }))}
+          onClose={() => setShowSupplierOrderModal(false)}
         />
       )}
 
@@ -2716,6 +2739,155 @@ function NewSkuModal({
               {saving ? 'Saving…' : saveLabel ? `${saveLabel} (${rows.length})` : `Add ${rows.length} Product${rows.length !== 1 ? 's' : ''} to Inventory`}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Worksheet Supplier Order Modal ───────────────────────────────────────────
+
+function WorksheetSupplierOrderModal({
+  supplierName, suppliers, companyInfo, orderDate, items, onClose,
+}: {
+  supplierName: string
+  suppliers: SupplierContact[]
+  companyInfo: CompanyInfo
+  orderDate: string
+  items: { sku: string; description: string; qty: number }[]
+  onClose: () => void
+}) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [rows, setRows] = useState(items.length > 0 ? items.map(it => ({ ...it })) : [{ sku: '', description: '', qty: 1 }])
+  const [poNumber, setPoNumber] = useState('')
+  const [date, setDate] = useState(orderDate || today)
+
+  function updateRow(idx: number, field: string, value: string | number) {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  }
+
+  function generatePDF() {
+    const totalQty = rows.reduce((s, r) => s + Number(r.qty), 0)
+    const rowsHtml = rows
+      .filter(r => r.sku || r.description)
+      .map((r, i) => `<tr>
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;">${i + 1}</td>
+        <td style="padding:8px 12px;font-family:monospace;font-size:13px;font-weight:600;">${r.sku}</td>
+        <td style="padding:8px 12px;font-size:13px;">${r.description}</td>
+        <td style="padding:8px 12px;text-align:center;font-weight:700;font-size:13px;">${r.qty}</td>
+      </tr>`).join('')
+    const companyBlock = companyInfo.name
+      ? `<p style="font-size:13px;font-weight:700;">${companyInfo.name}</p>
+         ${companyInfo.address ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.address}</p>` : ''}
+         ${companyInfo.phone ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.phone}</p>` : ''}
+         ${companyInfo.email ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.email}</p>` : ''}
+         ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;">VAT: ${companyInfo.vatNumber}</p>` : ''}`
+      : ''
+    const supplier = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase())
+    const displayDate = new Date(date).toLocaleDateString('en-ZA')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Supplier Order – ${supplierName}</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px}
+    .title{font-size:24px;font-weight:800;margin-bottom:2px}.meta{font-size:13px;color:#6b7280;margin-top:4px}
+    .supplier-box{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;margin-bottom:28px}
+    .supplier-box p{font-size:13px;margin-bottom:2px}table{width:100%;border-collapse:collapse}
+    thead tr{border-bottom:2px solid #111827}th{padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280}
+    th.center{text-align:center}tbody tr{border-bottom:1px solid #f3f4f6}tbody tr:nth-child(even){background:#f9fafb}
+    tfoot tr{border-top:2px solid #111827}tfoot td{padding:10px 12px;font-weight:700;font-size:13px}@page{size:A4;margin:0}</style>
+    </head><body>
+    <div class="header"><div>${companyBlock}</div><div style="text-align:right">
+    <p class="title">SUPPLIER ORDER</p>
+    ${poNumber ? `<p class="meta">PO: <strong>${poNumber}</strong></p>` : ''}
+    <p class="meta">Date: ${displayDate}</p></div></div>
+    <div class="supplier-box">
+    <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:6px">Supplier</p>
+    <p style="font-weight:700;font-size:14px;">${supplierName}</p>
+    ${supplier?.code ? `<p style="font-size:12px;color:#6b7280;">Code: ${supplier.code}</p>` : ''}
+    </div>
+    <table><thead><tr><th style="width:40px">#</th><th>SKU</th><th>Description</th><th class="center" style="width:80px">Qty</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+    <tfoot><tr><td colspan="3" style="text-align:right;padding-right:12px;color:#6b7280">Total</td><td style="text-align:center">${totalQty}</td></tr></tfoot>
+    </table></body></html>`
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Supplier Order</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{supplierName} · {rows.filter(r => r.sku).length} item{rows.filter(r => r.sku).length !== 1 ? 's' : ''}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">PO / Reference</label>
+              <input value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="PO-001"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Order Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Order Items</p>
+              <span className="text-xs text-gray-400">{rows.length} line{rows.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">SKU</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500">Description</th>
+                    <th className="px-3 py-2 text-center text-xs font-semibold text-gray-500 w-16">Qty</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {rows.map((row, idx) => (
+                    <tr key={idx}>
+                      <td className="px-3 py-1.5">
+                        <input value={row.sku} onChange={e => updateRow(idx, 'sku', e.target.value)}
+                          className="w-full border-0 bg-transparent font-mono text-xs text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <input value={row.description} onChange={e => updateRow(idx, 'description', e.target.value)}
+                          className="w-full border-0 bg-transparent text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <input type="number" min={1} value={row.qty} onChange={e => updateRow(idx, 'qty', parseInt(e.target.value) || 1)}
+                          className="w-14 border-0 bg-transparent text-xs text-center text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
+                      </td>
+                      <td className="pr-2">
+                        <button onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-400 text-sm leading-none">×</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <button onClick={() => setRows(prev => [...prev, { sku: '', description: '', qty: 1 }])}
+                className="w-full text-xs text-gray-400 hover:text-gray-600 py-2 border-t border-gray-100 hover:bg-gray-50 transition-colors">
+                + Add Item
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50">Cancel</button>
+          <button onClick={generatePDF} disabled={!rows.some(r => r.sku || r.description)}
+            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Generate PDF
+          </button>
         </div>
       </div>
     </div>
