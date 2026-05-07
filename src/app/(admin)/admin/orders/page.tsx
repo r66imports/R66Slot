@@ -2423,6 +2423,7 @@ export default function OrdersPage() {
         setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, sentToPackingList: true } as any : d))
         setPackingListResult(`✓ ${doc.docNumber} sent to Packing List`)
         setTimeout(() => setPackingListResult(null), 4000)
+        window.open('/admin/shipments', '_blank')
       } else {
         setPackingListResult('Error sending to Packing List')
         setTimeout(() => setPackingListResult(null), 3000)
