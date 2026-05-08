@@ -16,13 +16,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Admin user not found in DB' }, { status: 404 })
     }
 
-    const newHash = await bcrypt.hash('Admin123!', 10)
+    const newHash = await bcrypt.hash('Route66@1978', 10)
     customers[adminIndex].password = newHash
     await blobWrite(CUSTOMERS_KEY, customers)
 
     return NextResponse.json({
       success: true,
-      message: 'Admin password reset to Admin123! — you can now log in from any device. Delete this endpoint file after use.',
+      message: 'Admin password reset to Route66@1978 — log in now.',
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
