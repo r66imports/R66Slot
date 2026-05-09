@@ -138,6 +138,7 @@ export default function EditProductPage({
   const [pricingCollapsed, setPricingCollapsed] = useState(false)
   const [inventoryCollapsed, setInventoryCollapsed] = useState(false)
   const [skuHighlighted, setSkuHighlighted] = useState(false)
+  const [skuEntityTag, setSkuEntityTag] = useState('')
   const skuRef = useRef<HTMLInputElement>(null)
   const [shippingCollapsed, setShippingCollapsed] = useState(false)
   const [statusCollapsed, setStatusCollapsed] = useState(false)
@@ -318,6 +319,12 @@ export default function EditProductPage({
           setPreOrderPrice((found as any).preOrderPrice?.toString() || '')
           setCostPerItem(found.costPerItem?.toString() || '')
           setSku(found.sku || '')
+          if (found.sku) {
+            fetch('/api/admin/sku-entity-map')
+              .then(r => r.ok ? r.json() : {})
+              .then((map: Record<string, string>) => setSkuEntityTag(map[found.sku.trim().toUpperCase()] || ''))
+              .catch(() => {})
+          }
           setBarcode(found.barcode || '')
           setTrackQuantity(found.trackQuantity ?? true)
           setQuantity(found.quantity?.toString() || '0')
@@ -1062,7 +1069,14 @@ export default function EditProductPage({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Average Cost <span className="text-xs text-gray-400 font-normal">(internal)</span></label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    Average Cost <span className="text-xs text-gray-400 font-normal">(internal)</span>
+                    {skuEntityTag && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${skuEntityTag === 'R66' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        {skuEntityTag === 'R66' ? 'R66 +VAT' : 'JDM'}
+                      </span>
+                    )}
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-2 text-gray-500">R</span>
                     <input

@@ -222,6 +222,9 @@ function WorksheetEditor({
   const [fxUpdated, setFxUpdated] = useState('')
   const [fxLoading, setFxLoading] = useState(false)
 
+  // ── SKU entity map (persisted auto-allocation) ──
+  const [skuEntityMap, setSkuEntityMap] = useState<Record<string, string>>({})
+
   // ── Worksheets list ──
   const [allWorksheets, setAllWorksheets] = useState<WsSheet[]>([])
   const [showMySheets, setShowMySheets] = useState(true)
@@ -599,6 +602,25 @@ function WorksheetEditor({
 
   useEffect(() => { refreshSheets() }, [refreshSheets])
 
+  // Load entity map once on mount
+  useEffect(() => {
+    fetch('/api/admin/sku-entity-map')
+      .then(r => r.ok ? r.json() : {})
+      .then(setSkuEntityMap)
+      .catch(() => {})
+  }, [])
+
+  // When entity map loads, auto-fill items that have no entity assigned yet
+  useEffect(() => {
+    if (Object.keys(skuEntityMap).length === 0) return
+    setItems(prev => prev.map(it => {
+      if (it.costingEntity || !it.sku) return it
+      const mapped = skuEntityMap[it.sku.trim().toUpperCase()]
+      if (!mapped) return it
+      return { ...it, costingEntity: mapped as 'R66' | 'JDM' }
+    }))
+  }, [skuEntityMap])
+
   // ── Auto-load sheet from URL ?id= param ──
   const initialLoadDone = useRef(false)
   useEffect(() => {
@@ -714,6 +736,20 @@ function WorksheetEditor({
       }
       // Sync wholesale price (supplier currency) to inventory pricelist
       await syncWholesalePricelist()
+      // Persist entity allocations for auto-fill on future worksheets
+      const entityEntries: Record<string, string> = {}
+      for (const it of items) {
+        if (it.sku && it.costingEntity) {
+          entityEntries[it.sku.trim().toUpperCase()] = it.costingEntity
+        }
+      }
+      if (Object.keys(entityEntries).length > 0) {
+        fetch('/api/admin/sku-entity-map', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(entityEntries),
+        }).then(r => r.ok ? r.json() : {}).then(setSkuEntityMap).catch(() => {})
+      }
       await refreshSheets()
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2500)
@@ -739,6 +775,9 @@ function WorksheetEditor({
     setTrackingEditMode(false)
     setItems(sheet.items.length > 0 ? sheet.items.map((it) => {
       const prod = products.find((p) => p.sku === it.sku)
+      const mappedEntity = !it.costingEntity && it.sku
+        ? (skuEntityMap[it.sku.trim().toUpperCase()] as 'R66' | 'JDM' | undefined)
+        : undefined
       return {
         ...it,
         skuSearch: '',
@@ -747,6 +786,7 @@ function WorksheetEditor({
         inStock: it.inStock ?? prod?.quantity ?? 0,
         retailPrice: it.retailPrice || prod?.price || 0,
         preOrderPrice: it.preOrderPrice || prod?.preOrderPrice || 0,
+        ...(mappedEntity ? { costingEntity: mappedEntity } : {}),
       }
     }) : [newWsItem()])
     setShowArchive(false)
@@ -1518,12 +1558,14 @@ function WorksheetEditor({
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => {
                                 const plEntry = pricelist.find((e) => e.sku === p.sku)
+                                const mappedEntity = skuEntityMap[p.sku.trim().toUpperCase()] as 'R66' | 'JDM' | undefined
                                 updateItem(it.id, {
                                   sku: p.sku, skuSearch: '', description: p.title,
                                   unit: p.unit, category: p.category,
                                   inStock: p.quantity, retailPrice: p.price,
                                   preOrderPrice: p.preOrderPrice || 0,
                                   ...(plEntry ? { wholesalePrice: plEntry.wholesalePrice } : {}),
+                                  ...(mappedEntity ? { costingEntity: mappedEntity } : {}),
                                 })
                                 setActiveSkuRow(null)
                               }}
