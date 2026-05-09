@@ -305,7 +305,7 @@ function WorksheetEditor({
         const skuLower = it.sku.trim().toLowerCase()
         const prod = products.find((p) => p.sku.trim().toLowerCase() === skuLower)
         if (!prod) { errors.push(`SKU ${it.sku} not found in products`); continue }
-        const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+        const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
         const preOrderZAR = Math.round(calcRetail(it.wholesalePrice) * 100) / 100
         const patch: Record<string, number> = {}
@@ -380,7 +380,7 @@ function WorksheetEditor({
       const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
       if (!prod) {
         // New SKU — pre-fill from worksheet values
-        const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+        const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
         const retailZAR = it.retailPrice > 0
           ? it.retailPrice
           : Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
@@ -476,7 +476,7 @@ function WorksheetEditor({
       if (!it.sku) continue
       const inDb = products.some((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
       if (inDb) continue
-      const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+      const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
       const retailZAR = it.retailPrice > 0
         ? it.retailPrice
         : Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
@@ -537,7 +537,7 @@ function WorksheetEditor({
       for (const it of confirmUpdateItems) {
         const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
         if (!prod) { errors.push(it.sku); continue }
-        const finalLanded = Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100
+        const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
         const preOrderZAR = Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
         const patch: Record<string, number> = {}
@@ -646,6 +646,10 @@ function WorksheetEditor({
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
 
   function calcFinalLanded(w: number) { return w * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100) }
+  function calcEntityFinalLanded(w: number, entity?: 'R66' | 'JDM' | '') {
+    const base = calcFinalLanded(w)
+    return entity === 'R66' ? base * 1.15 : base
+  }
   // Markup applied on top of Final Landed: (wholesale + shipping + customs) × (1 + markup%)
   function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
   function fmtFC(n: number) { return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -816,7 +820,7 @@ function WorksheetEditor({
       'Final Landed (ZAR)', 'Landed Retail (ZAR)', `Total (${currency})`]
     const rows = items.filter((it) => it.sku || it.description).map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
-      const fLanded = calcFinalLanded(it.wholesalePrice)
+      const fLanded = calcEntityFinalLanded(it.wholesalePrice, it.costingEntity)
       const fRetail = calcFinalRetail(it.wholesalePrice)
       const totalCur = it.qty * it.wholesalePrice
       return [i + 1, it.sku, `"${it.description.replace(/"/g, '""')}"`,
@@ -848,7 +852,7 @@ function WorksheetEditor({
     const rows = pdfFilledItems.map((it, i) => {
       const landed = calcLanded(it.wholesalePrice)
       const retail = it.retailOverride !== '' ? Number(it.retailOverride) : calcRetail(it.wholesalePrice)
-      const fLanded = it.wholesalePrice > 0 ? fmtFC(calcFinalLanded(it.wholesalePrice)) : '—'
+      const fLanded = it.wholesalePrice > 0 ? fmtFC(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity)) : '—'
       const fRetail = it.wholesalePrice > 0 ? fmtFC(calcFinalRetail(it.wholesalePrice)) : '—'
       const totalCur = it.wholesalePrice > 0 ? fmtFC(it.qty * it.wholesalePrice) : '—'
       return `<tr>
@@ -1628,8 +1632,16 @@ function WorksheetEditor({
                     <td className="py-2 px-2">
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-xs text-gray-400">R</span>
-                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg ${hasFinal ? 'text-emerald-700 bg-emerald-50 border border-emerald-100' : 'text-gray-300'}`}>
-                          {hasFinal ? fmtFC(calcFinalLanded(it.wholesalePrice)) : '—'}
+                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg ${
+                          hasFinal
+                            ? it.costingEntity === 'R66'
+                              ? 'text-blue-700 bg-blue-50 border border-blue-100'
+                              : it.costingEntity === 'JDM'
+                              ? 'text-purple-700 bg-purple-50 border border-purple-100'
+                              : 'text-emerald-700 bg-emerald-50 border border-emerald-100'
+                            : 'text-gray-300'
+                        }`}>
+                          {hasFinal ? fmtFC(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity)) : '—'}
                         </span>
                       </div>
                     </td>
