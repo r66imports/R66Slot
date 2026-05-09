@@ -32,6 +32,7 @@ interface WsItem {
   description: string
   unit: string
   category: string
+  costingEntity?: 'R66' | 'JDM' | ''
   inStock: number
   retailPrice: number
   preOrderPrice: number
@@ -86,7 +87,7 @@ function newWsItem(): WsItem {
   return {
     id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     sku: '', skuSearch: '', description: '',
-    unit: '', category: '',
+    unit: '', category: '', costingEntity: '' as const,
     inStock: 0, retailPrice: 0, preOrderPrice: 0,
     qty: 1, wholesalePrice: 0, retailOverride: '', sentToInventory: false,
   }
@@ -353,6 +354,8 @@ function WorksheetEditor({
   // ── Send to Supplier Order ──
   const [showSupplierOrderModal, setShowSupplierOrderModal] = useState(false)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showR66InvoiceModal, setShowR66InvoiceModal] = useState(false)
+  const [showJDMInvoiceModal, setShowJDMInvoiceModal] = useState(false)
   // ── Add to Database (no stock update) ──
   const [showAddToDbModal, setShowAddToDbModal] = useState(false)
   const [addToDbItems, setAddToDbItems] = useState<NewSkuRow[]>([])
@@ -1363,6 +1366,24 @@ function WorksheetEditor({
               Create Invoice
             </button>
             <button
+              onClick={() => setShowR66InvoiceModal(true)}
+              disabled={!items.some(it => it.costingEntity === 'R66' && it.sku)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40"
+              title="R66 items only — Final Landed + 15% VAT"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
+              R66 Invoice
+            </button>
+            <button
+              onClick={() => setShowJDMInvoiceModal(true)}
+              disabled={!items.some(it => it.costingEntity === 'JDM' && it.sku)}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40"
+              title="JDM items only — Final Landed, no VAT"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
+              JDM Invoice
+            </button>
+            <button
               onClick={addToDatabase}
               disabled={!items.some((it) => it.sku && !products.some((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()))}
               className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"
@@ -1432,6 +1453,7 @@ function WorksheetEditor({
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-wider text-gray-400">
                 <th className="text-left pb-2 w-6">#</th>
+                <th className="text-center pb-2 px-1 w-14" title="Costing account: R66 = Route 66 Imports (15% VAT) · JDM = JDM Garage (no VAT)">Acct</th>
                 <th className="text-left pb-2 px-2" style={{ minWidth: '110px' }}>SKU</th>
                 <th className="text-left pb-2 px-2" style={{ minWidth: '150px' }}>Description</th>
                 <th className="text-right pb-2 px-2 w-24">Retail (ZAR)</th>
@@ -1456,6 +1478,23 @@ function WorksheetEditor({
                 return (
                   <tr key={it.id} className="border-b border-gray-50">
                     <td className="py-2 text-xs text-gray-400">{i + 1}</td>
+
+                    {/* Costing Entity */}
+                    <td className="py-2 px-1 text-center">
+                      <select
+                        value={it.costingEntity || ''}
+                        onChange={(e) => updateItem(it.id, { costingEntity: e.target.value as 'R66' | 'JDM' | '' })}
+                        className={`text-[10px] font-bold rounded-md px-1 py-1 border-0 outline-none cursor-pointer ${
+                          it.costingEntity === 'R66' ? 'bg-blue-100 text-blue-700' :
+                          it.costingEntity === 'JDM' ? 'bg-purple-100 text-purple-700' :
+                          'bg-gray-100 text-gray-400'
+                        }`}
+                      >
+                        <option value="">—</option>
+                        <option value="R66">R66</option>
+                        <option value="JDM">JDM</option>
+                      </select>
+                    </td>
 
                     {/* SKU */}
                     <td className="py-2 px-2">
@@ -1723,19 +1762,49 @@ function WorksheetEditor({
         />
       )}
 
-      {/* ── Create Invoice Modal ── */}
+      {/* ── Create Invoice Modal (all items, no VAT) ── */}
       {showInvoiceModal && (
         <WorksheetInvoiceModal
           supplierName={supplier}
           companyInfo={companyInfo}
           invoiceDate={worksheetDate}
           items={items.filter((it) => it.sku && it.wholesalePrice > 0).map((it) => ({
-            sku: it.sku,
-            description: it.description,
-            qty: it.qty,
+            sku: it.sku, description: it.description, qty: it.qty,
             unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
           }))}
           onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
+
+      {/* ── R66 Invoice Modal (R66 items, +15% VAT) ── */}
+      {showR66InvoiceModal && (
+        <WorksheetInvoiceModal
+          supplierName={supplier}
+          companyInfo={companyInfo}
+          invoiceDate={worksheetDate}
+          title="R66 Imports Invoice"
+          vatPct={15}
+          items={items.filter((it) => it.costingEntity === 'R66' && it.sku && it.wholesalePrice > 0).map((it) => ({
+            sku: it.sku, description: it.description, qty: it.qty,
+            unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
+          }))}
+          onClose={() => setShowR66InvoiceModal(false)}
+        />
+      )}
+
+      {/* ── JDM Invoice Modal (JDM items, no VAT, company name override) ── */}
+      {showJDMInvoiceModal && (
+        <WorksheetInvoiceModal
+          supplierName={supplier}
+          companyInfo={{ ...companyInfo, name: 'JDM Garage PTY LTD' }}
+          invoiceDate={worksheetDate}
+          title="JDM Garage Invoice"
+          vatPct={0}
+          items={items.filter((it) => it.costingEntity === 'JDM' && it.sku && it.wholesalePrice > 0).map((it) => ({
+            sku: it.sku, description: it.description, qty: it.qty,
+            unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
+          }))}
+          onClose={() => setShowJDMInvoiceModal(false)}
         />
       )}
 
@@ -2773,19 +2842,23 @@ function NewSkuModal({
 // ─── Worksheet Invoice Modal ──────────────────────────────────────────────────
 
 function WorksheetInvoiceModal({
-  supplierName, companyInfo, invoiceDate, items, onClose,
+  supplierName, companyInfo, invoiceDate, items, onClose, title, vatPct,
 }: {
   supplierName: string
   companyInfo: CompanyInfo
   invoiceDate: string
   items: { sku: string; description: string; qty: number; unitCost: number }[]
   onClose: () => void
+  title?: string
+  vatPct?: number  // 15 for R66, 0 or undefined for no VAT
 }) {
   const [poRef, setPoRef] = useState('')
   const [date, setDate] = useState(invoiceDate || new Date().toISOString().slice(0, 10))
   const [rows, setRows] = useState(items.map(it => ({ ...it })))
 
-  const grandTotal = rows.reduce((s, r) => s + r.qty * r.unitCost, 0)
+  const subtotal = rows.reduce((s, r) => s + r.qty * r.unitCost, 0)
+  const vatAmt = vatPct ? subtotal * vatPct / 100 : 0
+  const grandTotal = subtotal + vatAmt
 
   function updateRow(idx: number, field: string, value: string | number) {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
@@ -2836,10 +2909,12 @@ function WorksheetInvoiceModal({
     </div>
     <div class="info-row">
       <div class="info-box"><p class="info-label">Billed To</p>${billedToBlock}</div>
-      <div class="info-box" style="flex:0;min-width:180px;">
+      <div class="info-box" style="flex:0;min-width:200px;">
         <p class="info-label">Invoice Total</p>
+        ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: R ${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        <p style="font-size:13px;color:#6b7280;">VAT (${vatPct}%): R ${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
         <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">R ${grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-        <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items · landed cost</p>
+        <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ' · landed cost'}</p>
       </div>
     </div>
     <table>
@@ -2850,10 +2925,11 @@ function WorksheetInvoiceModal({
         <th class="right" style="width:120px">Total (ZAR)</th>
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
-      <tfoot><tr>
-        <td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total</td>
-        <td style="text-align:right;">R ${grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      </tr></tfoot>
+      <tfoot>
+        ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">R ${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">R ${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>` : ''}
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">R ${grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+      </tfoot>
     </table></body></html>`
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
@@ -2864,10 +2940,10 @@ function WorksheetInvoiceModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">Create Invoice</h2>
+            <h2 className="text-base font-semibold text-gray-900">{title ?? 'Create Invoice'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
               {supplierName && <span className="font-medium">{supplierName}</span>}
-              {supplierName && ' · '}Landed cost · R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
+              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -2929,12 +3005,27 @@ function WorksheetInvoiceModal({
                 ))}
               </tbody>
               <tfoot className="bg-gray-50 border-t-2 border-gray-200">
-                <tr>
-                  <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total</td>
-                  <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">
-                    R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
-                </tr>
+                {vatPct ? (
+                  <>
+                    <tr>
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-xs text-gray-500">Subtotal (excl. VAT)</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">R {subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-xs text-gray-500">VAT ({vatPct}%)</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">R {vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total (incl. VAT)</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    </tr>
+                  </>
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total</td>
+                    <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+                )}
               </tfoot>
             </table>
           </div>

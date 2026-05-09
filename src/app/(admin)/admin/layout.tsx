@@ -186,6 +186,7 @@ export default function AdminLayout({
         icon: '👥',
         submenu: [
           { name: 'Customers', href: '/admin/contacts', icon: '👤' },
+          { name: 'Customer Dashboard', href: '/admin/customer-dashboard', icon: '📊' },
           { name: 'Suppliers', href: '/admin/supplier-contacts', icon: '🏭' },
         ]
       },

@@ -2277,6 +2277,7 @@ export default function OrdersPage() {
   const [showArchive, setShowArchive] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
+  const [driveUploading, setDriveUploading] = useState<string | null>(null) // doc.id being uploaded
   const [soToInvoiceResult, setSoToInvoiceResult] = useState<string | null>(null)
   const [inventoryMsg, setInventoryMsg] = useState<string | null>(null)
   const [paymentModal, setPaymentModal] = useState<OrderDocument | null>(null)
@@ -2431,6 +2432,155 @@ export default function OrdersPage() {
     } catch {
       setPackingListResult('Error sending to Packing List')
       setTimeout(() => setPackingListResult(null), 3000)
+    }
+  }
+
+  const handleDriveUpload = async (doc: OrderDocument) => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    if (!clientId) {
+      alert('Google Drive not configured. Ask your admin to set NEXT_PUBLIC_GOOGLE_CLIENT_ID.')
+      return
+    }
+
+    setDriveUploading(doc.id)
+    try {
+      // Load Google Identity Services on demand
+      await new Promise<void>((resolve) => {
+        if ((window as any).google?.accounts?.oauth2) { resolve(); return }
+        const s = document.createElement('script')
+        s.src = 'https://accounts.google.com/gsi/client'
+        s.async = true; s.defer = true; s.onload = () => resolve()
+        document.head.appendChild(s)
+      })
+
+      const accessToken = await new Promise<string | null>((resolve) => {
+        const tc = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/drive.file',
+          callback: (r: any) => resolve(r.error ? null : r.access_token),
+        })
+        tc.requestAccessToken({ prompt: '' })
+      })
+
+      if (!accessToken) { setDriveUploading(null); return }
+
+      // Generate PDF using jsPDF
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+      const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+      const discAmt = sub * ((doc as any).discountPct || 0) / 100
+      const ship = (doc as any).shippingCost || 0
+      const total = sub - discAmt + ship
+      const fmtR = (n: number) => `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+      // Header
+      pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')
+      pdf.text('INVOICE', 200, 20, { align: 'right' })
+      pdf.setFontSize(10); pdf.setFont('helvetica', 'normal')
+      pdf.text(template.companyName || 'Route 66', 14, 20)
+      pdf.setFontSize(9); pdf.setTextColor(100)
+      if (template.companyAddress) pdf.text(template.companyAddress, 14, 26)
+      if (template.companyEmail) pdf.text(template.companyEmail, 14, 31)
+      pdf.setTextColor(0)
+
+      // Invoice meta
+      pdf.setFontSize(9)
+      pdf.text(`Invoice: ${doc.docNumber}`, 200, 28, { align: 'right' })
+      pdf.text(`Date: ${new Date(doc.createdAt).toLocaleDateString('en-ZA')}`, 200, 34, { align: 'right' })
+      if ((doc as any).amountPaid > 0) {
+        pdf.setTextColor(22, 163, 74)
+        pdf.text(`Status: PAID`, 200, 40, { align: 'right' })
+        pdf.setTextColor(0)
+      }
+
+      // Bill to
+      pdf.setFontSize(8); pdf.setFont('helvetica', 'bold')
+      pdf.text('BILL TO', 14, 46)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(doc.clientName, 14, 52)
+      if ((doc as any).clientEmail) pdf.text((doc as any).clientEmail, 14, 57)
+
+      // Line items
+      autoTable(pdf, {
+        startY: 65,
+        head: [['SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
+        body: doc.lineItems.map((li: any) => [
+          li.sku || '—',
+          li.description || '—',
+          li.qty,
+          fmtR(li.unitPrice),
+          fmtR(li.qty * li.unitPrice),
+        ]),
+        headStyles: { fillColor: [17, 24, 39], textColor: 255, fontSize: 8, fontStyle: 'bold' },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+        margin: { left: 14, right: 14 },
+      })
+
+      const finalY = (pdf as any).lastAutoTable.finalY + 6
+      pdf.setFontSize(9)
+      const lines: [string, number][] = [
+        [`Subtotal: ${fmtR(sub)}`, finalY],
+        ...(discAmt > 0 ? [`Discount (${(doc as any).discountPct}%): -${fmtR(discAmt)}`, finalY + 5] as any : []),
+        ...(ship > 0 ? [`Shipping: ${fmtR(ship)}`, finalY + (discAmt > 0 ? 10 : 5)] as any : []),
+      ]
+      lines.forEach(([text, y]) => pdf.text(text, 200, y as number, { align: 'right' }))
+      const totY = finalY + (discAmt > 0 ? 15 : 5) + (ship > 0 ? 5 : 0)
+      pdf.setFont('helvetica', 'bold'); pdf.setFontSize(11)
+      pdf.text(`TOTAL: ${fmtR(total)}`, 200, totY, { align: 'right' })
+      if ((doc as any).amountPaid > 0) {
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(22, 163, 74)
+        pdf.text(`Paid: ${fmtR((doc as any).amountPaid)}`, 200, totY + 6, { align: 'right' })
+        pdf.setTextColor(0)
+      }
+
+      const pdfBlob = pdf.output('blob')
+      const filename = `${doc.docNumber} - ${doc.clientName}.pdf`
+      const existingFileId = (doc as any).driveFileId
+
+      // Upload to Drive
+      let fileId: string | null = null
+      if (existingFileId) {
+        // Overwrite existing file
+        const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=media`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/pdf' },
+          body: pdfBlob,
+        })
+        if (r.ok) fileId = existingFileId
+      } else {
+        // Create new file
+        const meta = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: filename, mimeType: 'application/pdf' }),
+        })
+        if (meta.ok) {
+          const { id } = await meta.json()
+          const upload = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=media`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/pdf' },
+            body: pdfBlob,
+          })
+          if (upload.ok) fileId = id
+        }
+      }
+
+      if (fileId) {
+        await fetch(`/api/admin/orders/documents/${doc.id}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ driveFileId: fileId }),
+        })
+        setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, driveFileId: fileId } as any : d))
+      } else {
+        alert('Upload failed. Check your Google Drive permissions.')
+      }
+    } catch (e: any) {
+      alert(`Drive upload error: ${e.message}`)
+    } finally {
+      setDriveUploading(null)
     }
   }
 
@@ -3433,6 +3583,13 @@ export default function OrdersPage() {
                               className: (doc as any).sentToPackingList ? 'text-gray-400' : 'text-blue-600',
                               disabled: !!(doc as any).sentToPackingList,
                               onClick: () => { if (!(doc as any).sentToPackingList) handleSendToPackingList(doc) },
+                            }] : []),
+                            ...(doc.type === 'invoice' ? [{
+                              label: driveUploading === doc.id ? 'Uploading…' : (doc as any).driveFileId ? '✓ Saved to Drive' : 'Download to Drive',
+                              icon: <svg className="w-4 h-4" viewBox="0 0 87.3 78" fill="currentColor"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H0c0 1.55.4 3.1 1.2 4.5zm40.15-14.85H27.45L13.7 76.8c1.35.8 2.9 1.2 4.5 1.2h50.6c1.6 0 3.15-.45 4.5-1.2L59.55 52zm20.35 0l13.75 23.8c1.35-.8 2.5-1.9 3.3-3.3l3.85-6.65c.8-1.4 1.2-2.95 1.2-4.5zm-5.6-9.45L43.65 14.2 25.8 44.85c1.3.15 2.6.25 3.85.25h33zm-27.85 0H20c-5.5 0-10.4-3-13.05-7.5L0 26.45C0 24.9.4 23.35 1.2 21.9l18.65-32.3C21.2 8.05 23.3 6.85 25.65 6.85c2.35 0 4.5 1.2 5.8 3.15l12.2 21.2zm26.3 0L47.45 14.5c.8-1.4 2.35-2.1 3.9-1.95C54.7 12.9 57.45 11 57.45 8s-2.75-4.9-5.85-4.9l-8 .05L25.8 34.55h33.8c1.25 0 2.55-.1 3.85-.25z" /></svg>,
+                              className: (doc as any).driveFileId ? 'text-green-600 font-semibold' : 'text-gray-700',
+                              disabled: driveUploading === doc.id,
+                              onClick: () => handleDriveUpload(doc),
                             }] : []),
                             'separator' as const,
                             {
