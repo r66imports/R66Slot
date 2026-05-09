@@ -78,25 +78,29 @@ export async function GET(_request: NextRequest) {
       })),
 
       // Admin documents (quotes, sales orders, invoices)
-      ...documents.filter(matchesCustomer).map((d: any) => ({
-        id: d.id,
-        ref: d.docNumber || d.id?.slice(-8).toUpperCase(),
-        type: d.type, // 'quote' | 'salesorder' | 'invoice'
-        date: d.createdAt || new Date().toISOString(),
-        status: d.status || 'draft',
-        total: (() => {
-          const sub = (d.lineItems || []).reduce((s: number, i: any) => s + (Number(i.price || 0) * Number(i.qty || 1)), 0)
-          const disc = d.discountPct ? sub * (d.discountPct / 100) : 0
-          const ship = Number(d.shippingCost || 0)
-          return (sub - disc + ship) * 1.15
-        })(),
-        items: (d.lineItems || []).map((i: any) => ({
-          sku: i.sku || '',
-          description: i.description || '',
-          qty: Number(i.qty || 1),
-          price: Number(i.price || 0),
-        })),
-      })),
+      ...documents.filter(matchesCustomer).map((d: any) => {
+        const sub = (d.lineItems || []).reduce((s: number, i: any) => s + (Number(i.price || 0) * Number(i.qty || 1)), 0)
+        const disc = d.discountPct ? sub * (d.discountPct / 100) : 0
+        const ship = Number(d.shippingCost || 0)
+        const total = (sub - disc + ship) * 1.15
+        return {
+          id: d.id,
+          ref: d.docNumber || d.id?.slice(-8).toUpperCase(),
+          type: d.type, // 'quote' | 'salesorder' | 'invoice'
+          date: d.createdAt || new Date().toISOString(),
+          status: d.status || 'draft',
+          amountPaid: Number(d.amountPaid || 0),
+          total,
+          discountPct: Number(d.discountPct || 0),
+          shippingCost: Number(d.shippingCost || 0),
+          items: (d.lineItems || []).map((i: any) => ({
+            sku: i.sku || '',
+            description: i.description || '',
+            qty: Number(i.qty || 1),
+            price: Number(i.price || 0),
+          })),
+        }
+      }),
     ]
 
     entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

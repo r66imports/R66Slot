@@ -17,6 +17,9 @@ interface Entry {
   date: string
   status: string
   total: number
+  amountPaid?: number
+  discountPct?: number
+  shippingCost?: number
   items: Item[]
 }
 
@@ -60,10 +63,17 @@ function fmt(n: number) {
   return 'R' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function getOutstanding(entry: Entry): number {
+  if (entry.type !== 'invoice') return 0
+  const paid = entry.amountPaid ?? 0
+  return Math.max(0, entry.total - paid)
+}
+
 export default function OrdersPage() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/account/orders')
@@ -78,6 +88,7 @@ export default function OrdersPage() {
 
   // Stats
   const stats = useMemo(() => {
+    const invoices = entries.filter(e => e.type === 'invoice')
     const totalSpent = entries
       .filter(e => ['invoice', 'order'].includes(e.type))
       .reduce((s, e) => s + e.total, 0)
@@ -102,7 +113,15 @@ export default function OrdersPage() {
     }))
     const topItem = Object.values(skuCount).sort((a, b) => b.qty - a.qty)[0]
 
-    return { totalSpent, thisMonth, totalItems, topItem }
+    // Outstanding balance across all invoices
+    const totalOutstanding = invoices.reduce((s, e) => s + getOutstanding(e), 0)
+    // Overpaid / credit: amountPaid > total
+    const totalCredit = invoices.reduce((s, e) => {
+      const paid = e.amountPaid ?? 0
+      return s + Math.max(0, paid - e.total)
+    }, 0)
+
+    return { totalSpent, thisMonth, totalItems, topItem, totalOutstanding, totalCredit }
   }, [entries])
 
   // Monthly breakdown — last 6 months
@@ -141,6 +160,64 @@ export default function OrdersPage() {
     return c
   }, [entries])
 
+  function downloadStatement() {
+    const invoices = entries.filter(e => e.type === 'invoice')
+    const totalOutstanding = stats.totalOutstanding
+    const totalCredit = stats.totalCredit
+
+    const rowsHtml = invoices.map(e => {
+      const outstanding = getOutstanding(e)
+      const paid = e.amountPaid ?? 0
+      const statusCls = outstanding > 0
+        ? 'color:#b91c1c;font-weight:700'
+        : 'color:#15803d;font-weight:700'
+      const statusLabel = outstanding > 0 ? `Due: R ${outstanding.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Paid'
+      return `<tr>
+        <td style="padding:8px 12px;font-size:12px;">${new Date(e.date).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' })}</td>
+        <td style="padding:8px 12px;font-size:12px;font-weight:600;">#${e.ref}</td>
+        <td style="padding:8px 12px;font-size:12px;">${e.status.charAt(0).toUpperCase() + e.status.slice(1)}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:12px;">R ${e.total.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:12px;">R ${paid.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:12px;${statusCls}">${statusLabel}</td>
+      </tr>`
+    }).join('')
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Account Statement</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm}
+    h1{font-size:24px;font-weight:800;margin-bottom:4px}
+    .sub{font-size:13px;color:#6b7280;margin-bottom:28px}
+    table{width:100%;border-collapse:collapse;margin-top:20px}
+    thead tr{border-bottom:2px solid #111}
+    th{padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280}
+    th.r{text-align:right}
+    tbody tr{border-bottom:1px solid #f3f4f6}
+    tbody tr:nth-child(even){background:#f9fafb}
+    .summary{margin-top:24px;text-align:right}
+    .summary p{font-size:13px;margin-bottom:4px}
+    .due{font-size:16px;font-weight:800;color:#b91c1c}
+    .credit{font-size:16px;font-weight:800;color:#15803d}
+    @page{size:A4;margin:0}</style>
+    </head><body>
+    <h1>Account Statement</h1>
+    <p class="sub">Generated ${new Date().toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Invoice #</th><th>Status</th>
+        <th class="r">Total</th><th class="r">Paid</th><th class="r">Balance</th>
+      </tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="summary">
+      ${totalOutstanding > 0 ? `<p class="due">Amount Due: R ${totalOutstanding.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
+      ${totalCredit > 0 ? `<p class="credit">Credit: R ${totalCredit.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
+      ${totalOutstanding === 0 && totalCredit === 0 ? '<p style="color:#15803d;font-weight:700;">All invoices paid — account is clear</p>' : ''}
+    </div>
+    </body></html>`
+
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -162,12 +239,25 @@ export default function OrdersPage() {
     )
   }
 
+  const hasBalance = stats.totalOutstanding > 0 || stats.totalCredit > 0
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">Order History</h2>
-        <p className="text-sm text-gray-500 mt-0.5">All your orders, bookings and documents</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Order History</h2>
+          <p className="text-sm text-gray-500 mt-0.5">All your orders, bookings and documents</p>
+        </div>
+        {entries.some(e => e.type === 'invoice') && (
+          <button
+            onClick={downloadStatement}
+            className="flex items-center gap-2 text-sm px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Download Statement
+          </button>
+        )}
       </div>
 
       {/* Stats */}
@@ -175,13 +265,38 @@ export default function OrdersPage() {
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Spent</p>
           <p className="text-2xl font-bold text-gray-900">{fmt(stats.totalSpent)}</p>
-          <p className="text-xs text-gray-400 mt-1">Invoices & shop orders</p>
+          <p className="text-xs text-gray-400 mt-1">Invoices &amp; shop orders</p>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">This Month</p>
-          <p className="text-2xl font-bold text-red-600">{fmt(stats.thisMonth)}</p>
-          <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' })}</p>
-        </div>
+
+        {/* Balance card — outstanding (red) or credit (green) or clear */}
+        {hasBalance ? (
+          stats.totalOutstanding > 0 ? (
+            <div className="bg-red-50 border border-red-100 rounded-2xl shadow-sm p-5">
+              <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-1">Amount Due</p>
+              <p className="text-2xl font-bold text-red-600">{fmt(stats.totalOutstanding)}</p>
+              <p className="text-xs text-red-400 mt-1">Outstanding on invoices</p>
+            </div>
+          ) : (
+            <div className="bg-green-50 border border-green-100 rounded-2xl shadow-sm p-5">
+              <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1">Credit</p>
+              <p className="text-2xl font-bold text-green-600">{fmt(stats.totalCredit)}</p>
+              <p className="text-xs text-green-500 mt-1">Overpaid on invoices</p>
+            </div>
+          )
+        ) : entries.some(e => e.type === 'invoice') ? (
+          <div className="bg-green-50 border border-green-100 rounded-2xl shadow-sm p-5">
+            <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1">Balance</p>
+            <p className="text-2xl font-bold text-green-600">All Clear</p>
+            <p className="text-xs text-green-500 mt-1">All invoices paid</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">This Month</p>
+            <p className="text-2xl font-bold text-red-600">{fmt(stats.thisMonth)}</p>
+            <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' })}</p>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-sm p-5">
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Items</p>
           <p className="text-2xl font-bold text-gray-900">{stats.totalItems}</p>
@@ -206,7 +321,7 @@ export default function OrdersPage() {
         <div className="flex items-end gap-3 h-28">
           {monthly.map((m) => (
             <div key={m.label} className="flex-1 flex flex-col items-center gap-1">
-              <p className="text-xs text-gray-500 font-medium">{m.total > 0 ? fmt(m.total).replace('R','R') : ''}</p>
+              <p className="text-xs text-gray-500 font-medium">{m.total > 0 ? fmt(m.total) : ''}</p>
               <div className="w-full rounded-t-lg bg-red-100 relative" style={{ height: '80px' }}>
                 <div
                   className="absolute bottom-0 left-0 right-0 bg-red-600 rounded-t-lg transition-all duration-500"
@@ -260,35 +375,148 @@ export default function OrdersPage() {
               const itemSummary = entry.items.length === 1
                 ? entry.items[0].description || entry.items[0].sku
                 : `${entry.items.length} items`
+              const outstanding = getOutstanding(entry)
+              const isInvoice = entry.type === 'invoice'
+              const isExpanded = expandedId === entry.id
+
               return (
-                <div key={entry.id} className="px-6 py-4 flex items-center gap-4">
-                  {/* Icon */}
-                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
-                    {meta.icon}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${meta.bg} ${meta.color}`}>
-                        {meta.label}
-                      </span>
-                      <span className="font-semibold text-sm text-gray-900">#{entry.ref}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusCls}`}>
-                        {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
-                      </span>
+                <div key={entry.id}>
+                  {/* Row */}
+                  <div
+                    className={`px-6 py-4 flex items-center gap-4 ${isInvoice ? 'cursor-pointer hover:bg-gray-50/60 transition-colors' : ''}`}
+                    onClick={() => isInvoice && setExpandedId(isExpanded ? null : entry.id)}
+                  >
+                    {/* Icon */}
+                    <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-xl flex-shrink-0">
+                      {meta.icon}
                     </div>
-                    <p className="text-sm text-gray-500 mt-0.5 truncate">{itemSummary}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {new Date(entry.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </p>
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${meta.bg} ${meta.color}`}>
+                          {meta.label}
+                        </span>
+                        <span className="font-semibold text-sm text-gray-900">#{entry.ref}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusCls}`}>
+                          {entry.status.charAt(0).toUpperCase() + entry.status.slice(1)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-0.5 truncate">{itemSummary}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(entry.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+
+                    {/* Total + outstanding badge */}
+                    <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
+                      <p className="font-bold text-gray-900">{fmt(entry.total)}</p>
+                      <p className="text-xs text-gray-400">{entry.items.reduce((s, i) => s + i.qty, 0)} item{entry.items.reduce((s, i) => s + i.qty, 0) !== 1 ? 's' : ''}</p>
+                      {isInvoice && outstanding > 0 && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                          Due {fmt(outstanding)}
+                        </span>
+                      )}
+                      {isInvoice && outstanding === 0 && (entry.amountPaid ?? 0) > 0 && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                          Paid
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Expand chevron for invoices */}
+                    {isInvoice && (
+                      <svg
+                        className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    )}
                   </div>
 
-                  {/* Total */}
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-gray-900">{fmt(entry.total)}</p>
-                    <p className="text-xs text-gray-400">{entry.items.reduce((s, i) => s + i.qty, 0)} item{entry.items.reduce((s, i) => s + i.qty, 0) !== 1 ? 's' : ''}</p>
-                  </div>
+                  {/* Expanded invoice detail */}
+                  {isInvoice && isExpanded && (
+                    <div className="bg-gray-50 border-t border-gray-100 px-6 py-4">
+                      <table className="w-full text-sm mb-4">
+                        <thead>
+                          <tr className="text-xs text-gray-400 uppercase border-b border-gray-200">
+                            <th className="text-left pb-2 font-semibold">Item</th>
+                            <th className="text-center pb-2 font-semibold w-16">Qty</th>
+                            <th className="text-right pb-2 font-semibold w-28">Unit Price</th>
+                            <th className="text-right pb-2 font-semibold w-28">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {entry.items.map((item, idx) => (
+                            <tr key={idx} className="border-b border-gray-100">
+                              <td className="py-2 text-gray-700">
+                                {item.sku && <span className="font-mono text-xs text-blue-600 mr-2">{item.sku}</span>}
+                                {item.description}
+                              </td>
+                              <td className="py-2 text-center text-gray-600">{item.qty}</td>
+                              <td className="py-2 text-right text-gray-600">{fmt(item.price)}</td>
+                              <td className="py-2 text-right font-semibold text-gray-900">{fmt(item.price * item.qty)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {/* Totals breakdown */}
+                      <div className="flex justify-end">
+                        <div className="w-64 space-y-1 text-sm">
+                          {(() => {
+                            const sub = entry.items.reduce((s, i) => s + i.price * i.qty, 0)
+                            const disc = entry.discountPct ? sub * (entry.discountPct / 100) : 0
+                            const ship = entry.shippingCost ?? 0
+                            const vatBase = sub - disc + ship
+                            const vat = vatBase * 0.15
+                            const paid = entry.amountPaid ?? 0
+                            return (
+                              <>
+                                {disc > 0 && (
+                                  <>
+                                    <div className="flex justify-between text-gray-500">
+                                      <span>Subtotal</span><span>{fmt(sub)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-500">
+                                      <span>Discount ({entry.discountPct}%)</span><span>−{fmt(disc)}</span>
+                                    </div>
+                                  </>
+                                )}
+                                {ship > 0 && (
+                                  <div className="flex justify-between text-gray-500">
+                                    <span>Shipping</span><span>{fmt(ship)}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between text-gray-500">
+                                  <span>VAT (15%)</span><span>{fmt(vat)}</span>
+                                </div>
+                                <div className="flex justify-between font-bold text-gray-900 border-t border-gray-200 pt-1">
+                                  <span>Total</span><span>{fmt(entry.total)}</span>
+                                </div>
+                                {paid > 0 && (
+                                  <div className="flex justify-between text-green-600">
+                                    <span>Paid</span><span>−{fmt(paid)}</span>
+                                  </div>
+                                )}
+                                {outstanding > 0 && (
+                                  <div className="flex justify-between font-bold text-red-600 border-t border-red-100 pt-1">
+                                    <span>Amount Due</span><span>{fmt(outstanding)}</span>
+                                  </div>
+                                )}
+                                {outstanding === 0 && paid > 0 && (
+                                  <div className="flex justify-between font-bold text-green-600 border-t border-green-100 pt-1">
+                                    <span>Balance</span><span>Paid in full</span>
+                                  </div>
+                                )}
+                              </>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
