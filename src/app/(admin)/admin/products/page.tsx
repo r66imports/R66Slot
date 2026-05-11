@@ -434,6 +434,7 @@ export default function ProductsPage() {
   const [supplierFilter, setSupplierFilter] = useState('')
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [supplierSkus, setSupplierSkus] = useState<Record<string, Set<string>>>({}) // supplierId → Set<sku>
+  const [pricelistEntries, setPricelistEntries] = useState<{ supplierId: string; sku: string; wholesalePrice: number }[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showImportModal, setShowImportModal] = useState(false)
   const [importText, setImportText] = useState('')
@@ -534,6 +535,7 @@ export default function ProductsPage() {
           map[entry.supplierId].add((entry.sku || '').trim().toLowerCase())
         }
         setSupplierSkus(map)
+        setPricelistEntries(pricelist)
       }
     }).catch(() => {})
   }, [])
@@ -622,8 +624,25 @@ export default function ProductsPage() {
   }
 
   const exportMasterCSV = (rows: Product[], label?: string) => {
+    // Resolve supplier ID from label (brand name or supplier name)
+    const supplierObj = label
+      ? suppliers.find(s => s.name.toLowerCase() === label.toLowerCase())
+      : null
+
+    const getWholesalePrice = (p: Product): string => {
+      // Find pricelist entry: prefer the matched supplier, fall back to any supplier
+      const skuLower = (p.sku || '').trim().toLowerCase()
+      let entry = supplierObj
+        ? pricelistEntries.find(e => e.supplierId === supplierObj.id && (e.sku || '').trim().toLowerCase() === skuLower)
+        : pricelistEntries.find(e => (e.sku || '').trim().toLowerCase() === skuLower)
+      if (!entry && !supplierObj) {
+        entry = pricelistEntries.find(e => (e.sku || '').trim().toLowerCase() === skuLower)
+      }
+      return entry?.wholesalePrice != null ? String(entry.wholesalePrice) : ''
+    }
+
     const headers = [
-      'Code', 'Description', 'Brand', 'Category (Brand)', 'Item Categories (Unit)',
+      'Code', 'Description', 'Wholesale Price', 'Brand', 'Category (Brand)', 'Item Categories (Unit)',
       'Categories', 'Price (Retail)', 'Average Cost', 'Cost Per Item', 'Pre Order Price',
       'Barcode', 'Supplier', 'Car Class', 'Sales Account', 'Purchases Account',
     ]
@@ -636,6 +655,7 @@ export default function ProductsPage() {
         return [
           p.sku,
           p.title,
+          getWholesalePrice(p),
           p.brand || '',
           (p.categoryBrands && p.categoryBrands.length > 0) ? p.categoryBrands.join('; ') : (p.brand || ''),
           (p.itemCategories && p.itemCategories.length > 0) ? p.itemCategories.join('; ') : (p.productType || ''),
