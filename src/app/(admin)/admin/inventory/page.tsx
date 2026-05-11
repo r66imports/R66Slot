@@ -148,6 +148,9 @@ export default function InventoryPage() {
   const [shopInventoryUnlocked, setShopInventoryUnlocked] = useState(false)
   const [localQuantities, setLocalQuantities] = useState<Record<string, string>>({})
 
+  // Reserved quantities from active Sales Orders (keyed by SKU uppercase)
+  const [reserved, setReserved] = useState<Record<string, number>>({})
+
   // Column resize (base mode only)
   const { widths: colW, setWidth } = useColumnResize('inventory', {
     idx: 40, sku: 90, product: 220, retail: 90, brand: 120, dbQty: 80, count: 90, save: 70,
@@ -190,6 +193,15 @@ export default function InventoryPage() {
 
       if (countsData.date) setLastStockTakeDate(countsData.date)
     }).finally(() => setLoading(false))
+  }, [])
+
+  // ─── Load reserved quantities from active Sales Orders ──────────────────────
+
+  useEffect(() => {
+    fetch('/api/admin/inventory-reserved')
+      .then(r => r.ok ? r.json() : {})
+      .then(setReserved)
+      .catch(() => {})
   }, [])
 
   // ─── Load suppliers ─────────────────────────────────────────────────────────
@@ -809,6 +821,8 @@ export default function InventoryPage() {
                     </button>
                   </div>
                 </th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-amber-600 uppercase w-20">Reserved</th>
+                <th className="text-center px-3 py-3 text-xs font-semibold text-blue-600 uppercase w-20">Total Inv</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
                   Wholesale ({currency})
                 </th>
@@ -835,6 +849,8 @@ export default function InventoryPage() {
                 const displayQty = localQuantities[product.id] ?? String(product.quantity)
                 const invCount = counts[product.id] ?? String(product.quantity)
                 const qtyMismatch = invCount !== '' && displayQty !== '' && invCount !== displayQty
+                const reservedQty = reserved[(product.sku || '').trim().toUpperCase()] || 0
+                const availableQty = Math.max(0, product.quantity - reservedQty)
                 return (
                   <tr key={product.id} className={`border-b last:border-0 ${qtyMismatch ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-2 text-xs text-gray-400">{idx + 1}</td>
@@ -886,8 +902,22 @@ export default function InventoryPage() {
                           className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
                         />
                       ) : (
-                        <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : 'text-gray-700'}`}>{product.quantity}</span>
+                        <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : availableQty === 0 && reservedQty > 0 ? 'text-red-500' : 'text-gray-700'}`}>
+                          {availableQty}
+                        </span>
                       )}
+                    </td>
+                    {/* Reserved */}
+                    <td className="px-3 py-2 text-center">
+                      {reservedQty > 0 ? (
+                        <span className="text-sm font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{reservedQty}</span>
+                      ) : (
+                        <span className="text-sm text-gray-300">—</span>
+                      )}
+                    </td>
+                    {/* Total Inventory */}
+                    <td className="px-3 py-2 text-center">
+                      <span className="text-sm font-semibold text-blue-700">{product.quantity}</span>
                     </td>
                     <td className="px-3 py-2 text-center">
                       <div className="flex items-center gap-1 justify-center">
@@ -928,7 +958,7 @@ export default function InventoryPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-gray-400">No products found</td>
+                  <td colSpan={11} className="text-center py-12 text-gray-400">No products found</td>
                 </tr>
               )}
             </tbody>
@@ -986,6 +1016,8 @@ export default function InventoryPage() {
                   </div>
                   <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
                 </th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-amber-600 uppercase w-20">Reserved</th>
+                <th className="text-center px-4 py-3 text-xs font-semibold text-blue-600 uppercase w-20">Total Inv</th>
                 <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
                   <div>
                     Inventory Count
@@ -1005,6 +1037,8 @@ export default function InventoryPage() {
                 const isDirty = countVal !== savedCounts[product.id]
                 const displayQtyBase = localQuantities[product.id] ?? String(product.quantity)
                 const qtyMismatchBase = countVal !== '' && displayQtyBase !== '' && countVal !== displayQtyBase
+                const reservedQtyBase = reserved[(product.sku || '').trim().toUpperCase()] || 0
+                const availableQtyBase = Math.max(0, product.quantity - reservedQtyBase)
                 return (
                   <tr key={product.id} className={`border-b last:border-0 ${qtyMismatchBase ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>
@@ -1043,8 +1077,22 @@ export default function InventoryPage() {
                           className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
                         />
                       ) : (
-                        <span className={`text-sm font-semibold ${qtyMismatchBase ? 'text-red-600' : 'text-gray-700'}`}>{product.quantity}</span>
+                        <span className={`text-sm font-semibold ${qtyMismatchBase ? 'text-red-600' : availableQtyBase === 0 && reservedQtyBase > 0 ? 'text-red-500' : 'text-gray-700'}`}>
+                          {availableQtyBase}
+                        </span>
                       )}
+                    </td>
+                    {/* Reserved */}
+                    <td className="px-4 py-2 text-center">
+                      {reservedQtyBase > 0 ? (
+                        <span className="text-sm font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{reservedQtyBase}</span>
+                      ) : (
+                        <span className="text-sm text-gray-300">—</span>
+                      )}
+                    </td>
+                    {/* Total Inventory */}
+                    <td className="px-4 py-2 text-center">
+                      <span className="text-sm font-semibold text-blue-700">{product.quantity}</span>
                     </td>
                     <td className="px-4 py-2 text-center">
                       <input
@@ -1065,7 +1113,7 @@ export default function InventoryPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-gray-400">No products found</td>
+                  <td colSpan={8} className="text-center py-12 text-gray-400">No products found</td>
                 </tr>
               )}
             </tbody>
