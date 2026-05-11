@@ -112,7 +112,7 @@ export default function InventoryPage() {
           body: JSON.stringify({ counts: allCounts, date: now }),
         })
         if (r.ok) {
-          setSavedCounts(Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])))
+          setSavedCounts(prev => ({ ...prev, ...Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])) }))
           setLastStockTakeDate(now)
         } else {
           setSaveError(`Auto-save failed (${r.status}) — click Save to retry`)
@@ -330,8 +330,8 @@ export default function InventoryPage() {
     }
   }
 
-  async function saveAll() {
-    const hasChangedCounts = filtered.some((p) => counts[p.id] !== savedCounts[p.id])
+  async function saveAll(force = false) {
+    const hasChangedCounts = force || filtered.some((p) => counts[p.id] !== savedCounts[p.id])
 
     // Collect all dirty pricelist entries if supplier is selected
     const dirtyPricelist: PricelistEntry[] = []
@@ -355,7 +355,7 @@ export default function InventoryPage() {
     }
 
     const hasDirtyQtys = filtered.some((p) => localQuantities[p.id] !== undefined && parseInt(localQuantities[p.id], 10) !== p.quantity)
-    if (!hasChangedCounts && !dirtyPricelist.length && !hasDirtyQtys) return
+    if (!force && !hasChangedCounts && !dirtyPricelist.length && !hasDirtyQtys) return
 
     setSaveAllLoading(true)
     setSaveError('')
@@ -373,7 +373,7 @@ export default function InventoryPage() {
           body: JSON.stringify({ counts: allCounts, date: now }),
         })
         if (!r.ok) { setSaveError(`Failed to save counts (${r.status})`); return }
-        setSavedCounts(Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])))
+        setSavedCounts(prev => ({ ...prev, ...Object.fromEntries(Object.entries(allCounts).map(([k, v]) => [k, String(v)])) }))
         setLastStockTakeDate(now)
       }
       if (dirtyPricelist.length > 0) {
@@ -732,19 +732,31 @@ export default function InventoryPage() {
           )}
 
           {/* Save All */}
-          <button
-            onClick={() => { setSaveError(''); saveAll() }}
-            disabled={saveAllLoading || !saveAllDirty}
-            className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {saveAllLoading ? (
-              <><span className="animate-spin inline-block">⏳</span> Saving…</>
-            ) : saveAllDone ? (
-              '✅ Saved!'
-            ) : (
-              'Save'
+          <div className="flex flex-col items-end gap-0.5">
+            <button
+              onClick={() => { setSaveError(''); saveAll(true) }}
+              disabled={saveAllLoading}
+              className={`px-4 py-2 text-white text-sm font-semibold rounded-lg flex items-center gap-2 transition-colors ${
+                saveAllLoading ? 'bg-gray-400 cursor-not-allowed' :
+                saveAllDone ? 'bg-green-600 hover:bg-green-700' :
+                saveAllDirty ? 'bg-green-600 hover:bg-green-700' :
+                'bg-green-500 hover:bg-green-600'
+              }`}
+            >
+              {saveAllLoading ? (
+                <><span className="animate-spin inline-block">⏳</span> Saving…</>
+              ) : saveAllDone ? (
+                '✅ Saved!'
+              ) : (
+                `Save${saveAllDirty ? ` (${changedCount > 0 ? changedCount : ''})` : ''}`
+              )}
+            </button>
+            {lastStockTakeDate && (
+              <span className="text-[10px] text-gray-400">
+                Last saved: {new Date(lastStockTakeDate).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}
+              </span>
             )}
-          </button>
+          </div>
         </div>
         {saveError && (
           <div className="mt-2 px-4 py-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center justify-between gap-3">
