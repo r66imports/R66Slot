@@ -13,6 +13,21 @@ interface Category {
   isActive: boolean
 }
 
+const SLOT_BRANDS = [
+  { label: 'Revo',          prefix: 'Revo',          color: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200' },
+  { label: 'Sideways',      prefix: 'Sideways',      color: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' },
+  { label: 'NSR',           prefix: 'NSR',           color: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200' },
+  { label: 'Slot.It',       prefix: 'Slot.It',       color: 'bg-orange-100 text-orange-700 border-orange-200 hover:bg-orange-200' },
+  { label: 'DS',            prefix: 'DS',            color: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200' },
+  { label: 'ScaleAuto',     prefix: 'ScaleAuto',     color: 'bg-cyan-100 text-cyan-700 border-cyan-200 hover:bg-cyan-200' },
+  { label: 'Carrera',       prefix: 'Carrera',       color: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200' },
+  { label: 'Slotting Plus', prefix: 'Slotting Plus', color: 'bg-pink-100 text-pink-700 border-pink-200 hover:bg-pink-200' },
+  { label: 'Pioneer',       prefix: 'Pioneer',       color: 'bg-indigo-100 text-indigo-700 border-indigo-200 hover:bg-indigo-200' },
+  { label: 'BRM',           prefix: 'BRM',           color: 'bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-200' },
+]
+
+const BRAND_PREFIXES = SLOT_BRANDS.map(b => b.prefix.toLowerCase())
+
 const CARD_GRADIENTS = [
   'from-blue-200 to-cyan-100',
   'from-rose-200 to-pink-100',
@@ -32,6 +47,7 @@ export default function CategoriesPage() {
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [brandFilter, setBrandFilter] = useState<string>('none')
   // Image editing state: which card is open + input value
   const [editingImageId, setEditingImageId] = useState<string | null>(null)
   const [imageInput, setImageInput] = useState('')
@@ -89,7 +105,14 @@ export default function CategoriesPage() {
   }
 
   const filtered = categories
-    .filter(c => !search || c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(c => {
+      if (search && !c.name.toLowerCase().includes(search.toLowerCase())) return false
+      const nameLower = c.name.toLowerCase()
+      if (brandFilter === 'none') {
+        return !BRAND_PREFIXES.some(p => nameLower.startsWith(p))
+      }
+      return nameLower.startsWith(brandFilter.toLowerCase())
+    })
     .sort((a, b) => a.name.localeCompare(b.name))
 
   const getProductCount = (cat: Category) =>
@@ -133,6 +156,31 @@ export default function CategoriesPage() {
             New Category
           </button>
         </div>
+      </div>
+
+      {/* Brand filter buttons */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button
+          onClick={() => setBrandFilter('none')}
+          className={`px-3 py-1 text-xs font-semibold rounded-full border font-play transition-colors ${
+            brandFilter === 'none'
+              ? 'bg-gray-800 text-white border-gray-800'
+              : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+          }`}
+        >
+          General
+        </button>
+        {SLOT_BRANDS.map(b => (
+          <button
+            key={b.prefix}
+            onClick={() => setBrandFilter(brandFilter === b.prefix ? 'none' : b.prefix)}
+            className={`px-3 py-1 text-xs font-semibold rounded-full border font-play transition-colors ${
+              brandFilter === b.prefix ? b.color + ' ring-2 ring-offset-1 ring-current' : b.color
+            }`}
+          >
+            {b.label}
+          </button>
+        ))}
       </div>
 
       <p className="text-sm text-gray-500 mb-6 font-play">
