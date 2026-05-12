@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { MediaLibraryPicker } from '@/components/page-editor/media-library-picker'
 
@@ -25,9 +25,18 @@ interface Product {
   status: string
 }
 
+const BRAND_PREFIXES = ['Revo','Sideways','NSR','Slot.It','DS','ScaleAuto','Carrera','Slotting Plus','Pioneer','BRM']
+
+function getBrandFromName(name: string): string {
+  const lower = name.toLowerCase()
+  return BRAND_PREFIXES.find(p => lower.startsWith(p.toLowerCase())) || 'none'
+}
+
 export default function CategoryEditPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const fromBrand = searchParams.get('from') || 'none'
 
   const [category, setCategory] = useState<Category | null>(null)
   const [loading, setLoading] = useState(true)
@@ -78,13 +87,14 @@ export default function CategoryEditPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...category, name, imageUrl, productIds, productCount: productIds.length }),
       })
-      router.push('/admin/categories')
+      const returnBrand = getBrandFromName(name)
+      router.push(`/admin/categories?brand=${encodeURIComponent(returnBrand)}`)
     } catch {
       setSaving(false)
     }
   }
 
-  const handleCancel = () => router.push('/admin/categories')
+  const handleCancel = () => router.push(`/admin/categories?brand=${encodeURIComponent(fromBrand)}`)
 
   const toggleProduct = (productId: string) => {
     setProductIds(prev =>
@@ -114,7 +124,7 @@ export default function CategoryEditPage() {
     <div className="max-w-6xl mx-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-4 font-play">
-        <Link href="/admin/categories" className="hover:text-gray-900">Categories</Link>
+        <Link href={`/admin/categories?brand=${encodeURIComponent(fromBrand)}`} className="hover:text-gray-900">Categories</Link>
         <span>›</span>
         <span className="text-gray-900">{name}</span>
       </div>

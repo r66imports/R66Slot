@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Category {
   id: string
@@ -42,12 +42,13 @@ const CARD_GRADIENTS = [
 
 export default function CategoriesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showSearch, setShowSearch] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [brandFilter, setBrandFilter] = useState<string>('none')
+  const [brandFilter, setBrandFilter] = useState<string>(() => searchParams.get('brand') || 'none')
   // Image editing state: which card is open + input value
   const [editingImageId, setEditingImageId] = useState<string | null>(null)
   const [imageInput, setImageInput] = useState('')
@@ -70,7 +71,7 @@ export default function CategoriesPage() {
         body: JSON.stringify({ name: 'New Category' }),
       })
       const cat = await res.json()
-      router.push(`/admin/categories/${cat.id}`)
+      router.push(`/admin/categories/${cat.id}?from=${encodeURIComponent(brandFilter)}`)
     } catch {
       setCreating(false)
     }
