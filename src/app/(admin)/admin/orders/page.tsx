@@ -70,6 +70,15 @@ interface OrderTemplate {
   footerText: string
 }
 
+interface BankAccount {
+  id: string
+  bankName: string
+  accountName: string
+  accountNumber: string
+  branchCode: string
+  address: string
+}
+
 // Normalised view data — works for both backorder + standalone source
 interface DocViewData {
   docType: DocType
@@ -1115,6 +1124,13 @@ function CreateDocumentModal({
     }))
   }, [modalProducts])
 
+  useEffect(() => {
+    fetch('/api/admin/bank-accounts')
+      .then(r => r.ok ? r.json() : [])
+      .then(setBankAccounts)
+      .catch(() => {})
+  }, [])
+
   // Auto-generate next quote number (QR660001 format) for new quotes only
   useEffect(() => {
     if (editDoc || docType !== 'quote') return
@@ -1163,15 +1179,22 @@ function CreateDocumentModal({
   const updateLine = (id: string, k: keyof LineItem, v: string | number | boolean) =>
     setLineItems((p) => p.map((l) => (l.id === id ? { ...l, [k]: v } : l)))
 
-  const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.discountPct || 0)
+  const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.depositMode ? ((editDoc as any)?.depositPct || 0) : ((editDoc as any)?.discountPct || 0))
   const [shippingCost, setShippingCost] = useState<number>((editDoc as any)?.shippingCost || 0)
   const [shippingMethod, setShippingMethod] = useState<string>((editDoc as any)?.shippingMethod || '')
   const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
+  const [depositMode, setDepositMode] = useState<boolean>((editDoc as any)?.depositMode || false)
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>((editDoc as any)?.bankAccountId || '')
+  const [showBankManager, setShowBankManager] = useState(false)
+  const [newBank, setNewBank] = useState({ bankName: '', accountName: '', accountNumber: '', branchCode: '', address: '' })
+  const [savingBank, setSavingBank] = useState(false)
   const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
-  const discountAmt = subtotal * discountPct / 100
+  const discountAmt = depositMode ? 0 : subtotal * discountPct / 100
   const total = subtotal - discountAmt + shippingCost
-  const balanceDue = total - depositPaid
+  const depositAmount = depositMode ? Math.round(total * discountPct / 100 * 100) / 100 : depositPaid
+  const balanceDue = total - depositAmount
 
   const handleSave = async () => {
     if (!form.clientName.trim()) { setError('Client name is required'); return }
@@ -1190,7 +1213,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct, shippingCost, shippingMethod, trackingNumber, depositPaid, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: depositMode ? selectedBankAccountId : '', shippingCost, shippingMethod, trackingNumber, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -1216,7 +1239,7 @@ function CreateDocumentModal({
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 ${fullScreen ? '' : 'p-4'}`}>
-      <div className={`bg-white flex flex-col ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh]'}`}>
+      <div className={`bg-white flex flex-col relative ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh]'}`}>
         <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
           <h2 className="text-lg font-bold">{editDoc ? `Edit ${cfg.singularLabel}` : `Create ${cfg.singularLabel}`}</h2>
           <div className="flex items-center gap-2">
@@ -1301,6 +1324,17 @@ function CreateDocumentModal({
                     </button>
                   ))}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setDepositMode(m => !m)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-all border ${
+                    depositMode
+                      ? 'bg-amber-100 text-amber-700 border-amber-300'
+                      : 'bg-gray-100 text-gray-500 border-transparent hover:text-gray-700'
+                  }`}
+                >
+                  Deposit
+                </button>
                 <button onClick={addLine} className="text-xs text-blue-600 hover:text-blue-800 font-semibold">+ Add Line</button>
               </div>
             </div>
@@ -1378,7 +1412,11 @@ function CreateDocumentModal({
                   {/* Rule 5 — Shipping & Discounts: only shown when rule is active */}
                   {shippingEnabled ? (<>
                     <tr className="bg-gray-50">
-                      <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Discount %</td>
+                      <td colSpan={3} className="px-3 py-1.5 text-right text-xs">
+                        <span className={depositMode ? 'text-amber-700 font-semibold' : 'text-gray-500'}>
+                          {depositMode ? 'Deposit %' : 'Discount %'}
+                        </span>
+                      </td>
                       <td className="px-2 py-1">
                         <input type="number" min={0} max={100} step={0.5}
                           className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
@@ -1386,8 +1424,11 @@ function CreateDocumentModal({
                           onChange={(e) => setDiscountPct(Math.max(0, Math.min(100, Number(e.target.value))))}
                         />
                       </td>
-                      <td className="px-3 py-1.5 text-right text-red-500 font-medium">
-                        {discountPct > 0 ? `-${fmtPrice(discountAmt)}` : '—'}
+                      <td className="px-3 py-1.5 text-right font-medium">
+                        {depositMode
+                          ? (discountPct > 0 ? <span className="text-amber-600">{fmtPrice(depositAmount)}</span> : '—')
+                          : (discountPct > 0 ? <span className="text-red-500">-{fmtPrice(discountAmt)}</span> : '—')
+                        }
                       </td>
                       <td />
                     </tr>
@@ -1460,21 +1501,50 @@ function CreateDocumentModal({
                     <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
                     <td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(total)}</td><td />
                   </tr>
-                  <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
-                    <td className="px-2 py-1">
-                      <input type="number" min={0} step={0.01}
-                        className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
-                        value={depositPaid}
-                        onChange={(e) => setDepositPaid(Math.max(0, Number(e.target.value)))}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5 text-right text-green-600 font-medium">
-                      {depositPaid > 0 ? `-${fmtPrice(depositPaid)}` : '—'}
-                    </td>
-                    <td />
-                  </tr>
-                  {depositPaid > 0 && (
+                  {!depositMode && (
+                    <tr className="bg-gray-50">
+                      <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
+                      <td className="px-2 py-1">
+                        <input type="number" min={0} step={0.01}
+                          className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                          value={depositPaid}
+                          onChange={(e) => setDepositPaid(Math.max(0, Number(e.target.value)))}
+                        />
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-green-600 font-medium">
+                        {depositPaid > 0 ? `-${fmtPrice(depositPaid)}` : '—'}
+                      </td>
+                      <td />
+                    </tr>
+                  )}
+                  {depositMode && (
+                    <tr className="bg-gray-50">
+                      <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Account</td>
+                      <td colSpan={2} className="px-2 py-1">
+                        <div className="flex gap-1">
+                          <select
+                            value={selectedBankAccountId}
+                            onChange={e => setSelectedBankAccountId(e.target.value)}
+                            className="flex-1 px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
+                          >
+                            <option value="">— Select Account —</option>
+                            {bankAccounts.map(ba => (
+                              <option key={ba.id} value={ba.id}>{ba.bankName} – {ba.accountName}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setShowBankManager(true)}
+                            className="px-2 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 whitespace-nowrap font-semibold"
+                          >
+                            Add +
+                          </button>
+                        </div>
+                      </td>
+                      <td />
+                    </tr>
+                  )}
+                  {depositAmount > 0 && (
                     <tr className="border-t bg-orange-50">
                       <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-orange-700">Balance Due</td>
                       <td className="px-3 py-2.5 text-right font-bold text-orange-700">{fmtPrice(balanceDue)}</td><td />
@@ -1554,6 +1624,86 @@ function CreateDocumentModal({
             </button>
           </div>
         </div>
+
+        {/* Bank Account Manager Overlay */}
+        {showBankManager && (
+          <div className="absolute inset-0 z-10 bg-black/50 flex items-center justify-center rounded-2xl p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold">Bank Accounts</h3>
+                <button onClick={() => { setShowBankManager(false); setNewBank({ bankName: '', accountName: '', accountNumber: '', branchCode: '', address: '' }) }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+              </div>
+              {/* Existing accounts */}
+              <div className="flex-1 overflow-y-auto space-y-2 mb-4 min-h-0">
+                {bankAccounts.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-4">No bank accounts saved yet.</p>
+                )}
+                {bankAccounts.map(ba => (
+                  <div key={ba.id} className="flex items-start justify-between border border-gray-100 rounded-lg p-3 bg-gray-50">
+                    <div className="text-sm">
+                      <p className="font-semibold text-gray-800">{ba.bankName}</p>
+                      <p className="text-gray-600">{ba.accountName} · {ba.accountNumber}</p>
+                      {ba.branchCode && <p className="text-gray-400 text-xs">Branch: {ba.branchCode}</p>}
+                      {ba.address && <p className="text-gray-400 text-xs">{ba.address}</p>}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/admin/bank-accounts?id=${ba.id}`, { method: 'DELETE' })
+                        setBankAccounts(prev => prev.filter(a => a.id !== ba.id))
+                        if (selectedBankAccountId === ba.id) setSelectedBankAccountId('')
+                      }}
+                      className="ml-3 text-gray-300 hover:text-red-500 flex-shrink-0 text-lg leading-none"
+                      title="Delete"
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+              {/* Add new account form */}
+              <div className="border-t pt-4 space-y-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Add New Account</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-500 mb-0.5 block">Bank Name *</label>
+                    <input className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={newBank.bankName} onChange={e => setNewBank(b => ({ ...b, bankName: e.target.value }))} placeholder="e.g. FNB" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-0.5 block">Account Name *</label>
+                    <input className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={newBank.accountName} onChange={e => setNewBank(b => ({ ...b, accountName: e.target.value }))} placeholder="e.g. R66 Imports" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-0.5 block">Account Number</label>
+                    <input className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={newBank.accountNumber} onChange={e => setNewBank(b => ({ ...b, accountNumber: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 mb-0.5 block">Branch Code</label>
+                    <input className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={newBank.branchCode} onChange={e => setNewBank(b => ({ ...b, branchCode: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-0.5 block">Branch / Address</label>
+                  <input className="w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={newBank.address} onChange={e => setNewBank(b => ({ ...b, address: e.target.value }))} placeholder="e.g. Sandton Branch" />
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    disabled={savingBank || !newBank.bankName.trim() || !newBank.accountName.trim()}
+                    onClick={async () => {
+                      setSavingBank(true)
+                      const res = await fetch('/api/admin/bank-accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newBank) })
+                      const saved = await res.json()
+                      setBankAccounts(prev => [...prev, saved])
+                      setSelectedBankAccountId(saved.id)
+                      setNewBank({ bankName: '', accountName: '', accountNumber: '', branchCode: '', address: '' })
+                      setSavingBank(false)
+                    }}
+                    className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+                  >
+                    {savingBank ? 'Saving...' : 'Save Account'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
