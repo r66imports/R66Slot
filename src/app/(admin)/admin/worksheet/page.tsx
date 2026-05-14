@@ -1811,7 +1811,15 @@ function WorksheetEditor({
           suppliers={suppliers}
           companyInfo={companyInfo}
           orderDate={worksheetDate}
-          items={items.filter((it) => it.sku).map((it) => ({ sku: it.sku, description: it.description, qty: it.qty }))}
+          currency={currency}
+          items={items.filter((it) => it.sku).map((it) => ({
+            sku: it.sku,
+            description: it.description,
+            qty: it.qty,
+            wholesalePrice: it.wholesalePrice,
+            landedCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
+            costingEntity: it.costingEntity || '',
+          }))}
           onClose={() => setShowSupplierOrderModal(false)}
         />
       )}
@@ -3100,19 +3108,135 @@ function WorksheetInvoiceModal({
 // ─── Worksheet Supplier Order Modal ───────────────────────────────────────────
 
 function WorksheetSupplierOrderModal({
-  supplierName, suppliers, companyInfo, orderDate, items, onClose,
+  supplierName, suppliers, companyInfo, orderDate, items, currency, onClose,
 }: {
   supplierName: string
   suppliers: SupplierContact[]
   companyInfo: CompanyInfo
   orderDate: string
-  items: { sku: string; description: string; qty: number }[]
+  currency?: string
+  items: { sku: string; description: string; qty: number; wholesalePrice?: number; landedCost?: number; costingEntity?: string }[]
   onClose: () => void
 }) {
   const today = new Date().toISOString().slice(0, 10)
-  const [rows, setRows] = useState(items.length > 0 ? items.map(it => ({ ...it })) : [{ sku: '', description: '', qty: 1 }])
+  const [rows, setRows] = useState(items.length > 0 ? items.map(it => ({ sku: it.sku, description: it.description, qty: it.qty })) : [{ sku: '', description: '', qty: 1 }])
   const [poNumber, setPoNumber] = useState('')
   const [date, setDate] = useState(orderDate || today)
+
+  const curr = currency || 'ZAR'
+  const currSym = ({ EUR: '€', GBP: '£', CNY: '¥', HKD: 'HK$', SGD: 'S$', ZAR: 'R', USD: '$' } as Record<string, string>)[curr] ?? (curr + ' ')
+  const fmtR = (n: number) => 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmtC = (n: number) => currSym + ' ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const jdmItems = items.filter(it => it.costingEntity === 'JDM' && (it.landedCost || 0) > 0)
+
+  const INV_CSS = `*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
+    .title{font-size:28px;font-weight:800;color:#111827;margin-bottom:4px}.meta{font-size:13px;color:#6b7280;margin-top:2px}
+    .info-row{display:flex;gap:32px;margin-bottom:28px}.info-box{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px}
+    .lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:6px}
+    table{width:100%;border-collapse:collapse}thead tr{border-bottom:2px solid #111827}
+    th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280}
+    th.r{text-align:right}th.c{text-align:center}
+    tbody tr{border-bottom:1px solid #f3f4f6}tbody tr:nth-child(even){background:#f9fafb}
+    tfoot tr{border-top:2px solid #111827}tfoot td{padding:10px 12px;font-weight:700;font-size:14px}@page{size:A4;margin:0}`
+
+  function invoiceHTML(opts: {
+    fromBlock: string; billedToBlock: string; unitLabel: string; totalLabel: string;
+    invItems: { sku: string; description: string; qty: number; unitPrice: number }[]
+    vatPct?: number; totalNote: string
+  }) {
+    const { fromBlock, billedToBlock, unitLabel, totalLabel, invItems, vatPct, totalNote } = opts
+    const subtotal = invItems.reduce((s, it) => s + it.qty * it.unitPrice, 0)
+    const vatAmt = vatPct ? subtotal * vatPct / 100 : 0
+    const grand = subtotal + vatAmt
+    const displayDate = new Date(date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })
+    const rowsHtml = invItems.map((it, i) => {
+      const lt = it.qty * it.unitPrice
+      return `<tr>
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;">${i + 1}</td>
+        <td style="padding:8px 12px;font-family:monospace;font-size:12px;font-weight:600;">${it.sku}</td>
+        <td style="padding:8px 12px;font-size:13px;">${it.description}</td>
+        <td style="padding:8px 12px;text-align:center;font-size:13px;">${it.qty}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:13px;">${it.unitPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">${lt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+      </tr>`
+    }).join('')
+    const footerHtml = vatPct
+      ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;">${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;">${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total (incl. VAT)</td><td style="text-align:right;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`
+      : `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total</td><td style="text-align:right;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice</title><style>${INV_CSS}</style></head><body>
+    <div class="hdr">
+      <div><p class="title">INVOICE</p>${poNumber ? `<p class="meta">Ref: <strong>${poNumber}</strong></p>` : ''}<p class="meta">Date: ${displayDate}</p></div>
+      <div style="text-align:right">${fromBlock}</div>
+    </div>
+    <div class="info-row">
+      <div class="info-box"><p class="lbl">Billed To</p>${billedToBlock}</div>
+      <div class="info-box" style="flex:0;min-width:200px;">
+        <p class="lbl">Invoice Total</p>
+        ${vatPct ? `<p style="font-size:11px;color:#9ca3af;">Excl. VAT: ${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        <p style="font-size:11px;color:#9ca3af;">VAT (${vatPct}%): ${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
+        <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${invItems.reduce((s, it) => s + it.qty, 0)} items · ${totalNote}</p>
+      </div>
+    </div>
+    <table><thead><tr>
+      <th style="width:36px">#</th><th>SKU</th><th>Description</th>
+      <th class="c" style="width:60px">Qty</th>
+      <th class="r" style="width:140px">${unitLabel}</th>
+      <th class="r" style="width:140px">${totalLabel}</th>
+    </tr></thead><tbody>${rowsHtml}</tbody><tfoot>${footerHtml}</tfoot></table>
+    </body></html>`
+  }
+
+  function openInvoice(html: string) {
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
+  }
+
+  function generateSupplierInvoice() {
+    const invItems = items.filter(it => (it.wholesalePrice || 0) > 0).map(it => ({
+      sku: it.sku, description: it.description, qty: it.qty, unitPrice: it.wholesalePrice || 0,
+    }))
+    if (!invItems.length) return
+    const billedTo = `
+      <p style="font-size:13px;font-weight:700;">${companyInfo.name}</p>
+      ${companyInfo.address ? `<p style="font-size:12px;color:#374151;">${companyInfo.address}</p>` : ''}
+      ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
+      ${companyInfo.phone ? `<p style="font-size:12px;color:#374151;">${companyInfo.phone}</p>` : ''}
+      ${companyInfo.email ? `<p style="font-size:12px;color:#374151;">${companyInfo.email}</p>` : ''}
+      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">VAT: ${companyInfo.vatNumber}</p>` : ''}`
+    const fromBlock = `<p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">FROM</p><p style="font-weight:700;font-size:15px;">${supplierName}</p>`
+    openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: `Unit Cost (${curr})`, totalLabel: `Total (${curr})`, invItems, totalNote: 'wholesale cost' }))
+  }
+
+  function generateJDMSupplierInvoice() {
+    const invItems = jdmItems.map(it => ({ sku: it.sku, description: it.description, qty: it.qty, unitPrice: it.landedCost || 0 }))
+    if (!invItems.length) return
+    const billedTo = `
+      <p style="font-size:13px;font-weight:700;">${companyInfo.name}</p>
+      ${companyInfo.address ? `<p style="font-size:12px;color:#374151;">${companyInfo.address}</p>` : ''}
+      ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
+      ${companyInfo.phone ? `<p style="font-size:12px;color:#374151;">${companyInfo.phone}</p>` : ''}
+      ${companyInfo.email ? `<p style="font-size:12px;color:#374151;">${companyInfo.email}</p>` : ''}`
+    const fromBlock = `<p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">FROM</p><p style="font-weight:700;font-size:15px;">JDM Garage</p>`
+    openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: 'Unit Cost (ZAR)', totalLabel: 'Total (ZAR)', invItems, totalNote: 'landed cost' }))
+  }
+
+  function generateR66SupplierInvoice() {
+    const invItems = jdmItems.map(it => ({ sku: it.sku, description: it.description, qty: it.qty, unitPrice: it.landedCost || 0 }))
+    if (!invItems.length) return
+    const fromBlock = `
+      <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">FROM</p>
+      <p style="font-weight:700;font-size:14px;">Route 66 Imports (PTY) LTD</p>
+      <p style="font-size:12px;color:#374151;">217 Clarkson Road, Estoire</p>
+      <p style="font-size:12px;color:#374151;">Bloemfontein, 9301</p>
+      <p style="font-size:12px;color:#374151;">+27615898921</p>
+      <p style="font-size:11px;color:#9ca3af;margin-top:2px;">VAT: 4310297884</p>`
+    const billedTo = `<p style="font-size:13px;font-weight:700;">JDM Garage PTY LTD</p>`
+    openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: 'Unit Cost (ZAR)', totalLabel: 'Total (ZAR)', invItems, vatPct: 15, totalNote: 'incl. 15% VAT' }))
+  }
 
   function updateRow(idx: number, field: string, value: string | number) {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
@@ -3120,9 +3244,7 @@ function WorksheetSupplierOrderModal({
 
   function generatePDF() {
     const totalQty = rows.reduce((s, r) => s + Number(r.qty), 0)
-    const rowsHtml = rows
-      .filter(r => r.sku || r.description)
-      .map((r, i) => `<tr>
+    const rowsHtml = rows.filter(r => r.sku || r.description).map((r, i) => `<tr>
         <td style="padding:8px 12px;color:#6b7280;font-size:13px;">${i + 1}</td>
         <td style="padding:8px 12px;font-family:monospace;font-size:13px;font-weight:600;">${r.sku}</td>
         <td style="padding:8px 12px;font-size:13px;">${r.description}</td>
@@ -3133,8 +3255,7 @@ function WorksheetSupplierOrderModal({
          ${companyInfo.address ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.address}</p>` : ''}
          ${companyInfo.phone ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.phone}</p>` : ''}
          ${companyInfo.email ? `<p style="font-size:12px;color:#6b7280;">${companyInfo.email}</p>` : ''}
-         ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;">VAT: ${companyInfo.vatNumber}</p>` : ''}`
-      : ''
+         ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;">VAT: ${companyInfo.vatNumber}</p>` : ''}` : ''
     const supplier = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase())
     const displayDate = new Date(date).toLocaleDateString('en-ZA')
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Supplier Order – ${supplierName}</title>
@@ -3163,6 +3284,9 @@ function WorksheetSupplierOrderModal({
     const win = window.open('', '_blank')
     if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
   }
+
+  // suppress unused warning
+  void fmtR; void fmtC
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
@@ -3232,13 +3356,43 @@ function WorksheetSupplierOrderModal({
               </button>
             </div>
           </div>
+
+          {/* ── Supplier Invoice Buttons ── */}
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Generate Supplier Invoices</p>
+            <div className="space-y-2">
+              <button
+                onClick={generateSupplierInvoice}
+                disabled={!items.some(it => (it.wholesalePrice || 0) > 0)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100 disabled:opacity-40"
+              >
+                Create Supplier Invoice ({curr})
+              </button>
+              <button
+                onClick={generateJDMSupplierInvoice}
+                disabled={jdmItems.length === 0}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border border-purple-200 text-purple-700 bg-purple-50 hover:bg-purple-100 disabled:opacity-40"
+                title={jdmItems.length === 0 ? 'No JDM-tagged items on this worksheet' : ''}
+              >
+                Create JDM Supplier Invoice (ZAR)
+              </button>
+              <button
+                onClick={generateR66SupplierInvoice}
+                disabled={jdmItems.length === 0}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border border-green-200 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-40"
+                title={jdmItems.length === 0 ? 'No JDM-tagged items on this worksheet' : ''}
+              >
+                Create R66 Supplier Invoice (+15% VAT)
+              </button>
+            </div>
+          </div>
         </div>
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50">Cancel</button>
           <button onClick={generatePDF} disabled={!rows.some(r => r.sku || r.description)}
             className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-            Generate PDF
+            Generate Supplier Order
           </button>
         </div>
       </div>
