@@ -16,6 +16,9 @@ export default function ProfilePage() {
     username: '',
     email: '',
     phone: '',
+    pudoLocker: '',
+    courierGuyKiosk: '',
+    postnetKiosk: '',
   })
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -34,6 +37,9 @@ export default function ProfilePage() {
           username: data.username || '',
           email: data.email || '',
           phone: data.phone || '',
+          pudoLocker: data.pudoLocker || '',
+          courierGuyKiosk: data.courierGuyKiosk || '',
+          postnetKiosk: data.postnetKiosk || '',
         })
       })
       .catch(() => {
@@ -264,6 +270,93 @@ export default function ProfilePage() {
                       username: user.username || '',
                       email: user.email || '',
                       phone: user.phone || '',
+                      pudoLocker: user.pudoLocker || '',
+                      courierGuyKiosk: user.courierGuyKiosk || '',
+                      postnetKiosk: user.postnetKiosk || '',
+                    })
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Delivery Addresses */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Delivery Addresses</CardTitle>
+          {!isEditing && (
+            <Button onClick={() => setIsEditing(true)} variant="outline">
+              Edit
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-500 mb-4">
+            Save your preferred collection points so we can pre-fill them when you place an order.
+          </p>
+          <form onSubmit={handleSaveProfile} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Pudo Locker Address
+              </label>
+              <Input
+                type="text"
+                name="pudoLocker"
+                value={formData.pudoLocker}
+                onChange={handleChange}
+                disabled={!isEditing}
+                placeholder="e.g. Pick n Pay Sandton — Locker #12"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Courier Guy Kiosk
+              </label>
+              <Input
+                type="text"
+                name="courierGuyKiosk"
+                value={formData.courierGuyKiosk}
+                onChange={handleChange}
+                disabled={!isEditing}
+                placeholder="e.g. Checkers Randburg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                PostNet Kiosk
+              </label>
+              <Input
+                type="text"
+                name="postnetKiosk"
+                value={formData.postnetKiosk}
+                onChange={handleChange}
+                disabled={!isEditing}
+                placeholder="e.g. PostNet Fourways"
+              />
+            </div>
+            {isEditing && (
+              <div className="flex gap-2">
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditing(false)
+                    setFormData({
+                      firstName: user.firstName || '',
+                      lastName: user.lastName || '',
+                      username: user.username || '',
+                      email: user.email || '',
+                      phone: user.phone || '',
+                      pudoLocker: user.pudoLocker || '',
+                      courierGuyKiosk: user.courierGuyKiosk || '',
+                      postnetKiosk: user.postnetKiosk || '',
                     })
                   }}
                 >

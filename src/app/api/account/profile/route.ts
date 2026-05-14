@@ -49,7 +49,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any
-    const { firstName, lastName, username, email, phone } = await request.json()
+    const { firstName, lastName, username, email, phone, pudoLocker, courierGuyKiosk, postnetKiosk } = await request.json()
 
     const customers = await getCustomers()
     const customerIndex = customers.findIndex((c: any) => c.id === decoded.id)
@@ -90,6 +90,9 @@ export async function PUT(request: NextRequest) {
       username: username || customers[customerIndex].username,
       email,
       phone: phone || '',
+      pudoLocker: pudoLocker || '',
+      courierGuyKiosk: courierGuyKiosk || '',
+      postnetKiosk: postnetKiosk || '',
       updatedAt: new Date().toISOString(),
     }
 
