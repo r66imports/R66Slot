@@ -3717,7 +3717,7 @@ export default function OrdersPage() {
                     const docTotal = sub - disc + ship
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
-                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
+                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 text-xs">
                           <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
                           {(doc as any).sourceQuoteNumber && (
@@ -3837,6 +3837,16 @@ export default function OrdersPage() {
                             },
                             { label: 'Push to Sage', onClick: () => {}, disabled: true, className: 'text-gray-400' },
                             'separator' as const,
+                            'separator' as const,
+                            {
+                              label: (doc as any).redFlag ? '🚩 Remove Flag' : '🚩 Red Flag',
+                              className: (doc as any).redFlag ? 'text-red-600 font-semibold' : 'text-red-500',
+                              onClick: async () => {
+                                const newFlag = !(doc as any).redFlag
+                                const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ redFlag: newFlag }) })
+                                if (res.ok) setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, redFlag: newFlag } as any : d))
+                              },
+                            },
                             {
                               label: deleteConfirm === doc.id ? 'Confirm Delete' : 'Delete',
                               icon: <IconTrash />,
