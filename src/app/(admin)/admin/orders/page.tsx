@@ -3649,16 +3649,16 @@ export default function OrdersPage() {
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
                       <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4 text-xs">
                           <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
                           {(doc as any).sourceQuoteNumber && (
                             <div className="text-[10px] text-gray-400 mt-0.5">Q: {(doc as any).sourceQuoteNumber}</div>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-gray-500">{fmtDate(doc.date)}</td>
-                        <td className="py-3 px-4 font-medium">{doc.clientName}</td>
-                        <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{firstDesc}</td>
-                        <td className="py-3 px-4 text-right font-semibold">{fmtPrice(docTotal)}</td>
+                        <td className="py-3 px-4 text-xs text-gray-500">{fmtDate(doc.date)}</td>
+                        <td className="py-3 px-4 text-xs font-medium">{doc.clientName}</td>
+                        <td className="py-3 px-4 text-xs text-gray-600 break-words">{firstDesc}</td>
+                        <td className="py-3 px-4 text-xs text-right font-semibold">{fmtPrice(docTotal)}</td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">
                             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
