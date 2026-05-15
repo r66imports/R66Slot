@@ -2740,7 +2740,26 @@ export default function OrdersPage() {
     const key = doc.clientName.toLowerCase().replace(/\s+/g, '_')
     const res = await fetch(`/api/admin/customer-credits/${key}`)
     const data = res.ok ? await res.json() : { balance: 0 }
-    setClientCreditBalance(data.balance ?? 0)
+    const blobBalance = data.balance ?? 0
+
+    // Fallback: recompute from invoice documents in case blob is stale
+    // Sum overpaymentCredit on all invoices for this client, minus creditApplied
+    const computedBalance = Math.max(0, documents
+      .filter(d => d.type === 'invoice' && d.clientName.toLowerCase().replace(/\s+/g, '_') === key)
+      .reduce((s, d) => s + ((d as any).overpaymentCredit || 0) - ((d as any).creditApplied || 0), 0))
+
+    const balance = Math.max(blobBalance, computedBalance)
+
+    // If computed is higher than blob, repair the blob silently
+    if (computedBalance > blobBalance + 0.005) {
+      fetch('/api/admin/customer-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'record_payment', clientName: doc.clientName, invoiceNumber: 'recompute', amountPaid: 0, creditApplied: 0, overpayment: computedBalance - blobBalance }),
+      }).catch(() => {})
+    }
+
+    setClientCreditBalance(balance)
     setPaymentForm({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '' })
     setPaymentModal(doc)
   }

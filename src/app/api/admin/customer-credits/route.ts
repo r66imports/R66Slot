@@ -54,6 +54,10 @@ export async function POST(request: Request) {
     const mkId = () => `txn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
 
     if (action === 'record_payment') {
+      // Only write if there is something to record — prevents accidental zero-balance record creation
+      if (creditApplied <= 0 && overpayment <= 0) {
+        return NextResponse.json(record)
+      }
       if (creditApplied > 0) {
         record.balance = Math.max(0, record.balance - creditApplied)
         record.transactions.push({ id: mkId(), type: 'credit_applied', invoiceNumber, amount: -creditApplied, notes, date: now })
