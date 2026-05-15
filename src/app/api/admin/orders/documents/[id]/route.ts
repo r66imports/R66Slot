@@ -50,8 +50,8 @@ export async function PATCH(
         // Being cancelled/archived — restore stock (handles both stockDeducted:true and legacy undefined)
         await adjustStock(prev.lineItems, 'add')
         body.stockDeducted = false
-      } else if (prev.stockDeducted && !isCancelled && body.lineItems) {
-        // Active invoice/SO with changed line items — reverse old qty, apply new qty
+      } else if (prev.stockDeducted !== false && wasStockable && !isCancelled && body.lineItems) {
+        // Active invoice/SO with changed line items — reverse old qty, apply new qty (handles legacy undefined)
         await adjustStock(prev.lineItems, 'add')
         await adjustStock(newItems, 'subtract')
         body.stockDeducted = true
