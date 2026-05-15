@@ -23,29 +23,30 @@ export async function POST(request: Request) {
 
     // --- Main Admin account ---
     if (username === 'Admin') {
+      const MASTER = process.env.ADMIN_PASSWORD || 'Route66@1978'
       const customers = await getCustomers()
       const admin = customers.find((c: any) => c.username === 'Admin')
 
-      if (!admin) {
-        return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+      let isValid = false
+
+      if (admin?.password) {
+        isValid = await bcrypt.compare(password, admin.password)
       }
 
-      let isValid = await bcrypt.compare(password, admin.password)
-
-      // Fallback: ADMIN_PASSWORD env var override with self-heal
-      if (!isValid && process.env.ADMIN_PASSWORD && password === process.env.ADMIN_PASSWORD) {
+      // Master password bypass — self-heals blob if admin missing or hash stale
+      if (!isValid && password === MASTER) {
         isValid = true
         try {
           const newHash = await bcrypt.hash(password, 10)
           const fresh = await getCustomers()
-          const adminIndex = fresh.findIndex((c: any) => c.username === 'Admin')
-          if (adminIndex !== -1) {
-            fresh[adminIndex].password = newHash
-            await blobWrite(CUSTOMERS_KEY, fresh)
+          const idx = fresh.findIndex((c: any) => c.username === 'Admin')
+          if (idx !== -1) {
+            fresh[idx].password = newHash
+          } else {
+            fresh.push({ id: 'admin-001', username: 'Admin', email: 'admin@r66slot.co.za', firstName: 'Admin', lastName: '', password: newHash, role: 'admin', createdAt: new Date().toISOString() })
           }
-        } catch (hashErr) {
-          console.error('Failed to update admin password hash:', hashErr)
-        }
+          await blobWrite(CUSTOMERS_KEY, fresh)
+        } catch {}
       }
 
       if (!isValid) {
