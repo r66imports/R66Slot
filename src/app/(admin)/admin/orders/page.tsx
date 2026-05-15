@@ -1174,6 +1174,15 @@ function CreateDocumentModal({
   }, [])
 
   const setField = (k: string, v: string | number) => setForm((f) => ({ ...f, [k]: v }))
+
+  const fetchClientCredit = (name: string) => {
+    if (!name.trim() || isQuote) return
+    const key = name.trim().toLowerCase().replace(/\s+/g, '_')
+    fetch(`/api/admin/customer-credits/${key}`)
+      .then(r => r.ok ? r.json() : { balance: 0 })
+      .then(data => setAvailableCredit(data.balance ?? 0))
+      .catch(() => {})
+  }
   const addLine = () => setLineItems((p) => [...p, newLine()])
   const removeLine = (id: string) => setLineItems((p) => p.filter((l) => l.id !== id))
   const updateLine = (id: string, k: keyof LineItem, v: string | number | boolean) =>
@@ -1190,11 +1199,17 @@ function CreateDocumentModal({
   const [showBankManager, setShowBankManager] = useState(false)
   const [newBank, setNewBank] = useState({ bankName: '', accountName: '', accountNumber: '', branchCode: '', address: '' })
   const [savingBank, setSavingBank] = useState(false)
+  const [availableCredit, setAvailableCredit] = useState(0)
+  const [useCredit, setUseCredit] = useState(false)
+  const [creditInput, setCreditInput] = useState('')
   const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = depositMode ? 0 : subtotal * discountPct / 100
   const total = subtotal - discountAmt + shippingCost
   const depositAmount = depositMode ? Math.round(total * discountPct / 100 * 100) / 100 : depositPaid
-  const balanceDue = total - depositAmount
+  const creditAppliedAmt = (isQuote ? false : useCredit)
+    ? Math.min(availableCredit, parseFloat(creditInput) || availableCredit)
+    : 0
+  const balanceDue = total - depositAmount - creditAppliedAmt
 
   const handleSave = async () => {
     if (!form.clientName.trim()) { setError('Client name is required'); return }
@@ -1213,7 +1228,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: depositMode ? selectedBankAccountId : '', shippingCost, shippingMethod, trackingNumber, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: depositMode ? selectedBankAccountId : '', shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -1226,6 +1241,14 @@ function CreateDocumentModal({
               body: JSON.stringify({ clientName: form.clientName, clientEmail: form.clientEmail, clientPhone: form.clientPhone, sku: sku || '', description: li.description, qty: li.qty, price: li.unitPrice, source: 'quote' }),
             })
           }))
+        }
+        // Record credit application in the credit store
+        if (creditAppliedAmt > 0) {
+          fetch('/api/admin/customer-credits', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'record_payment', clientName: form.clientName, invoiceNumber: savedDoc.docNumber, amountPaid: 0, creditApplied: creditAppliedAmt, overpayment: 0 }),
+          }).catch(() => {})
         }
         onCreated(savedDoc)
         onClose()
@@ -1283,10 +1306,12 @@ function CreateDocumentModal({
                 <ClientAutofill
                   clients={clients}
                   onSelect={(c) => {
-                    setField('clientName', `${c.firstName} ${c.lastName}`.trim())
+                    const name = `${c.firstName} ${c.lastName}`.trim()
+                    setField('clientName', name)
                     setField('clientEmail', c.email)
                     setField('clientPhone', c.phone)
                     setField('clientAddress', c.companyAddress || '')
+                    fetchClientCredit(name)
                   }}
                 />
               </div>
@@ -1501,6 +1526,31 @@ function CreateDocumentModal({
                     <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
                     <td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(total)}</td><td />
                   </tr>
+                  {/* Credit allocation — invoices only */}
+                  {!isQuote && availableCredit > 0 && (
+                    <tr className="bg-green-50">
+                      <td colSpan={3} className="px-3 py-1.5 text-right text-xs">
+                        <label className="flex items-center justify-end gap-1.5 cursor-pointer text-green-700 font-semibold">
+                          <input type="checkbox" checked={useCredit} onChange={e => { setUseCredit(e.target.checked); setCreditInput('') }} className="accent-green-600 w-3.5 h-3.5" />
+                          Apply Credit (R{availableCredit.toFixed(2)})
+                        </label>
+                      </td>
+                      <td className="px-2 py-1">
+                        {useCredit && (
+                          <input type="number" min={0} max={availableCredit} step={0.01}
+                            className="w-full px-2 py-1 text-sm text-right rounded border border-green-300 focus:outline-none focus:ring-1 focus:ring-green-400"
+                            value={creditInput}
+                            placeholder={availableCredit.toFixed(2)}
+                            onChange={e => setCreditInput(e.target.value)}
+                          />
+                        )}
+                      </td>
+                      <td className="px-3 py-1.5 text-right text-green-600 font-medium">
+                        {creditAppliedAmt > 0 ? `-${fmtPrice(creditAppliedAmt)}` : '—'}
+                      </td>
+                      <td />
+                    </tr>
+                  )}
                   {!depositMode && (
                     <tr className="bg-gray-50">
                       <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
