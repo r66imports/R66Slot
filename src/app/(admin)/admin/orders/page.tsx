@@ -2426,6 +2426,8 @@ export default function OrdersPage() {
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
+  const [docPageSize, setDocPageSize] = useState(50)
+  const [docPage, setDocPage] = useState(1)
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
   const [driveUploading, setDriveUploading] = useState<string | null>(null) // doc.id being uploaded
   const [soToInvoiceResult, setSoToInvoiceResult] = useState<string | null>(null)
@@ -2978,6 +2980,12 @@ export default function OrdersPage() {
           return docSortDir === 'asc' ? cmp : -cmp
         })
     : []
+  // Reset to page 1 when tab, search or archive view changes
+  useEffect(() => { setDocPage(1) }, [tab, clientSearch, showArchive, docSortBy, docSortDir])
+
+  const docPageCount = Math.max(1, Math.ceil(docRows.length / docPageSize))
+  const safeDocPage = Math.min(docPage, docPageCount)
+  const pagedDocRows = docRows.slice((safeDocPage - 1) * docPageSize, safeDocPage * docPageSize)
   const totalCount = boRows.length + docRows.length
 
   const grandTotal =
@@ -3633,7 +3641,7 @@ export default function OrdersPage() {
                   ))}
 
                   {/* Standalone document rows */}
-                  {docRows.map((doc) => {
+                  {pagedDocRows.map((doc) => {
                     const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
                     const disc = sub * ((doc as any).discountPct || 0) / 100
                     const ship = (doc as any).shippingCost || 0
@@ -3780,6 +3788,63 @@ export default function OrdersPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {tab !== 'backorders' && docPageCount > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100 bg-white rounded-b-xl">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">Rows per page:</span>
+                  {[25, 50, 75, 100].map(n => (
+                    <button
+                      key={n}
+                      onClick={() => { setDocPageSize(n); setDocPage(1) }}
+                      className={`px-2.5 py-1 text-xs rounded-lg font-semibold border transition-colors ${docPageSize === n ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                    >{n}</button>
+                  ))}
+                  <span className="text-xs text-gray-400 ml-2">{docRows.length} total</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDocPage(p => Math.max(1, p - 1))}
+                    disabled={safeDocPage === 1}
+                    className="px-2.5 py-1 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  >‹ Prev</button>
+                  {Array.from({ length: docPageCount }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === docPageCount || Math.abs(p - safeDocPage) <= 2)
+                    .reduce<(number | 'ellipsis')[]>((acc, p, i, arr) => {
+                      if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('ellipsis')
+                      acc.push(p)
+                      return acc
+                    }, [])
+                    .map((p, i) => p === 'ellipsis'
+                      ? <span key={`e${i}`} className="px-1 text-xs text-gray-400">…</span>
+                      : <button key={p} onClick={() => setDocPage(p as number)}
+                          className={`w-8 h-7 text-xs rounded-lg border font-semibold transition-colors ${safeDocPage === p ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                        >{p}</button>
+                    )}
+                  <button
+                    onClick={() => setDocPage(p => Math.min(docPageCount, p + 1))}
+                    disabled={safeDocPage === docPageCount}
+                    className="px-2.5 py-1 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                  >Next ›</button>
+                </div>
+              </div>
+            )}
+
+            {/* Page size selector when only 1 page */}
+            {tab !== 'backorders' && docPageCount === 1 && docRows.length > 0 && (
+              <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-100 bg-white rounded-b-xl">
+                <span className="text-xs text-gray-500">Rows per page:</span>
+                {[25, 50, 75, 100].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => { setDocPageSize(n); setDocPage(1) }}
+                    className={`px-2.5 py-1 text-xs rounded-lg font-semibold border transition-colors ${docPageSize === n ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                  >{n}</button>
+                ))}
+                <span className="text-xs text-gray-400 ml-2">{docRows.length} total</span>
+              </div>
+            )}
           </div>
         </>
       )}
