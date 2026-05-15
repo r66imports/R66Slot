@@ -3215,7 +3215,7 @@ function WorksheetSupplierOrderModal({
     const invItems = jdmItems.map(it => ({ sku: it.sku, description: it.description, qty: it.qty, unitPrice: it.landedCost || 0 }))
     if (!invItems.length) return
     const billedTo = `
-      <p style="font-size:13px;font-weight:700;">${companyInfo.name}</p>
+      <p style="font-size:13px;font-weight:700;">Route 66 Imports (PTY) LTD</p>
       ${companyInfo.address ? `<p style="font-size:12px;color:#374151;">${companyInfo.address}</p>` : ''}
       ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
       ${companyInfo.phone ? `<p style="font-size:12px;color:#374151;">${companyInfo.phone}</p>` : ''}
