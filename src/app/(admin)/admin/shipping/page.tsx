@@ -2,15 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
-interface ShippingZone {
-  id: string
-  name: string
-  regions: string
-  rate: string
-  freeAbove: string
-  enabled: boolean
-}
-
 interface ShippingRow {
   id: string
   docNumber: string
@@ -29,12 +20,6 @@ interface AccountsData {
   totalPaid: number
   outstanding: number
 }
-
-const DEFAULT_ZONES: ShippingZone[] = [
-  { id: '1', name: 'Local (Gauteng)',         regions: 'Gauteng',          rate: '75',  freeAbove: '500', enabled: true },
-  { id: '2', name: 'National (South Africa)', regions: 'All SA provinces', rate: '120', freeAbove: '750', enabled: true },
-  { id: '3', name: 'International',           regions: 'Rest of world',    rate: '350', freeAbove: '',    enabled: false },
-]
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
@@ -56,9 +41,6 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 export default function ShippingPage() {
-  const [zones, setZones] = useState<ShippingZone[]>(DEFAULT_ZONES)
-  const [editing, setEditing] = useState<string | null>(null)
-
   // Shipping Accounts
   const [fromDate, setFromDate] = useState('')
   const [toDate,   setToDate]   = useState('')
@@ -81,10 +63,6 @@ export default function ShippingPage() {
   }, [fromDate, toDate])
 
   useEffect(() => { loadAccounts() }, [loadAccounts])
-
-  const toggleZone = (id: string) => setZones(zones.map(z => z.id === id ? { ...z, enabled: !z.enabled } : z))
-  const updateZone = (id: string, field: keyof ShippingZone, value: string) =>
-    setZones(zones.map(z => z.id === id ? { ...z, [field]: value } : z))
 
   function toggleSort(col: typeof sortBy) {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -189,52 +167,6 @@ export default function ShippingPage() {
       <div>
         <h1 className="text-3xl font-bold">Shipping</h1>
         <p className="text-gray-600 mt-1">Configure shipping zones and rates for your store</p>
-      </div>
-
-      {/* ── Zones ── */}
-      <div className="space-y-4">
-        {zones.map(zone => (
-          <div key={zone.id} className="bg-white rounded-2xl border p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={zone.enabled} onChange={() => toggleZone(zone.id)} className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600" />
-                </label>
-                <div>
-                  <h3 className="font-semibold text-lg">{zone.name}</h3>
-                  <p className="text-sm text-gray-500">{zone.regions}</p>
-                </div>
-              </div>
-              {editing === zone.id ? (
-                <div className="flex items-center gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500">Rate (R)</label>
-                    <input type="number" value={zone.rate} onChange={e => updateZone(zone.id, 'rate', e.target.value)}
-                      className="w-24 px-2 py-1 border rounded text-sm block" />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500">Free above (R)</label>
-                    <input type="number" value={zone.freeAbove} placeholder="Never"
-                      onChange={e => updateZone(zone.id, 'freeAbove', e.target.value)}
-                      className="w-24 px-2 py-1 border rounded text-sm block" />
-                  </div>
-                  <button onClick={() => setEditing(null)}
-                    className="mt-4 px-4 py-1.5 bg-gray-900 text-white rounded-lg text-sm font-semibold">Done</button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="font-semibold">R{zone.rate}</p>
-                    {zone.freeAbove && <p className="text-xs text-green-600">Free above R{zone.freeAbove}</p>}
-                  </div>
-                  <button onClick={() => setEditing(zone.id)}
-                    className="px-4 py-1.5 border rounded-lg text-sm font-semibold hover:bg-gray-50">Edit</button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* ── Shipping Accounts ── */}
