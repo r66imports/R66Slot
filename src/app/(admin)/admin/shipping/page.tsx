@@ -66,6 +66,8 @@ export default function ShippingPage() {
   const [loading,  setLoading]  = useState(false)
   const [savingId, setSavingId] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [sortBy,  setSortBy]  = useState<'date' | 'docNumber' | 'clientName' | 'shippingMethod' | 'shippingCost' | 'status'>('date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const loadAccounts = useCallback(async () => {
     setLoading(true)
@@ -83,6 +85,22 @@ export default function ShippingPage() {
   const toggleZone = (id: string) => setZones(zones.map(z => z.id === id ? { ...z, enabled: !z.enabled } : z))
   const updateZone = (id: string, field: keyof ShippingZone, value: string) =>
     setZones(zones.map(z => z.id === id ? { ...z, [field]: value } : z))
+
+  function toggleSort(col: typeof sortBy) {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(col); setSortDir('asc') }
+  }
+
+  const sortedRows = [...accounts.rows].sort((a, b) => {
+    let cmp = 0
+    if (sortBy === 'date')           cmp = new Date(a.date).getTime() - new Date(b.date).getTime()
+    else if (sortBy === 'docNumber') cmp = a.docNumber.localeCompare(b.docNumber, undefined, { numeric: true })
+    else if (sortBy === 'clientName') cmp = a.clientName.localeCompare(b.clientName)
+    else if (sortBy === 'shippingMethod') cmp = a.shippingMethod.localeCompare(b.shippingMethod)
+    else if (sortBy === 'shippingCost') cmp = a.shippingCost - b.shippingCost
+    else if (sortBy === 'status')    cmp = a.status.localeCompare(b.status)
+    return sortDir === 'asc' ? cmp : -cmp
+  })
 
   async function togglePaid(row: ShippingRow) {
     const newPaid = !row.shippingPaid
@@ -296,17 +314,32 @@ export default function ShippingPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-gray-50">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Invoice #</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Method</th>
-                  <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Shipping</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Inv. Status</th>
+                  {([
+                    { col: 'date',           label: 'Date',       align: 'left'   },
+                    { col: 'docNumber',      label: 'Invoice #',  align: 'left'   },
+                    { col: 'clientName',     label: 'Client',     align: 'left'   },
+                    { col: 'shippingMethod', label: 'Method',     align: 'left'   },
+                    { col: 'shippingCost',   label: 'Shipping',   align: 'right'  },
+                    { col: 'status',         label: 'Inv. Status',align: 'left'   },
+                  ] as { col: typeof sortBy; label: string; align: string }[]).map(({ col, label, align }) => (
+                    <th key={col}
+                      onClick={() => toggleSort(col)}
+                      className={`px-5 py-3 text-xs font-semibold uppercase tracking-wide cursor-pointer select-none group ${align === 'right' ? 'text-right' : 'text-left'} ${sortBy === col ? 'text-blue-600' : 'text-gray-500 hover:text-gray-800'}`}>
+                      <span className="inline-flex items-center gap-1">
+                        {label}
+                        <span className={`transition-opacity ${sortBy === col ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>
+                          {sortBy === col
+                            ? (sortDir === 'asc' ? '↑' : '↓')
+                            : '↕'}
+                        </span>
+                      </span>
+                    </th>
+                  ))}
                   <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Paid</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {accounts.rows.map(r => {
+                {sortedRows.map(r => {
                   const hasShipping = r.shippingCost > 0
                   return (
                     <tr key={r.id} className={
