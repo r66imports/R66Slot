@@ -79,10 +79,10 @@ export async function GET(_request: NextRequest) {
 
       // Admin documents (quotes, sales orders, invoices)
       ...documents.filter(matchesCustomer).map((d: any) => {
-        const sub = (d.lineItems || []).reduce((s: number, i: any) => s + (Number(i.price || 0) * Number(i.qty || 1)), 0)
+        const sub = (d.lineItems || []).reduce((s: number, i: any) => s + (Number(i.unitPrice || i.price || 0) * Number(i.qty || 1)), 0)
         const disc = d.discountPct ? sub * (d.discountPct / 100) : 0
         const ship = Number(d.shippingCost || 0)
-        const total = (sub - disc + ship) * 1.15
+        const total = sub - disc + ship
         return {
           id: d.id,
           ref: d.docNumber || d.id?.slice(-8).toUpperCase(),
@@ -90,6 +90,7 @@ export async function GET(_request: NextRequest) {
           date: d.createdAt || new Date().toISOString(),
           status: d.status || 'draft',
           amountPaid: Number(d.amountPaid || 0),
+          creditApplied: Number(d.creditApplied || 0),
           total,
           discountPct: Number(d.discountPct || 0),
           shippingCost: Number(d.shippingCost || 0),
@@ -97,7 +98,7 @@ export async function GET(_request: NextRequest) {
             sku: i.sku || '',
             description: i.description || '',
             qty: Number(i.qty || 1),
-            price: Number(i.price || 0),
+            price: Number(i.unitPrice || i.price || 0),
           })),
         }
       }),

@@ -89,21 +89,17 @@ export default function OrdersPage() {
   // Stats
   const stats = useMemo(() => {
     const invoices = entries.filter(e => e.type === 'invoice')
-    const totalSpent = entries
-      .filter(e => ['invoice', 'order'].includes(e.type))
-      .reduce((s, e) => s + e.total, 0)
 
-    const now = new Date()
-    const thisMonth = entries
-      .filter(e => {
-        const d = new Date(e.date)
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-      })
-      .reduce((s, e) => s + e.total, 0)
+    const totalInvoiced = invoices.reduce((s, e) => s + e.total, 0)
+    const totalPaid = invoices.reduce((s, e) => s + (e.amountPaid ?? 0), 0)
+    const totalOutstanding = invoices.reduce((s, e) => s + getOutstanding(e), 0)
+    const totalCredit = invoices.reduce((s, e) => {
+      const paid = (e.amountPaid ?? 0) + ((e as any).creditApplied ?? 0)
+      return s + Math.max(0, paid - e.total)
+    }, 0)
 
     const totalItems = entries.reduce((s, e) => s + e.items.reduce((si, i) => si + i.qty, 0), 0)
 
-    // Most ordered item
     const skuCount: Record<string, { desc: string; qty: number }> = {}
     entries.forEach(e => e.items.forEach(i => {
       const key = i.sku || i.description
@@ -113,15 +109,7 @@ export default function OrdersPage() {
     }))
     const topItem = Object.values(skuCount).sort((a, b) => b.qty - a.qty)[0]
 
-    // Outstanding balance across all invoices
-    const totalOutstanding = invoices.reduce((s, e) => s + getOutstanding(e), 0)
-    // Overpaid / credit: amountPaid > total
-    const totalCredit = invoices.reduce((s, e) => {
-      const paid = e.amountPaid ?? 0
-      return s + Math.max(0, paid - e.total)
-    }, 0)
-
-    return { totalSpent, thisMonth, totalItems, topItem, totalOutstanding, totalCredit }
+    return { totalInvoiced, totalPaid, totalOutstanding, totalCredit, totalItems, topItem }
   }, [entries])
 
   // Monthly breakdown — last 6 months
@@ -239,8 +227,6 @@ export default function OrdersPage() {
     )
   }
 
-  const hasBalance = stats.totalOutstanding > 0 || stats.totalCredit > 0
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -262,57 +248,49 @@ export default function OrdersPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Invoiced */}
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Spent</p>
-          <p className="text-2xl font-bold text-gray-900">{fmt(stats.totalSpent)}</p>
-          <p className="text-xs text-gray-400 mt-1">Invoices &amp; shop orders</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Invoiced</p>
+          <p className="text-2xl font-bold text-gray-900">{fmt(stats.totalInvoiced)}</p>
+          <p className="text-xs text-gray-400 mt-1">Total billed to you</p>
         </div>
 
-        {/* Balance card — outstanding (red) or credit (green) or clear */}
-        {hasBalance ? (
-          stats.totalOutstanding > 0 ? (
-            <div className="bg-red-50 border border-red-100 rounded-2xl shadow-sm p-5">
-              <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-1">Amount Due</p>
-              <p className="text-2xl font-bold text-red-600">{fmt(stats.totalOutstanding)}</p>
-              <p className="text-xs text-red-400 mt-1">Outstanding on invoices</p>
-            </div>
-          ) : (
-            <div className="bg-green-50 border border-green-100 rounded-2xl shadow-sm p-5">
-              <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1">Credit</p>
-              <p className="text-2xl font-bold text-green-600">{fmt(stats.totalCredit)}</p>
-              <p className="text-xs text-green-500 mt-1">Overpaid on invoices</p>
-            </div>
-          )
-        ) : entries.some(e => e.type === 'invoice') ? (
-          <div className="bg-green-50 border border-green-100 rounded-2xl shadow-sm p-5">
-            <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1">Balance</p>
-            <p className="text-2xl font-bold text-green-600">All Clear</p>
-            <p className="text-xs text-green-500 mt-1">All invoices paid</p>
+        {/* Total Paid */}
+        <div className="bg-green-50 border border-green-100 rounded-2xl shadow-sm p-5">
+          <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1">Total Paid</p>
+          <p className="text-2xl font-bold text-green-600">{fmt(stats.totalPaid)}</p>
+          <p className="text-xs text-green-500 mt-1">Payments recorded</p>
+        </div>
+
+        {/* Outstanding */}
+        {stats.totalOutstanding > 0 ? (
+          <div className="bg-red-50 border border-red-100 rounded-2xl shadow-sm p-5">
+            <p className="text-xs font-semibold text-red-400 uppercase tracking-wide mb-1">Outstanding</p>
+            <p className="text-2xl font-bold text-red-600">{fmt(stats.totalOutstanding)}</p>
+            <p className="text-xs text-red-400 mt-1">Amount still owed</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm p-5">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">This Month</p>
-            <p className="text-2xl font-bold text-red-600">{fmt(stats.thisMonth)}</p>
-            <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' })}</p>
+          <div className="bg-green-50 border border-green-100 rounded-2xl shadow-sm p-5">
+            <p className="text-xs font-semibold text-green-500 uppercase tracking-wide mb-1">Outstanding</p>
+            <p className="text-2xl font-bold text-green-600">All Clear</p>
+            <p className="text-xs text-green-500 mt-1">No amount owing</p>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Items</p>
-          <p className="text-2xl font-bold text-gray-900">{stats.totalItems}</p>
-          <p className="text-xs text-gray-400 mt-1">Across {entries.length} records</p>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm p-5">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Most Ordered</p>
-          {stats.topItem ? (
-            <>
-              <p className="text-sm font-bold text-gray-900 line-clamp-1">{stats.topItem.desc}</p>
-              <p className="text-xs text-gray-400 mt-1">{stats.topItem.qty}× ordered</p>
-            </>
-          ) : (
-            <p className="text-sm text-gray-400">—</p>
-          )}
-        </div>
+        {/* Credits */}
+        {stats.totalCredit > 0 ? (
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl shadow-sm p-5">
+            <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">Store Credit</p>
+            <p className="text-2xl font-bold text-blue-600">{fmt(stats.totalCredit)}</p>
+            <p className="text-xs text-blue-400 mt-1">Available credit</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-sm p-5">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Items</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.totalItems}</p>
+            <p className="text-xs text-gray-400 mt-1">Across {entries.length} records</p>
+          </div>
+        )}
       </div>
 
       {/* Monthly spend chart */}
