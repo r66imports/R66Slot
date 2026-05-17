@@ -3715,9 +3715,13 @@ export default function OrdersPage() {
                     const disc = sub * ((doc as any).discountPct || 0) / 100
                     const ship = (doc as any).shippingCost || 0
                     const docTotal = sub - disc + ship
+                    const amtPaid = (doc as any).amountPaid || 0
+                    const docBalance = Math.max(0, docTotal - amtPaid - ((doc as any).creditApplied || 0))
+                    const isPartiallyPaid = doc.type === 'invoice' && amtPaid > 0 && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
+                    const hasOutstanding = doc.type === 'invoice' && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
-                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
+                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 text-xs">
                           <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
                           {(doc as any).sourceQuoteNumber && (
@@ -3727,7 +3731,11 @@ export default function OrdersPage() {
                         <td className="py-3 px-4 text-xs text-gray-500">{fmtDate(doc.date)}</td>
                         <td className="py-3 px-4 text-xs font-medium">{doc.clientName}</td>
                         <td className="py-3 px-4 text-xs text-gray-600 break-words">{firstDesc}</td>
-                        <td className="py-3 px-4 text-xs text-right font-semibold">{fmtPrice(docTotal)}</td>
+                        <td className="py-3 px-4 text-xs text-right">
+                          <div className="font-semibold">{fmtPrice(docTotal)}</div>
+                          {isPartiallyPaid && <div className="text-[10px] text-red-600 font-semibold mt-0.5">Due {fmtPrice(docBalance)}</div>}
+                          {amtPaid > 0 && !isPartiallyPaid && doc.status !== 'paid' && doc.status !== 'archived' && <div className="text-[10px] text-green-600 mt-0.5">Paid {fmtPrice(amtPaid)}</div>}
+                        </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">
                             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
@@ -3747,6 +3755,11 @@ export default function OrdersPage() {
                             {(doc as any).paymentMethod2 && (
                               <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod2}</span>
                             )}
+                            {isPartiallyPaid && (
+                              <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                                Partial · Due {fmtPrice(docBalance)}
+                              </span>
+                            )}
                             {doc.type === 'invoice' && (() => {
                               const key = doc.clientName.toLowerCase().replace(/\s+/g, '_')
                               const bal = creditBalances[key]
@@ -3761,9 +3774,9 @@ export default function OrdersPage() {
                         <td className="py-3 px-4 text-center">
                           <ActionsDropdown items={[
                             ...(doc.type === 'invoice' ? [{
-                              label: 'Record Payment',
+                              label: isPartiallyPaid ? `Record Payment (Due ${fmtPrice(docBalance)})` : 'Record Payment',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
-                              className: (doc as any).amountPaid > 0 || doc.status === 'paid' ? 'text-green-600 font-semibold' : 'text-blue-600',
+                              className: isPartiallyPaid ? 'text-red-600 font-semibold' : (amtPaid > 0 || doc.status === 'paid' ? 'text-green-600 font-semibold' : 'text-blue-600'),
                               onClick: () => handleRecordPayment(doc),
                             }] : []),
                             ...(doc.type === 'invoice' && doc.status !== 'paid' ? [{
@@ -3820,9 +3833,10 @@ export default function OrdersPage() {
                             }] : []),
                             'separator' as const,
                             {
-                              label: 'Send to Archive',
+                              label: hasOutstanding ? 'Archive (pay first)' : 'Send to Archive',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8" /></svg>,
-                              className: 'text-gray-500',
+                              className: hasOutstanding ? 'text-gray-300' : 'text-gray-500',
+                              disabled: hasOutstanding,
                               onClick: async () => {
                                 const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
                                 if (res.ok) {
@@ -3836,7 +3850,6 @@ export default function OrdersPage() {
                               },
                             },
                             { label: 'Push to Sage', onClick: () => {}, disabled: true, className: 'text-gray-400' },
-                            'separator' as const,
                             'separator' as const,
                             {
                               label: (doc as any).redFlag ? '🚩 Remove Flag' : '🚩 Red Flag',
