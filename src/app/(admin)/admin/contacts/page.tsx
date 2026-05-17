@@ -498,6 +498,471 @@ function DeliveryBadges({ c }: { c: Contact }) {
   )
 }
 
+// ─── Customer Dashboard Modal ─────────────────────────────────────────────────
+
+const fmt = (n: number) => `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmtD = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
+const DATE_PRESETS = [
+  { label: 'Last 30 days', days: 30 },
+  { label: 'Last 90 days', days: 90 },
+  { label: 'This year',    days: -1 },
+  { label: 'All time',     days: 0 },
+]
+function presetDates(days: number) {
+  const to = new Date().toISOString().slice(0, 10)
+  if (days === 0) return { from: '', to: '' }
+  if (days === -1) return { from: `${new Date().getFullYear()}-01-01`, to }
+  return { from: new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10), to }
+}
+
+function CustomerDashboardModal({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+  const [fullScreen, setFullScreen] = useState(false)
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+  const [data, setData] = useState<any>(null)
+  const [backorders, setBackorders] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState<'info' | 'invoices' | 'items' | 'outstanding' | 'credits' | 'backorders'>('info')
+
+  const name = fullName(contact)
+
+  const loadData = useCallback(async (from: string, to: string) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ client: name })
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
+      const [dashRes, boRes] = await Promise.all([
+        fetch(`/api/admin/customer-dashboard?${params}`),
+        fetch('/api/admin/backorders'),
+      ])
+      if (dashRes.ok) setData(await dashRes.json())
+      if (boRes.ok) {
+        const allBo: any[] = await boRes.json()
+        setBackorders(allBo.filter(b => b.clientName?.toLowerCase() === name.toLowerCase()))
+      }
+    } finally { setLoading(false) }
+  }, [name])
+
+  useEffect(() => { loadData('', '') }, [loadData])
+
+  function applyDates(from: string, to: string) {
+    setDateFrom(from); setDateTo(to); loadData(from, to)
+  }
+
+  const invoices = data ? (data.documents || []).filter((d: any) => d.type === 'invoice') : []
+  const allDocs  = data ? (data.documents || []) : []
+  const unpaidInv = invoices.filter((d: any) => d.status !== 'paid' && d.status !== 'archived' && d.status !== 'cancelled')
+  const totalInvoiced    = invoices.reduce((s: number, d: any) => s + d._total, 0)
+  const totalPaid        = invoices.reduce((s: number, d: any) => s + (d.amountPaid || 0), 0)
+  const totalOutstanding = unpaidInv.reduce((s: number, d: any) => s + (d._total - (d.amountPaid || 0)), 0)
+  const creditBalance    = data?.credit?.balance ?? 0
+
+  const itemsMap: Record<string, any> = {}
+  invoices.forEach((d: any) => {
+    (d.lineItems || []).forEach((li: any) => {
+      const k = li.sku || li.description; if (!k) return
+      if (!itemsMap[k]) itemsMap[k] = { sku: li.sku, description: li.description, totalQty: 0, totalSpent: 0 }
+      itemsMap[k].totalQty += li.qty || 0
+      itemsMap[k].totalSpent += (li.qty || 0) * (li.unitPrice || 0)
+    })
+  })
+  const itemsList = Object.values(itemsMap).sort((a: any, b: any) => b.totalSpent - a.totalSpent)
+
+  function downloadStatement() {
+    const dateRange = dateFrom || dateTo ? `${dateFrom || '—'} to ${dateTo || '—'}` : 'All time'
+    const invRows = invoices.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((d: any, i: number) => {
+        const bal = d._total - (d.amountPaid || 0)
+        return `<tr><td>${i+1}</td><td>${fmtD(d.createdAt)}</td><td>${d.docNumber}</td>
+          <td style="text-align:right">${fmt(d._total)}</td>
+          <td style="text-align:right">${fmt(d.amountPaid||0)}</td>
+          <td style="text-align:right;color:${bal>0?'#dc2626':'#16a34a'}">${fmt(Math.max(0,bal))}</td>
+          <td>${d.status}</td></tr>`
+      }).join('')
+    const itRows = itemsList.map((it: any, i: number) =>
+      `<tr><td>${i+1}</td><td>${it.sku||'—'}</td><td>${it.description}</td>
+       <td style="text-align:center">${it.totalQty}</td><td style="text-align:right">${fmt(it.totalSpent)}</td></tr>`
+    ).join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Statement – ${name}</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:16mm;font-size:13px}
+    h1{font-size:22px;font-weight:800}h2{font-size:13px;font-weight:700;margin:18px 0 6px;text-transform:uppercase;letter-spacing:.05em;color:#374151}
+    .meta{color:#6b7280;font-size:12px;margin-top:4px}
+    .cards{display:flex;gap:12px;margin:14px 0}.card{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:10px}
+    .cl{font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}.cv{font-size:17px;font-weight:800;margin-top:3px}
+    table{width:100%;border-collapse:collapse;margin-top:6px}
+    th{background:#f3f4f6;padding:6px 9px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase}
+    td{padding:6px 9px;border-bottom:1px solid #f3f4f6;font-size:12px}@page{size:A4;margin:0}</style>
+    </head><body>
+    <h1>Customer Statement</h1>
+    <p class="meta">${name}${contact.email?` · ${contact.email}`:''}${contact.phone?` · ${contact.phone}`:''}</p>
+    <p class="meta">Period: ${dateRange} · Generated: ${new Date().toLocaleDateString('en-ZA')}</p>
+    <div class="cards">
+      <div class="card"><div class="cl">Total Invoiced</div><div class="cv">${fmt(totalInvoiced)}</div></div>
+      <div class="card"><div class="cl">Total Paid</div><div class="cv" style="color:#16a34a">${fmt(totalPaid)}</div></div>
+      <div class="card"><div class="cl">Outstanding</div><div class="cv" style="color:${totalOutstanding>0?'#dc2626':'#374151'}">${fmt(totalOutstanding)}</div></div>
+      <div class="card"><div class="cl">Credits</div><div class="cv" style="color:#2563eb">${fmt(creditBalance)}</div></div>
+    </div>
+    <h2>Invoice History</h2>
+    <table><thead><tr><th>#</th><th>Date</th><th>Invoice #</th><th style="text-align:right">Total</th><th style="text-align:right">Paid</th><th style="text-align:right">Balance</th><th>Status</th></tr></thead>
+    <tbody>${invRows||'<tr><td colspan="7" style="color:#9ca3af;text-align:center">No invoices</td></tr>'}</tbody></table>
+    <h2>Items Purchased</h2>
+    <table><thead><tr><th>#</th><th>SKU</th><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Spent</th></tr></thead>
+    <tbody>${itRows||'<tr><td colspan="5" style="color:#9ca3af;text-align:center">No items</td></tr>'}</tbody></table>
+    </body></html>`
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
+  }
+
+  function downloadInvoice(doc: any) {
+    const rows = (doc.lineItems || []).map((li: any, i: number) =>
+      `<tr><td>${i+1}</td><td style="font-family:monospace">${li.sku||'—'}</td><td>${li.description}</td>
+       <td style="text-align:center">${li.qty}</td><td style="text-align:right">${fmt(li.unitPrice)}</td>
+       <td style="text-align:right;font-weight:700">${fmt(li.qty*li.unitPrice)}</td></tr>`
+    ).join('')
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice ${doc.docNumber}</title>
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;font-size:13px}
+    .hdr{display:flex;justify-content:space-between;margin-bottom:24px}
+    .title{font-size:28px;font-weight:800}.meta{font-size:12px;color:#6b7280;margin-top:3px}
+    .boxes{display:flex;gap:24px;margin-bottom:24px}
+    .box{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px}
+    .bl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:5px}
+    table{width:100%;border-collapse:collapse}thead tr{border-bottom:2px solid #111}
+    th{padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280}
+    th.r{text-align:right}td{padding:8px 10px;border-bottom:1px solid #f3f4f6;font-size:13px}
+    tfoot tr{border-top:2px solid #111}@page{size:A4;margin:0}</style>
+    </head><body>
+    <div class="hdr"><div><p class="title">INVOICE</p><p class="meta">${doc.docNumber}</p><p class="meta">Date: ${fmtD(doc.createdAt)}</p></div></div>
+    <div class="boxes">
+      <div class="box"><p class="bl">Billed To</p><p style="font-weight:700">${doc.clientName}</p></div>
+      <div class="box"><p class="bl">Invoice Total</p><p style="font-size:20px;font-weight:800">${fmt(doc._total)}</p><p style="font-size:11px;color:#9ca3af">Status: ${doc.status}</p></div>
+    </div>
+    <table><thead><tr><th style="width:32px">#</th><th>SKU</th><th>Description</th><th class="r" style="width:55px">Qty</th><th class="r" style="width:110px">Unit Price</th><th class="r" style="width:110px">Total</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="5" style="text-align:right;color:#6b7280;padding-right:10px">Total</td><td style="text-align:right;font-size:15px;font-weight:800">${fmt(doc._total)}</td></tr></tfoot>
+    </table></body></html>`
+    const win = window.open('', '_blank')
+    if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
+  }
+
+  const TABS = [
+    { key: 'info',        label: 'Customer Info' },
+    { key: 'invoices',    label: `Invoices (${invoices.length})` },
+    { key: 'items',       label: `Items (${itemsList.length})` },
+    { key: 'outstanding', label: `Outstanding (${unpaidInv.length})` },
+    { key: 'credits',     label: 'Credits' },
+    { key: 'backorders',  label: `Backorders (${backorders.length})` },
+  ] as const
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className={`bg-white flex flex-col ${fullScreen ? 'w-full h-full rounded-none' : 'rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh]'}`}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+              {contact.firstName.charAt(0)}{contact.lastName.charAt(0) || ''}
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">{name}</h2>
+              <p className="text-xs text-gray-400">{contact.email}{contact.phone ? ` · ${contact.phone}` : ''}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {data && (
+              <button onClick={downloadStatement} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                Download Statement
+              </button>
+            )}
+            <button onClick={() => setFullScreen(f => !f)} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100" title={fullScreen ? 'Restore' : 'Fullscreen'}>
+              {fullScreen
+                ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5M15 15l5.25 5.25" /></svg>
+                : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+              }
+            </button>
+            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 text-lg leading-none">✕</button>
+          </div>
+        </div>
+
+        {/* Date range */}
+        <div className="flex items-center gap-3 px-6 py-2.5 border-b border-gray-100 bg-gray-50 flex-shrink-0 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Period:</span>
+          <input type="date" value={dateFrom} onChange={e => applyDates(e.target.value, dateTo)} className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <span className="text-xs text-gray-400">to</span>
+          <input type="date" value={dateTo} onChange={e => applyDates(dateFrom, e.target.value)} className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          {DATE_PRESETS.map(p => (
+            <button key={p.label} onClick={() => { const d = presetDates(p.days); applyDates(d.from, d.to) }}
+              className="px-2.5 py-1 text-xs border border-gray-200 rounded-lg hover:bg-white text-gray-600 hover:border-gray-300">
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Summary cards */}
+        {data && (
+          <div className="grid grid-cols-4 gap-3 px-6 py-3 border-b border-gray-100 flex-shrink-0">
+            {[
+              { label: 'Total Invoiced', value: fmt(totalInvoiced), color: 'text-gray-900' },
+              { label: 'Total Paid',     value: fmt(totalPaid),     color: 'text-green-700' },
+              { label: 'Outstanding',    value: fmt(totalOutstanding), color: totalOutstanding > 0 ? 'text-red-600' : 'text-gray-400' },
+              { label: 'Store Credits',  value: fmt(creditBalance),  color: 'text-blue-700' },
+            ].map(c => (
+              <div key={c.label} className="bg-gray-50 rounded-xl px-4 py-2.5">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{c.label}</p>
+                <p className={`text-base font-bold mt-0.5 ${c.color}`}>{c.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex border-b border-gray-100 flex-shrink-0 overflow-x-auto">
+          {TABS.map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key as any)}
+              className={`px-4 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${activeTab === t.key ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-800'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          {loading && (
+            <div className="flex items-center justify-center h-32 text-gray-400">
+              <svg className="w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
+              Loading…
+            </div>
+          )}
+
+          {/* Customer Info */}
+          {!loading && activeTab === 'info' && (
+            <div className="p-6 grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Contact</p>
+                  {contact.email && <p className="text-sm text-blue-600">{contact.email}</p>}
+                  {contact.phone && <p className="text-sm text-gray-700">{contact.phone}</p>}
+                  {contact.mobile && <p className="text-sm text-gray-500">{contact.mobile}</p>}
+                </div>
+                <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Address</p>
+                  {contact.addressStreet && <p className="text-sm text-gray-700">{contact.addressStreet}</p>}
+                  <p className="text-sm text-gray-700">{[contact.addressCity, contact.addressProvince, contact.addressPostalCode].filter(Boolean).join(', ')}</p>
+                  {contact.addressCountry && <p className="text-sm text-gray-500">{contact.addressCountry}</p>}
+                </div>
+                {contact.clubName && (
+                  <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Club</p>
+                    <p className="text-sm font-semibold text-indigo-700">🏁 {contact.clubName}</p>
+                    {contact.clubMemberId && <p className="text-xs text-gray-400">Member ID: {contact.clubMemberId}</p>}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-4">
+                {contact.companyName && (
+                  <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Business</p>
+                    <p className="text-sm font-semibold text-emerald-700">🏢 {contact.companyName}</p>
+                    {contact.companyVAT && <p className="text-xs text-gray-400">VAT: {contact.companyVAT}</p>}
+                    {contact.companyAddress && <p className="text-xs text-gray-500 mt-1">{contact.companyAddress}</p>}
+                  </div>
+                )}
+                <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Delivery Preferences</p>
+                  <DeliveryBadges c={contact} />
+                </div>
+                {contact.notes && (
+                  <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Notes</p>
+                    <p className="text-sm text-gray-600">{contact.notes}</p>
+                  </div>
+                )}
+                <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Stats</p>
+                  <p className="text-sm text-gray-700">Total Orders: <strong>{contact.totalOrders}</strong></p>
+                  <p className="text-sm text-gray-700">Total Spent: <strong>{fmt(contact.totalSpent || 0)}</strong></p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Invoices */}
+          {!loading && activeTab === 'invoices' && (
+            invoices.length === 0
+              ? <p className="text-center py-12 text-gray-400 text-sm">No invoices found</p>
+              : <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Invoice #</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Paid</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Balance</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                      <th className="px-4 py-3 w-12"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {[...invoices].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((d: any) => {
+                      const bal = d._total - (d.amountPaid || 0)
+                      return (
+                        <tr key={d.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 text-gray-600 text-xs">{fmtD(d.createdAt)}</td>
+                          <td className="px-4 py-2.5 font-mono text-xs font-semibold text-blue-700">{d.docNumber}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold text-gray-900 text-xs">{fmt(d._total)}</td>
+                          <td className="px-4 py-2.5 text-right text-green-700 text-xs">{fmt(d.amountPaid || 0)}</td>
+                          <td className={`px-4 py-2.5 text-right font-semibold text-xs ${bal > 0.005 ? 'text-red-600' : 'text-gray-400'}`}>{fmt(Math.max(0, bal))}</td>
+                          <td className="px-4 py-2.5 text-center">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${d.status==='paid'?'bg-green-100 text-green-700':d.status==='archived'?'bg-gray-100 text-gray-500':'bg-yellow-100 text-yellow-700'}`}>{d.status}</span>
+                          </td>
+                          <td className="px-2 py-2.5 text-center">
+                            <button onClick={() => downloadInvoice(d)} className="p-1 text-gray-400 hover:text-gray-700" title="Download Invoice">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+          )}
+
+          {/* Items */}
+          {!loading && activeTab === 'items' && (
+            itemsList.length === 0
+              ? <p className="text-center py-12 text-gray-400 text-sm">No items found</p>
+              : <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SKU</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Description</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Qty</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total Spent</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {itemsList.map((it: any) => (
+                      <tr key={it.sku || it.description} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 font-mono text-xs font-semibold text-blue-700">{it.sku || '—'}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-700">{it.description}</td>
+                        <td className="px-4 py-2.5 text-center font-semibold text-gray-900 text-xs">{it.totalQty}</td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-gray-900 text-xs">{fmt(it.totalSpent)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                    <tr>
+                      <td colSpan={2} className="px-4 py-2.5 text-xs font-semibold text-gray-500 text-right uppercase">Total</td>
+                      <td className="px-4 py-2.5 text-center font-bold text-gray-900 text-xs">{itemsList.reduce((s: number, it: any) => s + it.totalQty, 0)}</td>
+                      <td className="px-4 py-2.5 text-right font-bold text-gray-900 text-xs">{fmt(itemsList.reduce((s: number, it: any) => s + it.totalSpent, 0))}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+          )}
+
+          {/* Outstanding */}
+          {!loading && activeTab === 'outstanding' && (
+            unpaidInv.length === 0
+              ? <p className="text-center py-12 text-gray-400 text-sm">No outstanding invoices</p>
+              : <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Invoice #</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Paid</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Balance Due</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {[...unpaidInv].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((d: any) => (
+                      <tr key={d.id} className="hover:bg-red-50/30">
+                        <td className="px-4 py-2.5 text-gray-600 text-xs">{fmtD(d.createdAt)}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs font-semibold text-blue-700">{d.docNumber}</td>
+                        <td className="px-4 py-2.5 text-right text-gray-900 text-xs">{fmt(d._total)}</td>
+                        <td className="px-4 py-2.5 text-right text-green-700 text-xs">{fmt(d.amountPaid || 0)}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-red-600 text-xs">{fmt(Math.max(0, d._total - (d.amountPaid || 0)))}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-red-50 border-t-2 border-red-200">
+                    <tr>
+                      <td colSpan={4} className="px-4 py-2.5 text-right text-xs font-semibold text-red-500 uppercase">Total Outstanding</td>
+                      <td className="px-4 py-2.5 text-right font-bold text-red-600 text-xs">{fmt(totalOutstanding)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+          )}
+
+          {/* Credits */}
+          {!loading && activeTab === 'credits' && data && (
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-semibold text-gray-700">Credit Balance</p>
+                <p className="text-2xl font-bold text-blue-700">{fmt(creditBalance)}</p>
+              </div>
+              {(data.credit?.transactions || []).length === 0
+                ? <p className="text-center py-8 text-gray-400 text-sm">No credit transactions</p>
+                : <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Type</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Invoice</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {[...data.credit.transactions].reverse().map((txn: any) => (
+                        <tr key={txn.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-2.5 text-gray-600 text-xs">{fmtD(txn.date)}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${txn.type==='overpayment'?'bg-blue-100 text-blue-700':txn.type==='credit_applied'?'bg-green-100 text-green-700':'bg-orange-100 text-orange-700'}`}>{txn.type.replace('_',' ')}</span>
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-xs text-blue-700">{txn.invoiceNumber}</td>
+                          <td className={`px-4 py-2.5 text-right font-semibold text-xs ${txn.amount>=0?'text-blue-700':'text-green-700'}`}>{txn.amount>=0?'+':''}{fmt(Math.abs(txn.amount))}</td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{txn.notes||'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+              }
+            </div>
+          )}
+
+          {/* Backorders */}
+          {!loading && activeTab === 'backorders' && (
+            backorders.length === 0
+              ? <p className="text-center py-12 text-gray-400 text-sm">No backorders for this customer</p>
+              : <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">SKU</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Description</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Qty</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Price</th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {backorders.map((b: any) => (
+                      <tr key={b.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2.5 text-gray-600 text-xs">{fmtD(b.createdAt)}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs font-semibold text-blue-700">{b.sku || '—'}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-700">{b.description}</td>
+                        <td className="px-4 py-2.5 text-center font-semibold text-xs">{b.qty}</td>
+                        <td className="px-4 py-2.5 text-right text-xs font-semibold">{fmt(b.price * b.qty)}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${b.status==='active'?'bg-blue-100 text-blue-700':b.status==='complete'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}`}>{b.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
@@ -509,6 +974,7 @@ export default function ContactsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [syncing, setSyncing]         = useState(false)
   const [syncMsg, setSyncMsg]         = useState('')
+  const [dashboardContact, setDashboardContact] = useState<Contact | null>(null)
   const [sortBy, setSortBy]           = useState<string>('name')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('asc')
   const { widths: colW, setWidth } = useColumnResize('contacts', {
@@ -827,7 +1293,7 @@ export default function ContactsPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map(c => (
-                  <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={c.id} onDoubleClick={() => setDashboardContact(c)} className="hover:bg-gray-50 transition-colors cursor-pointer" title="Double-click to open dashboard">
 
                     {/* Name */}
                     <td className="px-4 py-3">
@@ -952,6 +1418,14 @@ export default function ContactsPage() {
           initial={editFormData}
           onSave={editItem ? handleEdit : handleCreate}
           onClose={() => { setShowModal(false); setEditItem(null) }}
+        />
+      )}
+
+      {/* Customer Dashboard Modal */}
+      {dashboardContact && (
+        <CustomerDashboardModal
+          contact={dashboardContact}
+          onClose={() => setDashboardContact(null)}
         />
       )}
 
