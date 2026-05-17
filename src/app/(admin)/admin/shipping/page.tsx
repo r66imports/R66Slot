@@ -255,9 +255,11 @@ export default function ShippingPage() {
         {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 divide-x border-b">
           <div className="px-5 py-4">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Shipments</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Invoices</p>
             <p className="text-2xl font-bold">{accounts.rows.length}</p>
-            <p className="text-xs text-gray-400 mt-0.5">{period}</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {accounts.rows.filter(r => r.shippingCost > 0).length} with shipping · {period}
+            </p>
           </div>
           <div className="px-5 py-4">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Total Shipping</p>
@@ -283,7 +285,7 @@ export default function ShippingPage() {
         ) : accounts.rows.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <div className="text-4xl mb-2">📦</div>
-            <p className="text-sm font-medium">No shipping charges found</p>
+            <p className="text-sm font-medium">No invoices found</p>
             {(fromDate || toDate) && (
               <button onClick={() => { setFromDate(''); setToDate('') }}
                 className="mt-3 text-xs text-blue-600 hover:underline">Clear date filter</button>
@@ -304,36 +306,49 @@ export default function ShippingPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {accounts.rows.map(r => (
-                  <tr key={r.id} className={r.shippingPaid ? 'bg-green-50/50' : 'hover:bg-gray-50'}>
-                    <td className="px-5 py-3 text-gray-500 text-sm">{fmtDate(r.date)}</td>
-                    <td className="px-5 py-3 font-semibold">{r.docNumber}</td>
-                    <td className="px-5 py-3">{r.clientName}</td>
-                    <td className="px-5 py-3 text-gray-500">{r.shippingMethod || '—'}</td>
-                    <td className={`px-5 py-3 text-right font-bold ${r.shippingPaid ? 'text-green-700 line-through decoration-green-400' : ''}`}>
-                      {fmt(r.shippingCost)}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[r.status] || 'bg-gray-100 text-gray-500'}`}>
-                        {r.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-center">
-                      <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={r.shippingPaid}
-                          disabled={savingId === r.id}
-                          onChange={() => togglePaid(r)}
-                          className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer disabled:opacity-50"
-                        />
-                        {savingId === r.id && (
-                          <span className="w-3 h-3 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                {accounts.rows.map(r => {
+                  const hasShipping = r.shippingCost > 0
+                  return (
+                    <tr key={r.id} className={
+                      !hasShipping ? 'bg-gray-50/60' :
+                      r.shippingPaid ? 'bg-green-50/50' : 'hover:bg-gray-50'
+                    }>
+                      <td className="px-5 py-2.5 text-gray-500 text-sm">{fmtDate(r.date)}</td>
+                      <td className="px-5 py-2.5 font-semibold">{r.docNumber}</td>
+                      <td className="px-5 py-2.5">{r.clientName}</td>
+                      <td className="px-5 py-2.5 text-gray-400 text-xs">{r.shippingMethod || '—'}</td>
+                      <td className={`px-5 py-2.5 text-right font-bold ${
+                        !hasShipping ? 'text-gray-300' :
+                        r.shippingPaid ? 'text-green-700 line-through decoration-green-400' : ''
+                      }`}>
+                        {hasShipping ? fmt(r.shippingCost) : '—'}
+                      </td>
+                      <td className="px-5 py-2.5">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[r.status] || 'bg-gray-100 text-gray-500'}`}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-2.5 text-center">
+                        {hasShipping ? (
+                          <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={r.shippingPaid}
+                              disabled={savingId === r.id}
+                              onChange={() => togglePaid(r)}
+                              className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer disabled:opacity-50"
+                            />
+                            {savingId === r.id && (
+                              <span className="w-3 h-3 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                            )}
+                          </label>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
                         )}
-                      </label>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-gray-200 bg-gray-50">
@@ -342,7 +357,7 @@ export default function ShippingPage() {
                   <td />
                   <td className="px-5 py-3 text-center">
                     <span className="text-xs text-green-700 font-semibold">
-                      {accounts.rows.filter(r => r.shippingPaid).length}/{accounts.rows.length} paid
+                      {accounts.rows.filter(r => r.shippingPaid).length}/{accounts.rows.filter(r => r.shippingCost > 0).length} paid
                     </span>
                   </td>
                 </tr>
