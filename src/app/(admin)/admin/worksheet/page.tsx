@@ -71,6 +71,7 @@ interface WsSheet {
   finalCustomsCost: number
   finalMarkupPct: number
   finalVatPct: number
+  finalDiscountPct?: number
   trackingNumber?: string
   items: WsItem[]
 }
@@ -212,6 +213,7 @@ function WorksheetEditor({
   const [finalCustomsCost, setFinalCustomsCost] = useState(0)
   const [finalMarkupPct, setFinalMarkupPct] = useState(30)
   const [finalVatPct, setFinalVatPct] = useState(0)
+  const [finalDiscountPct, setFinalDiscountPct] = useState(0)
 
   // ── Items ──
   const [items, setItems] = useState<WsItem[]>([newWsItem()])
@@ -667,7 +669,10 @@ function WorksheetEditor({
   const shippingPctCalc = totalWholesaleZAR > 0 ? (finalShippingCost / totalWholesaleZAR) * 100 : 0
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
 
-  function calcFinalLanded(w: number) { return w * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100) }
+  function calcFinalLanded(w: number) {
+    const adj = finalDiscountPct > 0 ? w * (1 + finalDiscountPct / 100) : w
+    return adj * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100)
+  }
   function calcEntityFinalLanded(w: number, entity?: 'R66' | 'JDM' | '') {
     const base = calcFinalLanded(w)
     return entity === 'R66' ? base * 1.15 : base
@@ -709,7 +714,7 @@ function WorksheetEditor({
       date: worksheetDate,
       archived: false,
       currency, exchangeRate, markupPct, shippingPct, vatPct,
-      finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct,
+      finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct, finalDiscountPct,
       trackingNumber,
       items: items.map((it) => ({ ...it, skuSearch: '' })),
     }
@@ -771,6 +776,7 @@ function WorksheetEditor({
     setFinalCustomsCost(sheet.finalCustomsCost ?? 0)
     setFinalMarkupPct(sheet.finalMarkupPct)
     setFinalVatPct(sheet.finalVatPct)
+    setFinalDiscountPct((sheet as any).finalDiscountPct ?? 0)
     setTrackingNumber(sheet.trackingNumber ?? '')
     setTrackingEditMode(false)
     setItems(sheet.items.length > 0 ? sheet.items.map((it) => {
@@ -808,6 +814,7 @@ function WorksheetEditor({
     setFinalCustomsCost(0)
     setFinalMarkupPct(30)
     setFinalVatPct(0)
+    setFinalDiscountPct(0)
     setTrackingNumber('')
     setTrackingEditMode(false)
     setItems([newWsItem()])
@@ -1322,6 +1329,27 @@ function WorksheetEditor({
             <label className="text-xs text-gray-500">VAT %</label>
             <input type="number" min={0} step={1} value={finalVatPct} onChange={(e) => setFinalVatPct(Number(e.target.value))}
               className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          </div>
+
+          {/* ── Wholesale Discount + VAT display ── */}
+          <div className="w-px h-8 bg-emerald-200 self-end mb-1.5" />
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-amber-600 font-semibold">Discount %</label>
+            <input
+              type="number" min={0} step={0.1}
+              value={finalDiscountPct || ''}
+              placeholder="0"
+              onChange={(e) => setFinalDiscountPct(Number(e.target.value))}
+              className="border-2 border-amber-300 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-400 font-semibold text-amber-900"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-amber-600 font-semibold">Wholesale + Disc + VAT15%</label>
+            <div className="px-2.5 py-1.5 text-sm w-36 bg-amber-100 border-2 border-amber-300 rounded-lg text-amber-900 font-bold text-center">
+              {finalDiscountPct > 0
+                ? `R ${fmtFC(totalWholesaleZAR * (1 + finalDiscountPct / 100) * 1.15)}`
+                : `R ${fmtFC(totalWholesaleZAR * 1.15)}`}
+            </div>
           </div>
         </div>
       </div>
