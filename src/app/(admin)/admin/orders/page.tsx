@@ -927,15 +927,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
   }
 
   function handleSelect(p: { sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number; isPreOrder?: boolean }) {
-    if (!isQuote && (p.isPreOrder || p.quantity <= 0)) {
-      const type = p.isPreOrder ? 'preorder' : 'oos'
-      const text = p.isPreOrder
-        ? `"${p.sku}" — Book for Next Shipment — add to Back Orders instead`
-        : `"${p.sku}" is out of stock`
-      setBlockMsg({ text, type })
-      setTimeout(() => setBlockMsg(null), 4000)
-      return
-    }
+    // Always allow admin to add any item — OOS/pre-order badges are informational only
     onSelectProduct(p.sku, p.title, p.price, p.costPerItem, p.preOrderPrice, p.quantity)
     setSearchQ('')
     setOpen(false)
@@ -980,19 +972,20 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
           {filtered.map((p) => {
             const oos = p.quantity <= 0
             const isPre = p.isPreOrder
-            const blocked = !isQuote && (isPre || oos)
             return (
               <button
                 key={p.id}
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => handleSelect(p)}
-                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-50 last:border-0 ${blocked ? 'opacity-60 cursor-not-allowed bg-gray-50' : 'hover:bg-blue-50'}`}
+                className={`w-full text-left px-3 py-2 text-sm border-b border-gray-50 last:border-0 ${
+                  isPre ? 'hover:bg-amber-50' : oos ? 'hover:bg-red-50' : 'hover:bg-blue-50'
+                }`}
               >
                 <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
-                <span className={blocked ? 'text-gray-400' : 'text-gray-800'}>{p.title}</span>
+                <span className="text-gray-800">{p.title}</span>
                 {isPre
-                  ? <span className={`float-right text-[10px] font-semibold px-1.5 py-0.5 rounded ${isQuote ? 'text-amber-600 bg-amber-50' : 'text-amber-600 bg-amber-50'}`}>NEXT SHIPMENT</span>
+                  ? <span className="float-right text-[10px] font-semibold px-1.5 py-0.5 rounded text-amber-600 bg-amber-50">NEXT SHIPMENT</span>
                   : oos
                     ? <span className="float-right text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
                     : <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
