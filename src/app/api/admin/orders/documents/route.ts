@@ -72,26 +72,9 @@ export async function POST(request: Request) {
     // The SO already deducted stock — skip both the stock limit check and re-deduction.
     const stockAlreadyReserved = !!body.stockAlreadyReserved
 
-    // Rule 1 — Enforce Stock Limits: block creation if any line item exceeds available qty
-    if (!stockAlreadyReserved && stockable && await isRuleActive('enforce_stock_limit', false)) {
-      for (const li of lineItems) {
-        const sku = extractSku(li.description)
-        if (!sku || li.qty <= 0) continue
-        const result = await db.query(
-          'SELECT quantity FROM products WHERE LOWER(sku) = LOWER($1) LIMIT 1',
-          [sku]
-        )
-        if (result.rows[0]) {
-          const available = result.rows[0].quantity ?? 0
-          if (li.qty > available) {
-            return NextResponse.json(
-              { error: `Insufficient stock for ${sku}: ${available} available, ${li.qty} requested` },
-              { status: 422 }
-            )
-          }
-        }
-      }
-    }
+    // Rule 1 — Stock limit check (info only — admin can always save; qty floors at 0 on deduction)
+    // Previously this blocked save; removed because admin may legitimately sell physical stock
+    // that the DB hasn't yet been updated for (e.g. item just removed from a Sales Order).
 
     // Rule 3 — Stock Deduction: deduct inventory when invoice/SO is created
     // Skip if stock was already reserved by the originating Sales Order
