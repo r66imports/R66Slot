@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 
 export interface LocalCartItem {
   id: string
+  sku: string
   title: string
   brand: string
   price: number

@@ -65,6 +65,7 @@ function ProductGridLive({
   const handleAddToCart = (p: any) => {
     addItem({
       id: p.id,
+      sku: p.sku || '',
       title: p.title,
       brand: p.brand || '',
       price: p.price || 0,

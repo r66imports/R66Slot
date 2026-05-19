@@ -68,6 +68,7 @@ export default function ProductDetailPage() {
   const handleAddToCart = () => {
     addItem({
       id: product.id,
+      sku: product.sku || '',
       title: product.title,
       brand: product.brand || '',
       price: product.price || 0,

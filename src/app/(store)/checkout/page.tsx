@@ -112,7 +112,7 @@ export default function CheckoutPage() {
           },
           items: checkoutItems.map((i) => ({
             id: i.id,
-            sku: '',
+            sku: i.sku || '',
             title: i.title,
             brand: i.brand,
             price: i.price,
