@@ -3220,6 +3220,7 @@ function WorksheetSupplierOrderModal({
     const subtotal = invItems.reduce((s, it) => s + it.qty * it.unitPrice, 0)
     const vatAmt = vatPct ? subtotal * vatPct / 100 : 0
     const grand = subtotal + vatAmt
+    const fmtAmt = (n: number) => sym + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const rowsHtml = invItems.map((it, i) => {
       const lt = it.qty * it.unitPrice
       return `<tr>
@@ -3231,7 +3232,6 @@ function WorksheetSupplierOrderModal({
         <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">${fmtAmt(lt)}</td>
       </tr>`
     }).join('')
-    const fmtAmt = (n: number) => sym + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const footerHtml = vatPct
       ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;">${fmtAmt(subtotal)}</td></tr>
          <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;">${fmtAmt(vatAmt)}</td></tr>
