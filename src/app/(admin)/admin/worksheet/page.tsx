@@ -23,6 +23,7 @@ interface PricelistEntry {
 
 interface SupplierContact {
   id: string; name: string; code: string
+  address?: string; phone?: string; email?: string
 }
 
 interface WsItem {
@@ -3149,6 +3150,7 @@ function WorksheetSupplierOrderModal({
   const today = new Date().toISOString().slice(0, 10)
   const [rows, setRows] = useState(items.length > 0 ? items.map(it => ({ sku: it.sku, description: it.description, qty: it.qty })) : [{ sku: '', description: '', qty: 1 }])
   const [poNumber, setPoNumber] = useState('')
+  const [supplierInvNumber, setSupplierInvNumber] = useState('')
   const [date, setDate] = useState(orderDate || today)
 
   const curr = currency || 'ZAR'
@@ -3174,6 +3176,7 @@ function WorksheetSupplierOrderModal({
     vatPct?: number; totalNote: string
   }) {
     const { fromBlock, billedToBlock, unitLabel, totalLabel, invItems, vatPct, totalNote } = opts
+    const invNumLine = supplierInvNumber ? `<p class="meta">Invoice #: <strong>${supplierInvNumber}</strong></p>` : ''
     const subtotal = invItems.reduce((s, it) => s + it.qty * it.unitPrice, 0)
     const vatAmt = vatPct ? subtotal * vatPct / 100 : 0
     const grand = subtotal + vatAmt
@@ -3196,7 +3199,7 @@ function WorksheetSupplierOrderModal({
       : `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total</td><td style="text-align:right;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice</title><style>${INV_CSS}</style></head><body>
     <div class="hdr">
-      <div><p class="title">INVOICE</p>${poNumber ? `<p class="meta">Ref: <strong>${poNumber}</strong></p>` : ''}<p class="meta">Date: ${displayDate}</p></div>
+      <div><p class="title">INVOICE</p>${poNumber ? `<p class="meta">Ref: <strong>${poNumber}</strong></p>` : ''}${invNumLine}<p class="meta">Date: ${displayDate}</p></div>
       <div style="text-align:right">${fromBlock}</div>
     </div>
     <div class="info-row">
@@ -3234,8 +3237,16 @@ function WorksheetSupplierOrderModal({
       ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
       ${companyInfo.phone ? `<p style="font-size:12px;color:#374151;">${companyInfo.phone}</p>` : ''}
       ${companyInfo.email ? `<p style="font-size:12px;color:#374151;">${companyInfo.email}</p>` : ''}
-      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">VAT: ${companyInfo.vatNumber}</p>` : ''}`
-    const fromBlock = `<p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">FROM</p><p style="font-weight:700;font-size:15px;">${supplierName}</p>`
+      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">VAT: ${companyInfo.vatNumber}</p>` : ''}
+      <p style="font-size:11px;color:#9ca3af;">Customs Import Code: 25174181</p>
+      <p style="font-size:11px;color:#9ca3af;">HSE Code: 9503.00.90</p>`
+    const supplierContact = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase())
+    const fromBlock = `
+      <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">FROM</p>
+      <p style="font-weight:700;font-size:15px;">${supplierName}</p>
+      ${supplierContact?.address ? `<p style="font-size:12px;color:#374151;margin-top:2px;">${supplierContact.address}</p>` : ''}
+      ${supplierContact?.phone ? `<p style="font-size:12px;color:#374151;">${supplierContact.phone}</p>` : ''}
+      ${supplierContact?.email ? `<p style="font-size:12px;color:#374151;">${supplierContact.email}</p>` : ''}`
     openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: `Unit Cost (${curr})`, totalLabel: `Total (${curr})`, invItems, totalNote: 'wholesale cost' }))
   }
 
@@ -3247,7 +3258,9 @@ function WorksheetSupplierOrderModal({
       ${companyInfo.address ? `<p style="font-size:12px;color:#374151;">${companyInfo.address}</p>` : ''}
       ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
       ${companyInfo.phone ? `<p style="font-size:12px;color:#374151;">${companyInfo.phone}</p>` : ''}
-      ${companyInfo.email ? `<p style="font-size:12px;color:#374151;">${companyInfo.email}</p>` : ''}`
+      ${companyInfo.email ? `<p style="font-size:12px;color:#374151;">${companyInfo.email}</p>` : ''}
+      <p style="font-size:11px;color:#9ca3af;margin-top:4px;">Customs Import Code: 25174181</p>
+      <p style="font-size:11px;color:#9ca3af;">HSE Code: 9503.00.90</p>`
     const fromBlock = `<p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">FROM</p><p style="font-weight:700;font-size:15px;">JDM Garage</p>`
     openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: 'Unit Cost (ZAR)', totalLabel: 'Total (ZAR)', invItems, totalNote: 'landed cost' }))
   }
@@ -3261,7 +3274,9 @@ function WorksheetSupplierOrderModal({
       <p style="font-size:12px;color:#374151;">217 Clarkson Road, Estoire</p>
       <p style="font-size:12px;color:#374151;">Bloemfontein, 9301</p>
       <p style="font-size:12px;color:#374151;">+27615898921</p>
-      <p style="font-size:11px;color:#9ca3af;margin-top:2px;">VAT: 4310297884</p>`
+      <p style="font-size:11px;color:#9ca3af;margin-top:2px;">VAT: 4310297884</p>
+      <p style="font-size:11px;color:#9ca3af;">Customs Import Code: 25174181</p>
+      <p style="font-size:11px;color:#9ca3af;">HSE Code: 9503.00.90</p>`
     const billedTo = `<p style="font-size:13px;font-weight:700;">JDM Garage PTY LTD</p>`
     openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: 'Unit Cost (ZAR)', totalLabel: 'Total (ZAR)', invItems, vatPct: 15, totalNote: 'incl. 15% VAT' }))
   }
@@ -3340,6 +3355,11 @@ function WorksheetSupplierOrderModal({
               <input type="date" value={date} onChange={e => setDate(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Supplier Invoice Number</label>
+            <input value={supplierInvNumber} onChange={e => setSupplierInvNumber(e.target.value)} placeholder="e.g. INV-2026-001"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
