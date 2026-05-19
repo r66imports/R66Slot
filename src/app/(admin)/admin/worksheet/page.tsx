@@ -3210,9 +3210,9 @@ function WorksheetSupplierOrderModal({
   function invoiceHTML(opts: {
     fromBlock: string; billedToBlock: string; unitLabel: string; totalLabel: string;
     invItems: { sku: string; description: string; qty: number; unitPrice: number }[]
-    vatPct?: number; totalNote: string
+    vatPct?: number; totalNote: string; sym?: string
   }) {
-    const { fromBlock, billedToBlock, unitLabel, totalLabel, invItems, vatPct, totalNote } = opts
+    const { fromBlock, billedToBlock, unitLabel, totalLabel, invItems, vatPct, totalNote, sym = 'R ' } = opts
     const invNum = supplierInvNumber || ''
     const invDateDisplay = supplierInvDate
       ? new Date(supplierInvDate + 'T00:00:00').toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -3227,15 +3227,16 @@ function WorksheetSupplierOrderModal({
         <td style="padding:8px 12px;font-family:monospace;font-size:12px;font-weight:600;">${it.sku}</td>
         <td style="padding:8px 12px;font-size:13px;">${it.description}</td>
         <td style="padding:8px 12px;text-align:center;font-size:13px;">${it.qty}</td>
-        <td style="padding:8px 12px;text-align:right;font-size:13px;">${it.unitPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">${lt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:13px;">${fmtAmt(it.unitPrice)}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">${fmtAmt(lt)}</td>
       </tr>`
     }).join('')
+    const fmtAmt = (n: number) => sym + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const footerHtml = vatPct
-      ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;">${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
-         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;">${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
-         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total (incl. VAT)</td><td style="text-align:right;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`
-      : `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total</td><td style="text-align:right;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`
+      ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;">${fmtAmt(subtotal)}</td></tr>
+         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;">${fmtAmt(vatAmt)}</td></tr>
+         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total (incl. VAT)</td><td style="text-align:right;">${fmtAmt(grand)}</td></tr>`
+      : `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total</td><td style="text-align:right;">${fmtAmt(grand)}</td></tr>`
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice</title><style>${INV_CSS}</style></head><body>
     <div class="hdr">
       <div>
@@ -3250,9 +3251,9 @@ function WorksheetSupplierOrderModal({
       <div class="info-box"><p class="lbl">Billed To</p>${billedToBlock}</div>
       <div class="info-box" style="flex:0;min-width:200px;">
         <p class="lbl">Invoice Total</p>
-        ${vatPct ? `<p style="font-size:11px;color:#9ca3af;">Excl. VAT: ${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-        <p style="font-size:11px;color:#9ca3af;">VAT (${vatPct}%): ${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
-        <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        ${vatPct ? `<p style="font-size:11px;color:#9ca3af;">Excl. VAT: ${fmtAmt(subtotal)}</p>
+        <p style="font-size:11px;color:#9ca3af;">VAT (${vatPct}%): ${fmtAmt(vatAmt)}</p>` : ''}
+        <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${fmtAmt(grand)}</p>
         <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${invItems.reduce((s, it) => s + it.qty, 0)} items · ${totalNote}</p>
       </div>
     </div>
@@ -3291,7 +3292,7 @@ function WorksheetSupplierOrderModal({
       ${supplierContact?.address ? `<p style="font-size:12px;color:#374151;margin-top:2px;">${supplierContact.address}</p>` : ''}
       ${supplierContact?.phone ? `<p style="font-size:12px;color:#374151;">${supplierContact.phone}</p>` : ''}
       ${supplierContact?.email ? `<p style="font-size:12px;color:#374151;">${supplierContact.email}</p>` : ''}`
-    openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: `Unit Cost (${curr})`, totalLabel: `Total (${curr})`, invItems, totalNote: 'wholesale cost' }))
+    openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: `Unit Cost (${curr})`, totalLabel: `Total (${curr})`, invItems, totalNote: 'wholesale cost', sym: currSym }))
   }
 
   function generateJDMSupplierInvoice() {
