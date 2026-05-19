@@ -74,6 +74,8 @@ interface WsSheet {
   finalVatPct: number
   finalDiscountPct?: number
   trackingNumber?: string
+  supplierInvNumber?: string
+  supplierInvDate?: string
   items: WsItem[]
 }
 
@@ -192,6 +194,10 @@ function WorksheetEditor({
   // ── Tracking number ──
   const [trackingNumber, setTrackingNumber] = useState('')
   const [trackingEditMode, setTrackingEditMode] = useState(false)
+
+  // ── Supplier invoice number + date ──
+  const [supplierInvNumber, setSupplierInvNumber] = useState('')
+  const [supplierInvDate, setSupplierInvDate] = useState('')
 
   function getTrackingUrl(tracking: string): string {
     if (!tracking) return ''
@@ -717,6 +723,8 @@ function WorksheetEditor({
       currency, exchangeRate, markupPct, shippingPct, vatPct,
       finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct, finalDiscountPct,
       trackingNumber,
+      supplierInvNumber,
+      supplierInvDate,
       items: items.map((it) => ({ ...it, skuSearch: '' })),
     }
   }
@@ -780,6 +788,8 @@ function WorksheetEditor({
     setFinalDiscountPct((sheet as any).finalDiscountPct ?? 0)
     setTrackingNumber(sheet.trackingNumber ?? '')
     setTrackingEditMode(false)
+    setSupplierInvNumber(sheet.supplierInvNumber ?? '')
+    setSupplierInvDate(sheet.supplierInvDate ?? '')
     setItems(sheet.items.length > 0 ? sheet.items.map((it) => {
       const prod = products.find((p) => p.sku === it.sku)
       const mappedEntity = !it.costingEntity && it.sku
@@ -818,6 +828,8 @@ function WorksheetEditor({
     setFinalDiscountPct(0)
     setTrackingNumber('')
     setTrackingEditMode(false)
+    setSupplierInvNumber('')
+    setSupplierInvDate('')
     setItems([newWsItem()])
   }
 
@@ -1482,8 +1494,9 @@ function WorksheetEditor({
           />
         )}
 
-        {/* Tracking number */}
-        <div className="px-5 pt-3 pb-1 flex items-center gap-2">
+        {/* Tracking number + Supplier Invoice Number + INV Date */}
+        <div className="px-5 pt-3 pb-1 flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
           <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Tracking #</label>
           {trackingEditMode || !trackingNumber ? (
             <input
@@ -1511,6 +1524,26 @@ function WorksheetEditor({
               {trackingNumber}
             </a>
           )}
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-500 whitespace-nowrap">Invoice #</label>
+            <input
+              type="text"
+              value={supplierInvNumber}
+              onChange={e => setSupplierInvNumber(e.target.value)}
+              placeholder="e.g. SW-2026-001"
+              className="border border-gray-200 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-40"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-500 whitespace-nowrap">INV Date</label>
+            <input
+              type="date"
+              value={supplierInvDate}
+              onChange={e => setSupplierInvDate(e.target.value)}
+              className="border border-gray-200 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+          </div>
         </div>
 
         {/* Date display */}
@@ -1841,6 +1874,8 @@ function WorksheetEditor({
           companyInfo={companyInfo}
           orderDate={worksheetDate}
           currency={currency}
+          supplierInvNumber={supplierInvNumber}
+          supplierInvDate={supplierInvDate}
           items={items.filter((it) => it.sku).map((it) => ({
             sku: it.sku,
             description: it.description,
@@ -3137,20 +3172,22 @@ function WorksheetInvoiceModal({
 // ─── Worksheet Supplier Order Modal ───────────────────────────────────────────
 
 function WorksheetSupplierOrderModal({
-  supplierName, suppliers, companyInfo, orderDate, items, currency, onClose,
+  supplierName, suppliers, companyInfo, orderDate, items, currency,
+  supplierInvNumber, supplierInvDate, onClose,
 }: {
   supplierName: string
   suppliers: SupplierContact[]
   companyInfo: CompanyInfo
   orderDate: string
   currency?: string
+  supplierInvNumber?: string
+  supplierInvDate?: string
   items: { sku: string; description: string; qty: number; wholesalePrice?: number; landedCost?: number; costingEntity?: string }[]
   onClose: () => void
 }) {
   const today = new Date().toISOString().slice(0, 10)
   const [rows, setRows] = useState(items.length > 0 ? items.map(it => ({ sku: it.sku, description: it.description, qty: it.qty })) : [{ sku: '', description: '', qty: 1 }])
   const [poNumber, setPoNumber] = useState('')
-  const [supplierInvNumber, setSupplierInvNumber] = useState('')
   const [date, setDate] = useState(orderDate || today)
 
   const curr = currency || 'ZAR'
@@ -3161,7 +3198,7 @@ function WorksheetSupplierOrderModal({
 
   const INV_CSS = `*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
     .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
-    .title{font-size:28px;font-weight:800;color:#111827;margin-bottom:4px}.meta{font-size:13px;color:#6b7280;margin-top:2px}
+    .title{font-size:28px;font-weight:800;color:#111827;margin-bottom:4px}.meta{font-size:13px;color:#111827;margin-top:2px}
     .info-row{display:flex;gap:32px;margin-bottom:28px}.info-box{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px}
     .lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:6px}
     table{width:100%;border-collapse:collapse}thead tr{border-bottom:2px solid #111827}
@@ -3176,11 +3213,13 @@ function WorksheetSupplierOrderModal({
     vatPct?: number; totalNote: string
   }) {
     const { fromBlock, billedToBlock, unitLabel, totalLabel, invItems, vatPct, totalNote } = opts
-    const invNumLine = supplierInvNumber ? `<p class="meta">Invoice #: <strong>${supplierInvNumber}</strong></p>` : ''
+    const invNum = supplierInvNumber || ''
+    const invDateDisplay = supplierInvDate
+      ? new Date(supplierInvDate + 'T00:00:00').toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })
+      : new Date(date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })
     const subtotal = invItems.reduce((s, it) => s + it.qty * it.unitPrice, 0)
     const vatAmt = vatPct ? subtotal * vatPct / 100 : 0
     const grand = subtotal + vatAmt
-    const displayDate = new Date(date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })
     const rowsHtml = invItems.map((it, i) => {
       const lt = it.qty * it.unitPrice
       return `<tr>
@@ -3199,7 +3238,12 @@ function WorksheetSupplierOrderModal({
       : `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Total</td><td style="text-align:right;">${grand.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice</title><style>${INV_CSS}</style></head><body>
     <div class="hdr">
-      <div><p class="title">INVOICE</p>${poNumber ? `<p class="meta">Ref: <strong>${poNumber}</strong></p>` : ''}${invNumLine}<p class="meta">Date: ${displayDate}</p></div>
+      <div>
+        <p class="title">INVOICE</p>
+        ${invNum ? `<p style="font-size:14px;font-weight:700;color:#111827;margin-top:2px;">Invoice #: ${invNum}</p>` : ''}
+        <p style="font-size:13px;color:#111827;margin-top:2px;">Date: ${invDateDisplay}</p>
+        ${poNumber ? `<p style="font-size:13px;color:#111827;margin-top:2px;">Ref: ${poNumber}</p>` : ''}
+      </div>
       <div style="text-align:right">${fromBlock}</div>
     </div>
     <div class="info-row">
@@ -3355,11 +3399,6 @@ function WorksheetSupplierOrderModal({
               <input type="date" value={date} onChange={e => setDate(e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Supplier Invoice Number</label>
-            <input value={supplierInvNumber} onChange={e => setSupplierInvNumber(e.target.value)} placeholder="e.g. INV-2026-001"
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
