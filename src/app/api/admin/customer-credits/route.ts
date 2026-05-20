@@ -20,7 +20,7 @@ export interface ClientCreditRecord {
 
 export type CreditStore = Record<string, ClientCreditRecord>
 
-export function clientKey(name: string): string {
+function clientKey(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '_')
 }
 
