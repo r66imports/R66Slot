@@ -21,6 +21,8 @@ interface DashboardCustomer {
   email?: string
   phone?: string
   qty: number
+  depositPaid?: boolean
+  depositPaidDate?: string
 }
 
 interface DashboardItem {
@@ -118,6 +120,7 @@ function ItemCard({
   onDelete,
   isNew,
   onCancelNew,
+  onWhatsAppDeposit,
 }: {
   item: DashboardItem & { _draft?: boolean }
   contacts: Contact[]
@@ -126,6 +129,7 @@ function ItemCard({
   onDelete: (id: string) => Promise<void>
   isNew?: boolean
   onCancelNew?: () => void
+  onWhatsAppDeposit?: (customer: DashboardCustomer, item: DashboardItem, deposit: number) => void
 }) {
   const [form, setForm] = useState<Omit<DashboardItem, 'id' | 'createdAt'>>({
     sku: item.sku,
@@ -219,6 +223,10 @@ function ItemCard({
 
   const updateCustomerQty = (id: string, qty: number) => {
     set('customers', form.customers.map((c) => c.id === id ? { ...c, qty } : c))
+  }
+
+  const updateCustomer = (id: string, patch: Partial<DashboardCustomer>) => {
+    set('customers', form.customers.map((c) => c.id === id ? { ...c, ...patch } : c))
   }
 
   const removeCustomer = (id: string) => {
@@ -464,29 +472,58 @@ function ItemCard({
             {form.customers.length === 0 && (
               <p className="text-xs text-gray-400 italic">No customers added yet.</p>
             )}
-            {form.customers.map((c) => (
-              <div key={c.id} className="flex items-center gap-2 bg-indigo-50 rounded px-2 py-1.5">
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm font-medium text-gray-800 truncate block">{c.name}</span>
-                  {c.email && <span className="text-xs text-gray-500 truncate block">{c.email}</span>}
+            {form.customers.map((c) => {
+              const unitPrice = parseFloat(form.estimatedRetailPrice || '0')
+              const deposit = unitPrice > 0 ? unitPrice * 0.5 * c.qty : 0
+              return (
+                <div key={c.id} className="bg-indigo-50 rounded px-2 py-1.5 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-800 truncate block">{c.name}</span>
+                      {c.email && <span className="text-xs text-gray-500 truncate block">{c.email}</span>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <label className="text-xs text-gray-500">Qty</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={c.qty}
+                        onChange={(e) => updateCustomerQty(c.id, Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-12 text-xs border border-gray-300 rounded px-1 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                      />
+                      <button
+                        onClick={() => removeCustomer(c.id)}
+                        className="text-gray-400 hover:text-red-500 text-xs leading-none ml-1"
+                        title="Remove"
+                      >✕</button>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {deposit > 0 && <span className="text-xs text-indigo-700 font-medium">Deposit: R{deposit.toFixed(2)}</span>}
+                    <label className="flex items-center gap-1 cursor-pointer ml-auto">
+                      <input type="checkbox" checked={!!c.depositPaid}
+                        onChange={e => updateCustomer(c.id, { depositPaid: e.target.checked, depositPaidDate: e.target.checked ? (c.depositPaidDate || new Date().toISOString().slice(0, 10)) : undefined })}
+                        className="w-3.5 h-3.5 accent-indigo-600" />
+                      <span className="text-xs text-gray-600">Paid</span>
+                    </label>
+                    {c.depositPaid && (
+                      <input type="date" value={c.depositPaidDate || ''}
+                        onChange={e => updateCustomer(c.id, { depositPaidDate: e.target.value })}
+                        className="text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white" />
+                    )}
+                    {deposit > 0 && (
+                      <button
+                        title="Send Deposit Quote via WhatsApp"
+                        onClick={() => onWhatsAppDeposit?.(c, item, deposit)}
+                        className="ml-1 w-6 h-6 flex items-center justify-center rounded-full bg-green-500 hover:bg-green-600 text-white shrink-0"
+                      >
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <label className="text-xs text-gray-500">Qty</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={c.qty}
-                    onChange={(e) => updateCustomerQty(c.id, Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-12 text-xs border border-gray-300 rounded px-1 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  />
-                  <button
-                    onClick={() => removeCustomer(c.id)}
-                    className="text-gray-400 hover:text-red-500 text-xs leading-none ml-1"
-                    title="Remove"
-                  >✕</button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Add customer */}
@@ -508,23 +545,29 @@ export default function PreOrderDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [showNew, setShowNew] = useState(false)
   const [newDraft, setNewDraft] = useState<DashboardItem | null>(null)
+  const [bankAccounts, setBankAccounts] = useState<{ id: string; bankName: string; accountName: string; accountNumber: string; branchCode: string }[]>([])
+  const [waModal, setWaModal] = useState<{ customer: DashboardCustomer; item: DashboardItem; deposit: number } | null>(null)
+  const [waBankId, setWaBankId] = useState('')
 
   const load = async () => {
     setLoading(true)
     try {
-      const [itemsRes, contactsRes, suppliersRes] = await Promise.all([
+      const [itemsRes, contactsRes, suppliersRes, bankRes] = await Promise.all([
         fetch('/api/admin/preorder-dashboard'),
         fetch('/api/admin/contacts'),
         fetch('/api/admin/supplier-contacts'),
+        fetch('/api/admin/bank-accounts'),
       ])
-      const [itemsData, contactsData, suppliersData] = await Promise.all([
+      const [itemsData, contactsData, suppliersData, bankData] = await Promise.all([
         itemsRes.json(),
         contactsRes.json(),
         suppliersRes.json(),
+        bankRes.ok ? bankRes.json() : [],
       ])
       setItems(Array.isArray(itemsData) ? itemsData : [])
       setContacts(Array.isArray(contactsData) ? contactsData : [])
       setSuppliers(Array.isArray(suppliersData) ? suppliersData : [])
+      if (Array.isArray(bankData) && bankData.length > 0) { setBankAccounts(bankData); setWaBankId(bankData[0].id) }
     } catch (e) {
       console.error(e)
     } finally {
@@ -622,6 +665,7 @@ export default function PreOrderDashboardPage() {
                 onDelete={handleDelete}
                 isNew
                 onCancelNew={cancelNew}
+                onWhatsAppDeposit={(c, it, d) => { setWaModal({ customer: c, item: it, deposit: d }); if (bankAccounts.length > 0 && !waBankId) setWaBankId(bankAccounts[0].id) }}
               />
             </div>
           )}
@@ -643,12 +687,132 @@ export default function PreOrderDashboardPage() {
                   suppliers={suppliers}
                   onSave={handleSave}
                   onDelete={handleDelete}
+                  onWhatsAppDeposit={(c, it, d) => { setWaModal({ customer: c, item: it, deposit: d }); if (bankAccounts.length > 0 && !waBankId) setWaBankId(bankAccounts[0].id) }}
                 />
               ))}
             </div>
           )}
         </>
       )}
+
+      {/* ── WhatsApp Deposit Quote Modal ── */}
+      {waModal && (() => {
+        const { customer, item, deposit } = waModal
+        const bank = bankAccounts.find(b => b.id === waBankId)
+        const retailPrice = parseFloat(item.estimatedRetailPrice || '0')
+
+        const bankHtml = bank ? `
+          <div style="margin-top:20px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px 20px;">
+            <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:10px">PAYMENT DETAILS</p>
+            <table style="width:100%;font-size:13px;border-collapse:collapse;">
+              <tr><td style="padding:3px 0;color:#6b7280;width:140px">Bank</td><td style="font-weight:600">${bank.bankName}</td></tr>
+              <tr><td style="padding:3px 0;color:#6b7280">Account Holder</td><td style="font-weight:600">${bank.accountName}</td></tr>
+              <tr><td style="padding:3px 0;color:#6b7280">Account Number</td><td style="font-weight:600">${bank.accountNumber}</td></tr>
+              <tr><td style="padding:3px 0;color:#6b7280">Branch Code</td><td style="font-weight:600">${bank.branchCode}</td></tr>
+              <tr><td style="padding:3px 0;color:#6b7280">Reference</td><td style="font-weight:600">${customer.name}</td></tr>
+            </table>
+          </div>` : ''
+
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Deposit Quote</title>
+        <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;background:white;color:#111827}
+        h1{font-size:26px;font-weight:800;margin-bottom:4px}.meta{font-size:13px;color:#374151;margin-bottom:2px}
+        table.items{width:100%;border-collapse:collapse;margin-top:20px}
+        table.items thead tr{border-bottom:2px solid #111}
+        table.items th{padding:8px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280}
+        table.items th.r{text-align:right}
+        table.items tbody tr{border-bottom:1px solid #f3f4f6}
+        table.items td{padding:9px 10px;font-size:13px}
+        .total-row{margin-top:16px;text-align:right}
+        .deposit-label{font-size:13px;color:#374151;margin-bottom:4px}
+        .deposit-amount{font-size:28px;font-weight:800;color:#111827}
+        .note{font-size:11px;color:#9ca3af;margin-top:24px;border-top:1px solid #f3f4f6;padding-top:12px}
+        @page{size:A4;margin:0}</style>
+        </head><body>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px">
+          <div><h1>DEPOSIT QUOTE</h1>
+          <p class="meta">Date: ${new Date().toLocaleDateString('en-ZA', { day:'2-digit', month:'long', year:'numeric' })}</p></div>
+          <div style="text-align:right">
+            <p style="font-size:11px;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:4px">BILLED TO</p>
+            <p style="font-weight:700;font-size:15px;">${customer.name}</p>
+            ${customer.email ? `<p style="font-size:12px;color:#374151;">${customer.email}</p>` : ''}
+            ${customer.phone ? `<p style="font-size:12px;color:#374151;">${customer.phone}</p>` : ''}
+          </div>
+        </div>
+        <table class="items"><thead><tr>
+          <th>SKU</th><th>Description</th><th class="r" style="width:60px">Qty</th>
+          <th class="r" style="width:130px">Retail Price</th><th class="r" style="width:130px">Deposit (50%)</th>
+        </tr></thead><tbody><tr>
+          <td style="font-family:monospace;font-weight:600">${item.sku}</td>
+          <td>${item.description}</td>
+          <td style="text-align:right">${customer.qty}</td>
+          <td style="text-align:right">R ${retailPrice.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</td>
+          <td style="text-align:right;font-weight:700">R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</td>
+        </tr></tbody></table>
+        <div class="total-row"><p class="deposit-label">Deposit Due</p>
+        <p class="deposit-amount">R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</p></div>
+        ${bankHtml}
+        <p class="note">This is a deposit quote. The balance is due on collection or as agreed. Please use your name as the payment reference.</p>
+        </body></html>`
+
+        function downloadPDF() {
+          const win = window.open('', '_blank')
+          if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
+          setWaModal(null)
+        }
+
+        function sendWhatsApp() {
+          const win = window.open('', '_blank')
+          if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
+          const phone = (customer.phone || '').replace(/\D/g, '').replace(/^0/, '27')
+          if (phone) {
+            const msg = encodeURIComponent(`Hi ${customer.name.split(' ')[0]}, please find your deposit quote for *${item.description}* (${item.sku}).\n\nDeposit Due: *R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}*\n\n${bank ? `Bank: ${bank.bankName}\nAccount: ${bank.accountName}\nAcc No: ${bank.accountNumber}\nBranch: ${bank.branchCode}\nRef: ${customer.name}` : ''}\n\nPlease use your name as reference. Thank you!`)
+            setTimeout(() => window.open(`https://wa.me/${phone}?text=${msg}`, '_blank'), 700)
+          }
+          setWaModal(null)
+        }
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+              <h3 className="font-bold text-base">Send Deposit Quote</h3>
+              <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-0.5">
+                <p className="font-semibold">{customer.name}</p>
+                <p className="text-gray-500 text-xs">{item.description}</p>
+                <p className="text-indigo-700 font-bold mt-1">Deposit: R {deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</p>
+                {!customer.phone && <p className="text-amber-600 text-xs mt-1">⚠ No phone number — PDF only</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Bank Account</label>
+                {bankAccounts.length === 0 ? (
+                  <p className="text-xs text-gray-400">No bank accounts saved. Add one in Admin → Orders → Bank Manager.</p>
+                ) : (
+                  <select value={waBankId} onChange={e => setWaBankId(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                    {bankAccounts.map(b => (
+                      <option key={b.id} value={b.id}>{b.bankName} — {b.accountName}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setWaModal(null)}
+                  className="py-2 px-3 border rounded-lg text-sm font-semibold hover:bg-gray-50">Cancel</button>
+                <button onClick={downloadPDF}
+                  className="flex-1 py-2 bg-gray-800 text-white rounded-lg text-sm font-bold hover:bg-gray-900 flex items-center justify-center gap-1.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                  Download PDF
+                </button>
+                <button onClick={sendWhatsApp} disabled={!customer.phone}
+                  title={!customer.phone ? 'No phone number saved' : 'Send via WhatsApp'}
+                  className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm font-bold hover:bg-green-600 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 shrink-0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  WhatsApp
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
