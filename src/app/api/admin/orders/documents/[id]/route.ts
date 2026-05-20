@@ -7,8 +7,8 @@ import { isRuleActive } from '@/lib/site-rules'
 const KEY = 'data/order-documents.json'
 const CANCELLED_STATUSES = new Set(['archived', 'rejected'])
 
-// Only invoices physically deduct stock. SOs use virtual reservation display in inventory.
-// isStockable still returns true for salesorder so OLD SOs (stockDeducted:true) can restore on archive/delete.
+// Sales Orders AND Invoices physically deduct stock. isStockable includes salesorder so all
+// stock-relevant changes (line item edits, archive, delete) correctly adjust inventory.
 function isStockable(type: string) {
   return type === 'invoice' || type === 'salesorder'
 }

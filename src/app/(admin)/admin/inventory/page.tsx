@@ -862,7 +862,9 @@ export default function InventoryPage() {
                 const invCount = counts[product.id] ?? String(product.quantity)
                 const qtyMismatch = invCount !== '' && displayQty !== '' && invCount !== displayQty
                 const reservedQty = reserved[(product.sku || '').trim().toUpperCase()] || 0
-                const availableQty = Math.max(0, product.quantity - reservedQty)
+                // DB qty already reflects SO deduction; available = DB qty, total = DB qty + reserved
+                const availableQty = product.quantity
+                const totalInventoryQty = product.quantity + reservedQty
                 return (
                   <tr key={product.id} className={`border-b last:border-0 ${qtyMismatch ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-3 py-2 text-xs text-gray-400">{idx + 1}</td>
@@ -914,7 +916,7 @@ export default function InventoryPage() {
                           className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
                         />
                       ) : (
-                        <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : availableQty === 0 && reservedQty > 0 ? 'text-red-500' : 'text-gray-700'}`}>
+                        <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : availableQty === 0 ? 'text-red-500' : 'text-gray-700'}`}>
                           {availableQty}
                         </span>
                       )}
@@ -927,9 +929,9 @@ export default function InventoryPage() {
                         <span className="text-sm text-gray-300">—</span>
                       )}
                     </td>
-                    {/* Total Inventory */}
+                    {/* Total Inventory = available + reserved */}
                     <td className="px-3 py-2 text-center">
-                      <span className="text-sm font-semibold text-blue-700">{product.quantity}</span>
+                      <span className="text-sm font-semibold text-blue-700">{totalInventoryQty}</span>
                     </td>
                     <td className="px-3 py-2 text-center">
                       <div className="flex items-center gap-1 justify-center">
@@ -1050,7 +1052,9 @@ export default function InventoryPage() {
                 const displayQtyBase = localQuantities[product.id] ?? String(product.quantity)
                 const qtyMismatchBase = countVal !== '' && displayQtyBase !== '' && countVal !== displayQtyBase
                 const reservedQtyBase = reserved[(product.sku || '').trim().toUpperCase()] || 0
-                const availableQtyBase = Math.max(0, product.quantity - reservedQtyBase)
+                // DB qty already reflects SO deduction
+                const availableQtyBase = product.quantity
+                const totalInventoryQtyBase = product.quantity + reservedQtyBase
                 return (
                   <tr key={product.id} className={`border-b last:border-0 ${qtyMismatchBase ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
                     <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>
@@ -1089,7 +1093,7 @@ export default function InventoryPage() {
                           className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
                         />
                       ) : (
-                        <span className={`text-sm font-semibold ${qtyMismatchBase ? 'text-red-600' : availableQtyBase === 0 && reservedQtyBase > 0 ? 'text-red-500' : 'text-gray-700'}`}>
+                        <span className={`text-sm font-semibold ${qtyMismatchBase ? 'text-red-600' : availableQtyBase === 0 ? 'text-red-500' : 'text-gray-700'}`}>
                           {availableQtyBase}
                         </span>
                       )}
@@ -1102,9 +1106,9 @@ export default function InventoryPage() {
                         <span className="text-sm text-gray-300">—</span>
                       )}
                     </td>
-                    {/* Total Inventory */}
+                    {/* Total Inventory = available + reserved */}
                     <td className="px-4 py-2 text-center">
-                      <span className="text-sm font-semibold text-blue-700">{product.quantity}</span>
+                      <span className="text-sm font-semibold text-blue-700">{totalInventoryQtyBase}</span>
                     </td>
                     <td className="px-4 py-2 text-center">
                       <input
