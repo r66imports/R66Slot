@@ -27,6 +27,7 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Business & Store', name: 'Flyer Generator', href: '/admin/social' },
   { group: 'Business & Store', name: 'Media Library', href: '/admin/media' },
   { group: 'Business & Store', name: 'Customers', href: '/admin/contacts' },
+  { group: 'Business & Store', name: 'Customer Dashboard', href: '/admin/customer-dashboard' },
   { group: 'Business & Store', name: 'Suppliers', href: '/admin/supplier-contacts' },
   { group: 'Business & Store', name: 'Events', href: '/admin/events' },
   { group: 'Business & Store', name: 'Payments', href: '/admin/payments' },
