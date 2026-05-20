@@ -287,7 +287,7 @@ function DocumentBody({
   const total = subtotal - discountAmt + shipping
   const deposit = data.depositPaid || 0
   const balanceDuePreview = total - deposit
-  const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
+  const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
   const logoUrl = normalizeMediaUrl(template.logoUrl || '')
 
@@ -514,7 +514,7 @@ function ViewDocumentModal({
   template: OrderTemplate
   onClose: () => void
 }) {
-  const docTypeLabel = data.docType === 'salesorder' ? 'Sales Order' : data.docType.charAt(0).toUpperCase() + data.docType.slice(1)
+  const docTypeLabel = (data as any).preOrderDeposit ? 'Pre Order Deposit' : data.docType === 'salesorder' ? 'Sales Order' : data.docType.charAt(0).toUpperCase() + data.docType.slice(1)
 
   const handlePrint = () => doPrint(data, template)
   const handleEmail = () => doEmail(data, template)
@@ -1187,6 +1187,7 @@ function CreateDocumentModal({
   const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
   const [depositMode, setDepositMode] = useState<boolean>((editDoc as any)?.depositMode || false)
+  const [preOrderDeposit, setPreOrderDeposit] = useState<boolean>((editDoc as any)?.preOrderDeposit || false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>((editDoc as any)?.bankAccountId || '')
   const [showBankManager, setShowBankManager] = useState(false)
@@ -1221,7 +1222,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: depositMode ? selectedBankAccountId : '', shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0 }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: depositMode ? selectedBankAccountId : '', shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0, preOrderDeposit }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -1257,7 +1258,11 @@ function CreateDocumentModal({
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 ${fullScreen ? '' : 'p-4'}`}>
       <div className={`bg-white flex flex-col relative ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh]'}`}>
         <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
-          <h2 className="text-lg font-bold">{editDoc ? `Edit ${cfg.singularLabel}` : `Create ${cfg.singularLabel}`}</h2>
+          <h2 className="text-lg font-bold">
+            {editDoc
+              ? `Edit ${preOrderDeposit && docType === 'quote' ? 'Pre Order Deposit' : cfg.singularLabel}`
+              : `Create ${preOrderDeposit && docType === 'quote' ? 'Pre Order Deposit' : cfg.singularLabel}`}
+          </h2>
           <div className="flex items-center gap-2">
             <button onClick={() => setFullScreen(f => !f)} className="text-gray-400 hover:text-gray-600 transition-colors" title={fullScreen ? 'Restore' : 'Full screen'}>
               {fullScreen
@@ -1277,7 +1282,7 @@ function CreateDocumentModal({
           )}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-semibold text-gray-500 mb-1 block">{cfg.singularLabel} Number *</label>
+              <label className="text-xs font-semibold text-gray-500 mb-1 block">{preOrderDeposit && docType === 'quote' ? 'Pre Order Deposit' : cfg.singularLabel} Number *</label>
               {docType === 'quote' ? (
                 <div className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700 font-mono select-none">
                   {form.docNumber || 'Auto-generating…'}
@@ -1291,6 +1296,24 @@ function CreateDocumentModal({
               <input type="date" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.date} onChange={(e) => setField('date', e.target.value)} />
             </div>
           </div>
+
+          {docType === 'quote' && (
+            <label className={`flex items-center gap-3 cursor-pointer select-none px-4 py-3 rounded-xl border-2 transition-colors ${preOrderDeposit ? 'border-amber-400 bg-amber-50' : 'border-gray-200 hover:border-amber-300'}`}>
+              <input
+                type="checkbox"
+                checked={preOrderDeposit}
+                onChange={(e) => {
+                  setPreOrderDeposit(e.target.checked)
+                  if (e.target.checked) setDepositMode(true)
+                }}
+                className="w-4 h-4 rounded accent-amber-600"
+              />
+              <div>
+                <span className="text-sm font-semibold text-amber-700">Pre Order Deposit</span>
+                <span className="text-xs text-gray-500 ml-2">Renames this Quote to "Pre Order Deposit" and switches Discount → Deposit %</span>
+              </div>
+            </label>
+          )}
 
           <section>
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Client Details</h3>
@@ -1663,7 +1686,9 @@ function CreateDocumentModal({
           <div className="flex justify-end gap-3">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
             <button onClick={handleSave} disabled={saving} className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium">
-              {saving ? 'Saving...' : editDoc ? `Update ${cfg.singularLabel}` : `Save ${cfg.singularLabel}`}
+              {saving ? 'Saving...' : editDoc
+                ? `Update ${preOrderDeposit && docType === 'quote' ? 'Pre Order Deposit' : cfg.singularLabel}`
+                : `Save ${preOrderDeposit && docType === 'quote' ? 'Pre Order Deposit' : cfg.singularLabel}`}
             </button>
           </div>
         </div>
@@ -1755,7 +1780,7 @@ function CreateDocumentModal({
 // ─── Document Print / Email Utilities ─────────────────────────────────────────
 
 function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
-  const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
+  const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shippingHTML = data.shippingCost || 0
@@ -1929,7 +1954,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
 
   let y = 18
 
-  const docTitle = data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
+  const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shippingPDF = data.shippingCost || 0
@@ -3744,6 +3769,9 @@ export default function OrdersPage() {
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">
                             <span className="text-xs bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full">Standalone</span>
+                            {(doc as any).preOrderDeposit && (
+                              <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pre Order Deposit</span>
+                            )}
                             {(doc as any).paymentMethod && (
                               <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod}</span>
                             )}
