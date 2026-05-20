@@ -760,13 +760,23 @@ export default function PreOrderDashboardPage() {
           setWaModal(null)
         }
 
-        function sendWhatsApp() {
+        async function sendWhatsApp() {
+          const phone = (customer.phone || '').replace(/\D/g, '').replace(/^0/, '27')
+          const msgText = `Hi ${customer.name.split(' ')[0]}, please find your deposit quote for *${item.description}* (${item.sku}).\n\nDeposit Due: *R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}*\n\n${bank ? `Bank: ${bank.bankName}\nAccount: ${bank.accountName}\nAcc No: ${bank.accountNumber}\nBranch: ${bank.branchCode}\nRef: ${customer.name}` : ''}\n\nPlease use your name as reference. Thank you!`
+          const file = new File([html], `Deposit-Quote-${customer.name.replace(/\s+/g, '-')}.html`, { type: 'text/html' })
+          // Try Web Share API (works on mobile — opens native share sheet including WhatsApp)
+          if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+              await navigator.share({ files: [file], text: msgText, title: `Deposit Quote — ${customer.name}` })
+              setWaModal(null)
+              return
+            } catch {}
+          }
+          // Desktop fallback: open print dialog + open WhatsApp text link
           const win = window.open('', '_blank')
           if (win) { win.document.write(html); win.document.close(); win.focus(); setTimeout(() => win.print(), 350) }
-          const phone = (customer.phone || '').replace(/\D/g, '').replace(/^0/, '27')
           if (phone) {
-            const msg = encodeURIComponent(`Hi ${customer.name.split(' ')[0]}, please find your deposit quote for *${item.description}* (${item.sku}).\n\nDeposit Due: *R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}*\n\n${bank ? `Bank: ${bank.bankName}\nAccount: ${bank.accountName}\nAcc No: ${bank.accountNumber}\nBranch: ${bank.branchCode}\nRef: ${customer.name}` : ''}\n\nPlease use your name as reference. Thank you!`)
-            setTimeout(() => window.open(`https://wa.me/${phone}?text=${msg}`, '_blank'), 700)
+            setTimeout(() => window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msgText)}`, '_blank'), 700)
           }
           setWaModal(null)
         }
