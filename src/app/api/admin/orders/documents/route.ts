@@ -64,20 +64,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'type, clientName and docNumber are required' }, { status: 400 })
     }
     const now = new Date().toISOString()
-    // Invoices deduct stock permanently; Sales Orders reserve (same deduction). Quotes = no impact.
-    const stockable = body.type === 'invoice' || body.type === 'salesorder'
+    // Only Invoices deduct physical stock. Sales Orders use the virtual reservation display
+    // in the inventory page (reserved = active SO qty computed on the fly). Quotes = no impact.
+    const stockable = body.type === 'invoice'
     const lineItems: LineItem[] = body.lineItems || []
 
-    // stockAlreadyReserved = true when converting a Sales Order to Invoice.
-    // The SO already deducted stock — skip both the stock limit check and re-deduction.
+    // stockAlreadyReserved = true when converting an OLD Sales Order (stockDeducted:true) to Invoice.
+    // The SO already deducted stock — skip re-deduction to avoid double-deduct.
+    // For new SOs (stockDeducted:false) this will be false, so the Invoice correctly deducts.
     const stockAlreadyReserved = !!body.stockAlreadyReserved
 
     // Rule 1 — Stock limit check (info only — admin can always save; qty floors at 0 on deduction)
-    // Previously this blocked save; removed because admin may legitimately sell physical stock
-    // that the DB hasn't yet been updated for (e.g. item just removed from a Sales Order).
+    // Previously this blocked save; removed because admin may legitimately sell physical stock.
 
-    // Rule 3 — Stock Deduction: deduct inventory when invoice/SO is created
-    // Skip if stock was already reserved by the originating Sales Order
+    // Rule 3 — Stock Deduction: deduct inventory only when creating Invoices
     const deductStock = !stockAlreadyReserved && stockable && await isRuleActive('invoice_stock_deduction', true)
     if (deductStock) {
       await adjustStock(lineItems, 'subtract')

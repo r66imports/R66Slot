@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import type { OrderDocument } from '../route'
-import { adjustStock, extractSku } from '@/lib/order-helpers'
+import { adjustStock } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
-import type { LineItem } from '@/lib/order-helpers'
 
 const KEY = 'data/order-documents.json'
 const CANCELLED_STATUSES = new Set(['archived', 'rejected'])
 
-// Both invoices and sales orders hold stock. Quotes do not.
+// Only invoices physically deduct stock. SOs use virtual reservation display in inventory.
+// isStockable still returns true for salesorder so OLD SOs (stockDeducted:true) can restore on archive/delete.
 function isStockable(type: string) {
   return type === 'invoice' || type === 'salesorder'
 }
@@ -56,25 +56,6 @@ export async function PATCH(
         await adjustStock(prev.lineItems, 'add')
         await adjustStock(newItems, 'subtract')
         body.stockDeducted = true
-      } else if (prev.stockDeducted === false && wasStockable && !isCancelled && body.lineItems) {
-        // stockDeducted:false SO with changed line items — delta only: restore removed items, deduct added items.
-        // Covers the case where an item was removed from an SO to be placed on an Invoice.
-        const deltaRestore: LineItem[] = []
-        const deltaDeduct: LineItem[] = []
-        for (const pli of prev.lineItems) {
-          const pSku = extractSku(pli.description)
-          const nli = (newItems as LineItem[]).find(x => extractSku(x.description) === pSku)
-          const diff = pli.qty - (nli?.qty ?? 0)
-          if (diff > 0) deltaRestore.push({ ...pli, qty: diff })
-          else if (diff < 0) deltaDeduct.push({ ...pli, qty: -diff })
-        }
-        for (const nli of (newItems as LineItem[])) {
-          const nSku = extractSku(nli.description)
-          if (!prev.lineItems.some(p => extractSku(p.description) === nSku)) deltaDeduct.push(nli)
-        }
-        if (deltaRestore.length > 0) await adjustStock(deltaRestore, 'add')
-        if (deltaDeduct.length > 0) await adjustStock(deltaDeduct, 'subtract')
-        if (deltaRestore.length > 0 || deltaDeduct.length > 0) body.stockDeducted = true
       } else if (!prev.stockDeducted && nowStockable && !isCancelled) {
         // Wasn't deducted (quote→SO/invoice upgrade, or old record) — deduct now
         await adjustStock(newItems, 'subtract')

@@ -2580,7 +2580,9 @@ export default function OrdersPage() {
           shippingMethod: (doc as any).shippingMethod || '',
           shippingCost: (doc as any).shippingCost || 0,
           trackingNumber: (doc as any).trackingNumber || '',
-          stockAlreadyReserved: true,
+          // true only for old SOs that already physically deducted stock (prevents double-deduct).
+          // New SOs (stockDeducted:false) never deducted, so the invoice must deduct.
+          stockAlreadyReserved: (doc as any).stockDeducted === true,
         }),
       })
       if (res.ok) {
