@@ -3,10 +3,9 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
-import { AuthGuard } from '@/components/admin/auth-guard'
 import { useState, useEffect } from 'react'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
-import { useAdminAuth } from '@/lib/admin-auth-context'
+import { AdminAuthContext, type AdminAuthData } from '@/lib/admin-auth-context'
 import { ALWAYS_ALLOWED } from '@/lib/admin-permissions'
 
 // Submenu item type
@@ -26,7 +25,11 @@ export default function AdminLayout({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { role, permissions } = useAdminAuth()
+  const isLoginPage = pathname === '/admin/login'
+  const [authData, setAuthData] = useState<AdminAuthData>({ role: null, permissions: [], username: null })
+  const [isAuthenticated, setIsAuthenticated] = useState(isLoginPage)
+  const [isLoading, setIsLoading] = useState(!isLoginPage)
+  const { role, permissions } = authData
   const [currentBrand, setCurrentBrand] = useState('')
 
   // Returns true if the current user can see this nav item
@@ -35,6 +38,42 @@ export default function AdminLayout({
     if (ALWAYS_ALLOWED.includes(href)) return true
     return permissions.includes(href) || permissions.some((p) => p !== '/admin' && href.startsWith(p + '/'))
   }
+
+  // Auth check — must run at layout level so canAccess reads live data, not default context
+  useEffect(() => {
+    if (isLoginPage) return
+    const check = async () => {
+      if (process.env.NODE_ENV === 'development') {
+        setAuthData({ role: 'admin', permissions: [], username: 'Admin' })
+        setIsAuthenticated(true)
+        setIsLoading(false)
+        return
+      }
+      try {
+        const res = await fetch('/api/admin/auth/check')
+        const data = await res.json()
+        if (data.authenticated) {
+          const r = data.role ?? 'admin'
+          const p: string[] = data.permissions ?? []
+          setAuthData({ role: r, permissions: p, username: data.username ?? 'Admin' })
+          setIsAuthenticated(true)
+          if (r === 'staff') {
+            const ok = ALWAYS_ALLOWED.includes(pathname) ||
+              p.includes(pathname) ||
+              p.some((x) => x !== '/admin' && pathname.startsWith(x + '/'))
+            if (!ok) router.push(p.find((x) => !ALWAYS_ALLOWED.includes(x)) ?? '/admin')
+          }
+        } else {
+          router.push('/admin/login')
+        }
+      } catch {
+        router.push('/admin/login')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    check()
+  }, [pathname, isLoginPage, router])
 
   // Read brand param from URL on client (avoids useSearchParams Suspense requirement)
   useEffect(() => {
@@ -214,13 +253,23 @@ export default function AdminLayout({
     setCostingState(INITIAL_COSTING_STATE)
   }
 
-  // Don't show navigation for login page
-  if (pathname === '/admin/login') {
-    return <AuthGuard>{children}</AuthGuard>
+  // Login page — no nav needed
+  if (isLoginPage) {
+    return (
+      <AdminAuthContext.Provider value={authData}>
+        {children}
+      </AdminAuthContext.Provider>
+    )
   }
 
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center"><div className="text-lg font-play">Loading...</div></div>
+  }
+
+  if (!isAuthenticated) return null
+
   return (
-    <AuthGuard>
+    <AdminAuthContext.Provider value={authData}>
       <div className="min-h-screen bg-gray-100">
       {/* Header */}
       <header className="bg-secondary text-white border-b border-gray-700">
@@ -677,6 +726,6 @@ export default function AdminLayout({
         onClose={handleCloseCosting}
       />
     )}
-    </AuthGuard>
+    </AdminAuthContext.Provider>
   )
 }
