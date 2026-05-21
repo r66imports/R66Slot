@@ -1340,8 +1340,8 @@ function WorksheetEditor({
       {/* ── Costing Calculator ── */}
       <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-100'}`}>
         <div className="flex items-center gap-3 mb-3">
-          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : 'text-blue-700'}`}>
-            Costing Calculator{slsMode ? ' — SCS Mode' : ''}
+          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : jssMode ? 'text-violet-700' : 'text-blue-700'}`}>
+            Costing Calculator{slsMode ? ' — SCS Mode' : jssMode ? ' — JSS Mode' : ''}
           </p>
           <button
             type="button"
@@ -1350,6 +1350,14 @@ function WorksheetEditor({
             className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
           >
             SCS
+          </button>
+          <button
+            type="button"
+            onClick={toggleJssMode}
+            title="Jeffrey Stein Supplier: Wholesale + Shipping + VAT − Discount × Markup = Retail"
+            className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${jssMode ? 'bg-violet-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-violet-100 hover:text-violet-700'}`}
+          >
+            JSS
           </button>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -1406,8 +1414,8 @@ function WorksheetEditor({
       {/* ── Final Costing Calculator ── */}
       <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'}`}>
         <div className="flex items-center gap-3 mb-1">
-          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : 'text-emerald-700'}`}>
-            Final Costing Calculator{slsMode ? ' — SCS Mode' : ''}
+          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : jssMode ? 'text-violet-700' : 'text-emerald-700'}`}>
+            Final Costing Calculator{slsMode ? ' — SCS Mode' : jssMode ? ' — JSS Mode' : ''}
           </p>
           <button
             type="button"
@@ -1416,6 +1424,14 @@ function WorksheetEditor({
             className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
           >
             SCS
+          </button>
+          <button
+            type="button"
+            onClick={toggleJssMode}
+            title="Jeffrey Stein Supplier: Wholesale + Shipping + VAT − Discount × Markup = Retail"
+            className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${jssMode ? 'bg-violet-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-violet-100 hover:text-violet-700'}`}
+          >
+            JSS
           </button>
         </div>
         <p className="text-xs text-emerald-600 mb-3">
@@ -1528,17 +1544,9 @@ function WorksheetEditor({
       {(isJssSupplier || jssMode) && (
         <div className={`border rounded-xl px-5 py-4 ${jssMode ? 'bg-violet-50 border-violet-200' : 'bg-gray-50 border-gray-200'}`}>
           <div className="flex items-center gap-3 mb-3">
-            <p className={`text-xs font-semibold uppercase tracking-wider ${jssMode ? 'text-violet-700' : 'text-gray-500'}`}>
-              JSS Calculator{jssMode ? ' — Jeffrey Stein Supplier' : ''}
+            <p className="text-xs font-semibold uppercase tracking-wider text-violet-700">
+              JSS Calculator — Jeffrey Stein Supplier
             </p>
-            <button
-              type="button"
-              onClick={toggleJssMode}
-              title="Jeffrey Stein Supplier: Wholesale + Shipping + VAT - Discount × Markup = Retail"
-              className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${jssMode ? 'bg-violet-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-violet-100 hover:text-violet-700'}`}
-            >
-              JSS
-            </button>
             {jssMode && jssTotalWholesale > 0 && (
               <span className="text-xs text-violet-600">Total wholesale: R {fmtFC(jssTotalWholesale)}</span>
             )}
