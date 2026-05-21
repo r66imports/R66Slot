@@ -81,6 +81,8 @@ interface WsSheet {
   jssVatPct?: number
   jssDiscountPct?: number
   jssMarkupPct?: number
+  cutMode?: boolean
+  cutDiscountPct?: number
   trackingNumber?: string
   supplierInvNumber?: string
   supplierInvDate?: string
@@ -235,6 +237,9 @@ function WorksheetEditor({
 
   // ── JSS Calculator (Jeffrey Stein Supplier) ──
   const [jssMode, setJssMode] = useState(false)
+  // ── CUT Calculator ──
+  const [cutMode, setCutMode] = useState(false)
+  const [cutDiscountPct, setCutDiscountPct] = useState(10)
   const [jssShippingCost, setJssShippingCost] = useState(0)
   const [jssVatPct, setJssVatPct] = useState(15)
   const [jssDiscountPct, setJssDiscountPct] = useState(2.5)
@@ -769,6 +774,12 @@ function WorksheetEditor({
     }
   }
 
+  function toggleCutMode() {
+    const activating = !cutMode
+    setCutMode(activating)
+    if (activating) { setCurrency('ZAR'); setExchangeRate(1) }
+  }
+
   // ── Items ──
   function updateItem(id: string, patch: Partial<WsItem>) {
     setItems((prev) => prev.map((it) => it.id === id ? { ...it, ...patch } : it))
@@ -805,6 +816,7 @@ function WorksheetEditor({
       finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct, finalDiscountPct,
       slsMode, slsDiscountPct, finalSlsDiscountPct,
       jssMode, jssShippingCost, jssVatPct, jssDiscountPct, jssMarkupPct,
+      cutMode, cutDiscountPct,
       trackingNumber,
       supplierInvNumber,
       supplierInvDate,
@@ -877,6 +889,8 @@ function WorksheetEditor({
     setJssVatPct((sheet as any).jssVatPct ?? 15)
     setJssDiscountPct((sheet as any).jssDiscountPct ?? 2.5)
     setJssMarkupPct((sheet as any).jssMarkupPct ?? 30)
+    setCutMode((sheet as any).cutMode ?? false)
+    setCutDiscountPct((sheet as any).cutDiscountPct ?? 10)
     setTrackingNumber(sheet.trackingNumber ?? '')
     setTrackingEditMode(false)
     setSupplierInvNumber(sheet.supplierInvNumber ?? '')
@@ -1340,9 +1354,17 @@ function WorksheetEditor({
       {/* ── Costing Calculator ── */}
       <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-100'}`}>
         <div className="flex items-center gap-3 mb-3">
-          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : jssMode ? 'text-violet-700' : 'text-blue-700'}`}>
-            Costing Calculator{slsMode ? ' — SCS Mode' : jssMode ? ' — JSS Mode' : ''}
+          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : jssMode ? 'text-violet-700' : cutMode ? 'text-rose-700' : 'text-blue-700'}`}>
+            Costing Calculator{slsMode ? ' — SCS Mode' : jssMode ? ' — JSS Mode' : cutMode ? ' — CUT Mode' : ''}
           </p>
+          <button
+            type="button"
+            onClick={toggleCutMode}
+            title="CUT: Wholesale × Discount % = Cut Amount"
+            className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${cutMode ? 'bg-rose-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-rose-100 hover:text-rose-700'}`}
+          >
+            CUT
+          </button>
           <button
             type="button"
             onClick={toggleScsMode}
@@ -1414,9 +1436,17 @@ function WorksheetEditor({
       {/* ── Final Costing Calculator ── */}
       <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'}`}>
         <div className="flex items-center gap-3 mb-1">
-          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : jssMode ? 'text-violet-700' : 'text-emerald-700'}`}>
-            Final Costing Calculator{slsMode ? ' — SCS Mode' : jssMode ? ' — JSS Mode' : ''}
+          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : jssMode ? 'text-violet-700' : cutMode ? 'text-rose-700' : 'text-emerald-700'}`}>
+            Final Costing Calculator{slsMode ? ' — SCS Mode' : jssMode ? ' — JSS Mode' : cutMode ? ' — CUT Mode' : ''}
           </p>
+          <button
+            type="button"
+            onClick={toggleCutMode}
+            title="CUT: Wholesale × Discount % = Cut Amount"
+            className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${cutMode ? 'bg-rose-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-rose-100 hover:text-rose-700'}`}
+          >
+            CUT
+          </button>
           <button
             type="button"
             onClick={toggleScsMode}
@@ -1598,6 +1628,45 @@ function WorksheetEditor({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── CUT Calculator ── */}
+      {cutMode && (
+        <div className="border border-rose-200 rounded-xl px-5 py-4 bg-rose-50">
+          <div className="flex items-center gap-3 mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-rose-700">CUT Calculator</p>
+            {items.filter(it => it.wholesalePrice > 0).length > 0 && (
+              <span className="text-xs text-rose-600">
+                Total wholesale: R {fmtFC(items.filter(it => it.wholesalePrice > 0).reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0))}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-rose-700">Discount %</label>
+              <input
+                type="number" min={0} max={100} step={0.5}
+                value={cutDiscountPct}
+                onChange={(e) => setCutDiscountPct(Number(e.target.value))}
+                className="border-2 border-rose-300 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-rose-400 font-semibold text-rose-900"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-rose-600 font-semibold">Formula</label>
+              <div className="px-2.5 py-1.5 text-xs text-rose-700 bg-rose-100 border border-rose-200 rounded-lg whitespace-nowrap">
+                W × {cutDiscountPct}% = W × {(cutDiscountPct / 100).toFixed(4)} = CUT
+              </div>
+            </div>
+            {items.filter(it => it.wholesalePrice > 0).length > 0 && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-rose-600 font-semibold">Total CUT</label>
+                <div className="px-3 py-1.5 text-sm font-bold text-rose-800 bg-rose-200 border border-rose-300 rounded-lg">
+                  R {fmtFC(items.filter(it => it.wholesalePrice > 0).reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate * (cutDiscountPct / 100), 0))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
