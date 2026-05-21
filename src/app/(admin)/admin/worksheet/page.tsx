@@ -705,29 +705,33 @@ function WorksheetEditor({
   }
 
   // ── Costing functions ──
-  // CUT effective: W × (CUT%/100) — applied before all other calculations
-  // CUT: W - (CUT% × W) = W × (1 - CUT%/100)
-  function effectiveW(w: number) { return cutMode ? w * (1 - cutDiscountPct / 100) : w }
+  // CUT formula: W - (CUT% × W) = W × (1 - CUT%/100)
+  // When SCS is also active, CUT operates on the SCS-computed wholesale (not raw RRP input)
+  function effectiveW(w: number) {
+    const afterScs = slsMode ? w * (1 - slsDiscountPct / 100) : w
+    return cutMode ? afterScs * (1 - cutDiscountPct / 100) : afterScs
+  }
+  // Final Costing uses its own SCS % (finalSlsDiscountPct)
+  function effectiveFinalW(w: number) {
+    const afterScs = slsMode
+      ? w * (1 - finalSlsDiscountPct / 100)
+      : (finalDiscountPct > 0 ? w * (1 + finalDiscountPct / 100) : w)
+    return cutMode ? afterScs * (1 - cutDiscountPct / 100) : afterScs
+  }
   function calcLanded(w: number) {
-    const ew = effectiveW(w)
-    const cost = slsMode ? ew * (1 - slsDiscountPct / 100) : ew
-    return cost * exchangeRate * (1 + shippingPct / 100)
+    return effectiveW(w) * exchangeRate * (1 + shippingPct / 100)
   }
   function calcRetail(w: number) { return calcLanded(w) * (1 + markupPct / 100) * (1 + vatPct / 100) }
 
   // Final costing — derived percentages from total costs
   const totalWholesaleZAR = items
     .filter((it) => it.wholesalePrice > 0)
-    .reduce((sum, it) => sum + it.qty * effectiveW(it.wholesalePrice) * finalExRate, 0)
+    .reduce((sum, it) => sum + it.qty * effectiveFinalW(it.wholesalePrice) * finalExRate, 0)
   const shippingPctCalc = totalWholesaleZAR > 0 ? (finalShippingCost / totalWholesaleZAR) * 100 : 0
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
 
   function calcFinalLanded(w: number) {
-    const ew = effectiveW(w)
-    const cost = slsMode
-      ? ew * (1 - finalSlsDiscountPct / 100)
-      : (finalDiscountPct > 0 ? ew * (1 + finalDiscountPct / 100) : ew)
-    return cost * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100)
+    return effectiveFinalW(w) * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100)
   }
   function calcEntityFinalLanded(w: number, entity?: 'R66' | 'JDM' | '') {
     const base = calcFinalLanded(w)
@@ -1668,6 +1672,7 @@ function WorksheetEditor({
                 <label className="text-xs text-rose-600 font-semibold">Total CUT</label>
                 <div className="px-3 py-1.5 text-sm font-bold text-rose-800 bg-rose-200 border border-rose-300 rounded-lg">
                   R {fmtFC(items.filter(it => it.wholesalePrice > 0).reduce((s, it) => s + it.qty * effectiveW(it.wholesalePrice) * exchangeRate, 0))}
+                  {slsMode && cutMode && <span className="block text-[10px] text-rose-500 mt-0.5">SCS → CUT applied</span>}
                 </div>
               </div>
             )}
@@ -2066,7 +2071,7 @@ function WorksheetEditor({
                           <div className="flex items-center justify-end gap-1">
                             <span className="text-xs text-rose-400">{currency}</span>
                             <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-bold ${it.wholesalePrice > 0 ? 'text-rose-700 bg-rose-50 border border-rose-300' : 'text-gray-300'}`}>
-                              {it.wholesalePrice > 0 ? fmtFC(it.wholesalePrice * (1 - cutDiscountPct / 100)) : '—'}
+                              {it.wholesalePrice > 0 ? fmtFC(effectiveW(it.wholesalePrice)) : '—'}
                             </span>
                           </div>
                         </div>
