@@ -73,6 +73,9 @@ interface WsSheet {
   finalMarkupPct: number
   finalVatPct: number
   finalDiscountPct?: number
+  slsMode?: boolean
+  slsDiscountPct?: number
+  finalSlsDiscountPct?: number
   trackingNumber?: string
   supplierInvNumber?: string
   supplierInvDate?: string
@@ -221,6 +224,9 @@ function WorksheetEditor({
   const [finalMarkupPct, setFinalMarkupPct] = useState(30)
   const [finalVatPct, setFinalVatPct] = useState(0)
   const [finalDiscountPct, setFinalDiscountPct] = useState(0)
+  const [slsMode, setSlsMode] = useState(false)
+  const [slsDiscountPct, setSlsDiscountPct] = useState(30)
+  const [finalSlsDiscountPct, setFinalSlsDiscountPct] = useState(30)
 
   // ── Items ──
   const [items, setItems] = useState<WsItem[]>([newWsItem()])
@@ -666,7 +672,10 @@ function WorksheetEditor({
   }
 
   // ── Costing functions ──
-  function calcLanded(w: number) { return w * exchangeRate * (1 + shippingPct / 100) }
+  function calcLanded(w: number) {
+    const cost = slsMode ? w * (1 - slsDiscountPct / 100) : w
+    return cost * exchangeRate * (1 + shippingPct / 100)
+  }
   function calcRetail(w: number) { return calcLanded(w) * (1 + markupPct / 100) * (1 + vatPct / 100) }
 
   // Final costing — derived percentages from total costs
@@ -677,8 +686,10 @@ function WorksheetEditor({
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
 
   function calcFinalLanded(w: number) {
-    const adj = finalDiscountPct > 0 ? w * (1 + finalDiscountPct / 100) : w
-    return adj * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100)
+    const cost = slsMode
+      ? w * (1 - finalSlsDiscountPct / 100)
+      : (finalDiscountPct > 0 ? w * (1 + finalDiscountPct / 100) : w)
+    return cost * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100)
   }
   function calcEntityFinalLanded(w: number, entity?: 'R66' | 'JDM' | '') {
     const base = calcFinalLanded(w)
@@ -722,6 +733,7 @@ function WorksheetEditor({
       archived: false,
       currency, exchangeRate, markupPct, shippingPct, vatPct,
       finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct, finalDiscountPct,
+      slsMode, slsDiscountPct, finalSlsDiscountPct,
       trackingNumber,
       supplierInvNumber,
       supplierInvDate,
@@ -786,6 +798,9 @@ function WorksheetEditor({
     setFinalMarkupPct(sheet.finalMarkupPct)
     setFinalVatPct(sheet.finalVatPct)
     setFinalDiscountPct((sheet as any).finalDiscountPct ?? 0)
+    setSlsMode((sheet as any).slsMode ?? false)
+    setSlsDiscountPct((sheet as any).slsDiscountPct ?? 30)
+    setFinalSlsDiscountPct((sheet as any).finalSlsDiscountPct ?? 30)
     setTrackingNumber(sheet.trackingNumber ?? '')
     setTrackingEditMode(false)
     setSupplierInvNumber(sheet.supplierInvNumber ?? '')
@@ -989,7 +1004,7 @@ function WorksheetEditor({
     <thead><tr>
       <th style="width:28px">#</th><th>SKU</th><th>Description</th><th class="r">Retail (ZAR)</th><th class="c" style="width:50px">In Stock</th>
       <th class="c" style="width:36px">Qty</th>
-      <th class="r">Wholesale (${currency})</th>
+      <th class="r">${slsMode ? `RRP (${currency})` : `Wholesale (${currency})`}</th>
       <th class="r">Landed (ZAR)</th>
       <th class="r">Pre Order Price</th>
       <th class="r" style="color:#065f46">Final Landed</th>
@@ -1247,8 +1262,20 @@ function WorksheetEditor({
       </div>
 
       {/* ── Costing Calculator ── */}
-      <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-4">
-        <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-3">Costing Calculator</p>
+      <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-100'}`}>
+        <div className="flex items-center gap-3 mb-3">
+          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : 'text-blue-700'}`}>
+            Costing Calculator{slsMode ? ' — SLS Mode' : ''}
+          </p>
+          <button
+            type="button"
+            onClick={() => setSlsMode(m => !m)}
+            title="Slotcars Supply: Retail Price − Discount % = Wholesale Cost"
+            className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
+          >
+            SLS
+          </button>
+        </div>
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Currency</label>
@@ -1277,12 +1304,44 @@ function WorksheetEditor({
             <input type="number" min={0} step={1} value={vatPct} onChange={(e) => setVatPct(Number(e.target.value))}
               className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
+          {slsMode && (
+            <>
+              <div className="w-px h-8 bg-orange-200 self-end mb-1.5" />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-orange-600 font-semibold">SLS Discount %</label>
+                <input
+                  type="number" min={0} max={100} step={0.5}
+                  value={slsDiscountPct}
+                  onChange={(e) => setSlsDiscountPct(Number(e.target.value))}
+                  className="border-2 border-orange-300 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-400 font-semibold text-orange-900"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-orange-600 font-semibold">Formula</label>
+                <div className="px-2.5 py-1.5 text-xs text-orange-700 bg-orange-100 border border-orange-200 rounded-lg whitespace-nowrap">
+                  RRP × {(1 - slsDiscountPct / 100).toFixed(2)} = Cost
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* ── Final Costing Calculator ── */}
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
-        <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider mb-1">Final Costing Calculator</p>
+      <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'}`}>
+        <div className="flex items-center gap-3 mb-1">
+          <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : 'text-emerald-700'}`}>
+            Final Costing Calculator{slsMode ? ' — SLS Mode' : ''}
+          </p>
+          <button
+            type="button"
+            onClick={() => setSlsMode(m => !m)}
+            title="Slotcars Supply: Retail Price − Discount % = Wholesale Cost"
+            className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
+          >
+            SLS
+          </button>
+        </div>
         <p className="text-xs text-emerald-600 mb-3">
           Drives the <span className="font-semibold">Final Landed</span> and <span className="font-semibold">Landed Retail</span> columns.
           {totalWholesaleZAR > 0 && <span className="ml-2 text-emerald-700">Total wholesale: R {fmtFC(totalWholesaleZAR)}</span>}
@@ -1344,26 +1403,48 @@ function WorksheetEditor({
               className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
           </div>
 
-          {/* ── Wholesale Discount + VAT display ── */}
-          <div className="w-px h-8 bg-emerald-200 self-end mb-1.5" />
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-amber-600 font-semibold">Discount %</label>
-            <input
-              type="number" min={0} step={0.1}
-              value={finalDiscountPct || ''}
-              placeholder="0"
-              onChange={(e) => setFinalDiscountPct(Number(e.target.value))}
-              className="border-2 border-amber-300 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-400 font-semibold text-amber-900"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-amber-600 font-semibold">Wholesale + Disc + VAT15%</label>
-            <div className="px-2.5 py-1.5 text-sm w-36 bg-amber-100 border-2 border-amber-300 rounded-lg text-amber-900 font-bold text-center">
-              {finalDiscountPct > 0
-                ? `R ${fmtFC(totalWholesaleZAR * (1 + finalDiscountPct / 100) * 1.15)}`
-                : `R ${fmtFC(totalWholesaleZAR * 1.15)}`}
-            </div>
-          </div>
+          {/* ── SLS Discount OR regular Discount + VAT display ── */}
+          <div className={`w-px h-8 self-end mb-1.5 ${slsMode ? 'bg-orange-200' : 'bg-emerald-200'}`} />
+          {slsMode ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-orange-600 font-semibold">SLS Discount %</label>
+                <input
+                  type="number" min={0} max={100} step={0.5}
+                  value={finalSlsDiscountPct}
+                  onChange={(e) => setFinalSlsDiscountPct(Number(e.target.value))}
+                  className="border-2 border-orange-300 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-400 font-semibold text-orange-900"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-orange-600 font-semibold">Formula</label>
+                <div className="px-2.5 py-1.5 text-xs text-orange-700 bg-orange-100 border border-orange-200 rounded-lg whitespace-nowrap">
+                  RRP × {(1 - finalSlsDiscountPct / 100).toFixed(2)} = Cost
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-amber-600 font-semibold">Discount %</label>
+                <input
+                  type="number" min={0} step={0.1}
+                  value={finalDiscountPct || ''}
+                  placeholder="0"
+                  onChange={(e) => setFinalDiscountPct(Number(e.target.value))}
+                  className="border-2 border-amber-300 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-400 font-semibold text-amber-900"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-amber-600 font-semibold">Wholesale + Disc + VAT15%</label>
+                <div className="px-2.5 py-1.5 text-sm w-36 bg-amber-100 border-2 border-amber-300 rounded-lg text-amber-900 font-bold text-center">
+                  {finalDiscountPct > 0
+                    ? `R ${fmtFC(totalWholesaleZAR * (1 + finalDiscountPct / 100) * 1.15)}`
+                    : `R ${fmtFC(totalWholesaleZAR * 1.15)}`}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -1566,7 +1647,9 @@ function WorksheetEditor({
                 <th className="text-center pb-2 px-2 w-20">In Stock</th>
                 <th className="text-center pb-2 px-1 w-8" title="Check to confirm stock received">✓</th>
                 <th className="text-center pb-2 px-2 w-14">Qty</th>
-                <th className="text-right pb-2 px-2" style={{ minWidth: '120px' }}>Wholesale ({currency})</th>
+                <th className="text-right pb-2 px-2" style={{ minWidth: '120px' }}>
+                  {slsMode ? <span className="text-orange-700">RRP / Retail ({currency})</span> : `Wholesale (${currency})`}
+                </th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Landed (ZAR)</th>
                 <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Pre Order Price</th>
                 <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Final Landed</th>
