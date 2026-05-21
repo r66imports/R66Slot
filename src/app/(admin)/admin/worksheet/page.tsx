@@ -1265,15 +1265,15 @@ function WorksheetEditor({
       <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-100'}`}>
         <div className="flex items-center gap-3 mb-3">
           <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : 'text-blue-700'}`}>
-            Costing Calculator{slsMode ? ' — SLS Mode' : ''}
+            Costing Calculator{slsMode ? ' — SCS Mode' : ''}
           </p>
           <button
             type="button"
             onClick={() => setSlsMode(m => !m)}
-            title="Slotcars Supply: Retail Price − Discount % = Wholesale Cost"
+            title="Slotcar Supply: Retail Price − Discount % = Wholesale Cost"
             className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
           >
-            SLS
+            SCS
           </button>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -1308,7 +1308,7 @@ function WorksheetEditor({
             <>
               <div className="w-px h-8 bg-orange-200 self-end mb-1.5" />
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-orange-600 font-semibold">SLS Discount %</label>
+                <label className="text-xs text-orange-600 font-semibold">SCS Discount %</label>
                 <input
                   type="number" min={0} max={100} step={0.5}
                   value={slsDiscountPct}
@@ -1331,15 +1331,15 @@ function WorksheetEditor({
       <div className={`border rounded-xl px-5 py-4 ${slsMode ? 'bg-orange-50 border-orange-200' : 'bg-emerald-50 border-emerald-200'}`}>
         <div className="flex items-center gap-3 mb-1">
           <p className={`text-xs font-semibold uppercase tracking-wider ${slsMode ? 'text-orange-700' : 'text-emerald-700'}`}>
-            Final Costing Calculator{slsMode ? ' — SLS Mode' : ''}
+            Final Costing Calculator{slsMode ? ' — SCS Mode' : ''}
           </p>
           <button
             type="button"
             onClick={() => setSlsMode(m => !m)}
-            title="Slotcars Supply: Retail Price − Discount % = Wholesale Cost"
+            title="Slotcar Supply: Retail Price − Discount % = Wholesale Cost"
             className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
           >
-            SLS
+            SCS
           </button>
         </div>
         <p className="text-xs text-emerald-600 mb-3">
@@ -1408,7 +1408,7 @@ function WorksheetEditor({
           {slsMode ? (
             <>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-orange-600 font-semibold">SLS Discount %</label>
+                <label className="text-xs text-orange-600 font-semibold">SCS Discount %</label>
                 <input
                   type="number" min={0} max={100} step={0.5}
                   value={finalSlsDiscountPct}
