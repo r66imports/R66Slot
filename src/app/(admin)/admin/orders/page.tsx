@@ -389,43 +389,60 @@ function DocumentBody({
               </div>
             )}
           </>)}
-          <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
-            <span>TOTAL</span>
-            <span>{fmtPrice(total)}</span>
-          </div>
-          {deposit > 0 && (
-            <div className="flex justify-between py-1 border-b border-gray-100 text-sm mt-1">
-              <span className="text-gray-500">Deposit Paid</span>
-              <span className="font-medium text-green-600">-{fmtPrice(deposit)}</span>
+          {(data as any).preOrderDeposit && deposit > 0 ? (<>
+            <div className="flex justify-between py-1 border-b border-gray-100 text-xs text-gray-400 mt-1">
+              <span>Full Order Total</span>
+              <span>{fmtPrice(total)}</span>
             </div>
-          )}
-          {(data.creditApplied || 0) > 0 && (
-            <div className="flex justify-between py-1 border-b border-green-100 text-sm mt-1">
-              <span className="text-green-600 font-medium">Credit Applied</span>
-              <span className="font-medium text-green-600">-{fmtPrice(data.creditApplied)}</span>
+            <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
+              <span>DEPOSIT DUE</span>
+              <span>{fmtPrice(deposit)}</span>
             </div>
-          )}
-          {(data.overpaymentCredit || 0) > 0 && data.showCreditOnInvoice && (
-            <div className="flex justify-between py-1 border-b border-amber-100 text-sm mt-1">
-              <span className="text-amber-600 font-medium">Overpayment Credit <span className="text-[10px] font-normal">(carried to your account)</span></span>
-              <span className="font-medium text-amber-600">{fmtPrice(data.overpaymentCredit)}</span>
-            </div>
-          )}
-          {(data.amountPaid || 0) > 0 && (
-            <div className="flex justify-between py-1 border-b border-blue-100 text-sm mt-1">
-              <span className="text-blue-600 font-medium">Amount Paid</span>
-              <span className="font-medium text-blue-600">-{fmtPrice(data.amountPaid)}</span>
-            </div>
-          )}
-          {(() => {
-            const remaining = total - deposit - (data.creditApplied || 0) - (data.amountPaid || 0)
-            return remaining > 0.005 ? (
+            {balanceDuePreview > 0.005 && (
               <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
-                <span>BALANCE DUE</span>
-                <span>{fmtPrice(remaining)}</span>
+                <span>BALANCE ON DELIVERY</span>
+                <span>{fmtPrice(balanceDuePreview)}</span>
               </div>
-            ) : null
-          })()}
+            )}
+          </>) : (<>
+            <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
+              <span>TOTAL</span>
+              <span>{fmtPrice(total)}</span>
+            </div>
+            {deposit > 0 && (
+              <div className="flex justify-between py-1 border-b border-gray-100 text-sm mt-1">
+                <span className="text-gray-500">Deposit Paid</span>
+                <span className="font-medium text-green-600">-{fmtPrice(deposit)}</span>
+              </div>
+            )}
+            {(data.creditApplied || 0) > 0 && (
+              <div className="flex justify-between py-1 border-b border-green-100 text-sm mt-1">
+                <span className="text-green-600 font-medium">Credit Applied</span>
+                <span className="font-medium text-green-600">-{fmtPrice(data.creditApplied)}</span>
+              </div>
+            )}
+            {(data.overpaymentCredit || 0) > 0 && data.showCreditOnInvoice && (
+              <div className="flex justify-between py-1 border-b border-amber-100 text-sm mt-1">
+                <span className="text-amber-600 font-medium">Overpayment Credit <span className="text-[10px] font-normal">(carried to your account)</span></span>
+                <span className="font-medium text-amber-600">{fmtPrice(data.overpaymentCredit)}</span>
+              </div>
+            )}
+            {(data.amountPaid || 0) > 0 && (
+              <div className="flex justify-between py-1 border-b border-blue-100 text-sm mt-1">
+                <span className="text-blue-600 font-medium">Amount Paid</span>
+                <span className="font-medium text-blue-600">-{fmtPrice(data.amountPaid)}</span>
+              </div>
+            )}
+            {(() => {
+              const remaining = total - deposit - (data.creditApplied || 0) - (data.amountPaid || 0)
+              return remaining > 0.005 ? (
+                <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
+                  <span>BALANCE DUE</span>
+                  <span>{fmtPrice(remaining)}</span>
+                </div>
+              ) : null
+            })()}
+          </>)}
         </div>
       </div>
 
@@ -1186,7 +1203,7 @@ function CreateDocumentModal({
   const [shippingMethod, setShippingMethod] = useState<string>((editDoc as any)?.shippingMethod || '')
   const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
-  const [depositMode, setDepositMode] = useState<boolean>((editDoc as any)?.depositMode || false)
+  const [depositMode, setDepositMode] = useState<boolean>((editDoc as any)?.depositMode || !!(editDoc as any)?.preOrderDeposit || false)
   const [preOrderDeposit, setPreOrderDeposit] = useState<boolean>((editDoc as any)?.preOrderDeposit || false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>((editDoc as any)?.bankAccountId || '')
@@ -1304,7 +1321,7 @@ function CreateDocumentModal({
                 checked={preOrderDeposit}
                 onChange={(e) => {
                   setPreOrderDeposit(e.target.checked)
-                  if (e.target.checked) setDepositMode(true)
+                  setDepositMode(e.target.checked)
                 }}
                 className="w-4 h-4 rounded accent-amber-600"
               />
@@ -1467,7 +1484,7 @@ function CreateDocumentModal({
                       </td>
                       <td className="px-3 py-1.5 text-right font-medium">
                         {depositMode
-                          ? (discountPct > 0 ? <span className="text-amber-600">{fmtPrice(depositAmount)}</span> : '—')
+                          ? (discountPct > 0 ? <span className="text-gray-400 text-xs">{fmtPrice(total)} full order</span> : '—')
                           : (discountPct > 0 ? <span className="text-red-500">-{fmtPrice(discountAmt)}</span> : '—')
                         }
                       </td>
@@ -1539,8 +1556,13 @@ function CreateDocumentModal({
                     </tr>
                   )}
                   <tr className="border-t bg-blue-50">
-                    <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-blue-800">Total</td>
-                    <td className="px-3 py-2.5 text-right font-bold text-blue-800">{fmtPrice(total)}</td><td />
+                    <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-blue-800">
+                      {depositMode && discountPct > 0 ? `Deposit Due (${discountPct}%)` : 'Total'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-bold text-blue-800">
+                      {fmtPrice(depositMode && discountPct > 0 ? depositAmount : total)}
+                    </td>
+                    <td />
                   </tr>
                   {/* Credit allocation — invoices only */}
                   {!isQuote && availableCredit > 0 && (
@@ -1612,7 +1634,9 @@ function CreateDocumentModal({
                   )}
                   {depositAmount > 0 && (
                     <tr className="border-t bg-orange-50">
-                      <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-orange-700">Balance Due</td>
+                      <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-orange-700">
+                        {depositMode ? 'Balance on Delivery' : 'Balance Due'}
+                      </td>
                       <td className="px-3 py-2.5 text-right font-bold text-orange-700">{fmtPrice(balanceDue)}</td><td />
                     </tr>
                   )}
@@ -1873,11 +1897,17 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
       ${((data.discountPct || 0) > 0 || shippingHTML > 0) ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>` : ''}
       ${(data.discountPct || 0) > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#ef4444">Discount (${data.discountPct}%)</span><span style="font-weight:500;color:#ef4444">-${fmtPrice(discountAmt)}</span></div>` : ''}
       ${shippingHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}</span><span style="font-weight:500">${fmtPrice(shippingHTML)}</span></div>` : ''}
+      ${(data as any).preOrderDeposit && depositHTML > 0 ? `
+      <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#9ca3af;font-size:11px">Full Order Total</span><span style="color:#9ca3af;font-size:11px">${fmtPrice(total)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>DEPOSIT DUE</span><span>${fmtPrice(depositHTML)}</span></div>
+      ${balanceDueHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>BALANCE ON DELIVERY</span><span>${fmtPrice(balanceDueHTML)}</span></div>` : ''}
+      ` : `
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
       ${depositHTML > 0 ? `
       <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Deposit Paid</span><span style="font-weight:500;color:#16a34a">-${fmtPrice(depositHTML)}</span></div>
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>BALANCE DUE</span><span>${fmtPrice(balanceDueHTML)}</span></div>
       ` : ''}
+      `}
     </div>
   </div>
   ${(data.shippingMethod || data.trackingNumber) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${data.shippingMethod ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Shipping:</span><span style="font-size:12px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:2px 10px;border-radius:99px">${data.shippingMethod}</span>` : ''}${data.trackingNumber ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-left:8px">Tracking:</span><span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;font-family:monospace;padding:2px 10px;border-radius:99px">${data.trackingNumber}</span>` : ''}</div>` : ''}
@@ -1926,8 +1956,9 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
     ...((data.discountPct || 0) > 0 || shippingEmail > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`] : []),
     ...((data.discountPct || 0) > 0 ? [`Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
     ...(shippingEmail > 0 ? [`Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}:  ${fmtPrice(shippingEmail)}`] : []),
-    `TOTAL:  ${fmtPrice(total)}`,
-    ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : []),
+    ...((data as any).preOrderDeposit && (data.depositPaid || 0) > 0
+      ? [`Full Order Total:  ${fmtPrice(total)}`, `DEPOSIT DUE:  ${fmtPrice(data.depositPaid)}`, `BALANCE ON DELIVERY:  ${fmtPrice(total - (data.depositPaid || 0))}`]
+      : [`TOTAL:  ${fmtPrice(total)}`, ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : [])]),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
     ...(data.paymentMethod || data.paymentMethod2 ? [`Payment:  ${[data.paymentMethod ? `${data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}${data.paymentMethod}` : '', data.paymentMethod2 ? `${data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}${data.paymentMethod2}` : ''].filter(Boolean).join(' + ')}`] : []),
@@ -2092,11 +2123,17 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
       ...(shippingPDF > 0 ? [
         ['', '', '', '', `Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF)],
       ] : []),
-      ['', '', '', '', 'TOTAL', fmtPrice(total)],
-      ...((data.depositPaid || 0) > 0 ? [
-        ['', '', '', '', 'Deposit Paid', `-${fmtPrice(data.depositPaid || 0)}`],
-        ['', '', '', '', 'BALANCE DUE', fmtPrice(total - (data.depositPaid || 0))],
-      ] : []),
+      ...((data as any).preOrderDeposit && (data.depositPaid || 0) > 0 ? [
+        ['', '', '', '', 'Full Order Total', fmtPrice(total)],
+        ['', '', '', '', 'DEPOSIT DUE', fmtPrice(data.depositPaid || 0)],
+        ['', '', '', '', 'BALANCE ON DELIVERY', fmtPrice(total - (data.depositPaid || 0))],
+      ] : [
+        ['', '', '', '', 'TOTAL', fmtPrice(total)],
+        ...((data.depositPaid || 0) > 0 ? [
+          ['', '', '', '', 'Deposit Paid', `-${fmtPrice(data.depositPaid || 0)}`],
+          ['', '', '', '', 'BALANCE DUE', fmtPrice(total - (data.depositPaid || 0))],
+        ] : []),
+      ]),
     ],
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
     bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
