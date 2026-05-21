@@ -76,6 +76,11 @@ interface WsSheet {
   slsMode?: boolean
   slsDiscountPct?: number
   finalSlsDiscountPct?: number
+  jssMode?: boolean
+  jssShippingCost?: number
+  jssVatPct?: number
+  jssDiscountPct?: number
+  jssMarkupPct?: number
   trackingNumber?: string
   supplierInvNumber?: string
   supplierInvDate?: string
@@ -227,6 +232,13 @@ function WorksheetEditor({
   const [slsMode, setSlsMode] = useState(false)
   const [slsDiscountPct, setSlsDiscountPct] = useState(30)
   const [finalSlsDiscountPct, setFinalSlsDiscountPct] = useState(30)
+
+  // ── JSS Calculator (Jeffrey Stein Supplier) ──
+  const [jssMode, setJssMode] = useState(false)
+  const [jssShippingCost, setJssShippingCost] = useState(0)
+  const [jssVatPct, setJssVatPct] = useState(15)
+  const [jssDiscountPct, setJssDiscountPct] = useState(2.5)
+  const [jssMarkupPct, setJssMarkupPct] = useState(30)
 
   // ── Items ──
   const [items, setItems] = useState<WsItem[]>([newWsItem()])
@@ -715,6 +727,20 @@ function WorksheetEditor({
   function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
   function fmtFC(n: number) { return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
+  // JSS Calculator — wholesale in ZAR, shipping allocated proportionally
+  const jssTotalWholesale = items.filter((it) => it.wholesalePrice > 0)
+    .reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
+  const jssShippingPct = jssTotalWholesale > 0 ? (jssShippingCost / jssTotalWholesale) * 100 : 0
+  function calcJssRetail(w: number): number {
+    if (w <= 0) return 0
+    const shipping = w * (jssShippingPct / 100)
+    const landed = w + shipping
+    const vat = landed * (1 + jssVatPct / 100)
+    const discounted = vat * (1 - jssDiscountPct / 100)
+    return discounted * (1 + jssMarkupPct / 100)
+  }
+  const isJssSupplier = supplier.toLowerCase().includes('jeffrey') || supplier.toLowerCase().includes('stein')
+
   // ── Items ──
   function updateItem(id: string, patch: Partial<WsItem>) {
     setItems((prev) => prev.map((it) => it.id === id ? { ...it, ...patch } : it))
@@ -750,6 +776,7 @@ function WorksheetEditor({
       currency, exchangeRate, markupPct, shippingPct, vatPct,
       finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct, finalDiscountPct,
       slsMode, slsDiscountPct, finalSlsDiscountPct,
+      jssMode, jssShippingCost, jssVatPct, jssDiscountPct, jssMarkupPct,
       trackingNumber,
       supplierInvNumber,
       supplierInvDate,
@@ -817,6 +844,11 @@ function WorksheetEditor({
     setSlsMode((sheet as any).slsMode ?? false)
     setSlsDiscountPct((sheet as any).slsDiscountPct ?? 30)
     setFinalSlsDiscountPct((sheet as any).finalSlsDiscountPct ?? 30)
+    setJssMode((sheet as any).jssMode ?? false)
+    setJssShippingCost((sheet as any).jssShippingCost ?? 0)
+    setJssVatPct((sheet as any).jssVatPct ?? 15)
+    setJssDiscountPct((sheet as any).jssDiscountPct ?? 2.5)
+    setJssMarkupPct((sheet as any).jssMarkupPct ?? 30)
     setTrackingNumber(sheet.trackingNumber ?? '')
     setTrackingEditMode(false)
     setSupplierInvNumber(sheet.supplierInvNumber ?? '')
@@ -1464,6 +1496,75 @@ function WorksheetEditor({
         </div>
       </div>
 
+      {/* ── JSS Calculator (Jeffrey Stein Supplier) ── */}
+      {(isJssSupplier || jssMode) && (
+        <div className={`border rounded-xl px-5 py-4 ${jssMode ? 'bg-violet-50 border-violet-200' : 'bg-gray-50 border-gray-200'}`}>
+          <div className="flex items-center gap-3 mb-3">
+            <p className={`text-xs font-semibold uppercase tracking-wider ${jssMode ? 'text-violet-700' : 'text-gray-500'}`}>
+              JSS Calculator{jssMode ? ' — Jeffrey Stein Supplier' : ''}
+            </p>
+            <button
+              type="button"
+              onClick={() => setJssMode(m => !m)}
+              title="Jeffrey Stein Supplier: Wholesale + Shipping + VAT - Discount × Markup = Retail"
+              className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${jssMode ? 'bg-violet-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-violet-100 hover:text-violet-700'}`}
+            >
+              JSS
+            </button>
+            {jssMode && jssTotalWholesale > 0 && (
+              <span className="text-xs text-violet-600">Total wholesale: R {fmtFC(jssTotalWholesale)}</span>
+            )}
+          </div>
+          {jssMode && (
+            <div className="flex flex-wrap items-end gap-3">
+              {/* Shipping cost input */}
+              <div className="flex items-end gap-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500">Total Shipping (ZAR) <span className="text-violet-500 font-mono">G19</span></label>
+                  <input
+                    type="number" min={0} step={0.01}
+                    value={jssShippingCost || ''}
+                    placeholder="0.00"
+                    onChange={(e) => setJssShippingCost(Number(e.target.value))}
+                    className="border-2 border-violet-300 rounded-lg px-2.5 py-1.5 text-sm w-36 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 font-semibold"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">Shipping % <span className="text-violet-500 font-mono">G3</span></label>
+                  <div className="px-2.5 py-1.5 text-sm w-24 bg-violet-100 border border-violet-200 rounded-lg text-violet-800 font-semibold text-center">
+                    {jssShippingPct.toFixed(4)}%
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">VAT %</label>
+                <input type="number" min={0} step={0.5} value={jssVatPct}
+                  onChange={(e) => setJssVatPct(Number(e.target.value))}
+                  className="border border-violet-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">Discount %</label>
+                <input type="number" min={0} step={0.5} value={jssDiscountPct}
+                  onChange={(e) => setJssDiscountPct(Number(e.target.value))}
+                  className="border border-violet-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-500">Markup %</label>
+                <input type="number" min={0} step={1} value={jssMarkupPct}
+                  onChange={(e) => setJssMarkupPct(Number(e.target.value))}
+                  className="border border-violet-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-violet-600 font-semibold">Formula</label>
+                <div className="px-2.5 py-1.5 text-xs text-violet-700 bg-violet-100 border border-violet-200 rounded-lg whitespace-nowrap">
+                  W + Shipping → Landed × {(1 + jssVatPct / 100).toFixed(2)} → × {(1 - jssDiscountPct / 100).toFixed(3)} → × {(1 + jssMarkupPct / 100).toFixed(2)} = Retail
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Items table ── */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {/* Table toolbar */}
@@ -1710,6 +1811,7 @@ function WorksheetEditor({
                 {!hiddenCols.has('pre_order') && <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Pre Order Price</th>}
                 {!hiddenCols.has('final_landed') && <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Final Landed</th>}
                 {!hiddenCols.has('landed_retail') && <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Landed Retail</th>}
+                {jssMode && <th className="text-right pb-2 px-2 text-violet-600" style={{ minWidth: '110px' }}>JSS Retail</th>}
                 <th className="text-right pb-2 px-2 text-blue-500" style={{ minWidth: '120px' }}>Total ({currency})</th>
                 <th className="w-8" />
               </tr>
@@ -1911,6 +2013,18 @@ function WorksheetEditor({
                       </div>
                     </td>}
 
+                    {/* JSS Retail */}
+                    {jssMode && (
+                      <td className="py-2 px-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-xs text-gray-400">R</span>
+                          <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold ${it.wholesalePrice > 0 ? 'text-violet-800 bg-violet-100 border border-violet-200' : 'text-gray-300'}`}>
+                            {it.wholesalePrice > 0 ? fmtFC(calcJssRetail(it.wholesalePrice)) : '—'}
+                          </span>
+                        </div>
+                      </td>
+                    )}
+
                     {/* Total Cost in currency */}
                     <td className="py-2 px-2">
                       <div className="flex items-center justify-end gap-1">
@@ -1959,6 +2073,7 @@ function WorksheetEditor({
                       + (!hiddenCols.has('pre_order') ? 1 : 0)
                       + (!hiddenCols.has('final_landed') ? 1 : 0)
                       + (!hiddenCols.has('landed_retail') ? 1 : 0)
+                      + (jssMode ? 1 : 0)
                     } className="py-3 px-2 text-xs font-semibold text-gray-500 text-right uppercase tracking-wider pr-4">
                       Total
                     </td>
