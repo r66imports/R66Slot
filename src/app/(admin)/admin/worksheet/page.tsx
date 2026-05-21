@@ -741,6 +741,34 @@ function WorksheetEditor({
   }
   const isJssSupplier = supplier.toLowerCase().includes('jeffrey') || supplier.toLowerCase().includes('stein')
 
+  function toggleScsMode() {
+    const activating = !slsMode
+    setSlsMode(activating)
+    if (activating) {
+      const match = suppliers.find((s) =>
+        s.name.toLowerCase().includes('slotcar') || s.name.toLowerCase().includes('slotcars supply')
+      )
+      if (match) setSupplier(match.name)
+      setCurrency('USD')
+      setExchangeRate(fxRates['USD'] ?? CURRENCY_DEFAULTS['USD'])
+      setFinalCurrency('USD')
+      setFinalExRate(fxRates['USD'] ?? CURRENCY_DEFAULTS['USD'])
+    }
+  }
+
+  function toggleJssMode() {
+    const activating = !jssMode
+    setJssMode(activating)
+    if (activating) {
+      const match = suppliers.find((s) =>
+        s.name.toLowerCase().includes('jeffrey') || s.name.toLowerCase().includes('stein')
+      )
+      if (match) setSupplier(match.name)
+      setCurrency('ZAR')
+      setExchangeRate(1)
+    }
+  }
+
   // ── Items ──
   function updateItem(id: string, patch: Partial<WsItem>) {
     setItems((prev) => prev.map((it) => it.id === id ? { ...it, ...patch } : it))
@@ -1317,7 +1345,7 @@ function WorksheetEditor({
           </p>
           <button
             type="button"
-            onClick={() => setSlsMode(m => !m)}
+            onClick={toggleScsMode}
             title="Slotcar Supply: Retail Price − Discount % = Wholesale Cost"
             className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
           >
@@ -1383,7 +1411,7 @@ function WorksheetEditor({
           </p>
           <button
             type="button"
-            onClick={() => setSlsMode(m => !m)}
+            onClick={toggleScsMode}
             title="Slotcar Supply: Retail Price − Discount % = Wholesale Cost"
             className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${slsMode ? 'bg-orange-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-orange-100 hover:text-orange-700'}`}
           >
@@ -1505,7 +1533,7 @@ function WorksheetEditor({
             </p>
             <button
               type="button"
-              onClick={() => setJssMode(m => !m)}
+              onClick={toggleJssMode}
               title="Jeffrey Stein Supplier: Wholesale + Shipping + VAT - Discount × Markup = Retail"
               className={`text-xs font-bold px-2.5 py-0.5 rounded-lg transition-colors ${jssMode ? 'bg-violet-600 text-white shadow-sm' : 'bg-gray-200 text-gray-600 hover:bg-violet-100 hover:text-violet-700'}`}
             >
