@@ -12,6 +12,7 @@ function rowToProduct(row: any): Product {
     compareAtPrice: row.compare_at_price ? parseFloat(row.compare_at_price) : null,
     costPerItem: row.cost_per_item ? parseFloat(row.cost_per_item) : null,
     preOrderPrice: row.pre_order_price ? parseFloat(row.pre_order_price) : null,
+    auctionReservePrice: row.auction_reserve_price ? parseFloat(row.auction_reserve_price) : null,
     sku: row.sku,
     barcode: row.barcode,
     brand: row.brand,
@@ -88,6 +89,8 @@ export async function PUT(
 
     const pageIds: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : [])
 
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS auction_reserve_price NUMERIC`).catch(() => {})
+
     const result = await db.query(`
       UPDATE products SET
         title = COALESCE($2, title),
@@ -135,6 +138,7 @@ export async function PUT(
         sideways_car_classes = COALESCE($44, sideways_car_classes),
         custom_orgs = COALESCE($45, custom_orgs),
         category_ids = COALESCE($46, category_ids),
+        auction_reserve_price = COALESCE($48, auction_reserve_price),
         updated_at = $36
       WHERE id = $1
       RETURNING *
@@ -186,6 +190,7 @@ export async function PUT(
       (typeof body.customOrgs === 'object' && body.customOrgs !== null) ? JSON.stringify(body.customOrgs) : null,
       Array.isArray(body.categoryIds) ? JSON.stringify(body.categoryIds) : null,
       body.preOrderPrice != null ? body.preOrderPrice : null,
+      body.auctionReservePrice != null ? body.auctionReservePrice : null,
     ])
 
     if (result.rowCount === 0) {

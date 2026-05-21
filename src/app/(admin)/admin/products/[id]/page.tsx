@@ -71,6 +71,7 @@ export default function EditProductPage({
   const [compareAtPrice, setCompareAtPrice] = useState('')
   const [preOrderPrice, setPreOrderPrice] = useState('')
   const [costPerItem, setCostPerItem] = useState('')
+  const [auctionReservePrice, setAuctionReservePrice] = useState('')
   const [sku, setSku] = useState('')
   const [barcode, setBarcode] = useState('')
   const [trackQuantity, setTrackQuantity] = useState(true)
@@ -318,6 +319,7 @@ export default function EditProductPage({
           setCompareAtPrice(found.compareAtPrice?.toString() || '')
           setPreOrderPrice((found as any).preOrderPrice?.toString() || '')
           setCostPerItem(found.costPerItem?.toString() || '')
+          setAuctionReservePrice((found as any).auctionReservePrice?.toString() || '')
           setSku(found.sku || '')
           if (found.sku) {
             fetch('/api/admin/sku-entity-map')
@@ -492,6 +494,7 @@ export default function EditProductPage({
           compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
           costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
           preOrderPrice: preOrderPrice ? cleanFloat(preOrderPrice) : null,
+          auctionReservePrice: auctionReservePrice ? cleanFloat(auctionReservePrice) : null,
           sku, barcode, trackQuantity, quantity: cleanInt(quantity),
           weight: weight ? cleanFloat(weight) : null, weightUnit,
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
@@ -1090,20 +1093,40 @@ export default function EditProductPage({
                   </div>
                 </div>
               </div>
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Cost per item</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2 text-gray-500">R</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={costPerItem}
-                    onChange={(e) => setCostPerItem(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cost per item</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-500">R</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={costPerItem}
+                      onChange={(e) => setCostPerItem(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">Customers won&apos;t see this</p>
                 </div>
-                <p className="mt-2 text-xs text-gray-500">Customers won&apos;t see this</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                    Auction Reserve
+                    <span className="text-xs font-normal text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">🔨 Auction</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2 text-gray-500">R</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={auctionReservePrice}
+                      onChange={(e) => setAuctionReservePrice(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-7 pr-3 py-2 border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">Auto-fills auction reserve price</p>
+                </div>
               </div>
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Book for Next Shipment Price</label>

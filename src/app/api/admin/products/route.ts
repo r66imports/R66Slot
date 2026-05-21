@@ -10,6 +10,7 @@ export interface Product {
   compareAtPrice: number | null
   costPerItem: number | null
   preOrderPrice: number | null
+  auctionReservePrice?: number | null
   sku: string
   barcode: string
   brand: string
