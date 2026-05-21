@@ -705,8 +705,11 @@ function WorksheetEditor({
   }
 
   // ── Costing functions ──
+  // CUT effective: W × (CUT%/100) — applied before all other calculations
+  function effectiveW(w: number) { return cutMode ? w * (cutDiscountPct / 100) : w }
   function calcLanded(w: number) {
-    const cost = slsMode ? w * (1 - slsDiscountPct / 100) : w
+    const ew = effectiveW(w)
+    const cost = slsMode ? ew * (1 - slsDiscountPct / 100) : ew
     return cost * exchangeRate * (1 + shippingPct / 100)
   }
   function calcRetail(w: number) { return calcLanded(w) * (1 + markupPct / 100) * (1 + vatPct / 100) }
@@ -714,14 +717,15 @@ function WorksheetEditor({
   // Final costing — derived percentages from total costs
   const totalWholesaleZAR = items
     .filter((it) => it.wholesalePrice > 0)
-    .reduce((sum, it) => sum + it.qty * it.wholesalePrice * finalExRate, 0)
+    .reduce((sum, it) => sum + it.qty * effectiveW(it.wholesalePrice) * finalExRate, 0)
   const shippingPctCalc = totalWholesaleZAR > 0 ? (finalShippingCost / totalWholesaleZAR) * 100 : 0
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
 
   function calcFinalLanded(w: number) {
+    const ew = effectiveW(w)
     const cost = slsMode
-      ? w * (1 - finalSlsDiscountPct / 100)
-      : (finalDiscountPct > 0 ? w * (1 + finalDiscountPct / 100) : w)
+      ? ew * (1 - finalSlsDiscountPct / 100)
+      : (finalDiscountPct > 0 ? ew * (1 + finalDiscountPct / 100) : ew)
     return cost * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100)
   }
   function calcEntityFinalLanded(w: number, entity?: 'R66' | 'JDM' | '') {
@@ -1912,7 +1916,6 @@ function WorksheetEditor({
                   {slsMode ? <span className="text-orange-700">RRP / Retail ({currency})</span> : `Wholesale (${currency})`}
                 </th>
                 {slsMode && <th className="text-right pb-2 px-2 text-orange-600" style={{ minWidth: '110px' }}>Wholesale ({currency})</th>}
-                {cutMode && <th className="text-right pb-2 px-2 text-rose-600" style={{ minWidth: '110px' }}>CUT ({currency})</th>}
                 {!hiddenCols.has('landed_zar') && <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Landed (ZAR)</th>}
                 {!hiddenCols.has('pre_order') && <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Pre Order Price</th>}
                 {!hiddenCols.has('final_landed') && <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Final Landed</th>}
@@ -2047,16 +2050,35 @@ function WorksheetEditor({
                       )}
                     </td>
 
-                    {/* Wholesale */}
+                    {/* Wholesale / CUT Wholesale */}
                     <td className="py-2 px-2">
-                      <div className="flex items-center justify-end">
-                        <span className="text-xs text-gray-400 mr-1">{currency}</span>
-                        <input type="number" min={0} step={0.01} value={it.wholesalePrice || ''} placeholder="0.00"
-                          onChange={(e) => updateItem(it.id, { wholesalePrice: Number(e.target.value) })}
-                          onFocus={() => setActiveSkuRow(null)}
-                          className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                      </div>
+                      {cutMode ? (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-[10px] text-gray-400">Base</span>
+                            <input type="number" min={0} step={0.01} value={it.wholesalePrice || ''} placeholder="0.00"
+                              onChange={(e) => updateItem(it.id, { wholesalePrice: Number(e.target.value) })}
+                              onFocus={() => setActiveSkuRow(null)}
+                              className="w-20 border border-gray-200 rounded px-2 py-0.5 text-[10px] text-right focus:outline-none focus:ring-1 focus:ring-rose-400 text-gray-500"
+                            />
+                          </div>
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-xs text-rose-400">{currency}</span>
+                            <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-bold ${it.wholesalePrice > 0 ? 'text-rose-700 bg-rose-50 border border-rose-300' : 'text-gray-300'}`}>
+                              {it.wholesalePrice > 0 ? fmtFC(it.wholesalePrice * (cutDiscountPct / 100)) : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end">
+                          <span className="text-xs text-gray-400 mr-1">{currency}</span>
+                          <input type="number" min={0} step={0.01} value={it.wholesalePrice || ''} placeholder="0.00"
+                            onChange={(e) => updateItem(it.id, { wholesalePrice: Number(e.target.value) })}
+                            onFocus={() => setActiveSkuRow(null)}
+                            className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          />
+                        </div>
+                      )}
                     </td>
 
                     {/* SCS Wholesale Price (SCS mode only) */}
@@ -2066,18 +2088,6 @@ function WorksheetEditor({
                           <span className="text-xs text-gray-400">{currency}</span>
                           <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg ${it.wholesalePrice > 0 ? 'text-orange-700 bg-orange-50 border border-orange-100' : 'text-gray-300'}`}>
                             {it.wholesalePrice > 0 ? fmtFC(it.wholesalePrice * (1 - slsDiscountPct / 100)) : '—'}
-                          </span>
-                        </div>
-                      </td>
-                    )}
-
-                    {/* CUT value (CUT mode only) — Wholesale × (cutPct/100) */}
-                    {cutMode && (
-                      <td className="py-2 px-2">
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="text-xs text-rose-400">{currency}</span>
-                          <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold ${it.wholesalePrice > 0 ? 'text-rose-700 bg-rose-50 border border-rose-200' : 'text-gray-300'}`}>
-                            {it.wholesalePrice > 0 ? fmtFC(it.wholesalePrice * (cutDiscountPct / 100)) : '—'}
                           </span>
                         </div>
                       </td>
@@ -2146,9 +2156,9 @@ function WorksheetEditor({
                     {/* Total Cost in currency */}
                     <td className="py-2 px-2">
                       <div className="flex items-center justify-end gap-1">
-                        <span className="text-xs text-gray-400">{currency}</span>
-                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold ${it.wholesalePrice > 0 ? 'text-blue-700 bg-blue-50 border border-blue-100' : 'text-gray-300'}`}>
-                          {it.wholesalePrice > 0 ? fmtFC(it.qty * it.wholesalePrice) : '—'}
+                        <span className={`text-xs ${cutMode ? 'text-rose-400' : 'text-gray-400'}`}>{currency}</span>
+                        <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold ${it.wholesalePrice > 0 ? (cutMode ? 'text-rose-700 bg-rose-50 border border-rose-200' : 'text-blue-700 bg-blue-50 border border-blue-100') : 'text-gray-300'}`}>
+                          {it.wholesalePrice > 0 ? fmtFC(it.qty * effectiveW(it.wholesalePrice)) : '—'}
                         </span>
                       </div>
                     </td>
@@ -2177,8 +2187,8 @@ function WorksheetEditor({
             {(() => {
               const filledItems = items.filter((it) => it.wholesalePrice > 0)
               if (filledItems.length === 0) return null
-              const totalCur = filledItems.reduce((s, it) => s + it.qty * it.wholesalePrice, 0)
-              const totalZAR = filledItems.reduce((s, it) => s + it.qty * it.wholesalePrice * exchangeRate, 0)
+              const totalCur = filledItems.reduce((s, it) => s + it.qty * effectiveW(it.wholesalePrice), 0)
+              const totalZAR = filledItems.reduce((s, it) => s + it.qty * effectiveW(it.wholesalePrice) * exchangeRate, 0)
               return (
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50">
@@ -2187,7 +2197,6 @@ function WorksheetEditor({
                       + (!hiddenCols.has('retail_zar') ? 1 : 0)
                       + (!hiddenCols.has('in_stock') ? 1 : 0)
                       + (slsMode ? 1 : 0)
-                      + (cutMode ? 1 : 0)
                       + (!hiddenCols.has('landed_zar') ? 1 : 0)
                       + (!hiddenCols.has('pre_order') ? 1 : 0)
                       + (!hiddenCols.has('final_landed') ? 1 : 0)
