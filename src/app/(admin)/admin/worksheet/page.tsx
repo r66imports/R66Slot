@@ -1655,7 +1655,7 @@ function WorksheetEditor({
             <div className="flex flex-col gap-1">
               <label className="text-xs text-rose-600 font-semibold">Formula</label>
               <div className="px-2.5 py-1.5 text-xs text-rose-700 bg-rose-100 border border-rose-200 rounded-lg whitespace-nowrap">
-                W × {cutDiscountPct}% = W × {(cutDiscountPct / 100).toFixed(4)} = CUT
+                W × ({cutDiscountPct}% × W) → W × {(cutDiscountPct / 100).toFixed(4)} = CUT
               </div>
             </div>
             {items.filter(it => it.wholesalePrice > 0).length > 0 && (
@@ -1912,6 +1912,7 @@ function WorksheetEditor({
                   {slsMode ? <span className="text-orange-700">RRP / Retail ({currency})</span> : `Wholesale (${currency})`}
                 </th>
                 {slsMode && <th className="text-right pb-2 px-2 text-orange-600" style={{ minWidth: '110px' }}>Wholesale ({currency})</th>}
+                {cutMode && <th className="text-right pb-2 px-2 text-rose-600" style={{ minWidth: '110px' }}>CUT ({currency})</th>}
                 {!hiddenCols.has('landed_zar') && <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Landed (ZAR)</th>}
                 {!hiddenCols.has('pre_order') && <th className="text-right pb-2 px-2" style={{ minWidth: '110px' }}>Pre Order Price</th>}
                 {!hiddenCols.has('final_landed') && <th className="text-right pb-2 px-2 text-emerald-500" style={{ minWidth: '110px' }}>Final Landed</th>}
@@ -2070,6 +2071,18 @@ function WorksheetEditor({
                       </td>
                     )}
 
+                    {/* CUT value (CUT mode only) — Wholesale × (cutPct/100) */}
+                    {cutMode && (
+                      <td className="py-2 px-2">
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-xs text-rose-400">{currency}</span>
+                          <span className={`w-24 px-2.5 py-1.5 text-xs text-right rounded-lg font-semibold ${it.wholesalePrice > 0 ? 'text-rose-700 bg-rose-50 border border-rose-200' : 'text-gray-300'}`}>
+                            {it.wholesalePrice > 0 ? fmtFC(it.wholesalePrice * (cutDiscountPct / 100)) : '—'}
+                          </span>
+                        </div>
+                      </td>
+                    )}
+
                     {/* Landed Cost */}
                     {!hiddenCols.has('landed_zar') && <td className="py-2 px-2">
                       <div className="flex items-center justify-end gap-1">
@@ -2174,6 +2187,7 @@ function WorksheetEditor({
                       + (!hiddenCols.has('retail_zar') ? 1 : 0)
                       + (!hiddenCols.has('in_stock') ? 1 : 0)
                       + (slsMode ? 1 : 0)
+                      + (cutMode ? 1 : 0)
                       + (!hiddenCols.has('landed_zar') ? 1 : 0)
                       + (!hiddenCols.has('pre_order') ? 1 : 0)
                       + (!hiddenCols.has('final_landed') ? 1 : 0)
