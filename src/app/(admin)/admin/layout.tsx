@@ -220,6 +220,7 @@ export default function AdminLayout({
       },
       { name: 'Events', href: '/admin/events', icon: '🏁' },
       { name: 'Payments', href: '/admin/payments', icon: '💳' },
+      { name: 'Accounting', href: '/admin/accounting', icon: '🏦' },
       { name: 'Sage Accounting', href: '/admin/sage', icon: '📊' },
       { name: 'Costing Calculator', href: '#', icon: '💰', isModal: true },
     ],

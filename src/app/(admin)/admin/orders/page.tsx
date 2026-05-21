@@ -72,10 +72,12 @@ interface OrderTemplate {
 
 interface BankAccount {
   id: string
+  companyName?: string
   bankName: string
   accountName: string
   accountNumber: string
   branchCode: string
+  accountType?: string
   address: string
 }
 
@@ -1617,7 +1619,9 @@ function CreateDocumentModal({
                           >
                             <option value="">— Select Account —</option>
                             {bankAccounts.map(ba => (
-                              <option key={ba.id} value={ba.id}>{ba.bankName} – {ba.accountName}</option>
+                              <option key={ba.id} value={ba.id}>
+                                {ba.companyName ? `${ba.companyName} — ` : ''}{ba.bankName} ({ba.accountNumber})
+                              </option>
                             ))}
                           </select>
                           <button
@@ -1733,6 +1737,7 @@ function CreateDocumentModal({
                 {bankAccounts.map(ba => (
                   <div key={ba.id} className="flex items-start justify-between border border-gray-100 rounded-lg p-3 bg-gray-50">
                     <div className="text-sm">
+                      {(ba as any).companyName && <p className="font-bold text-primary text-xs mb-0.5">{(ba as any).companyName}</p>}
                       <p className="font-semibold text-gray-800">{ba.bankName}</p>
                       <p className="text-gray-600">{ba.accountName} · {ba.accountNumber}</p>
                       {ba.branchCode && <p className="text-gray-400 text-xs">Branch: {ba.branchCode}</p>}
