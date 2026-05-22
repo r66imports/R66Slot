@@ -1757,31 +1757,40 @@ function CreateDocumentModal({
                 <h3 className="text-base font-bold">Bank Accounts</h3>
                 <button onClick={() => { setShowBankManager(false); setNewBank({ bankName: '', accountName: '', accountNumber: '', branchCode: '', address: '' }) }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
               </div>
-              {/* Existing accounts */}
+              {/* Existing accounts — click to select */}
               <div className="flex-1 overflow-y-auto space-y-2 mb-4 min-h-0">
                 {bankAccounts.length === 0 && (
                   <p className="text-sm text-gray-400 text-center py-4">No bank accounts saved yet.</p>
                 )}
-                {bankAccounts.map(ba => (
-                  <div key={ba.id} className="flex items-start justify-between border border-gray-100 rounded-lg p-3 bg-gray-50">
-                    <div className="text-sm">
-                      {(ba as any).companyName && <p className="font-bold text-primary text-xs mb-0.5">{(ba as any).companyName}</p>}
-                      <p className="font-semibold text-gray-800">{ba.bankName}</p>
-                      <p className="text-gray-600">{ba.accountName} · {ba.accountNumber}</p>
-                      {ba.branchCode && <p className="text-gray-400 text-xs">Branch: {ba.branchCode}</p>}
-                      {ba.address && <p className="text-gray-400 text-xs">{ba.address}</p>}
+                {bankAccounts.map(ba => {
+                  const isSelected = selectedBankAccountId === ba.id
+                  return (
+                    <div
+                      key={ba.id}
+                      onClick={() => { setSelectedBankAccountId(ba.id); setShowBankManager(false) }}
+                      className={`flex items-start justify-between rounded-lg p-3 cursor-pointer transition-colors ${isSelected ? 'border-2 border-blue-500 bg-blue-50' : 'border border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50/40'}`}
+                    >
+                      <div className="text-sm flex-1">
+                        {isSelected && <span className="text-xs font-bold text-blue-600 mb-0.5 block">✓ Selected</span>}
+                        {(ba as any).companyName && <p className="font-bold text-primary text-xs mb-0.5">{(ba as any).companyName}</p>}
+                        <p className="font-semibold text-gray-800">{ba.bankName}</p>
+                        <p className="text-gray-600">{ba.accountName} · {ba.accountNumber}</p>
+                        {ba.branchCode && <p className="text-gray-400 text-xs">Branch: {ba.branchCode}</p>}
+                        {ba.address && <p className="text-gray-400 text-xs">{ba.address}</p>}
+                      </div>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          await fetch(`/api/admin/bank-accounts?id=${ba.id}`, { method: 'DELETE' })
+                          setBankAccounts(prev => prev.filter(a => a.id !== ba.id))
+                          if (selectedBankAccountId === ba.id) setSelectedBankAccountId('')
+                        }}
+                        className="ml-3 text-gray-300 hover:text-red-500 flex-shrink-0 text-lg leading-none"
+                        title="Delete"
+                      >✕</button>
                     </div>
-                    <button
-                      onClick={async () => {
-                        await fetch(`/api/admin/bank-accounts?id=${ba.id}`, { method: 'DELETE' })
-                        setBankAccounts(prev => prev.filter(a => a.id !== ba.id))
-                        if (selectedBankAccountId === ba.id) setSelectedBankAccountId('')
-                      }}
-                      className="ml-3 text-gray-300 hover:text-red-500 flex-shrink-0 text-lg leading-none"
-                      title="Delete"
-                    >✕</button>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               {/* Add new account form */}
               <div className="border-t pt-4 space-y-2">
