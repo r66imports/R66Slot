@@ -127,6 +127,7 @@ interface DocViewData {
   amountPaid: number
   overpaymentCredit: number
   showCreditOnInvoice: boolean
+  bankAccountId?: string
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -562,8 +563,7 @@ function ViewDocumentModal({
   onClose: () => void
 }) {
   const docTypeLabel = (data as any).preOrderDeposit ? 'Pre Order Deposit' : data.docType === 'salesorder' ? 'Sales Order' : data.docType.charAt(0).toUpperCase() + data.docType.slice(1)
-  const bankAccountId = (data as any).bankAccountId as string | undefined
-  const selectedBankAccount = bankAccountId ? bankAccounts.find(b => b.id === bankAccountId) : undefined
+  const selectedBankAccount = data.bankAccountId ? bankAccounts.find(b => b.id === data.bankAccountId) : undefined
 
   const handlePrint = () => doPrint(data, template, selectedBankAccount)
   const handleEmail = () => doEmail(data, template, selectedBankAccount)
@@ -3303,6 +3303,7 @@ export default function OrdersPage() {
     amountPaid: (doc as any).amountPaid || 0,
     overpaymentCredit: (doc as any).overpaymentCredit || 0,
     showCreditOnInvoice: (doc as any).showCreditOnInvoice ?? false,
+    bankAccountId: (doc as any).bankAccountId || '',
   })
 
   const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
@@ -3908,9 +3909,9 @@ export default function OrdersPage() {
                               onClick: () => setEditDocState(doc),
                             },
                             { label: 'View', icon: <IconView />, onClick: () => viewDocument(doc) },
-                            { label: 'Print', icon: <IconPrint />, onClick: () => doPrint(docToViewData(doc), template) },
-                            { label: 'Email', icon: <IconEmail />, onClick: () => doEmail(docToViewData(doc), template) },
-                            { label: 'Download', icon: <IconDownload />, onClick: () => doDownload(docToViewData(doc), template) },
+                            { label: 'Print', icon: <IconPrint />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doPrint(docToViewData(doc), template, ba) } },
+                            { label: 'Email', icon: <IconEmail />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doEmail(docToViewData(doc), template, ba) } },
+                            { label: 'Download', icon: <IconDownload />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doDownload(docToViewData(doc), template, ba) } },
                             ...(doc.type === 'quote' ? [
                               {
                                 label: 'Send to Sales Order',
