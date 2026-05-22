@@ -81,6 +81,26 @@ interface BankAccount {
   address: string
 }
 
+// Resolve which bank details to show on a document — selected account wins over template fallback
+function resolveBank(selectedBankAccount: BankAccount | undefined, template: OrderTemplate) {
+  if (selectedBankAccount) {
+    return {
+      bankName: selectedBankAccount.bankName,
+      bankAccount: selectedBankAccount.accountNumber,
+      bankBranch: selectedBankAccount.branchCode,
+      bankType: selectedBankAccount.accountType || 'Current',
+      bankAccountName: selectedBankAccount.accountName,
+    }
+  }
+  return {
+    bankName: template.bankName,
+    bankAccount: template.bankAccount,
+    bankBranch: template.bankBranch,
+    bankType: template.bankType,
+    bankAccountName: '',
+  }
+}
+
 // Normalised view data — works for both backorder + standalone source
 interface DocViewData {
   docType: DocType
@@ -279,9 +299,11 @@ function normalizeMediaUrl(url: string): string {
 function DocumentBody({
   data,
   template,
+  selectedBankAccount,
 }: {
   data: DocViewData
   template: OrderTemplate
+  selectedBankAccount?: BankAccount
 }) {
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
@@ -492,17 +514,21 @@ function DocumentBody({
       )}
 
       {/* Banking (show for invoices always, others if banking details exist) */}
-      {(data.docType === 'invoice' || template.bankName) && template.bankName && (
-        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-          <div className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Banking Details</div>
-          <div className="grid grid-cols-2 gap-x-6 text-xs text-gray-700">
-            <div><span className="text-gray-500">Bank: </span>{template.bankName}</div>
-            <div><span className="text-gray-500">Account: </span>{template.bankAccount}</div>
-            <div><span className="text-gray-500">Branch Code: </span>{template.bankBranch}</div>
-            <div><span className="text-gray-500">Type: </span>{template.bankType}</div>
+      {(() => {
+        const bank = resolveBank(selectedBankAccount, template)
+        if (!bank.bankName) return null
+        return (
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <div className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Banking Details</div>
+            <div className="grid grid-cols-2 gap-x-6 text-xs text-gray-700">
+              <div><span className="text-gray-500">Bank: </span>{bank.bankName}</div>
+              <div><span className="text-gray-500">Account: </span>{bank.bankAccount}{bank.bankAccountName ? ` (${bank.bankAccountName})` : ''}</div>
+              <div><span className="text-gray-500">Branch Code: </span>{bank.bankBranch}</div>
+              <div><span className="text-gray-500">Type: </span>{bank.bankType}</div>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Terms */}
       {data.terms && (
@@ -527,17 +553,21 @@ function DocumentBody({
 function ViewDocumentModal({
   data,
   template,
+  bankAccounts,
   onClose,
 }: {
   data: DocViewData
   template: OrderTemplate
+  bankAccounts: BankAccount[]
   onClose: () => void
 }) {
   const docTypeLabel = (data as any).preOrderDeposit ? 'Pre Order Deposit' : data.docType === 'salesorder' ? 'Sales Order' : data.docType.charAt(0).toUpperCase() + data.docType.slice(1)
+  const bankAccountId = (data as any).bankAccountId as string | undefined
+  const selectedBankAccount = bankAccountId ? bankAccounts.find(b => b.id === bankAccountId) : undefined
 
-  const handlePrint = () => doPrint(data, template)
-  const handleEmail = () => doEmail(data, template)
-  const handlePrintAndEmail = () => { doPrint(data, template); setTimeout(() => doEmail(data, template), 600) }
+  const handlePrint = () => doPrint(data, template, selectedBankAccount)
+  const handleEmail = () => doEmail(data, template, selectedBankAccount)
+  const handlePrintAndEmail = () => { doPrint(data, template, selectedBankAccount); setTimeout(() => doEmail(data, template, selectedBankAccount), 600) }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -557,14 +587,14 @@ function ViewDocumentModal({
             <button onClick={handleEmail} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 hover:border-gray-600 shadow-sm font-medium transition-colors" title="Email">
               <IconEmail /> Email
             </button>
-            <button onClick={() => doDownload(data, template)} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 hover:border-gray-600 shadow-sm font-medium transition-colors" title="Download">
+            <button onClick={() => doDownload(data, template, selectedBankAccount)} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-400 rounded-lg text-gray-700 hover:bg-gray-100 hover:border-gray-600 shadow-sm font-medium transition-colors" title="Download">
               <IconDownload /> Download
             </button>
             <button onClick={onClose} className="ml-1 text-gray-500 hover:text-gray-800 text-xl leading-none font-bold">✕</button>
           </div>
         </div>
         <div className="overflow-y-auto flex-1 p-6">
-          <DocumentBody data={data} template={template} />
+          <DocumentBody data={data} template={template} selectedBankAccount={selectedBankAccount} />
         </div>
       </div>
     </div>
@@ -1241,7 +1271,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: depositMode ? selectedBankAccountId : '', shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0, preOrderDeposit }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0, preOrderDeposit }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -1607,35 +1637,33 @@ function CreateDocumentModal({
                       <td />
                     </tr>
                   )}
-                  {depositMode && (
-                    <tr className="bg-gray-50">
-                      <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Account</td>
-                      <td colSpan={2} className="px-2 py-1">
-                        <div className="flex gap-1">
-                          <select
-                            value={selectedBankAccountId}
-                            onChange={e => setSelectedBankAccountId(e.target.value)}
-                            className="flex-1 px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
-                          >
-                            <option value="">— Select Account —</option>
-                            {bankAccounts.map(ba => (
-                              <option key={ba.id} value={ba.id}>
-                                {ba.companyName ? `${ba.companyName} — ` : ''}{ba.bankName} ({ba.accountNumber})
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() => setShowBankManager(true)}
-                            className="px-2 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 whitespace-nowrap font-semibold"
-                          >
-                            Add +
-                          </button>
-                        </div>
-                      </td>
-                      <td />
-                    </tr>
-                  )}
+                  <tr className="bg-gray-50">
+                    <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">{depositMode ? 'Deposit Account' : 'Bank Details'}</td>
+                    <td colSpan={2} className="px-2 py-1">
+                      <div className="flex gap-1">
+                        <select
+                          value={selectedBankAccountId}
+                          onChange={e => setSelectedBankAccountId(e.target.value)}
+                          className="flex-1 px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
+                        >
+                          <option value="">— Template Default —</option>
+                          {bankAccounts.map(ba => (
+                            <option key={ba.id} value={ba.id}>
+                              {ba.companyName ? `${ba.companyName} — ` : ''}{ba.bankName} ({ba.accountNumber})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setShowBankManager(true)}
+                          className="px-2 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 whitespace-nowrap font-semibold"
+                        >
+                          Add +
+                        </button>
+                      </div>
+                    </td>
+                    <td />
+                  </tr>
                   {depositAmount > 0 && (
                     <tr className="border-t bg-orange-50">
                       <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-orange-700">
@@ -1808,7 +1836,7 @@ function CreateDocumentModal({
 
 // ─── Document Print / Email Utilities ─────────────────────────────────────────
 
-function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
+function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount): string {
   const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
@@ -1838,15 +1866,16 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
     </tr>`
   }).join('')
 
-  const bankHTML = template.bankName
+  const bank = resolveBank(selectedBankAccount, template)
+  const bankHTML = bank.bankName
     ? `<div style="margin-bottom:16px;padding:12px;background:#eff6ff;border-radius:8px;border:1px solid #dbeafe">
         <div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px">Banking Details</div>
         <table style="width:100%"><tr>
-          <td style="font-size:12px">Bank: <strong>${template.bankName}</strong></td>
-          <td style="font-size:12px">Account: <strong>${template.bankAccount}</strong></td>
+          <td style="font-size:12px">Bank: <strong>${bank.bankName}</strong></td>
+          <td style="font-size:12px">Account: <strong>${bank.bankAccount}</strong>${bank.bankAccountName ? ` <span style="color:#6b7280">(${bank.bankAccountName})</span>` : ''}</td>
         </tr><tr>
-          <td style="font-size:12px">Branch: <strong>${template.bankBranch}</strong></td>
-          <td style="font-size:12px">Type: <strong>${template.bankType}</strong></td>
+          <td style="font-size:12px">Branch: <strong>${bank.bankBranch}</strong></td>
+          <td style="font-size:12px">Type: <strong>${bank.bankType}</strong></td>
         </tr></table>
       </div>`
     : ''
@@ -1924,16 +1953,16 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate): string {
   </body></html>`
 }
 
-function doPrint(data: DocViewData, template: OrderTemplate) {
+function doPrint(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
   const win = window.open('', '_blank', 'width=920,height=750')
   if (!win) return
-  win.document.write(generateDocHTML(data, template))
+  win.document.write(generateDocHTML(data, template, selectedBankAccount))
   win.document.close()
   win.focus()
   setTimeout(() => { win.print(); win.close() }, 400)
 }
 
-function doEmail(data: DocViewData, template: OrderTemplate) {
+function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
   const docLabel = data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
@@ -1943,8 +1972,9 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
   const lines = data.lineItems.map((li, i) =>
     `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}  =  ${fmtPrice(li.qty * li.unitPrice)}`
   ).join('\n')
-  const banking = template.bankName
-    ? `\nBANKING DETAILS\nBank: ${template.bankName}  |  Account: ${template.bankAccount}\nBranch: ${template.bankBranch}  |  Type: ${template.bankType}\n`
+  const emailBank = resolveBank(selectedBankAccount, template)
+  const banking = emailBank.bankName
+    ? `\nBANKING DETAILS\nBank: ${emailBank.bankName}  |  Account: ${emailBank.bankAccount}${emailBank.bankAccountName ? ` (${emailBank.bankAccountName})` : ''}\nBranch: ${emailBank.bankBranch}  |  Type: ${emailBank.bankType}\n`
     : ''
   const body = [
     `Dear ${data.clientName},`,
@@ -1979,7 +2009,7 @@ function doEmail(data: DocViewData, template: OrderTemplate) {
   window.location.href = `mailto:${data.clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }
 
-async function doDownload(data: DocViewData, template: OrderTemplate) {
+async function doDownload(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
   const { jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
 
@@ -2233,7 +2263,8 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
   }
 
   // ── Banking ──────────────────────────────────────────────────────────────────
-  if (template.bankName) {
+  const pdfBank = resolveBank(selectedBankAccount, template)
+  if (pdfBank.bankName) {
     doc.setFontSize(7)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(29, 78, 216)
@@ -2242,8 +2273,9 @@ async function doDownload(data: DocViewData, template: OrderTemplate) {
     doc.setFontSize(8.5)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(50)
-    doc.text(`Bank: ${template.bankName}   |   Account: ${template.bankAccount}`, margin, y); y += 4.5
-    doc.text(`Branch Code: ${template.bankBranch}   |   Account Type: ${template.bankType}`, margin, y); y += 8
+    const acctLine = pdfBank.bankAccountName ? `${pdfBank.bankAccount} (${pdfBank.bankAccountName})` : pdfBank.bankAccount
+    doc.text(`Bank: ${pdfBank.bankName}   |   Account: ${acctLine}`, margin, y); y += 4.5
+    doc.text(`Branch Code: ${pdfBank.bankBranch}   |   Account Type: ${pdfBank.bankType}`, margin, y); y += 8
   }
 
   // ── Terms ────────────────────────────────────────────────────────────────────
@@ -2522,6 +2554,7 @@ export default function OrdersPage() {
   // Groups the user has explicitly opened — starts empty (all collapsed). Never reset on focus reload.
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [viewData, setViewData] = useState<DocViewData | null>(null)
+  const [allBankAccounts, setAllBankAccounts] = useState<BankAccount[]>([])
   const [editDocState, setEditDocState] = useState<OrderDocument | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [checkedBoIds, setCheckedBoIds] = useState<Set<string>>(new Set())
@@ -3067,6 +3100,13 @@ export default function OrdersPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    fetch('/api/admin/bank-accounts')
+      .then(r => r.ok ? r.json() : [])
+      .then(setAllBankAccounts)
+      .catch(() => {})
+  }, [])
 
   // Pick up compile intent from backorders page (sessionStorage handoff)
   useEffect(() => {
@@ -4052,7 +4092,7 @@ export default function OrdersPage() {
         />
       )}
       {viewData && (
-        <ViewDocumentModal data={viewData} template={template} onClose={() => setViewData(null)} />
+        <ViewDocumentModal data={viewData} template={template} bankAccounts={allBankAccounts} onClose={() => setViewData(null)} />
       )}
       {editDocState && (
         <CreateDocumentModal
