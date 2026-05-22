@@ -29,6 +29,7 @@ export interface OrderDocument {
   trackingNumber?: string
   depositPaid?: number
   paymentMethod?: string
+  bankAccountId?: string
   createdAt: string
   updatedAt: string
   backorderId?: string
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
       trackingNumber: body.trackingNumber || '',
       depositPaid: body.depositPaid || 0,
       paymentMethod: body.paymentMethod || '',
+      bankAccountId: body.bankAccountId || '',
       createdAt: now,
       updatedAt: now,
       backorderId: body.backorderId,
