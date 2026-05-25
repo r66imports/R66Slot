@@ -424,6 +424,7 @@ function WorksheetEditor({
           name: supplier ? `${supplier} – ${worksheetDate}` : `Worksheet ${worksheetDate}`,
           supplier,
           date: worksheetDate,
+          worksheetId,
           items: toSend.map(it => ({
             sku: it.sku,
             description: it.description,

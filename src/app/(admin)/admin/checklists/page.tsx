@@ -19,6 +19,7 @@ interface Checklist {
   createdAt: string
   items: ChecklistItem[]
   archived: boolean
+  worksheetId?: string
 }
 
 function fmtDate(iso: string) {
@@ -45,13 +46,23 @@ export default function ChecklistsPage() {
   useEffect(() => { load() }, [load])
 
   const toggleItem = async (cl: Checklist, itemId: string) => {
-    const newItems = cl.items.map(it => it.id === itemId ? { ...it, checked: !it.checked } : it)
+    const item = cl.items.find(it => it.id === itemId)
+    const newChecked = !item?.checked
+    const newItems = cl.items.map(it => it.id === itemId ? { ...it, checked: newChecked } : it)
     setChecklists(prev => prev.map(c => c.id === cl.id ? { ...c, items: newItems } : c))
     await fetch('/api/admin/checklists', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: cl.id, items: newItems }),
     })
+    // Sync to linked worksheet
+    if (cl.worksheetId && item?.sku) {
+      fetch('/api/admin/worksheets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worksheetId: cl.worksheetId, sku: item.sku, sentToInventory: newChecked }),
+      }).catch(() => {})
+    }
   }
 
   const updateItemNotes = async (cl: Checklist, itemId: string, notes: string) => {
@@ -74,6 +85,16 @@ export default function ChecklistsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: cl.id, items: newItems }),
     })
+    // Sync all items to unchecked in linked worksheet
+    if (cl.worksheetId) {
+      cl.items.filter(it => it.sku && it.checked).forEach(it => {
+        fetch('/api/admin/worksheets', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ worksheetId: cl.worksheetId, sku: it.sku, sentToInventory: false }),
+        }).catch(() => {})
+      })
+    }
   }
 
   const toggleArchive = async (cl: Checklist) => {

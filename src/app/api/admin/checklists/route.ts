@@ -20,6 +20,7 @@ export interface Checklist {
   createdAt: string
   items: ChecklistItem[]
   archived: boolean
+  worksheetId?: string   // linked worksheet — used to sync sentToInventory
 }
 
 async function getAll(): Promise<Checklist[]> {
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
       notes: '',
     })),
     archived: false,
+    worksheetId: body.worksheetId || '',
   }
   const all = await getAll()
   all.unshift(checklist)
