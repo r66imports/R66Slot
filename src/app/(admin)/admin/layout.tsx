@@ -163,6 +163,7 @@ export default function AdminLayout({
           { name: 'POS / Scanner', href: '/admin/pos', icon: '🔍' },
           { name: 'Reports', href: '/admin/reports', icon: '📊' },
           { name: 'Stock Audit', href: '/admin/stock-audit', icon: '🔎' },
+          { name: 'Checklists', href: '/admin/checklists', icon: '✅' },
         ]
       },
     ],

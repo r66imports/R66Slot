@@ -400,6 +400,9 @@ function WorksheetEditor({
   const [showAddToDbModal, setShowAddToDbModal] = useState(false)
   const [addToDbItems, setAddToDbItems] = useState<NewSkuRow[]>([])
   const [savingAddToDb, setSavingAddToDb] = useState(false)
+  // ── Send to Checklist ──
+  const [sendingChecklist, setSendingChecklist] = useState(false)
+  const [checklistSent, setChecklistSent] = useState(false)
 
   function toggleCheck(id: string) {
     setCheckedItems((prev) => {
@@ -407,6 +410,34 @@ function WorksheetEditor({
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
+  }
+
+  async function sendToChecklist() {
+    const toSend = items.filter(it => it.sku || it.description)
+    if (!toSend.length) return
+    setSendingChecklist(true)
+    try {
+      const res = await fetch('/api/admin/checklists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: supplier ? `${supplier} – ${worksheetDate}` : `Worksheet ${worksheetDate}`,
+          supplier,
+          date: worksheetDate,
+          items: toSend.map(it => ({
+            sku: it.sku,
+            description: it.description,
+            qty: it.qty || 1,
+          })),
+        }),
+      })
+      if (res.ok) {
+        setChecklistSent(true)
+        setTimeout(() => setChecklistSent(false), 3000)
+      }
+    } finally {
+      setSendingChecklist(false)
+    }
   }
 
   async function sendToInventory() {
@@ -1796,6 +1827,16 @@ function WorksheetEditor({
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
               Update Product Info
+            </button>
+            <button
+              onClick={sendToChecklist}
+              disabled={sendingChecklist || !hasItems}
+              className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 ${
+                checklistSent ? 'bg-green-600 text-white' : 'bg-cyan-600 text-white hover:bg-cyan-700'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+              {checklistSent ? '✓ Sent to Checklist!' : sendingChecklist ? 'Sending…' : 'Send to Checklist'}
             </button>
           </div>
         </div>
