@@ -1169,7 +1169,18 @@ function CreateDocumentModal({
   useEffect(() => {
     fetch('/api/admin/bank-accounts')
       .then(r => r.ok ? r.json() : [])
-      .then(setBankAccounts)
+      .then((accounts: BankAccount[]) => {
+        setBankAccounts(accounts)
+        // Auto-select the R66Slot default bank account for new documents
+        if (!selectedBankAccountId && accounts.length > 0) {
+          const preferred = accounts.find(a =>
+            a.companyName?.toLowerCase().includes('slot') ||
+            a.accountName?.toLowerCase().includes('slot') ||
+            a.companyName?.toLowerCase().includes('r66')
+          ) || accounts[0]
+          setSelectedBankAccountId(preferred.id)
+        }
+      })
       .catch(() => {})
   }, [])
 
