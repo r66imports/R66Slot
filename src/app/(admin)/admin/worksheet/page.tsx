@@ -419,10 +419,6 @@ function WorksheetEditor({
   const [showNewSkuModal, setShowNewSkuModal] = useState(false)
   const [newSkuModalItems, setNewSkuModalItems] = useState<NewSkuRow[]>([])
   const [savingNewSkus, setSavingNewSkus] = useState(false)
-  // ── Confirm update dialog (existing SKU, 2nd time) ──
-  const [showConfirmUpdate, setShowConfirmUpdate] = useState(false)
-  const [confirmUpdateItems, setConfirmUpdateItems] = useState<WsItem[]>([])
-  const [confirmingUpdate, setConfirmingUpdate] = useState(false)
   // ── Send to Supplier Order ──
   const [showSupplierOrderModal, setShowSupplierOrderModal] = useState(false)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
@@ -478,29 +474,23 @@ function WorksheetEditor({
     if (!toSend.length) return
 
     const newSkus: NewSkuRow[] = []
-    const existingWsItems: WsItem[] = []
+    const existingItems: WsItem[] = []
 
     for (const it of toSend) {
       const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
       if (!prod) {
-        // New SKU — pre-fill from worksheet values
+        // New SKU — show modal to create product with qty
         const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
         const retailZAR = it.retailPrice > 0
           ? it.retailPrice
           : Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
         newSkus.push({
-          wsId: it.id,
-          sku: it.sku,
-          description: it.description,
-          brand: '',
-          category: it.category || '',
-          unit: it.unit || '',
-          retailPrice: retailZAR,
-          costPrice: finalLanded,
-          qty: it.qty,
+          wsId: it.id, sku: it.sku, description: it.description, brand: '',
+          category: it.category || '', unit: it.unit || '',
+          retailPrice: retailZAR, costPrice: finalLanded, qty: it.qty,
         })
       } else {
-        existingWsItems.push(it)
+        existingItems.push(it)
       }
     }
 
@@ -508,9 +498,37 @@ function WorksheetEditor({
       setNewSkuModalItems(newSkus)
       setShowNewSkuModal(true)
     }
-    if (existingWsItems.length > 0) {
-      setConfirmUpdateItems(existingWsItems)
-      setShowConfirmUpdate(true)
+
+    // Existing products — qty only, no costing update, no dialog
+    if (existingItems.length > 0) {
+      setSendingInventory(true)
+      const errors: string[] = []
+      const sentIds: string[] = []
+      try {
+        for (const it of existingItems) {
+          const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())!
+          const res = await fetch(`/api/admin/products/${prod.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quantity: (prod.quantity ?? 0) + it.qty }),
+          })
+          if (!res.ok) {
+            const msg = await res.text().catch(() => res.status.toString())
+            errors.push(`${it.sku}: ${msg}`)
+          } else {
+            sentIds.push(it.id)
+          }
+        }
+        if (sentIds.length > 0) {
+          setItems((prev) => prev.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it))
+          setCheckedItems((prev) => { const next = new Set(prev); sentIds.forEach((id) => next.delete(id)); return next })
+          setInventorySent(true)
+          setTimeout(() => setInventorySent(false), 3000)
+        }
+        if (errors.length > 0) alert(`Failed:\n${errors.join('\n')}`)
+      } finally {
+        setSendingInventory(false)
+      }
     }
   }
 
@@ -630,44 +648,6 @@ function WorksheetEditor({
       await onRefresh()
     } finally {
       setSavingAddToDb(false)
-    }
-  }
-
-  async function handleConfirmUpdate(addQty: boolean) {
-    setConfirmingUpdate(true)
-    const errors: string[] = []
-    let updated = 0
-    try {
-      for (const it of confirmUpdateItems) {
-        const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-        if (!prod) { errors.push(it.sku); continue }
-        const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
-        const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
-        const preOrderZAR = Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
-        const patch: Record<string, number> = {}
-        if (finalLanded > 0) patch.costPerItem = finalLanded
-        if (retailZAR > 0) patch.price = retailZAR
-        if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
-        if (addQty && it.qty > 0) {
-          patch.quantity = (prod.quantity ?? 0) + it.qty
-        }
-        if (Object.keys(patch).length === 0) { updated++; continue }
-        const res = await fetch(`/api/admin/products/${prod.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch),
-        })
-        if (!res.ok) errors.push(it.sku)
-        else updated++
-      }
-      const sentIds = confirmUpdateItems.map((it) => it.id)
-      setItems((prev) => prev.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it))
-      setCheckedItems((prev) => { const next = new Set(prev); sentIds.forEach((id) => next.delete(id)); return next })
-      if (errors.length > 0) alert(`Updated ${updated}. Failed: ${errors.join(', ')}`)
-      setShowConfirmUpdate(false)
-      setConfirmUpdateItems([])
-    } finally {
-      setConfirmingUpdate(false)
     }
   }
 
@@ -1781,7 +1761,7 @@ function WorksheetEditor({
               }`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-              {inventorySent ? '✓ Sent!' : sendingInventory ? 'Sending…' : `Send to Inventory${checkedItems.size > 0 ? ` (${checkedItems.size})` : ''}`}
+              {inventorySent ? '✓ Qty Updated!' : sendingInventory ? 'Updating…' : `Update Qty's${checkedItems.size > 0 ? ` (${checkedItems.size})` : ''}`}
             </button>
             <button
               onClick={sendToChecklist}
@@ -1810,7 +1790,7 @@ function WorksheetEditor({
             </button>
             <button
               onClick={updateFinalCosting}
-              disabled={updatingCosts || !items.some((it) => it.sku && it.wholesalePrice > 0)}
+              disabled={updatingCosts || !items.some((it) => it.sku)}
               className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
                 costsUpdated ? 'bg-green-600 text-white' :
                 updatingCosts ? 'bg-gray-400 text-white' :
@@ -1818,7 +1798,7 @@ function WorksheetEditor({
               }`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              {costsUpdated ? '✓ Updated!' : updatingCosts ? 'Updating…' : 'Update Costing'}
+              {costsUpdated ? '✓ Inventory Updated!' : updatingCosts ? 'Updating…' : 'Update Inventory'}
             </button>
             <button
               onClick={() => setShowSupplierOrderModal(true)}
@@ -2434,44 +2414,6 @@ function WorksheetEditor({
       )}
 
       {/* ── Confirm Update Dialog (existing SKU — pricing only, no qty change) ── */}
-      {showConfirmUpdate && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h2 className="text-base font-semibold text-gray-900 mb-2">Update Existing Products?</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              The following <strong>{confirmUpdateItems.length}</strong> SKU{confirmUpdateItems.length !== 1 ? 's' : ''} already exist in inventory.
-              Choose whether to also add the worksheet quantities on top of current stock.
-            </p>
-            <ul className="text-xs text-gray-700 bg-gray-50 rounded-lg p-3 mb-5 max-h-48 overflow-y-auto space-y-1">
-              {confirmUpdateItems.map((it) => (
-                <li key={it.id} className="font-mono">{it.sku}{it.description ? ` — ${it.description}` : ''}{it.qty > 0 ? ` (+${it.qty})` : ''}</li>
-              ))}
-            </ul>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => { setShowConfirmUpdate(false); setConfirmUpdateItems([]) }}
-                className="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleConfirmUpdate(false)}
-                disabled={confirmingUpdate}
-                className="px-4 py-2 text-sm rounded-lg bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50"
-              >
-                {confirmingUpdate ? 'Updating…' : "Don't update quantities"}
-              </button>
-              <button
-                onClick={() => handleConfirmUpdate(true)}
-                disabled={confirmingUpdate}
-                className="px-4 py-2 text-sm rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-50"
-              >
-                {confirmingUpdate ? 'Updating…' : 'Yes, update Qty'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   )
