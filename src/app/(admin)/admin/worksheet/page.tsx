@@ -335,24 +335,56 @@ function WorksheetEditor({
   const [costsUpdated, setCostsUpdated] = useState(false)
 
   async function updateFinalCosting() {
-    const toUpdate = items.filter((it) => it.sku && it.wholesalePrice > 0)
-    if (!toUpdate.length) return
+    const toProcess = items.filter((it) => it.sku)
+    if (!toProcess.length) return
     setUpdatingCosts(true)
     const errors: string[] = []
     let updated = 0
+    let created = 0
     try {
-      for (const it of toUpdate) {
+      for (const it of toProcess) {
         const skuLower = it.sku.trim().toLowerCase()
         const prod = products.find((p) => p.sku.trim().toLowerCase() === skuLower)
-        if (!prod) { errors.push(`SKU ${it.sku} not found in products`); continue }
-        const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
+        const finalLanded = it.wholesalePrice > 0 ? Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100 : 0
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
-        const preOrderZAR = Math.round(calcRetail(it.wholesalePrice) * 100) / 100
-        const patch: Record<string, number> = {}
+        const preOrderZAR = it.wholesalePrice > 0 ? Math.round(calcRetail(it.wholesalePrice) * 100) / 100 : 0
+
+        if (!prod) {
+          // New SKU — add to products with qty=0 (no stock change)
+          const res = await fetch('/api/admin/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sku: it.sku,
+              title: it.description || it.sku,
+              brand: '',
+              description: '',
+              price: retailZAR,
+              cost_per_item: finalLanded,
+              quantity: 0,
+              status: 'active',
+              categoryBrands: it.category ? [it.category] : [],
+              itemCategories: it.unit ? [it.unit] : [],
+            }),
+          })
+          if (!res.ok) {
+            const msg = await res.text().catch(() => res.status.toString())
+            errors.push(`${it.sku} (new): ${msg}`)
+          } else {
+            created++
+          }
+          continue
+        }
+
+        // Existing product — update all applicable fields, quantity untouched
+        const patch: Record<string, any> = {}
+        if (it.description) patch.title = it.description
         if (finalLanded > 0) patch.costPerItem = finalLanded
         if (retailZAR > 0) patch.price = retailZAR
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
-        if (Object.keys(patch).length === 0) continue
+        if (it.category) patch.categoryBrands = [it.category]
+        if (it.unit) patch.itemCategories = [it.unit]
+        if (Object.keys(patch).length === 0) { updated++; continue }
         const res = await fetch(`/api/admin/products/${prod.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -368,7 +400,7 @@ function WorksheetEditor({
       await syncWholesalePricelist()
       await saveWorksheet()
       if (errors.length > 0) {
-        alert(`Updated ${updated} products.\n\nFailed:\n${errors.join('\n')}`)
+        alert(`Updated ${updated}, created ${created}.\n\nFailed:\n${errors.join('\n')}`)
       } else {
         setCostsUpdated(true)
         setTimeout(() => setCostsUpdated(false), 3000)
