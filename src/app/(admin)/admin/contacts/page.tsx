@@ -27,6 +27,7 @@ interface Contact {
   deliveryPudoLocker: boolean
   deliveryPostnetAramex: boolean
   source: 'book-now' | 'manual' | 'import' | 'website'
+  isReseller?: boolean
   notes: string
   totalOrders: number
   totalSpent: number
@@ -54,6 +55,8 @@ const EMPTY_FORM = {
   deliveryKioskToKiosk: false,
   deliveryPudoLocker: false,
   deliveryPostnetAramex: false,
+  isReseller: false,
+  fullAccess: false,
   notes: '',
 }
 
@@ -433,6 +436,36 @@ function ContactModal({
             )}
           </div>
 
+          {/* ── Reseller ──────────────────────────────────────── */}
+          <div className="flex items-center gap-2 py-2 px-3 bg-purple-50 border border-purple-200 rounded-lg">
+            <input
+              type="checkbox"
+              id="isReseller"
+              checked={(form as any).isReseller || false}
+              onChange={e => { const v = e.target.checked; setForm(f => ({ ...f, isReseller: v })) }}
+              className="w-4 h-4 accent-purple-600"
+            />
+            <label htmlFor="isReseller" className="text-sm font-semibold text-purple-700 cursor-pointer">
+              Reseller
+            </label>
+            <span className="text-xs text-purple-500">— wholesale / trade customer</span>
+          </div>
+
+          {/* ── Full Access ───────────────────────────────────── */}
+          <div className="flex items-center gap-2 py-2 px-3 bg-amber-50 border border-amber-300 rounded-lg">
+            <input
+              type="checkbox"
+              id="fullAccess"
+              checked={(form as any).fullAccess || false}
+              onChange={e => { const v = e.target.checked; setForm(f => ({ ...f, fullAccess: v })) }}
+              className="w-4 h-4 accent-amber-600"
+            />
+            <label htmlFor="fullAccess" className="text-sm font-semibold text-amber-700 cursor-pointer">
+              Full Access
+            </label>
+            <span className="text-xs text-amber-600">— full customer account access</span>
+          </div>
+
           {/* ── Notes ─────────────────────────────────────────── */}
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Notes</label>
@@ -495,6 +528,171 @@ function DeliveryBadges({ c }: { c: Contact }) {
         </span>
       ))}
     </div>
+  )
+}
+
+// ─── Client Profile Drawer ────────────────────────────────────────────────────
+
+function ClientProfileDrawer({
+  contact,
+  onClose,
+  onEdit,
+}: {
+  contact: Contact
+  onClose: () => void
+  onEdit: () => void
+}) {
+  const [backorders, setBackorders] = useState<any[]>([])
+  const [boLoading, setBoLoading] = useState(true)
+  const name = fullName(contact)
+
+  useEffect(() => {
+    fetch('/api/admin/backorders')
+      .then(r => r.ok ? r.json() : [])
+      .then((all: any[]) => {
+        setBackorders(all.filter(b => b.clientName?.toLowerCase() === name.toLowerCase()))
+      })
+      .catch(() => {})
+      .finally(() => setBoLoading(false))
+  }, [contact.id, name])
+
+  const deliveries = [
+    { key: 'deliveryDoorToDoor'    as const, icon: '🚪', label: 'Door to Door' },
+    { key: 'deliveryKioskToKiosk'  as const, icon: '📦', label: 'Kiosk to Kiosk' },
+    { key: 'deliveryPudoLocker'    as const, icon: '🔒', label: 'Pudo Locker' },
+    { key: 'deliveryPostnetAramex' as const, icon: '📮', label: 'Postnet (Aramex)' },
+  ]
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Drawer */}
+      <div className="fixed top-0 right-0 z-50 h-full w-full max-w-lg bg-white shadow-2xl flex flex-col overflow-hidden">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b bg-gray-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              {contact.firstName.charAt(0)}{contact.lastName.charAt(0) || ''}
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-gray-900">{name}</h2>
+              <p className="text-xs text-gray-400 flex items-center gap-1">
+                {sourceBadge(contact.source)}
+                {contact.isReseller && <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700">Reseller</span>}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={onEdit} className="text-xs px-3 py-1.5 rounded-lg bg-gray-900 text-white hover:bg-gray-700 font-semibold">Edit</button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full text-xl">×</button>
+          </div>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+          {/* Contact info */}
+          <div>
+            <SectionHeader icon="📞" title="Contact" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              {contact.email && <div><span className="text-xs text-gray-400 block">Email</span><a href={`mailto:${contact.email}`} className="text-blue-600 hover:underline">{contact.email}</a></div>}
+              {contact.phone && <div><span className="text-xs text-gray-400 block">Phone</span><a href={`tel:${contact.phone}`} className="text-gray-700">{contact.phone}</a></div>}
+              {contact.mobile && <div><span className="text-xs text-gray-400 block">Mobile</span><a href={`tel:${contact.mobile}`} className="text-gray-700">{contact.mobile}</a></div>}
+            </div>
+          </div>
+
+          {/* Address */}
+          {(contact.addressStreet || contact.addressCity || contact.addressProvince) && (
+            <div>
+              <SectionHeader icon="📍" title="Address" />
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {[contact.addressStreet, contact.addressCity, contact.addressProvince, contact.addressPostalCode, contact.addressCountry].filter(Boolean).join(', ')}
+              </p>
+            </div>
+          )}
+
+          {/* Club */}
+          {contact.clubName && (
+            <div>
+              <SectionHeader icon="🏁" title="Club" />
+              <p className="text-sm font-semibold text-indigo-700">{contact.clubName}</p>
+              {contact.clubMemberId && <p className="text-xs text-gray-400 mt-0.5">Member ID: {contact.clubMemberId}</p>}
+            </div>
+          )}
+
+          {/* Business */}
+          {contact.companyName && (
+            <div>
+              <SectionHeader icon="🏢" title="Business" />
+              <p className="text-sm font-semibold text-emerald-700">{contact.companyName}</p>
+              {contact.companyVAT && <p className="text-xs text-gray-400 mt-0.5">VAT: {contact.companyVAT}</p>}
+              {contact.companyAddress && <p className="text-xs text-gray-500 mt-0.5">{contact.companyAddress}</p>}
+            </div>
+          )}
+
+          {/* Delivery */}
+          {deliveries.some(d => contact[d.key]) && (
+            <div>
+              <SectionHeader icon="🚚" title="Delivery Options" />
+              <div className="flex flex-wrap gap-1.5">
+                {deliveries.filter(d => contact[d.key]).map(d => (
+                  <span key={d.key} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">{d.icon} {d.label}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {contact.notes && (
+            <div>
+              <SectionHeader icon="📝" title="Notes" />
+              <p className="text-sm text-gray-600 whitespace-pre-line">{contact.notes}</p>
+            </div>
+          )}
+
+          {/* Orders summary */}
+          {(contact.totalOrders > 0 || contact.totalSpent > 0) && (
+            <div>
+              <SectionHeader icon="💰" title="Order History" />
+              <div className="flex gap-4 text-sm">
+                <div><span className="text-xs text-gray-400 block">Total Orders</span><span className="font-bold text-gray-900">{contact.totalOrders}</span></div>
+                <div><span className="text-xs text-gray-400 block">Total Spent</span><span className="font-bold text-gray-900">R{(contact.totalSpent || 0).toFixed(2)}</span></div>
+              </div>
+            </div>
+          )}
+
+          {/* Backorders */}
+          <div>
+            <SectionHeader icon="📋" title="Backorders" subtitle="Active backorders for this customer" />
+            {boLoading ? (
+              <p className="text-xs text-gray-400">Loading backorders…</p>
+            ) : backorders.length === 0 ? (
+              <p className="text-xs text-gray-400 italic">No backorders for this customer.</p>
+            ) : (
+              <div className="space-y-2">
+                {backorders.map(b => (
+                  <div key={b.id} className="flex gap-3 bg-indigo-50 rounded-xl p-3 items-start">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-gray-800 truncate">{b.description}</p>
+                      {b.sku && <p className="text-[10px] text-gray-500 font-mono">{b.sku}</p>}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-medium">Qty: {b.qty}</span>
+                        {b.price > 0 && <span className="text-[10px] text-gray-500">R{(b.price * b.qty).toFixed(2)}</span>}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${b.status === 'active' ? 'bg-blue-100 text-blue-700' : b.status === 'complete' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{b.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -972,9 +1170,16 @@ export default function ContactsPage() {
   const [showModal, setShowModal]     = useState(false)
   const [editItem, setEditItem]       = useState<Contact | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
   const [syncing, setSyncing]         = useState(false)
   const [syncMsg, setSyncMsg]         = useState('')
   const [dashboardContact, setDashboardContact] = useState<Contact | null>(null)
+  const [resetContact, setResetContact] = useState<Contact | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetMsg, setResetMsg] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [resetLink, setResetLink] = useState('')
+  const [resetLinkCopied, setResetLinkCopied] = useState(false)
   const [sortBy, setSortBy]           = useState<string>('name')
   const [sortDir, setSortDir]         = useState<'asc' | 'desc'>('asc')
   const { widths: colW, setWidth } = useColumnResize('contacts', {
@@ -1044,6 +1249,47 @@ export default function ContactsPage() {
     const res = await fetch(`/api/admin/contacts/${id}`, { method: 'DELETE' })
     if (res.ok) setContacts(prev => prev.filter(c => c.id !== id))
     setDeleteConfirm(null)
+  }
+
+  // ── Reset password ────────────────────────────────────────────────────────
+  const handleResetPassword = async () => {
+    if (!resetContact || !resetPassword.trim()) return
+    setResetting(true)
+    setResetMsg('')
+    try {
+      const res = await fetch('/api/admin/customer-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetContact.email, password: resetPassword, resetIfExists: true }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setResetMsg(data.action === 'created' ? 'Account created & password set ✓' : 'Password reset successfully ✓')
+        setResetPassword('')
+      } else {
+        setResetMsg(data.error || 'Failed')
+      }
+    } catch { setResetMsg('Error — try again') }
+    finally { setResetting(false) }
+  }
+
+  const handleGenerateResetLink = async () => {
+    if (!resetContact) return
+    setResetLink('')
+    setResetLinkCopied(false)
+    try {
+      const res = await fetch('/api/admin/reset-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetContact.email }),
+      })
+      const data = await res.json()
+      if (data.resetLink) {
+        setResetLink(data.resetLink)
+        await navigator.clipboard.writeText(data.resetLink)
+        setResetLinkCopied(true)
+      }
+    } catch { setResetMsg('Failed to generate link') }
   }
 
   // ── CSV export ────────────────────────────────────────────────────────────
@@ -1141,6 +1387,8 @@ export default function ContactsPage() {
         deliveryKioskToKiosk:  editItem.deliveryKioskToKiosk  || false,
         deliveryPudoLocker:    editItem.deliveryPudoLocker    || false,
         deliveryPostnetAramex: editItem.deliveryPostnetAramex || false,
+        isReseller:           editItem.isReseller       || false,
+        fullAccess:           (editItem as any).fullAccess || false,
         notes:                editItem.notes           || '',
       }
     : undefined
@@ -1293,7 +1541,7 @@ export default function ContactsPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map(c => (
-                  <tr key={c.id} onDoubleClick={() => setDashboardContact(c)} className="hover:bg-gray-50 transition-colors cursor-pointer" title="Double-click to open dashboard">
+                  <tr key={c.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedContact(c)} onDoubleClick={() => setDashboardContact(c)}>
 
                     {/* Name */}
                     <td className="px-4 py-3">
@@ -1302,7 +1550,7 @@ export default function ContactsPage() {
                           {c.firstName.charAt(0)}{c.lastName.charAt(0) || c.firstName.charAt(1) || ''}
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-900">{fullName(c)}</p>
+                          <p className="font-semibold text-gray-900 hover:text-blue-600 transition-colors">{fullName(c)}</p>
                           {c.notes && (
                             <p className="text-xs text-gray-400 break-words">{c.notes}</p>
                           )}
@@ -1377,10 +1625,15 @@ export default function ContactsPage() {
                     </td>
 
                     {/* Source */}
-                    <td className="px-4 py-3 text-center">{sourceBadge(c.source)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1 flex-wrap">
+                        {sourceBadge(c.source)}
+                        {c.isReseller && <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-700">Reseller</span>}
+                      </div>
+                    </td>
 
                     {/* Actions */}
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <button
                           onClick={() => { setEditItem(c); setShowModal(true) }}
@@ -1388,6 +1641,13 @@ export default function ContactsPage() {
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           ✏️
+                        </button>
+                        <button
+                          onClick={() => { setResetContact(c); setResetPassword(''); setResetMsg('') }}
+                          title="Reset Password"
+                          className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        >
+                          🔑
                         </button>
                         <button
                           onClick={() => setDeleteConfirm(c.id)}
@@ -1411,6 +1671,15 @@ export default function ContactsPage() {
           </div>
         )}
       </div>
+
+      {/* Client Profile Drawer */}
+      {selectedContact && (
+        <ClientProfileDrawer
+          contact={selectedContact}
+          onClose={() => setSelectedContact(null)}
+          onEdit={() => { setEditItem(selectedContact); setShowModal(true); setSelectedContact(null) }}
+        />
+      )}
 
       {/* Add / Edit Modal */}
       {showModal && (
@@ -1462,6 +1731,66 @@ export default function ContactsPage() {
           </div>
         )
       })()}
+
+      {/* Reset Password Modal */}
+      {resetContact && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Reset Password</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Set a new login password for <strong>{fullName(resetContact)}</strong> ({resetContact.email})
+            </p>
+            <div className="relative mb-3">
+              <input
+                type="text"
+                value={resetPassword}
+                onChange={e => setResetPassword(e.target.value)}
+                placeholder="New password"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onKeyDown={e => e.key === 'Enter' && handleResetPassword()}
+              />
+            </div>
+            {resetMsg && (
+              <p className={`text-sm mb-3 ${resetMsg.includes('✓') ? 'text-green-600' : 'text-red-500'}`}>{resetMsg}</p>
+            )}
+            <div className="flex gap-3 mb-4">
+              <button
+                onClick={handleResetPassword}
+                disabled={resetting || !resetPassword.trim()}
+                className="flex-1 bg-amber-500 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-amber-600 disabled:opacity-50 transition-colors"
+              >
+                {resetting ? 'Saving…' : 'Set Password'}
+              </button>
+              <button
+                onClick={() => { setResetContact(null); setResetMsg(''); setResetLink(''); setResetLinkCopied(false) }}
+                className="flex-1 border border-gray-300 text-gray-700 rounded-xl py-2.5 text-sm font-semibold hover:bg-gray-50 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Generate reset link for WhatsApp */}
+            <div className="border-t pt-4">
+              <p className="text-xs text-gray-500 mb-2">Or send a self-service reset link via WhatsApp:</p>
+              <button
+                onClick={handleGenerateResetLink}
+                className="w-full bg-green-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-green-700 transition-colors"
+              >
+                🔗 Generate &amp; Copy Reset Link
+              </button>
+              {resetLink && (
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg border">
+                  <p className="text-xs text-green-600 font-semibold mb-1">
+                    {resetLinkCopied ? '✓ Copied to clipboard!' : 'Reset link:'}
+                  </p>
+                  <p className="text-xs text-gray-600 break-all font-mono">{resetLink}</p>
+                  <p className="text-xs text-gray-400 mt-1">Valid for 1 hour. Paste into WhatsApp and send to customer.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
