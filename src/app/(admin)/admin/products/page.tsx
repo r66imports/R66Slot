@@ -258,7 +258,9 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
         scale: obj['scale'] || '1/32',
         // Retail price not in NSR stock sheet spec — default 0; existing price stays if updating
         price: obj['price incl.'] || obj['price incl'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
-        costPerItem: wholesalePrice,
+        // EUR wholesale price goes to pricelist, NOT costPerItem (which is ZAR internal cost)
+        costPerItem: '',
+        _plPriceEur: wholesalePrice,
         preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
         quantity: findQtyValue(obj),
         salesAccount: obj['sales account'] || '',
@@ -825,6 +827,32 @@ export default function ProductsPage() {
             body: JSON.stringify({ filename: `import-${new Date().toISOString().slice(0, 10)}.csv`, csvData: importText, productCount: rows.length, source: 'product-import' }),
           })
         } catch {}
+
+        // NSR: post EUR wholesale prices to pricelist (shown as Wholesale Price on product edit page)
+        if (importProfile === 'nsr') {
+          try {
+            const nsrSup = suppliers.find((s) => s.name?.toLowerCase() === 'nsr')
+            if (nsrSup) {
+              const plEntries = rows
+                .filter((r) => r.sku && (r as any)._plPriceEur)
+                .map((r) => ({
+                  supplierId: nsrSup.id,
+                  sku: r.sku as string,
+                  wholesalePrice: parseFloat((r as any)._plPriceEur as string) || 0,
+                  shopQty: 0,
+                }))
+                .filter((e) => e.wholesalePrice > 0)
+              if (plEntries.length > 0) {
+                await fetch('/api/admin/inventory-pricelists', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ entries: plEntries }),
+                })
+              }
+            }
+          } catch {}
+        }
+
         const parts = []
         if (data.imported > 0) parts.push(`${data.imported} new`)
         if (data.updated > 0) parts.push(`${data.updated} updated`)
