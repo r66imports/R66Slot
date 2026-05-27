@@ -232,20 +232,23 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
   },
   nsr: {
     label: 'NSR',
-    hint: 'NSR Stock Sheet (positional): A=Skip | B=Code → NSR-prefix auto-added | C=Description (title + description) | D,E=Skip | F=Wholesale Price | G=Brand/Category (default NSR) | H=Unit/Item Categories | I=Supplier (default NSR)',
-    template: '(skip),Code,Description,(skip),(skip),Wholesale Price,Category,Unit,Supplier',
-    placeholder: '(skip),0001,NSR Audi R8 GT3 Evo,(skip),(skip),280.00,NSR,Slot Car,NSR',
+    hint: 'NSR Stock Sheet: A=Qty(skip) | B=Code→NSR-prefix | C=Description | D=Retail(skip) | E=Discount%(skip) | F=Net EUR→Wholesale Price | G=Total(skip) | H=Category/Brand | I=Categories(Unit) | J=Supplier',
+    template: 'qty,code,description,(all prices eur),di,net eur,total,Category/Brand,Categories (Unit),Supplier',
+    placeholder: ',GADPIN,OFFICIAL NSR GADGET PIN,,50,3,-,NSR,Accessories,NSR',
     mapRow: (obj) => {
-      // Positional mapping: _col_0=A(skip), _col_1=B(SKU), _col_2=C(desc), _col_5=F(wholesale), _col_6=G(brand), _col_7=H(unit), _col_8=I(supplier)
+      // Positional mapping (NSR stock sheet):
+      // A(0)=qty(skip) | B(1)=code→SKU | C(2)=description | D(3)=retail(skip) | E(4)=di(skip)
+      // F(5)=net eur→wholesale price | G(6)=total(skip) | H(7)=Category/Brand | I(8)=Categories(Unit) | J(9)=Supplier
       const rawSku = (obj['_col_1'] || obj['code'] || obj['sku'] || obj['item code'] || '').trim()
       const sku = rawSku
         ? (rawSku.toUpperCase().startsWith('NSR-') ? rawSku : `NSR-${rawSku}`)
         : ''
       const desc = (obj['_col_2'] || obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '').trim()
-      const wholesalePrice = (obj['_col_5'] || obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '').trim()
-      const brand = (obj['_col_6'] || obj['category'] || obj['brand'] || '').trim() || 'NSR'
-      const unit = (obj['_col_7'] || obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '').trim()
-      const supplier = (obj['_col_8'] || obj['supplier'] || obj['vendor'] || '').trim() || 'NSR'
+      const wholesalePrice = (obj['_col_5'] || obj['net eur'] || obj['last cost'] || obj['cost'] || '').trim()
+      // G(6)=total → skip; H(7)=Category/Brand; I(8)=Categories(Unit); J(9)=Supplier
+      const brand = (obj['_col_7'] || obj['category/brand'] || obj['category'] || obj['brand'] || '').trim() || 'NSR'
+      const unit = (obj['_col_8'] || obj['categories (unit)'] || obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || '').trim()
+      const supplier = (obj['_col_9'] || obj['supplier'] || obj['vendor'] || '').trim() || 'NSR'
       return {
         sku,
         title: desc,
@@ -262,7 +265,8 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
         costPerItem: '',
         _plPriceEur: wholesalePrice,
         preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
-        quantity: findQtyValue(obj),
+        // Col A = qty on NSR sheet — do NOT import (NSR qty is order qty, not our stock level)
+        quantity: '0',
         salesAccount: obj['sales account'] || '',
         purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
         eta: obj['eta'] || obj['delivery'] || obj['lead time'] || '',
@@ -956,6 +960,13 @@ export default function ProductsPage() {
           }}>Export Supplier</Button>
           <Button variant="outline" onClick={() => setShowExportModal(true)}>Export Sage CSV</Button>
           <Button variant="outline" onClick={() => setShowImportModal(true)}>Import</Button>
+          <Button
+            variant="outline"
+            className="border-red-300 text-red-700 hover:bg-red-50"
+            onClick={() => { setImportProfile('nsr'); setImportText(''); setShowImportModal(true) }}
+          >
+            NSR Import
+          </Button>
           <Button size="lg" asChild>
             <Link href="/admin/products/new">Add Product</Link>
           </Button>
