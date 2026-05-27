@@ -232,30 +232,44 @@ const IMPORT_PROFILES: Record<string, ImportProfile> = {
   },
   nsr: {
     label: 'NSR',
-    hint: 'Columns: Code, Description, Category, Unit, Retail Price - Inclusive, Last Cost, Qty On Hand, Sales Account, Purchases Account, Landed Cost, Cost, Pre Order Price',
-    template: 'Code,Description,Category,Unit,Retail Price - Inclusive,Last Cost,Qty On Hand,Sales Account,Purchases Account,Landed Cost,Cost,Pre Order Price',
-    placeholder: 'NSR-0001,NSR Audi R8 GT3,NSR,Slot Car,450,280,5,NSR Sales,NSR Purchases,,NSR,',
-    mapRow: (obj) => ({
-      sku: obj['code'] || obj['sku'] || obj['item code'] || '',
-      title: obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '',
-      brand: obj['category'] || obj['brand'] || 'NSR',
-      categoryBrands: obj['category'] || obj['brand'] || 'NSR',
-      productType: obj['unit'] || obj['type'] || 'Slot Car',
-      itemCategories: obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '',
-      carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
-      scale: obj['scale'] || '1/32',
-      price: obj['price incl.'] || obj['price incl'] || obj['srp - exclusive'] || obj['srp exclusive'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
-      costPerItem: obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '',
-      preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
-      quantity: findQtyValue(obj),
-      salesAccount: obj['sales account'] || '',
-      purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
-      eta: obj['eta'] || obj['delivery'] || obj['lead time'] || '',
-      status: 'active',
-      barcode: obj['barcode'] || obj['isbn'] || obj['upc'] || obj['gtin'] || '',
-      supplier: obj['supplier'] || obj['vendor'] || ((obj['category'] || obj['brand'] || 'NSR').toLowerCase() === 'nsr' ? 'NSR' : ''),
-      categories: obj['categories'] || '',
-    }),
+    hint: 'NSR Stock Sheet (positional): A=Skip | B=Code → NSR-prefix auto-added | C=Description (title + description) | D,E=Skip | F=Wholesale Price | G=Brand/Category (default NSR) | H=Unit/Item Categories | I=Supplier (default NSR)',
+    template: '(skip),Code,Description,(skip),(skip),Wholesale Price,Category,Unit,Supplier',
+    placeholder: '(skip),0001,NSR Audi R8 GT3 Evo,(skip),(skip),280.00,NSR,Slot Car,NSR',
+    mapRow: (obj) => {
+      // Positional mapping: _col_0=A(skip), _col_1=B(SKU), _col_2=C(desc), _col_5=F(wholesale), _col_6=G(brand), _col_7=H(unit), _col_8=I(supplier)
+      const rawSku = (obj['_col_1'] || obj['code'] || obj['sku'] || obj['item code'] || '').trim()
+      const sku = rawSku
+        ? (rawSku.toUpperCase().startsWith('NSR-') ? rawSku : `NSR-${rawSku}`)
+        : ''
+      const desc = (obj['_col_2'] || obj['description'] || obj['title'] || obj['name'] || obj['desc'] || '').trim()
+      const wholesalePrice = (obj['_col_5'] || obj['last cost'] || obj['cost - exclusive'] || obj['cost exclusive'] || obj['cost - inclusive'] || obj['cost inclusive'] || obj['cost price'] || obj['cost'] || '').trim()
+      const brand = (obj['_col_6'] || obj['category'] || obj['brand'] || '').trim() || 'NSR'
+      const unit = (obj['_col_7'] || obj['item categories (unit)'] || obj['item categories'] || obj['unit'] || obj['type'] || '').trim()
+      const supplier = (obj['_col_8'] || obj['supplier'] || obj['vendor'] || '').trim() || 'NSR'
+      return {
+        sku,
+        title: desc,
+        description: desc,
+        brand,
+        categoryBrands: brand,
+        productType: unit || 'Slot Car',
+        itemCategories: unit,
+        carClass: obj['car_class'] || obj['carclass'] || obj['class'] || '',
+        scale: obj['scale'] || '1/32',
+        // Retail price not in NSR stock sheet spec — default 0; existing price stays if updating
+        price: obj['price incl.'] || obj['price incl'] || obj['srp - inclusive'] || obj['srp inclusive'] || obj['retail price - inclusive'] || obj['retail price'] || obj['price'] || '0',
+        costPerItem: wholesalePrice,
+        preOrderPrice: obj['pre order price'] || obj['preorder price'] || obj['pre-order price'] || '',
+        quantity: findQtyValue(obj),
+        salesAccount: obj['sales account'] || '',
+        purchaseAccount: obj['purchases account'] || obj['purchase account'] || '',
+        eta: obj['eta'] || obj['delivery'] || obj['lead time'] || '',
+        status: 'active',
+        barcode: obj['barcode'] || obj['isbn'] || obj['upc'] || obj['gtin'] || '',
+        supplier,
+        categories: obj['categories'] || '',
+      }
+    },
     brandKey: 'NSR',
     exportHeaders: ['Code', 'Description', 'Category', 'Unit', 'Retail Price - Inclusive', 'Last Cost', 'Qty On Hand', 'Sales Account', 'Purchases Account', 'Landed Cost', 'Cost', 'Pre Order Price'],
     exportRow: (p) => [
@@ -793,6 +807,8 @@ export default function ProductsPage() {
         const values = parseCSVLine(line)
         const obj: Record<string, string> = {}
         headers.forEach((h, i) => { obj[h] = values[i] || '' })
+        // Also expose positional keys (_col_0, _col_1, …) for profiles that use column-index mapping
+        values.forEach((v, i) => { obj[`_col_${i}`] = v || '' })
         return profile.mapRow(obj)
       })
       const res = await fetch('/api/admin/products', {
