@@ -2526,7 +2526,7 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
         Actions <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div ref={menuRef} className={`fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px]`}
+        <div ref={menuRef} className={`fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px] max-h-80 overflow-y-auto`}
           style={(() => {
             if (!btnRef.current) return {}
             const r = btnRef.current.getBoundingClientRect()
@@ -3844,7 +3844,7 @@ export default function OrdersPage() {
                     const hasOutstanding = doc.type === 'invoice' && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
                     const firstDesc = doc.lineItems[0]?.description || '—'
                     return (
-                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
+                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 text-xs">
                           <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
                           {(doc as any).sourceQuoteNumber && (
@@ -3924,6 +3924,16 @@ export default function OrdersPage() {
                             { label: 'Email', icon: <IconEmail />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doEmail(docToViewData(doc), template, ba) } },
                             { label: 'Download', icon: <IconDownload />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doDownload(docToViewData(doc), template, ba) } },
                             ...(doc.type === 'quote' ? [
+                              {
+                                label: doc.status === 'sent' ? '✓ Quote Sent' : 'Quote Sent',
+                                icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+                                className: doc.status === 'sent' ? 'text-green-600 font-semibold' : 'text-gray-700',
+                                onClick: async () => {
+                                  const newStatus = doc.status === 'sent' ? 'draft' : 'sent'
+                                  const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) })
+                                  if (res.ok) setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, status: newStatus } : d))
+                                },
+                              },
                               {
                                 label: 'Send to Sales Order',
                                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
