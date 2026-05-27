@@ -43,6 +43,7 @@ interface Product {
     metaTitle: string
     metaDescription: string
     metaKeywords: string
+    ogImage?: string
   }
   createdAt: string
   updatedAt: string
@@ -128,6 +129,7 @@ export default function EditProductPage({
   const [seoTitle, setSeoTitle] = useState('')
   const [seoDescription, setSeoDescription] = useState('')
   const [seoKeywords, setSeoKeywords] = useState('')
+  const [seoImage, setSeoImage] = useState('')
   // Revo Racing Class Filter
   const DEFAULT_CAR_CLASSES = ['GT', 'GT 1', 'GT 2', 'GT 3', 'Group 2', 'Group 5', 'GT/IUMSA']
   const [carClassOptions, setCarClassOptions] = useState<string[]>(DEFAULT_CAR_CLASSES)
@@ -371,6 +373,7 @@ export default function EditProductPage({
           setSeoTitle(found.seo?.metaTitle || '')
           setSeoDescription(found.seo?.metaDescription || '')
           setSeoKeywords(found.seo?.metaKeywords || '')
+          setSeoImage(found.seo?.ogImage || '')
           setSalesAccount(Array.isArray((found as any).salesAccount) ? (found as any).salesAccount : [])
           setPurchaseAccount(Array.isArray((found as any).purchaseAccount) ? (found as any).purchaseAccount : [])
 
@@ -513,7 +516,7 @@ export default function EditProductPage({
           images: mediaFiles.filter(f => !f.url.startsWith('data:')).map(f => f.url),
           imageUrl: mediaFiles.find(f => !f.url.startsWith('data:'))?.url || '',
           pageIds, pageId: pageIds[0] || '', pageUrl,
-          seo: { metaTitle: seoTitle, metaDescription: seoDescription, metaKeywords: seoKeywords },
+          seo: { metaTitle: seoTitle, metaDescription: seoDescription, metaKeywords: seoKeywords, ogImage: seoImage },
         }),
       })
       setAutosaveStatus('saved')
@@ -557,7 +560,7 @@ export default function EditProductPage({
       selectedCarClasses, selectedRevoParts, selectedSidewaysParts, selectedSidewaysCarClasses,
       customOrgData,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
-      seoTitle, seoDescription, seoKeywords, salesAccount, purchaseAccount])
+      seoTitle, seoDescription, seoKeywords, seoImage, salesAccount, purchaseAccount])
 
   // Click-outside — close all custom dropdowns (registered once; no state deps needed)
   useEffect(() => {
@@ -1713,6 +1716,63 @@ export default function EditProductPage({
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
                   <p className="mt-1 text-xs text-gray-500">Separate with commas</p>
+                </div>
+
+                {/* OG Image picker */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    OG Image <span className="text-xs font-normal text-gray-400">(social sharing preview)</span>
+                  </label>
+                  {(() => {
+                    const imgs = mediaFiles.filter(f => !f.url.startsWith('data:'))
+                    if (imgs.length === 0) {
+                      return <p className="text-xs text-gray-400 italic">No product images loaded — upload images first to select an OG image.</p>
+                    }
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          {/* "Default" / no selection option */}
+                          <button
+                            type="button"
+                            onClick={() => setSeoImage('')}
+                            className={`w-16 h-16 flex flex-col items-center justify-center gap-0.5 border-2 rounded-lg text-[10px] leading-tight transition-colors ${!seoImage ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-400 hover:border-gray-300'}`}
+                          >
+                            {!seoImage && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                            <span>Default</span>
+                          </button>
+                          {/* Image thumbnails */}
+                          {imgs.map((f, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setSeoImage(f.url)}
+                              className={`relative w-16 h-16 border-2 rounded-lg overflow-hidden transition-all ${seoImage === f.url ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-400'}`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={f.url} alt="" className="w-full h-full object-cover" />
+                              {seoImage === f.url && (
+                                <div className="absolute inset-0 bg-blue-500 bg-opacity-20 flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-blue-600 drop-shadow" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                                </div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                        {seoImage && (
+                          <div className="flex items-center gap-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={seoImage} alt="OG preview" className="w-24 h-16 object-cover rounded border border-blue-200 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-blue-800">Selected OG Image</p>
+                              <p className="text-[10px] text-blue-600 truncate">{seoImage}</p>
+                              <button type="button" onClick={() => setSeoImage('')} className="mt-1 text-[10px] text-red-500 hover:text-red-700">✕ Remove</button>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500">Used when sharing on social media. Falls back to product image if not set.</p>
+                      </div>
+                    )
+                  })()}
                 </div>
               </div>}
             </div>

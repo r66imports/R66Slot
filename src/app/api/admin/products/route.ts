@@ -43,7 +43,7 @@ export interface Product {
   sidewaysCarClasses: string[]
   customOrgs: Record<string, { brands: string[]; carClasses: string[]; parts: string[]; carTypes: string[] }>
   isPreOrder: boolean
-  seo: { metaTitle: string; metaDescription: string; metaKeywords: string }
+  seo: { metaTitle: string; metaDescription: string; metaKeywords: string; ogImage?: string }
   sageItemCode: string | null
   sageLastSynced: string | null
   unit: string

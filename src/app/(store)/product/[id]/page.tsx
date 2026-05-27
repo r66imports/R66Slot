@@ -1,259 +1,47 @@
-'use client'
+import { Metadata } from 'next'
+import ProductDetailClient from './ProductDetailClient'
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import Link from 'next/link'
-import { useLocalCart } from '@/context/local-cart-context'
+interface Props {
+  params: Promise<{ id: string }>
+}
 
-export default function ProductDetailPage() {
-  const params = useParams()
-  const id = params.id as string
-  const [product, setProduct] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [activeImg, setActiveImg] = useState(0)
-  const [qty, setQty] = useState(1)
-  const [added, setAdded] = useState(false)
-  // Default true — enforce until API says otherwise (prevents race condition on add-to-cart)
-  const [stockRuleActive, setStockRuleActive] = useState(true)
-  const { addItem } = useLocalCart()
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params
+  try {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.r66slot.co.za'
+    const res = await fetch(`${siteUrl}/api/admin/products/${id}`, { next: { revalidate: 60 } })
+    if (!res.ok) return { title: 'Product | R66SLOT' }
+    const product = await res.json()
 
-  useEffect(() => {
-    fetch('/api/admin/site-rules')
-      .then((r) => r.ok ? r.json() : [])
-      .then((rules: any[]) => {
-        const rule = rules.find((r: any) => r.id === 'enforce_stock_limit')
-        // Only disable if rule is explicitly set to false; keep true if not found
-        setStockRuleActive(rule ? rule.active !== false : true)
-      })
-      .catch(() => {}) // keep true on error — fail safe
-  }, [])
+    const title = product.seo?.metaTitle || `${product.title} | R66SLOT`
+    const description = product.seo?.metaDescription || product.description || ''
+    const ogImage = product.seo?.ogImage || product.imageUrl || ''
+    const keywords = product.seo?.metaKeywords || ''
 
-  useEffect(() => {
-    fetch(`/api/admin/products/${id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setProduct(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [id])
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+    return {
+      title,
+      description,
+      keywords: keywords || undefined,
+      openGraph: {
+        title: product.seo?.metaTitle || product.title,
+        description,
+        images: ogImage ? [{ url: ogImage, width: 1200, height: 630, alt: product.title }] : [],
+        type: 'website',
+        url: `${siteUrl}/product/${id}`,
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: product.seo?.metaTitle || product.title,
+        description,
+        images: ogImage ? [ogImage] : [],
+      },
+    }
+  } catch {
+    return { title: 'Product | R66SLOT' }
   }
+}
 
-  if (!product) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <p className="text-gray-500 text-lg">Product not found.</p>
-        <Link href="/products" className="mt-4 inline-block text-red-600 hover:underline">← Back to Products</Link>
-      </div>
-    )
-  }
-
-  // Build full image list: primary + gallery
-  const allImages: string[] = [
-    ...(product.imageUrl ? [product.imageUrl] : []),
-    ...((product.images as string[]) || []).filter((img: string) => img && img !== product.imageUrl),
-  ]
-
-  // Enforce stock cap when Rule 1 is active OR product has track_quantity enabled
-  const trackStock = stockRuleActive || product.trackQuantity === true
-  const stockLimit = trackStock && product.quantity > 0 ? product.quantity : Infinity
-
-  const handleAddToCart = () => {
-    addItem({
-      id: product.id,
-      sku: product.sku || '',
-      title: product.title,
-      brand: product.brand || '',
-      price: product.price || 0,
-      imageUrl: product.imageUrl || '',
-      pageUrl: `/product/${product.id}`,
-      stockQty: trackStock ? (product.quantity ?? undefined) : undefined,
-      trackQty: trackStock,
-      isPreOrder: product.isPreOrder ?? false,
-    }, Math.min(qty, isFinite(stockLimit) ? stockLimit : qty))
-    setAdded(true)
-    setTimeout(() => setAdded(false), 2000)
-  }
-
-  const outOfStock = trackStock ? (product.quantity <= 0 && !product.isPreOrder) : (product.quantity === 0 && !product.isPreOrder)
-  const isPreOrder = product.isPreOrder
-
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* Breadcrumb */}
-      <nav className="mb-6 text-sm text-gray-500 flex items-center gap-1.5 flex-wrap">
-        <Link href="/" className="hover:text-red-600">Home</Link>
-        <span>/</span>
-        <Link href="/products" className="hover:text-red-600">Products</Link>
-        {product.brand && (
-          <>
-            <span>/</span>
-            <span className="text-gray-400">{product.brand}</span>
-          </>
-        )}
-        <span>/</span>
-        <span className="text-gray-800 font-medium">{product.title}</span>
-      </nav>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* ── Left: Images ── */}
-        <div>
-          {/* Main image */}
-          <div className="rounded-xl overflow-hidden bg-gray-50 border border-gray-100 mb-3 flex items-center justify-center" style={{ minHeight: '340px' }}>
-            {allImages.length > 0 ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={allImages[activeImg]}
-                alt={product.title}
-                className="w-full object-contain"
-                style={{ maxHeight: '480px' }}
-              />
-            ) : (
-              <span className="text-gray-300 text-8xl">🏎️</span>
-            )}
-          </div>
-
-          {/* Thumbnail strip */}
-          {allImages.length > 1 && (
-            <div className="flex gap-2 flex-wrap">
-              {allImages.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImg(idx)}
-                  className={`w-16 h-16 rounded-lg overflow-hidden border-2 flex-shrink-0 transition-all ${
-                    activeImg === idx ? 'border-red-600' : 'border-gray-200 hover:border-gray-400'
-                  }`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img} alt="" className="w-full h-full object-contain" />
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* SKU + title below images (mobile-friendly) */}
-          {product.sku && (
-            <p className="text-xs text-gray-400 font-mono mt-3">{product.sku}</p>
-          )}
-        </div>
-
-        {/* ── Right: Info ── */}
-        <div className="flex flex-col gap-4">
-          {/* Brand */}
-          {product.brand && (
-            <p className="text-sm font-bold uppercase tracking-widest text-gray-500">{product.brand}</p>
-          )}
-
-          {/* Title */}
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">{product.title}</h1>
-
-          {/* SKU */}
-          {product.sku && (
-            <p className="text-sm text-gray-500">SKU: <span className="font-mono font-semibold text-gray-700">{product.sku}</span></p>
-          )}
-
-          {/* Price */}
-          <div className="flex items-baseline gap-3">
-            <span className="text-3xl font-bold text-gray-900">
-              {product.price > 0 ? `R${product.price.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}` : 'POA'}
-            </span>
-            {product.compareAtPrice && product.compareAtPrice > product.price && (
-              <span className="text-lg text-gray-400 line-through">
-                R{product.compareAtPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-              </span>
-            )}
-          </div>
-
-          {/* Stock status */}
-          {!outOfStock && !isPreOrder && product.quantity > 0 && (
-            <p className="text-sm font-medium text-green-600">
-              {product.quantity} available
-            </p>
-          )}
-
-          {/* Quantity + Add to Cart */}
-          {!outOfStock ? (
-            <div className="flex flex-col gap-3">
-              {!isPreOrder && (
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-gray-600">Quantity</label>
-                  <div className="flex items-center gap-2 border border-gray-300 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() => setQty((q) => Math.max(1, q - 1))}
-                      disabled={qty <= 1}
-                      className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    >−</button>
-                    <span className="w-10 text-center font-semibold text-sm">{qty}</span>
-                    <button
-                      onClick={() => setQty((q) => Math.min(isFinite(stockLimit) ? stockLimit : q + 1, q + 1))}
-                      disabled={isFinite(stockLimit) && qty >= stockLimit}
-                      className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    >+</button>
-                  </div>
-                  {trackStock && isFinite(stockLimit) && (
-                    <span className="text-xs font-medium text-gray-500">
-                      {qty >= stockLimit ? '⚠ Max available: ' + stockLimit + ' in stock' : stockLimit + ' in stock'}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {isPreOrder ? (
-                <a
-                  href={`/book/product/${product.id}`}
-                  className="w-full text-center font-bold py-3 px-6 rounded-lg text-base bg-orange-500 text-white hover:bg-orange-600 transition-colors"
-                >
-                  Book for Next Shipment
-                </a>
-              ) : (
-                <button
-                  onClick={handleAddToCart}
-                  className={`w-full font-bold py-3 px-6 rounded-lg text-base transition-all duration-200 ${
-                    added ? 'bg-green-600 text-white scale-95' : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
-                >
-                  {added ? '✓ Added to Cart!' : 'Add to Cart'}
-                </button>
-              )}
-            </div>
-          ) : (
-            <button disabled className="w-full font-bold py-3 px-6 rounded-lg text-base bg-gray-200 text-gray-500 cursor-not-allowed">
-              Out of Stock
-            </button>
-          )}
-
-          {/* Meta tags */}
-          <div className="flex flex-wrap gap-2 pt-1">
-            {product.carClass && (
-              <span className="px-3 py-1 bg-black text-white text-xs font-bold rounded-full">{product.carClass}</span>
-            )}
-            {product.scale && (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">Scale {product.scale}</span>
-            )}
-            {product.productType && (
-              <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded-full">{product.productType}</span>
-            )}
-          </div>
-
-          {/* Description */}
-          {product.description && (
-            <div className="border-t border-gray-100 pt-4">
-              <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-2">Description</h2>
-              <div
-                className="text-sm text-gray-600 leading-relaxed prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: product.description }}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+export default async function ProductPage({ params }: Props) {
+  const { id } = await params
+  return <ProductDetailClient id={id} />
 }
