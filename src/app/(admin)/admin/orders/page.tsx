@@ -2433,7 +2433,7 @@ function PaymentModal({
         </div>
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
           <div className="flex justify-between py-2 border-b border-gray-100 text-sm">
-            <span className="text-gray-500">Invoice Total</span>
+            <span className="text-gray-500">{doc.type === 'invoice' ? 'Invoice Total' : doc.type === 'salesorder' ? 'Sales Order Total' : 'Quote Total'}</span>
             <span className="font-semibold">{fmtPrice(invoiceTotal)}</span>
           </div>
           {clientCreditBalance > 0 && (
@@ -2455,7 +2455,7 @@ function PaymentModal({
             <input type="number" min={0} step="0.01" value={paymentForm.amountReceived} onChange={e => set('amountReceived', e.target.value)} placeholder="0.00" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1.5">
-            <div className="flex justify-between"><span className="text-gray-500">Invoice Total</span><span className="font-medium">{fmtPrice(invoiceTotal)}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">{doc.type === 'invoice' ? 'Invoice Total' : doc.type === 'salesorder' ? 'Sales Order Total' : 'Quote Total'}</span><span className="font-medium">{fmtPrice(invoiceTotal)}</span></div>
             {creditApplied > 0 && <div className="flex justify-between text-green-600"><span>Credit Applied</span><span>-{fmtPrice(creditApplied)}</span></div>}
             <div className="flex justify-between border-t border-gray-200 pt-1.5"><span className="text-gray-500">Balance Due</span><span className="font-semibold">{fmtPrice(balanceDue)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Amount Received</span><span className="font-medium">{fmtPrice(amountReceived)}</span></div>
@@ -3899,13 +3899,13 @@ export default function OrdersPage() {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <ActionsDropdown items={[
-                            ...(doc.type === 'invoice' ? [{
+                            {
                               label: isPartiallyPaid ? `Record Payment (Due ${fmtPrice(docBalance)})` : 'Record Payment',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>,
                               className: isPartiallyPaid ? 'text-red-600 font-semibold' : (amtPaid > 0 || doc.status === 'paid' ? 'text-green-600 font-semibold' : 'text-blue-600'),
                               onClick: () => handleRecordPayment(doc),
-                            }] : []),
-                            ...(doc.type === 'invoice' && doc.status !== 'paid' ? [{
+                            },
+                            ...(doc.status !== 'paid' && doc.status !== 'archived' ? [{
                               label: 'Mark as Paid',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
                               className: 'text-green-600',

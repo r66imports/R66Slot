@@ -89,6 +89,7 @@ export async function PUT(
 
     const pageIds: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : [])
 
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS pre_order_price NUMERIC`).catch(() => {})
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS auction_reserve_price NUMERIC`).catch(() => {})
 
     const result = await db.query(`
