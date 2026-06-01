@@ -475,6 +475,7 @@ export default function ProductsPage() {
   const [fixingDupes, setFixingDupes] = useState(false)
   const [viewMode, setViewMode] = useState<'brands' | 'products'>('brands')
   const [groupBy, setGroupBy] = useState<'brand' | 'supplier'>('brand')
+  const [brandSummary, setBrandSummary] = useState<Array<{ brand: string; supplier: string; count: number }>>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const colPickerRef = useRef<HTMLDivElement>(null)
   const brandDropdownRef = useRef<HTMLDivElement>(null)
@@ -536,8 +537,12 @@ export default function ProductsPage() {
     const brand = new URLSearchParams(window.location.search).get('brand') || ''
     setUrlBrand(brand)
     setBrandFilter(brand)
-    if (brand) setViewMode('products')
-    fetchProducts('')  // always load all products so brand grid has accurate counts
+    if (brand) {
+      setViewMode('products')
+      fetchProducts(brand)
+    } else {
+      fetchBrandSummary()
+    }
     fetch('/api/admin/categories')
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setCategories(data) })
@@ -562,6 +567,18 @@ export default function ProductsPage() {
       }
     }).catch(() => {})
   }, [])
+
+  const fetchBrandSummary = async () => {
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/admin/products?summary=1')
+      if (res.ok) setBrandSummary(await res.json())
+    } catch (err) {
+      console.error('Error fetching brand summary:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const fetchProducts = async (brand = '') => {
     setIsLoading(true)
@@ -866,7 +883,8 @@ export default function ProductsPage() {
         alert(`Import complete: ${parts.join(', ')} product${(data.imported + data.updated) !== 1 ? 's' : ''}`)
         setShowImportModal(false)
         setImportText('')
-        fetchProducts(urlBrand)
+        setViewMode('brands')
+        fetchBrandSummary()
       } else {
         alert(`Import failed: ${data.error || 'Unknown error'}`)
       }
@@ -889,15 +907,14 @@ export default function ProductsPage() {
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
   const allRevoParts = Array.from(new Set(products.flatMap((p) => p.itemCategories || []))).sort()
 
-  // Brand/supplier grid groups
+  // Brand/supplier grid groups — built from lightweight summary (not full product list)
   const brandGroups = (() => {
     const groups: Record<string, number> = {}
     let unsortedCount = 0
-    for (const p of products) {
-      if (!p.brand?.trim() && p.status === 'draft') continue
-      const key = groupBy === 'brand' ? (p.brand || '').trim() : (p.supplier || '').trim()
-      if (!key) unsortedCount++
-      else groups[key] = (groups[key] || 0) + 1
+    for (const row of brandSummary) {
+      const key = groupBy === 'brand' ? (row.brand || '').trim() : (row.supplier || '').trim()
+      if (!key) unsortedCount += row.count
+      else groups[key] = (groups[key] || 0) + row.count
     }
     return { groups, unsortedCount }
   })()
@@ -976,7 +993,7 @@ export default function ProductsPage() {
             <>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => { setViewMode('brands'); setBrandFilter(''); setSupplierFilter(''); setSearchQuery('') }}
+                  onClick={() => { setViewMode('brands'); setBrandFilter(''); setSupplierFilter(''); setSearchQuery(''); fetchBrandSummary() }}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1045,6 +1062,9 @@ export default function ProductsPage() {
                   if (groupBy === 'supplier') {
                     const sup = suppliers.find((s) => s.name?.toLowerCase() === name.toLowerCase())
                     setSupplierFilter(sup?.id || '')
+                    fetchProducts('')
+                  } else {
+                    fetchProducts(name)
                   }
                   setViewMode('products')
                 }}
@@ -1056,7 +1076,7 @@ export default function ProductsPage() {
             ))}
           {brandGroups.unsortedCount > 0 && (
             <button
-              onClick={() => { setBrandFilter('__unsorted__'); setViewMode('products') }}
+              onClick={() => { setBrandFilter('__unsorted__'); fetchProducts(''); setViewMode('products') }}
               className="flex flex-col items-start gap-1 p-4 bg-gray-50 border border-dashed border-gray-300 rounded-xl hover:border-gray-400 transition-all text-left"
             >
               <span className="font-semibold text-gray-500 text-sm">Unsorted Items</span>

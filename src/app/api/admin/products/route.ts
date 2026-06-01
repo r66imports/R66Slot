@@ -126,6 +126,12 @@ export async function GET(request: Request) {
 
     const cache = { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } }
 
+    // Summary mode — returns brand/supplier group counts only (for brand grid)
+    if (searchParams.get('summary') === '1') {
+      const result = await db.query(`SELECT brand, supplier, COUNT(*) as count FROM products WHERE status != 'archived' GROUP BY brand, supplier ORDER BY brand ASC`)
+      return NextResponse.json(result.rows.map(r => ({ brand: r.brand || '', supplier: r.supplier || '', count: parseInt(r.count) })), cache)
+    }
+
     // Lightweight mode — only return requested columns (avoids SELECT * on large tables)
     if (fields) {
       const allowed = new Set(['sku', 'cost_per_item', 'id', 'title', 'price', 'quantity', 'status', 'brand'])
