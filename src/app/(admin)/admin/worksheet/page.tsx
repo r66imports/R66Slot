@@ -280,17 +280,17 @@ function WorksheetEditor({
   }, [supplier, suppliers])
 
   // ── Backfill retailPrice/inStock when products load ──
+  // inStock always reflects live DB quantity so manual inventory fixes are visible
   useEffect(() => {
     if (products.length === 0) return
     setItems((prev) => prev.map((it) => {
-      if (it.retailPrice > 0 && it.inStock > 0) return it
       const prod = products.find((p) => p.sku === it.sku)
       if (!prod) return it
       return {
         ...it,
         retailPrice: it.retailPrice || prod.price,
         preOrderPrice: it.preOrderPrice || prod.preOrderPrice || 0,
-        inStock: it.inStock || prod.quantity,
+        inStock: prod.quantity,
       }
     }))
   }, [products])
@@ -470,7 +470,8 @@ function WorksheetEditor({
   }
 
   async function sendToInventory() {
-    const toSend = items.filter((it) => checkedItems.has(it.id) && it.sku && it.qty > 0)
+    // Exclude items already sent — prevents double-update on re-click
+    const toSend = items.filter((it) => checkedItems.has(it.id) && it.sku && it.qty > 0 && !it.sentToInventory)
     if (!toSend.length) return
 
     const newSkus: NewSkuRow[] = []
@@ -510,7 +511,7 @@ function WorksheetEditor({
           const res = await fetch(`/api/admin/products/${prod.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ quantity: (prod.quantity ?? 0) + it.qty }),
+            body: JSON.stringify({ quantity: it.qty }),
           })
           if (!res.ok) {
             const msg = await res.text().catch(() => res.status.toString())
@@ -520,8 +521,15 @@ function WorksheetEditor({
           }
         }
         if (sentIds.length > 0) {
-          setItems((prev) => prev.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it))
+          const updatedItems = items.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it)
+          setItems(updatedItems)
           setCheckedItems((prev) => { const next = new Set(prev); sentIds.forEach((id) => next.delete(id)); return next })
+          // Auto-save so sentToInventory flag persists across reloads (prevents double-update)
+          await fetch('/api/admin/worksheets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...currentSheetData(), items: updatedItems.map((it) => ({ ...it, skuSearch: '' })) }),
+          }).catch(() => {})
           setInventorySent(true)
           setTimeout(() => setInventorySent(false), 3000)
         }
