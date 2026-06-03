@@ -226,7 +226,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Row 2: Horizontal nav */}
-          <nav className="px-1 flex items-stretch h-10 overflow-x-auto scrollbar-none">
+          <nav className="px-1 flex items-stretch h-10">
             {NAV.map((group) => {
               const isOpen = openMenu === group.label
               const groupActive = group.href
@@ -280,7 +280,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </button>
 
                   {isOpen && (
-                    <div className="absolute top-full left-0 min-w-[190px] bg-white border border-gray-200 shadow-xl z-50 py-1 rounded-b-lg overflow-hidden">
+                    <div className="absolute top-full left-0 min-w-[190px] bg-white border border-gray-200 shadow-xl z-50 py-1 rounded-b-lg" onClick={() => setOpenMenu(null)}>
                       {(group.items ?? [])
                         .filter((i) => {
                           if (i.isModal) return true
