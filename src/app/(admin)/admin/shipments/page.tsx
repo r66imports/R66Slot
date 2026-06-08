@@ -152,12 +152,14 @@ function ConfigurableDropdown({
   onSelect,
   onOptionsChange,
   placeholder = '—',
+  onDoubleClick,
 }: {
   value: string
   options: DropdownOption[]
   onSelect: (v: string) => void
   onOptionsChange: (opts: DropdownOption[]) => void
   placeholder?: string
+  onDoubleClick?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [dropPos, setDropPos] = useState({ top: 0, left: 0 })
@@ -209,11 +211,13 @@ function ConfigurableDropdown({
       <button
         ref={btnRef}
         onClick={handleOpen}
+        onDoubleClick={(e) => { e.stopPropagation(); setOpen(false); onDoubleClick?.() }}
+        title={onDoubleClick ? 'Click to pick · Double-click to type custom' : undefined}
         className={`min-w-[90px] text-xs font-semibold px-2 py-1 rounded-lg text-left whitespace-nowrap ${
-          selected ? pill(selected.color) : 'text-gray-400 bg-transparent'
+          selected ? pill(selected.color) : value ? 'text-gray-600 bg-gray-100 border border-gray-200' : 'text-gray-400 bg-transparent'
         }`}
       >
-        {selected ? selected.label : placeholder}
+        {selected ? selected.label : value || placeholder}
       </button>
 
       {open && (
@@ -375,6 +379,7 @@ export default function ShipmentLogPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [clientPopup, setClientPopup] = useState<Contact | null>(null)
   const [loading, setLoading] = useState(true)
+  const [boxFreeMode, setBoxFreeMode] = useState<Record<string, boolean>>({})
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const optSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -599,13 +604,29 @@ export default function ShipmentLogPage() {
                       </td>
 
                       <td className="py-2 px-2">
-                        <ConfigurableDropdown
-                          value={row.boxSize}
-                          options={options.boxSizes}
-                          onSelect={(v) => updateRow(row.id, 'boxSize', v)}
-                          onOptionsChange={(opts) => updateOptions('boxSizes', opts)}
-                          placeholder="Size"
-                        />
+                        {boxFreeMode[row.id] ? (
+                          <input
+                            autoFocus
+                            value={row.boxSize}
+                            onChange={(e) => updateRow(row.id, 'boxSize', e.target.value)}
+                            onBlur={() => setBoxFreeMode((p) => ({ ...p, [row.id]: false }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === 'Escape')
+                                setBoxFreeMode((p) => ({ ...p, [row.id]: false }))
+                            }}
+                            className="w-20 text-xs border border-indigo-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                            placeholder="Box size…"
+                          />
+                        ) : (
+                          <ConfigurableDropdown
+                            value={row.boxSize}
+                            options={options.boxSizes}
+                            onSelect={(v) => updateRow(row.id, 'boxSize', v)}
+                            onOptionsChange={(opts) => updateOptions('boxSizes', opts)}
+                            placeholder="Size"
+                            onDoubleClick={() => setBoxFreeMode((p) => ({ ...p, [row.id]: true }))}
+                          />
+                        )}
                       </td>
 
                       <td className="py-2 px-2">
