@@ -99,6 +99,7 @@ export default function CustomerPaymentsPage() {
   })
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -183,6 +184,44 @@ export default function CustomerPaymentsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleDeletePayment = async (doc: Invoice) => {
+    if (!confirm(`Clear all payment data for ${doc.docNumber} (${doc.clientName})?\n\nThis will remove the recorded payment. The invoice itself stays intact.`)) return
+    setDeletingId(doc.id)
+    try {
+      const prevCredit = doc.creditApplied || 0
+      await fetch(`/api/admin/orders/documents/${doc.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountPaid: 0,
+          paymentMethod: '',
+          paymentMethod2: '',
+          paymentMethod1Amount: 0,
+          paymentMethod2Amount: 0,
+          creditApplied: 0,
+          overpaymentCredit: 0,
+        }),
+      })
+      // Return any previously applied credit back to the customer's balance
+      if (prevCredit > 0.005) {
+        await fetch('/api/admin/customer-credits', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'record_payment',
+            clientName: doc.clientName,
+            invoiceNumber: doc.docNumber,
+            amountPaid: 0,
+            creditApplied: 0,
+            overpayment: prevCredit,
+          }),
+        }).catch(() => {})
+      }
+      await load()
+    } catch {}
+    setDeletingId(null)
   }
 
   const handleSort = (field: SortField) => {
@@ -428,12 +467,23 @@ export default function CustomerPaymentsPage() {
                       </td>
                       <td className="px-3 py-2 text-gray-500 text-xs max-w-[110px] truncate">{method || <span className="text-gray-300">—</span>}</td>
                       <td className="px-3 py-2">
-                        <button
-                          onClick={() => openEdit(doc)}
-                          className="px-2.5 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 font-semibold transition-colors"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => openEdit(doc)}
+                            className="px-2.5 py-1 text-xs bg-blue-50 text-blue-600 border border-blue-200 rounded hover:bg-blue-100 font-semibold transition-colors"
+                          >
+                            Edit
+                          </button>
+                          {totalSettled(doc) > 0.005 && (
+                            <button
+                              onClick={() => handleDeletePayment(doc)}
+                              disabled={deletingId === doc.id}
+                              className="px-2.5 py-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 font-semibold transition-colors disabled:opacity-40"
+                            >
+                              {deletingId === doc.id ? '…' : 'Delete'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
