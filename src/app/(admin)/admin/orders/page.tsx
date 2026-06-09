@@ -1184,6 +1184,26 @@ function CreateDocumentModal({
       .catch(() => {})
   }, [])
 
+  // Seed credit state when editing an existing invoice that already has creditApplied
+  useEffect(() => {
+    if (!editDoc || isQuote) return
+    const existingCredit = (editDoc as any).creditApplied || 0
+    const clientKey = (editDoc as any).clientName?.trim()?.toLowerCase()?.replace(/\s+/g, '_')
+    if (!clientKey) return
+    fetch(`/api/admin/customer-credits/${clientKey}`)
+      .then(r => r.ok ? r.json() : { balance: 0 })
+      .then(data => {
+        const balance = data.balance ?? 0
+        setAvailableCredit(balance + existingCredit)
+        if (existingCredit > 0) {
+          setUseCredit(true)
+          setCreditInput(String(existingCredit))
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-generate next quote number (QR660001 format) for new quotes only
   useEffect(() => {
     if (editDoc || docType !== 'quote') return
@@ -1296,12 +1316,14 @@ function CreateDocumentModal({
             })
           }))
         }
-        // Record credit application in the credit store
-        if (creditAppliedAmt > 0) {
+        // Record credit delta in the credit store (delta vs. what was previously applied)
+        const prevCredit = editDoc ? ((editDoc as any).creditApplied || 0) : 0
+        const creditDelta = creditAppliedAmt - prevCredit
+        if (creditDelta !== 0) {
           fetch('/api/admin/customer-credits', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'record_payment', clientName: form.clientName, invoiceNumber: savedDoc.docNumber, amountPaid: 0, creditApplied: creditAppliedAmt, overpayment: 0 }),
+            body: JSON.stringify({ action: 'record_payment', clientName: form.clientName, invoiceNumber: savedDoc.docNumber, amountPaid: 0, creditApplied: creditDelta > 0 ? creditDelta : 0, overpayment: creditDelta < 0 ? -creditDelta : 0 }),
           }).catch(() => {})
         }
         onCreated(savedDoc)
