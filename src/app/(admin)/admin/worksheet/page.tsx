@@ -361,6 +361,7 @@ function WorksheetEditor({
               description: '',
               price: retailZAR,
               cost_per_item: finalLanded,
+              compareAtPrice: finalLanded,
               quantity: 0,
               status: 'active',
               categoryBrands: it.category ? [it.category] : [],
@@ -379,7 +380,7 @@ function WorksheetEditor({
         // Existing product — update all applicable fields, quantity untouched
         const patch: Record<string, any> = {}
         if (it.description) patch.title = it.description
-        if (finalLanded > 0) patch.costPerItem = finalLanded
+        if (finalLanded > 0) { patch.costPerItem = finalLanded; patch.compareAtPrice = finalLanded }
         if (retailZAR > 0) patch.price = retailZAR
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
         if (it.category) patch.categoryBrands = [it.category]
@@ -1806,7 +1807,7 @@ function WorksheetEditor({
               }`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              {costsUpdated ? '✓ Inventory Updated!' : updatingCosts ? 'Updating…' : 'Update Inventory'}
+              {costsUpdated ? '✓ Costing Updated!' : updatingCosts ? 'Updating…' : 'Update Costing'}
             </button>
             <button
               onClick={() => setShowSupplierOrderModal(true)}
