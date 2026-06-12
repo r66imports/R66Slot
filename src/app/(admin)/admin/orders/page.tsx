@@ -2430,7 +2430,9 @@ function PaymentModal({
   const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
   const existingAmountPaid = (doc as any).amountPaid || 0
   const existingCreditApplied = (doc as any).creditApplied || 0
-  const existingSettled = existingAmountPaid + existingCreditApplied + ((doc as any).depositPaid || 0)
+  // depositPaid is often already folded into amountPaid once a deposit has been recorded
+  // as a payment — take whichever is larger so the deposit isn't counted twice.
+  const existingSettled = Math.max(existingAmountPaid, (doc as any).depositPaid || 0) + existingCreditApplied
   const creditApplied = paymentForm.useCredit
     ? Math.min(clientCreditBalance, parseFloat(paymentForm.creditApplied) || clientCreditBalance)
     : 0
