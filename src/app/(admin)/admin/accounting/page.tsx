@@ -26,6 +26,7 @@ interface OrderDoc {
   depositPaid?: number
   creditApplied?: number
   amountPaid?: number
+  bankAccountId?: string
   createdAt: string
 }
 
@@ -208,6 +209,29 @@ export default function AccountingPage() {
               <p className="text-xs text-gray-400 mt-1">from invoices</p>
             </div>
           </div>
+
+          {/* Total Sales by Account */}
+          {accounts.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-700">Total Sales by Account</h2>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 p-5">
+                {accounts.map(acc => {
+                  const accInvoices = periodInvoices.filter(d => d.bankAccountId === acc.id)
+                  const total = accInvoices.reduce((s, d) => s + docSubtotal(d), 0)
+                  const paid = accInvoices.reduce((s, d) => s + (d.amountPaid ?? (d.status === 'paid' ? docSubtotal(d) : 0)), 0)
+                  return (
+                    <div key={acc.id} className="border border-gray-200 rounded-xl p-4">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{acc.accountName || acc.companyName}</p>
+                      <p className="text-xl font-bold text-gray-900">{fmt(total)}</p>
+                      <p className="text-xs text-gray-400 mt-1">{accInvoices.length} invoice{accInvoices.length !== 1 ? 's' : ''} · {fmt(paid)} paid</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Document counts */}
           <div className="grid grid-cols-3 gap-4">
