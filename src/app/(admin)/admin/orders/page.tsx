@@ -2428,10 +2428,13 @@ function PaymentModal({
   const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
   const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
   const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
+  const existingAmountPaid = (doc as any).amountPaid || 0
+  const existingCreditApplied = (doc as any).creditApplied || 0
+  const existingSettled = existingAmountPaid + existingCreditApplied + ((doc as any).depositPaid || 0)
   const creditApplied = paymentForm.useCredit
     ? Math.min(clientCreditBalance, parseFloat(paymentForm.creditApplied) || clientCreditBalance)
     : 0
-  const balanceDue = Math.max(0, invoiceTotal - creditApplied)
+  const balanceDue = Math.max(0, invoiceTotal - existingSettled - creditApplied)
   const amountReceived = parseFloat(paymentForm.amountReceived) || 0
   const overpayment = Math.max(0, amountReceived - balanceDue)
   const shortfall = Math.max(0, balanceDue - amountReceived)
@@ -2478,7 +2481,8 @@ function PaymentModal({
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1.5">
             <div className="flex justify-between"><span className="text-gray-500">{doc.type === 'invoice' ? 'Invoice Total' : doc.type === 'salesorder' ? 'Sales Order Total' : 'Quote Total'}</span><span className="font-medium">{fmtPrice(invoiceTotal)}</span></div>
-            {creditApplied > 0 && <div className="flex justify-between text-green-600"><span>Credit Applied</span><span>-{fmtPrice(creditApplied)}</span></div>}
+            {existingSettled > 0.005 && <div className="flex justify-between text-green-600"><span>Already Paid</span><span>-{fmtPrice(existingSettled)}</span></div>}
+            {creditApplied > 0 && <div className="flex justify-between text-green-600"><span>Credit Applied (this payment)</span><span>-{fmtPrice(creditApplied)}</span></div>}
             <div className="flex justify-between border-t border-gray-200 pt-1.5"><span className="text-gray-500">Balance Due</span><span className="font-semibold">{fmtPrice(balanceDue)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Amount Received</span><span className="font-medium">{fmtPrice(amountReceived)}</span></div>
           </div>
@@ -2972,17 +2976,26 @@ export default function OrdersPage() {
     const subtotal = paymentModal.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
     const discountAmt = subtotal * ((paymentModal as any).discountPct || 0) / 100
     const invoiceTotal = subtotal - discountAmt + ((paymentModal as any).shippingCost || 0)
-    const fullySettled = result.amountPaid + result.creditApplied >= invoiceTotal - 0.005
+    // Accumulate onto any previously recorded payments/credits — multiple part-payments must add up, not overwrite
+    const newAmountPaid = ((paymentModal as any).amountPaid || 0) + result.amountPaid
+    const newCreditApplied = ((paymentModal as any).creditApplied || 0) + result.creditApplied
+    const newOverpaymentCredit = ((paymentModal as any).overpaymentCredit || 0) + result.overpaymentCredit
+    const fullySettled = newAmountPaid + newCreditApplied + ((paymentModal as any).depositPaid || 0) >= invoiceTotal - 0.005
+    const payments = [
+      ...((paymentModal as any).payments || []),
+      { date: new Date().toISOString(), amountPaid: result.amountPaid, creditApplied: result.creditApplied, paymentMethod: result.paymentMethod, notes: result.notes },
+    ]
     const patchRes = await fetch(`/api/admin/orders/documents/${paymentModal.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        amountPaid: result.amountPaid,
-        creditApplied: result.creditApplied,
-        overpaymentCredit: result.overpaymentCredit,
+        amountPaid: newAmountPaid,
+        creditApplied: newCreditApplied,
+        overpaymentCredit: newOverpaymentCredit,
         showCreditOnInvoice: result.showCreditOnInvoice,
         paymentMethod: result.paymentMethod,
         notes: result.notes || (paymentModal as any).notes || '',
+        payments,
         ...(fullySettled ? { status: 'paid' } : {}),
         ...((paymentModal as any).status === 'complete' ? { autoArchiveAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() } : {}),
       }),
