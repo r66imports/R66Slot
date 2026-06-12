@@ -189,6 +189,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       items: [
         { name: 'Site Settings', href: '/admin/settings' },
         { name: 'Site Rules', href: '/admin/settings/site-rules' },
+        { name: 'Prompts', href: '/admin/settings/prompts' },
         { name: 'User Accounts', href: '/admin/settings/users', adminOnly: true },
         { name: 'My Account', href: '/admin/account' },
       ],
