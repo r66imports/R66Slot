@@ -400,6 +400,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Admin Invoices', 'Customer Payments', 'Customer Account'],
     category: 'Invoices',
   },
+  {
+    id: 'payments_carry_over_and_consistent_output',
+    name: 'Rule 45 — Payments Carry Over on Conversion & Match Across View/Print/Download/Email',
+    description: `(1) Carry-over on conversion: when a Quote is converted to a Sales Order or Invoice ("Send to Invoice" / "Send to Sales Order"), any amountPaid, creditApplied, overpaymentCredit, payments[] history and depositPaid already recorded against the source Quote (via Record Payment) are copied onto the new document so deposits/payments taken on the quote are immediately reflected — they are never lost or re-requested. (2) No manual deposit/payment entry: the Create/Edit Quote, Sales Order and Invoice modal has no manual "Deposit Paid" or payment-amount input for standard documents — Amount Paid, Credit Applied and Balance Due are read-only, sourced entirely from Record Payment (Rule 44). The only exception is Pre-Order Deposit quotes (preOrderDeposit flag), where the deposit amount is auto-computed from Deposit % — that feature is unrelated and untouched. (3) Consistent output everywhere: the View modal, Print, Print & Email, Email, and Download (PDF) for a document must all show the same Amount Paid, Credit Applied and Balance Due (or omit them and show "PAID IN FULL" / no balance row when fully settled) — computed from the same fields (amountPaid, creditApplied, depositPaid) using the same "whichever is larger of amountPaid/depositPaid, plus creditApplied" rule to avoid double-counting a deposit that has since been folded into amountPaid via Record Payment. If a future field is added to the totals block, it must be added to all four output paths (generateDocHTML for view/print, doEmail, doDownload/PDF, and the React preview) — not just one.`,
+    active: true,
+    appliesTo: ['Admin Invoices', 'Customer Payments', 'Customer Account'],
+    category: 'Invoices',
+  },
 ]
 
 export async function GET() {

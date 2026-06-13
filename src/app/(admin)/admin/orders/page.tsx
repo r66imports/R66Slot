@@ -218,7 +218,8 @@ function docTotal(doc: OrderDocument) {
 }
 function docBalanceDue(doc: OrderDocument) {
   const total = docTotal(doc)
-  const settled = ((doc as any).amountPaid || 0) + ((doc as any).creditApplied || 0) + ((doc as any).depositPaid || 0)
+  // depositPaid is often already folded into amountPaid once recorded as a payment — take whichever is larger so it isn't counted twice
+  const settled = Math.max((doc as any).amountPaid || 0, (doc as any).depositPaid || 0) + ((doc as any).creditApplied || 0)
   return Math.max(0, total - settled)
 }
 // Extract SKU and description from a line item description string.
@@ -470,7 +471,8 @@ function DocumentBody({
               </div>
             )}
             {(() => {
-              const remaining = total - deposit - (data.creditApplied || 0) - (data.amountPaid || 0)
+              // deposit is often already folded into amountPaid once recorded as a payment — take whichever is larger so it isn't counted twice
+              const remaining = total - Math.max(deposit, data.amountPaid || 0) - (data.creditApplied || 0)
               return remaining > 0.005 ? (
                 <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
                   <span>BALANCE DUE</span>
@@ -1838,6 +1840,10 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   const total = subtotal - discountAmt + shippingHTML
   const depositHTML = data.depositPaid || 0
   const balanceDueHTML = total - depositHTML
+  const creditAppliedHTML = data.creditApplied || 0
+  const amountPaidHTML = data.amountPaid || 0
+  // depositHTML is often already folded into amountPaidHTML once recorded as a payment — take whichever is larger so it isn't counted twice
+  const remainingHTML = total - Math.max(depositHTML, amountPaidHTML) - creditAppliedHTML
   const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
   const logoUrlHTML = normalizeMediaUrl(template.logoUrl || '')
 
@@ -1933,13 +1939,14 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
       ${depositHTML > 0 ? `
       <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Deposit Paid</span><span style="font-weight:500;color:#16a34a">-${fmtPrice(depositHTML)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>BALANCE DUE</span><span>${fmtPrice(balanceDueHTML)}</span></div>
       ` : ''}
+      ${creditAppliedHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #d1fae5"><span style="color:#16a34a;font-weight:600">Credit Applied</span><span style="color:#16a34a;font-weight:600">-${fmtPrice(creditAppliedHTML)}</span></div>` : ''}
+      ${amountPaidHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #dbeafe"><span style="color:#2563eb;font-weight:600">Amount Paid</span><span style="color:#2563eb;font-weight:600">-${fmtPrice(amountPaidHTML)}</span></div>` : ''}
+      ${remainingHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>BALANCE DUE</span><span>${fmtPrice(remainingHTML)}</span></div>` : ''}
       `}
     </div>
   </div>
   ${(data.shippingMethod || data.trackingNumber) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${data.shippingMethod ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Shipping:</span><span style="font-size:12px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:2px 10px;border-radius:99px">${data.shippingMethod}</span>` : ''}${data.trackingNumber ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-left:8px">Tracking:</span><span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;font-family:monospace;padding:2px 10px;border-radius:99px">${data.trackingNumber}</span>` : ''}</div>` : ''}
-  ${(data.paymentMethod || data.paymentMethod2) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px"><span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Payment:</span>${data.paymentMethod ? `<span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}${data.paymentMethod}</span>` : ''}${data.paymentMethod2 ? `<span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;padding:2px 10px;border-radius:99px">${data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}${data.paymentMethod2}</span>` : ''}</div>` : ''}
   ${data.notes ? `<div style="margin-bottom:16px;padding:12px;background:#f9fafb;border-radius:8px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Notes</div><div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.notes}</div></div>` : ''}
   ${bankHTML}
   ${data.terms ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">Terms &amp; Conditions</div><div style="font-size:12px;color:#6b7280;white-space:pre-line">${data.terms}</div></div>` : ''}
@@ -1987,7 +1994,11 @@ function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount
     ...(shippingEmail > 0 ? [`Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}:  ${fmtPrice(shippingEmail)}`] : []),
     ...((data as any).preOrderDeposit && (data.depositPaid || 0) > 0
       ? [`Full Order Total:  ${fmtPrice(total)}`, `DEPOSIT DUE:  ${fmtPrice(data.depositPaid)}`, `BALANCE ON DELIVERY:  ${fmtPrice(total - (data.depositPaid || 0))}`]
-      : [`TOTAL:  ${fmtPrice(total)}`, ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : [])]),
+      : [`TOTAL:  ${fmtPrice(total)}`,
+         ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`] : []),
+         ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
+         ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
+         ...((total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`BALANCE DUE:  ${fmtPrice(total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0))}`] : [])]),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
     banking,
@@ -2134,6 +2145,51 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   y = toY + 8
 
   // ── Line items table ─────────────────────────────────────────────────────────
+  const creditAppliedPDF = data.creditApplied || 0
+  const amountPaidPDF = data.amountPaid || 0
+  const depositPDF = data.depositPaid || 0
+  const isPreOrderPDF = !!(data as any).preOrderDeposit && depositPDF > 0
+  const balanceOnDeliveryAmt = total - depositPDF
+  // depositPDF is often already folded into amountPaidPDF once recorded as a payment — take whichever is larger so it isn't counted twice
+  const remainingPDF = total - Math.max(depositPDF, amountPaidPDF) - creditAppliedPDF
+
+  const footRows: (string | number)[][] = []
+  let subtotalIdx = -1, discountIdx = -1, shippingIdx = -1
+  if ((data.discountPct || 0) > 0 || shippingPDF > 0) { footRows.push(['', '', '', '', 'Subtotal', fmtPrice(subtotal)]); subtotalIdx = footRows.length - 1 }
+  if ((data.discountPct || 0) > 0) { footRows.push(['', '', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`]); discountIdx = footRows.length - 1 }
+  if (shippingPDF > 0) { footRows.push(['', '', '', '', `Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF)]); shippingIdx = footRows.length - 1 }
+
+  let totalIdx = -1, balanceArrivalIdx = -1, depositNoteIdx = -1, creditIdx = -1, amountPaidIdx = -1, balanceDueIdx = -1
+  if (isPreOrderPDF) {
+    footRows.push(['', '', '', '', 'Full Order Total', fmtPrice(total)])
+    totalIdx = footRows.length - 1
+    footRows.push(['', '', '', '', 'DEPOSIT DUE', fmtPrice(depositPDF)])
+    depositNoteIdx = footRows.length - 1
+    if (balanceOnDeliveryAmt > 0.005) {
+      footRows.push(['', '', '', '', 'BALANCE ON DELIVERY', fmtPrice(balanceOnDeliveryAmt)])
+      balanceArrivalIdx = footRows.length - 1
+    }
+  } else {
+    footRows.push(['', '', '', '', 'TOTAL', fmtPrice(total)])
+    totalIdx = footRows.length - 1
+    if (depositPDF > 0) {
+      footRows.push(['', '', '', '', 'Deposit Paid', `-${fmtPrice(depositPDF)}`])
+      depositNoteIdx = footRows.length - 1
+    }
+    if (creditAppliedPDF > 0) {
+      footRows.push(['', '', '', '', 'Credit Applied', `-${fmtPrice(creditAppliedPDF)}`])
+      creditIdx = footRows.length - 1
+    }
+    if (amountPaidPDF > 0) {
+      footRows.push(['', '', '', '', 'Amount Paid', `-${fmtPrice(amountPaidPDF)}`])
+      amountPaidIdx = footRows.length - 1
+    }
+    if (remainingPDF > 0.005) {
+      footRows.push(['', '', '', '', 'BALANCE DUE', fmtPrice(remainingPDF)])
+      balanceDueIdx = footRows.length - 1
+    }
+  }
+
   autoTable(doc, {
     startY: y,
     head: [['#', 'SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
@@ -2141,28 +2197,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
       const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
       return [i + 1, liSku || '—', liTitle, li.qty, fmtPrice(li.unitPrice), fmtPrice(li.qty * li.unitPrice)]
     }),
-    foot: [
-      ...((data.discountPct || 0) > 0 || shippingPDF > 0 ? [
-        ['', '', '', '', 'Subtotal', fmtPrice(subtotal)],
-      ] : []),
-      ...((data.discountPct || 0) > 0 ? [
-        ['', '', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`],
-      ] : []),
-      ...(shippingPDF > 0 ? [
-        ['', '', '', '', `Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF)],
-      ] : []),
-      ...((data as any).preOrderDeposit && (data.depositPaid || 0) > 0 ? [
-        ['', '', '', '', 'Full Order Total', fmtPrice(total)],
-        ['', '', '', '', 'DEPOSIT DUE', fmtPrice(data.depositPaid || 0)],
-        ['', '', '', '', 'BALANCE ON DELIVERY', fmtPrice(total - (data.depositPaid || 0))],
-      ] : [
-        ['', '', '', '', 'TOTAL', fmtPrice(total)],
-        ...((data.depositPaid || 0) > 0 ? [
-          ['', '', '', '', 'Deposit Paid', `-${fmtPrice(data.depositPaid || 0)}`],
-          ['', '', '', '', 'BALANCE DUE', fmtPrice(total - (data.depositPaid || 0))],
-        ] : []),
-      ]),
-    ],
+    foot: footRows,
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
     bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
     footStyles: { fontSize: 8.5, textColor: [80, 80, 80], fillColor: [255, 255, 255] },
@@ -2177,27 +2212,17 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
     },
     margin: { left: margin, right: margin },
     didParseCell(hookData) {
-      const hasSubtotal = (data.discountPct || 0) > 0 || shippingPDF > 0
-      const hasDiscount = (data.discountPct || 0) > 0
-      const hasShipping = shippingPDF > 0
-      const subtotalIdx = 0
-      const discountIdx = hasSubtotal ? 1 : 0
-      const shippingIdx = (hasSubtotal ? 1 : 0) + (hasDiscount ? 1 : 0)
-      const preRows = (hasSubtotal ? 1 : 0) + (hasDiscount ? 1 : 0) + (hasShipping ? 1 : 0)
-      const footLen = preRows + 1 + ((data.depositPaid || 0) > 0 ? 2 : 0)
-      const totalIdx = preRows
-      const balanceIdx = (data.depositPaid || 0) > 0 ? footLen - 1 : -1
       if (hookData.section !== 'foot') return
       // Subtotal row — grey text
-      if (hasSubtotal && hookData.row.index === subtotalIdx) {
+      if (hookData.row.index === subtotalIdx) {
         hookData.cell.styles.textColor = [107, 114, 128]
       }
       // Discount row — red text
-      if (hasDiscount && hookData.row.index === discountIdx) {
+      if (hookData.row.index === discountIdx) {
         hookData.cell.styles.textColor = [239, 68, 68]
       }
       // Shipping row — grey text
-      if (hasShipping && hookData.row.index === shippingIdx) {
+      if (hookData.row.index === shippingIdx) {
         hookData.cell.styles.textColor = [107, 114, 128]
       }
       // TOTAL row — dark fill, white text
@@ -2206,8 +2231,29 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
       }
-      // BALANCE DUE row — orange fill, white text
-      if (hookData.row.index === balanceIdx) {
+      // BALANCE ON DELIVERY / BALANCE DUE ON ARRIVAL row — orange fill, white text
+      if (balanceArrivalIdx >= 0 && hookData.row.index === balanceArrivalIdx) {
+        hookData.cell.styles.fillColor = [234, 88, 12]
+        hookData.cell.styles.textColor = [255, 255, 255]
+        hookData.cell.styles.fontStyle = 'bold'
+      }
+      // Deposit Paid / DEPOSIT DUE note — grey text, normal weight
+      if (depositNoteIdx >= 0 && hookData.row.index === depositNoteIdx) {
+        hookData.cell.styles.textColor = [107, 114, 128]
+        hookData.cell.styles.fontStyle = 'normal'
+      }
+      // Credit Applied — green text
+      if (creditIdx >= 0 && hookData.row.index === creditIdx) {
+        hookData.cell.styles.textColor = [22, 163, 74]
+        hookData.cell.styles.fontStyle = 'bold'
+      }
+      // Amount Paid — blue text
+      if (amountPaidIdx >= 0 && hookData.row.index === amountPaidIdx) {
+        hookData.cell.styles.textColor = [37, 99, 235]
+        hookData.cell.styles.fontStyle = 'bold'
+      }
+      // BALANCE DUE — orange fill, white text
+      if (balanceDueIdx >= 0 && hookData.row.index === balanceDueIdx) {
         hookData.cell.styles.fillColor = [234, 88, 12]
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
