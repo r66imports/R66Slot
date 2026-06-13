@@ -392,6 +392,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Pre-Order Dashboard'],
     category: 'Admin UI',
   },
+  {
+    id: 'payments_record_payment_only',
+    name: 'Rule 44 — Payments Recorded via Record Payment Only',
+    description: `All payments against an invoice are captured exclusively through the Record Payment action (Orders → invoice row → Actions → Record Payment). Each submission is appended to the invoice's payments[] history array (date, amount, method, reference) and the invoice's amountPaid, creditApplied and overpaymentCredit fields are updated cumulatively — never overwritten. No other flow (Create Invoice, Edit Invoice, line-item changes, PATCH from other pages) writes to amountPaid. Flow: open Record Payment → enter amount/method/reference → save → payment appended to history → amountPaid recalculated as the sum of all payments + credit applied. The invoice list, invoice detail/print view, and the customer's Order History page all read from this single source of truth to show the Balance Due / Outstanding amount (red "Due R..." badge) or a green "Paid" badge once the outstanding balance reaches zero.`,
+    active: true,
+    appliesTo: ['Admin Invoices', 'Customer Payments', 'Customer Account'],
+    category: 'Invoices',
+  },
 ]
 
 export async function GET() {
