@@ -210,6 +210,17 @@ function fmtDateLong(iso: string) {
 function fmtPrice(n: number) {
   return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
+function docTotal(doc: OrderDocument) {
+  const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+  const disc = sub * ((doc as any).discountPct || 0) / 100
+  const ship = (doc as any).shippingCost || 0
+  return sub - disc + ship
+}
+function docBalanceDue(doc: OrderDocument) {
+  const total = docTotal(doc)
+  const settled = ((doc as any).amountPaid || 0) + ((doc as any).creditApplied || 0) + ((doc as any).depositPaid || 0)
+  return Math.max(0, total - settled)
+}
 // Extract SKU and description from a line item description string.
 // Handles em-dash: "SKU – Title" and space-hyphen-space: "SKU - Title"
 // Does NOT split on hyphens within SKU codes like "SC-5068" or "SWAX/54.5"
@@ -2522,6 +2533,71 @@ function PaymentModal({
   )
 }
 
+// ─── Send Quote to Invoice Modal ────────────────────────────────────────────────
+
+function SendToInvoiceModal({
+  quote, openInvoices, onCreateNew, onAppend, onClose, busy,
+}: {
+  quote: OrderDocument
+  openInvoices: OrderDocument[]
+  onCreateNew: () => void
+  onAppend: (target: OrderDocument) => void
+  onClose: () => void
+  busy: boolean
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div>
+            <h2 className="text-lg font-bold">Send to Invoice</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{quote.docNumber} · {quote.clientName}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          <button
+            onClick={onCreateNew}
+            disabled={busy}
+            className="w-full text-left px-4 py-3 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 transition-colors disabled:opacity-60"
+          >
+            <p className="text-sm font-semibold text-indigo-700">+ Create New Invoice</p>
+            <p className="text-xs text-indigo-500 mt-0.5">Convert this quote into a brand-new invoice</p>
+          </button>
+
+          {openInvoices.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Or add to an existing open invoice</p>
+              <div className="space-y-2">
+                {openInvoices.map((inv) => (
+                  <button
+                    key={inv.id}
+                    onClick={() => onAppend(inv)}
+                    disabled={busy}
+                    className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors disabled:opacity-60"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-gray-800">{inv.docNumber}</p>
+                      <p className="text-sm font-semibold text-gray-800">{fmtPrice(docTotal(inv))}</p>
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5">
+                      <p className="text-xs text-gray-400">{fmtDate(inv.date || inv.createdAt)} · {inv.status}</p>
+                      {docBalanceDue(inv) > 0.005 && <p className="text-xs text-red-500">Due {fmtPrice(docBalanceDue(inv))}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Actions Dropdown ──────────────────────────────────────────────────────────
 
 type ActionItem =
@@ -2630,6 +2706,42 @@ export default function OrdersPage() {
     amountReceived: string; creditApplied: string; useCredit: boolean
     showCreditOnInvoice: boolean; paymentMethod: string; notes: string
   }>({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '' })
+  const [sendToInvoiceQuote, setSendToInvoiceQuote] = useState<OrderDocument | null>(null)
+  const [appendingToInvoice, setAppendingToInvoice] = useState(false)
+
+  const handleAppendQuoteToInvoice = async (quote: OrderDocument, target: OrderDocument) => {
+    setAppendingToInvoice(true)
+    try {
+      const newItems = quote.lineItems.map((li, i) => ({ ...li, id: `li_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}` }))
+      const mergedItems = [...target.lineItems, ...newItems]
+      const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineItems: mergedItems }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setDocuments((prev) => prev.map((d) => d.id === updated.id ? updated : d))
+        const archiveRes = await fetch(`/api/admin/orders/documents/${quote.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'archived' }),
+        })
+        if (archiveRes.ok) setDocuments((prev) => prev.map((d) => d.id === quote.id ? { ...d, status: 'archived' } : d))
+        setSoToInvoiceResult(`✓ ${quote.docNumber} → added to ${target.docNumber}`)
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        setSoToInvoiceResult(`Error: ${errData.error || res.status}`)
+      }
+      setTimeout(() => setSoToInvoiceResult(null), 5000)
+    } catch (e: any) {
+      setSoToInvoiceResult(`Error: ${e?.message || 'unknown'}`)
+      setTimeout(() => setSoToInvoiceResult(null), 5000)
+    } finally {
+      setAppendingToInvoice(false)
+      setSendToInvoiceQuote(null)
+    }
+  }
 
   const handleConvertQuote = async (doc: OrderDocument, toType: 'salesorder' | 'invoice') => {
     try {
@@ -3981,7 +4093,7 @@ export default function OrdersPage() {
                                 label: 'Send to Invoice',
                                 icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
                                 className: 'text-indigo-600',
-                                onClick: () => handleConvertQuote(doc, 'invoice'),
+                                onClick: () => setSendToInvoiceQuote(doc),
                               },
                             ] : []),
                             ...(doc.type === 'salesorder' ? [{
@@ -4185,6 +4297,20 @@ export default function OrdersPage() {
           setPaymentForm={setPaymentForm}
           onSave={handleSavePayment}
           onClose={() => setPaymentModal(null)}
+        />
+      )}
+      {sendToInvoiceQuote && (
+        <SendToInvoiceModal
+          quote={sendToInvoiceQuote}
+          openInvoices={documents.filter((d) =>
+            d.type === 'invoice'
+            && !['paid', 'archived'].includes(d.status)
+            && d.clientName.trim().toLowerCase() === sendToInvoiceQuote.clientName.trim().toLowerCase()
+          )}
+          onCreateNew={() => { handleConvertQuote(sendToInvoiceQuote, 'invoice'); setSendToInvoiceQuote(null) }}
+          onAppend={(target) => handleAppendQuoteToInvoice(sendToInvoiceQuote, target)}
+          onClose={() => setSendToInvoiceQuote(null)}
+          busy={appendingToInvoice}
         />
       )}
     </div>
