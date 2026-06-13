@@ -500,23 +500,6 @@ function DocumentBody({
         </div>
       )}
 
-      {/* Payment Method */}
-      {(data.paymentMethod || data.paymentMethod2) && (
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Payment:</span>
-          {data.paymentMethod && (
-            <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-              {data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}{data.paymentMethod}
-            </span>
-          )}
-          {data.paymentMethod2 && (
-            <span className="text-xs font-semibold bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">
-              {data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}{data.paymentMethod2}
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Notes */}
       {data.notes && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
@@ -1737,48 +1720,6 @@ function CreateDocumentModal({
                 <option value="complete">Complete</option>
               </select>
             </div>
-            {docType === 'invoice' && (
-              <div className="flex items-end gap-2">
-                <div className="w-36">
-                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Payment Method</label>
-                  <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod} onChange={(e) => setField('paymentMethod', e.target.value)}>
-                    <option value="">— Select —</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Card">Card</option>
-                    <option value="EFT">EFT</option>
-                    <option value="Snapscan">Snapscan</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                {form.paymentMethod && (
-                  <div className="w-24">
-                    <label className="text-xs font-semibold text-gray-500 mb-1 block">Amount</label>
-                    <input type="number" min="0" step="0.01" placeholder="0.00" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod1Amount || ''} onChange={(e) => setField('paymentMethod1Amount', parseFloat(e.target.value) || 0)} />
-                  </div>
-                )}
-              </div>
-            )}
-            {docType === 'invoice' && (
-              <div className="flex items-end gap-2">
-                <div className="w-36">
-                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Payment Method 2</label>
-                  <select className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod2} onChange={(e) => setField('paymentMethod2', e.target.value)}>
-                    <option value="">— None —</option>
-                    <option value="Cash">Cash</option>
-                    <option value="Card">Card</option>
-                    <option value="EFT">EFT</option>
-                    <option value="Snapscan">Snapscan</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                {form.paymentMethod2 && (
-                  <div className="w-24">
-                    <label className="text-xs font-semibold text-gray-500 mb-1 block">Amount</label>
-                    <input type="number" min="0" step="0.01" placeholder="0.00" className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" value={form.paymentMethod2Amount || ''} onChange={(e) => setField('paymentMethod2Amount', parseFloat(e.target.value) || 0)} />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
         <div className="px-6 py-4 border-t space-y-3">
@@ -2049,7 +1990,6 @@ function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount
       : [`TOTAL:  ${fmtPrice(total)}`, ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`, `BALANCE DUE:  ${fmtPrice(total - (data.depositPaid || 0))}`] : [])]),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
-    ...(data.paymentMethod || data.paymentMethod2 ? [`Payment:  ${[data.paymentMethod ? `${data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}${data.paymentMethod}` : '', data.paymentMethod2 ? `${data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}${data.paymentMethod2}` : ''].filter(Boolean).join(' + ')}`] : []),
     banking,
     data.terms ? `\nTERMS & CONDITIONS\n${data.terms}` : '',
     '',
@@ -2304,16 +2244,6 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
     doc.text(parts.join('   |   '), margin, y); y += 6
   }
 
-  // ── Payment method ───────────────────────────────────────────────────────────
-  if (data.paymentMethod || data.paymentMethod2) {
-    const parts: string[] = []
-    if (data.paymentMethod) parts.push(`${data.paymentMethod1Amount ? `R${data.paymentMethod1Amount.toFixed(2)} ` : ''}${data.paymentMethod}`)
-    if (data.paymentMethod2) parts.push(`${data.paymentMethod2Amount ? `R${data.paymentMethod2Amount.toFixed(2)} ` : ''}${data.paymentMethod2}`)
-    doc.setFontSize(8.5)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(70)
-    doc.text(`Payment: ${parts.join('  +  ')}`, margin, y); y += 6
-  }
 
   // ── Banking ──────────────────────────────────────────────────────────────────
   const pdfBank = resolveBank(selectedBankAccount, template)
@@ -4023,12 +3953,6 @@ export default function OrdersPage() {
                             <span className="text-xs bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full">Standalone</span>
                             {(doc as any).preOrderDeposit && (
                               <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pre Order Deposit</span>
-                            )}
-                            {(doc as any).paymentMethod && (
-                              <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod}</span>
-                            )}
-                            {(doc as any).paymentMethod2 && (
-                              <span className="text-[10px] font-semibold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod2}</span>
                             )}
                             {isPartiallyPaid && (
                               <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
