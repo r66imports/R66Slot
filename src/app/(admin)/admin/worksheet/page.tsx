@@ -411,6 +411,12 @@ function WorksheetEditor({
     }
   }
 
+  // ── Update Products: runs costing update then opens Product Info modal ──
+  async function handleUpdateProducts() {
+    await updateFinalCosting()
+    setShowProductInfo(true)
+  }
+
   // ── Stock verification & send to inventory ──
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set())
   const [sendingInventory, setSendingInventory] = useState(false)
@@ -1825,7 +1831,7 @@ function WorksheetEditor({
               Download PDF
             </button>
             <button
-              onClick={updateFinalCosting}
+              onClick={handleUpdateProducts}
               disabled={updatingCosts || !items.some((it) => it.sku)}
               className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
                 costsUpdated ? 'bg-green-600 text-white' :
@@ -1834,7 +1840,7 @@ function WorksheetEditor({
               }`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-              {costsUpdated ? '✓ Costing Updated!' : updatingCosts ? 'Updating…' : 'Update Costing'}
+              {costsUpdated ? '✓ Costing Updated!' : updatingCosts ? 'Updating…' : 'Update Products'}
             </button>
             <button
               onClick={() => setShowSupplierOrderModal(true)}
@@ -1878,14 +1884,6 @@ function WorksheetEditor({
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
               Add to Database
-            </button>
-            <button
-              onClick={() => setShowProductInfo(true)}
-              disabled={!items.some((it) => it.sku)}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-40"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-              Update Product Info
             </button>
           </div>
         </div>
