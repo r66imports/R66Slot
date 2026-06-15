@@ -475,12 +475,34 @@ function WorksheetEditor({
     const toSend = items.filter((it) => checkedItems.has(it.id) && it.sku && it.qty > 0 && !it.sentToInventory)
     if (!toSend.length) return
 
+    // Always re-fetch products fresh so SKU matching uses the latest DB state
+    let freshProducts = products
+    try {
+      const res = await fetch('/api/admin/products')
+      if (res.ok) {
+        const raw: any[] = await res.json()
+        const mapped: ProductRef[] = raw.map((p: any) => ({
+          id: p.id, sku: p.sku || '', title: p.title || '',
+          brand: p.brand || '', price: Number(p.price) || 0,
+          quantity: Number(p.quantity) || 0,
+          preOrderPrice: p.preOrderPrice ? Number(p.preOrderPrice) : null,
+          unit: Array.isArray(p.itemCategories) ? p.itemCategories.join(' / ') : (p.itemCategories || ''),
+          category: Array.isArray(p.categoryBrands) ? p.categoryBrands.join(' / ') : (p.categoryBrands || ''),
+          categoryBrands: Array.isArray(p.categoryBrands) ? p.categoryBrands : [],
+          itemCategories: Array.isArray(p.itemCategories) ? p.itemCategories : [],
+          salesAccount: Array.isArray(p.salesAccount) ? p.salesAccount : [],
+          purchaseAccount: Array.isArray(p.purchaseAccount) ? p.purchaseAccount : [],
+        })).filter((p) => p.sku || p.title)
+        freshProducts = mapped
+      }
+    } catch {}
+
     const newSkus: NewSkuRow[] = []
     const existingItems: WsItem[] = []
 
     for (const it of toSend) {
-      const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-      if (!prod) {
+      const matches = freshProducts.filter((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
+      if (matches.length === 0) {
         // New SKU — show modal to create product with qty
         const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
         const retailZAR = it.retailPrice > 0
@@ -508,18 +530,23 @@ function WorksheetEditor({
       const sentIds: string[] = []
       try {
         for (const it of existingItems) {
-          const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())!
-          const res = await fetch(`/api/admin/products/${prod.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ quantity: it.qty }),
-          })
-          if (!res.ok) {
-            const msg = await res.text().catch(() => res.status.toString())
-            errors.push(`${it.sku}: ${msg}`)
-          } else {
-            sentIds.push(it.id)
+          const matches = freshProducts.filter((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
+          const patchBody: Record<string, any> = { quantity: it.qty }
+          if (it.retailPrice > 0) patchBody.price = Math.round(it.retailPrice * 100) / 100
+          let allOk = true
+          for (const prod of matches) {
+            const res = await fetch(`/api/admin/products/${prod.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(patchBody),
+            })
+            if (!res.ok) {
+              const msg = await res.text().catch(() => res.status.toString())
+              errors.push(`${it.sku}: ${msg}`)
+              allOk = false
+            }
           }
+          if (allOk) sentIds.push(it.id)
         }
         if (sentIds.length > 0) {
           const updatedItems = items.map((it) => sentIds.includes(it.id) ? { ...it, sentToInventory: true } : it)
