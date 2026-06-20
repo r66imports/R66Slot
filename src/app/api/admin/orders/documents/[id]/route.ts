@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { blobRead, blobAppendArrayItem, blobReplaceArrayItem, blobRemoveArrayItem } from '@/lib/blob-storage'
 import type { OrderDocument } from '../route'
 import { adjustStock } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
 
 const KEY = 'data/order-documents.json'
+const BIN_KEY = 'data/invoices-bin.json'
 const CANCELLED_STATUSES = new Set(['archived', 'rejected'])
 
 // Sales Orders AND Invoices physically deduct stock. isStockable includes salesorder so all
@@ -15,10 +16,6 @@ function isStockable(type: string) {
 
 async function getDocs(): Promise<OrderDocument[]> {
   return await blobRead<OrderDocument[]>(KEY, [])
-}
-
-async function saveDocs(docs: OrderDocument[]): Promise<void> {
-  await blobWrite(KEY, docs)
 }
 
 export async function PATCH(
@@ -69,7 +66,7 @@ export async function PATCH(
     }
 
     docs[idx] = { ...prev, ...body, updatedAt: new Date().toISOString() }
-    await saveDocs(docs)
+    await blobReplaceArrayItem(KEY, id, docs[idx])
     return NextResponse.json(docs[idx])
   } catch (error) {
     console.error('Error updating document:', error)
@@ -92,8 +89,11 @@ export async function DELETE(
       await adjustStock(doc.lineItems, 'add')
     }
 
-    const filtered = docs.filter((d) => d.id !== id)
-    await saveDocs(filtered)
+    if (doc.type === 'invoice') {
+      await blobAppendArrayItem(BIN_KEY, { ...doc, stockDeducted: false, deletedAt: new Date().toISOString() })
+    }
+
+    await blobRemoveArrayItem(KEY, id)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Error deleting document:', error)

@@ -2668,6 +2668,9 @@ export default function OrdersPage() {
   const [shippingEnabled, setShippingEnabled] = useState(true)
   const [stockDeductionEnabled, setStockDeductionEnabled] = useState(true)
   const [showArchive, setShowArchive] = useState(false)
+  const [showBin, setShowBin] = useState(false)
+  const [binDocs, setBinDocs] = useState<any[]>([])
+  const [binLoading, setBinLoading] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
   const [docPageSize, setDocPageSize] = useState(50)
   const [docPage, setDocPage] = useState(1)
@@ -3459,6 +3462,36 @@ export default function OrdersPage() {
     }
   }
 
+  const loadBin = async () => {
+    setBinLoading(true)
+    try {
+      const res = await fetch('/api/admin/orders/bin')
+      setBinDocs(res.ok ? await res.json() : [])
+    } finally {
+      setBinLoading(false)
+    }
+  }
+
+  const restoreFromBin = async (id: string) => {
+    const res = await fetch(`/api/admin/orders/bin/${id}`, { method: 'POST' })
+    if (res.ok) {
+      const restored = await res.json()
+      setBinDocs((prev) => prev.filter((d) => d.id !== id))
+      setDocuments((prev) => [restored, ...prev])
+    }
+  }
+
+  const permanentlyDeleteFromBin = async (id: string) => {
+    const res = await fetch(`/api/admin/orders/bin/${id}`, { method: 'DELETE' })
+    if (res.ok) setBinDocs((prev) => prev.filter((d) => d.id !== id))
+  }
+
+  const emptyBin = async () => {
+    const res = await fetch('/api/admin/orders/bin', { method: 'DELETE' })
+    if (res.ok) setBinDocs([])
+    setDeleteConfirm(null)
+  }
+
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: 'backorders', label: 'Back Orders', icon: '🔄' },
     { key: 'quotes', label: 'Quotes', icon: '📄' },
@@ -3515,7 +3548,7 @@ export default function OrdersPage() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setShowArchive(false); setClientSearch('') }}
+              onClick={() => { setTab(t.key); setShowArchive(false); setShowBin(false); setClientSearch('') }}
               className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                 tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
@@ -3737,7 +3770,89 @@ export default function OrdersPage() {
       )}
 
       {/* Content */}
-      {tab !== 'backorders' && loading ? (
+      {tab === 'invoices' && showBin ? (
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <p className="text-sm text-gray-500">{binDocs.length} Deleted Invoice{binDocs.length !== 1 ? 's' : ''}</p>
+            {binDocs.length > 0 && (
+              <button
+                onClick={() => deleteConfirm === 'empty-bin' ? emptyBin() : setDeleteConfirm('empty-bin')}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-300 bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
+              >
+                <IconTrash />
+                {deleteConfirm === 'empty-bin' ? 'Confirm Empty Bin' : 'Empty Bin'}
+              </button>
+            )}
+          </div>
+          {binLoading ? (
+            <div className="text-center py-16 text-gray-400">Loading...</div>
+          ) : binDocs.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="text-5xl mb-4">🗑️</div>
+              <p className="text-lg font-semibold text-gray-600">Bin is empty</p>
+              <p className="text-sm text-gray-400 mt-1">Deleted invoices appear here until permanently removed.</p>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500">
+                  <th className="text-left py-3 px-4">Doc #</th>
+                  <th className="text-left py-3 px-4">Date</th>
+                  <th className="text-left py-3 px-4">Client</th>
+                  <th className="text-left py-3 px-4">Description</th>
+                  <th className="text-right py-3 px-4">Total</th>
+                  <th className="text-left py-3 px-4">Deleted</th>
+                  <th className="text-center py-3 px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {binDocs.map((doc: any) => {
+                  const sub = (doc.lineItems || []).reduce((s: number, li: any) => s + li.qty * li.unitPrice, 0)
+                  const disc = sub * (doc.discountPct || 0) / 100
+                  const ship = doc.shippingCost || 0
+                  const docTotal = sub - disc + ship
+                  const firstDesc = doc.lineItems?.[0]?.description || '—'
+                  return (
+                    <tr key={`bin-${doc.id}`} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="py-3 px-4 font-mono font-semibold text-blue-700 text-xs">{doc.docNumber}</td>
+                      <td className="py-3 px-4 text-xs text-gray-500">{fmtDate(doc.date)}</td>
+                      <td className="py-3 px-4 text-xs font-medium">{doc.clientName}</td>
+                      <td className="py-3 px-4 text-xs text-gray-600 break-words">{firstDesc}</td>
+                      <td className="py-3 px-4 text-xs text-right font-semibold">{fmtPrice(docTotal)}</td>
+                      <td className="py-3 px-4 text-xs text-gray-500">{doc.deletedAt ? fmtDate(doc.deletedAt.slice(0, 10)) : '—'}</td>
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => restoreFromBin(doc.id)}
+                            className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-green-300 bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                          >
+                            ↩ Restore
+                          </button>
+                          {deleteConfirm === doc.id ? (
+                            <button
+                              onClick={() => permanentlyDeleteFromBin(doc.id)}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-300 bg-red-600 text-white hover:bg-red-700 transition-colors"
+                            >
+                              Confirm
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(doc.id)}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-red-600 transition-colors"
+                            >
+                              Delete Permanently
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      ) : tab !== 'backorders' && loading ? (
         <div className="text-center py-16 text-gray-400">Loading...</div>
       ) : tab !== 'backorders' && totalCount === 0 ? (
         <div className="text-center py-16">
@@ -3855,7 +3970,7 @@ export default function OrdersPage() {
                 </button>
               )}
               <button
-                onClick={() => setShowArchive((v) => !v)}
+                onClick={() => { setShowArchive((v) => !v); setShowBin(false) }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                   showArchive
                     ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
@@ -3867,6 +3982,27 @@ export default function OrdersPage() {
                 </svg>
                 {showArchive ? 'Back to Active' : 'View Archive'}
               </button>
+              {tab === 'invoices' && (
+                <button
+                  onClick={() => {
+                    const next = !showBin
+                    setShowBin(next)
+                    setShowArchive(false)
+                    if (next) loadBin()
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    showBin
+                      ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'
+                      : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  }`}
+                >
+                  <IconTrash />
+                  {showBin ? 'Back to Active' : 'Bin'}
+                  {binDocs.length > 0 && (
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${showBin ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{binDocs.length}</span>
+                  )}
+                </button>
+              )}
             </div>
             {!showArchive && <p className="text-sm font-semibold text-gray-700">Total (excl. VAT): {fmtPrice(grandTotal)}</p>}
           </div>

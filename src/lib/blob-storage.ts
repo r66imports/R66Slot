@@ -25,6 +25,40 @@ export async function blobWrite(key: string, data: unknown): Promise<void> {
   )
 }
 
+export async function blobAppendArrayItem(key: string, item: unknown): Promise<void> {
+  await db.query(
+    `INSERT INTO json_store (key, value, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (key) DO UPDATE
+       SET value = COALESCE(json_store.value, '[]'::jsonb) || $2::jsonb,
+           updated_at = NOW()`,
+    [key, JSON.stringify([item])]
+  )
+}
+
+export async function blobReplaceArrayItem(key: string, id: string, item: unknown): Promise<void> {
+  await db.query(
+    `UPDATE json_store
+     SET value = (
+       SELECT jsonb_agg(CASE WHEN elem->>'id' = $2 THEN $3::jsonb ELSE elem END)
+       FROM jsonb_array_elements(value) elem
+     ), updated_at = NOW()
+     WHERE key = $1`,
+    [key, id, JSON.stringify(item)]
+  )
+}
+
+export async function blobRemoveArrayItem(key: string, id: string): Promise<void> {
+  await db.query(
+    `UPDATE json_store
+     SET value = COALESCE((
+       SELECT jsonb_agg(elem) FROM jsonb_array_elements(value) elem WHERE elem->>'id' != $2
+     ), '[]'::jsonb), updated_at = NOW()
+     WHERE key = $1`,
+    [key, id]
+  )
+}
+
 export async function blobDelete(key: string): Promise<boolean> {
   try {
     const result = await db.query('DELETE FROM json_store WHERE key = $1', [key])

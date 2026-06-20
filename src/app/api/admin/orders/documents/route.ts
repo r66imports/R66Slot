@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { blobRead, blobAppendArrayItem } from '@/lib/blob-storage'
 import { isRuleActive } from '@/lib/site-rules'
 import { type LineItem, extractSku, autoCreateMissingProducts, adjustStock } from '@/lib/order-helpers'
 import { db } from '@/lib/db'
@@ -38,10 +38,6 @@ export interface OrderDocument {
 
 async function getDocs(): Promise<OrderDocument[]> {
   return await blobRead<OrderDocument[]>(KEY, [])
-}
-
-async function saveDocs(docs: OrderDocument[]): Promise<void> {
-  await blobWrite(KEY, docs)
 }
 
 export async function GET(request: Request) {
@@ -107,9 +103,7 @@ export async function POST(request: Request) {
       backorderId: body.backorderId,
       stockDeducted: deductStock,
     }
-    const docs = await getDocs()
-    docs.unshift(doc)
-    await saveDocs(docs)
+    await blobAppendArrayItem(KEY, doc)
     // Rule 2 — Auto-Create Product: create draft products for unknown SKUs (best-effort)
     // Skip for pre-orders (stockAlreadyReserved) — items haven't arrived, products already exist
     if (!stockAlreadyReserved && await isRuleActive('auto_create_product', true)) {
