@@ -1963,7 +1963,7 @@ function doPrint(data: DocViewData, template: OrderTemplate, selectedBankAccount
   setTimeout(() => { win.print(); win.close() }, 400)
 }
 
-function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
+async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
   const docLabel = data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
   const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
@@ -2010,7 +2010,26 @@ function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount
     template.companyEmail || '',
   ].filter((l) => l !== undefined).join('\n')
 
-  window.location.href = `mailto:${data.clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  const mailtoUrl = `mailto:${data.clientEmail || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  try {
+    const html = generateDocHTML(data, template, selectedBankAccount)
+    const res = await fetch('/api/admin/send-document', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: data.clientEmail, subject, html, documentType: docLabel }),
+    })
+    const result = await res.json()
+    if (result.success) {
+      alert(`✓ ${docLabel} emailed to ${data.clientEmail}`)
+    } else if (result.mailto) {
+      // SMTP not configured on server — open local mail client as fallback
+      window.location.href = mailtoUrl
+    } else {
+      alert(`Failed to send email: ${result.error || 'Unknown error'}`)
+    }
+  } catch {
+    window.location.href = mailtoUrl
+  }
 }
 
 async function doDownload(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
