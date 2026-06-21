@@ -592,7 +592,22 @@ export default function CustomerPaymentsPage() {
               {/* Payment history */}
               {((editDoc as any).payments || []).length > 0 && (
                 <div>
-                  <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Payment History</div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Payment History</div>
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/admin/orders/documents/${editDoc!.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ payments: [] }),
+                        })
+                        setEditDoc(prev => prev ? { ...prev, payments: [] } as any : null)
+                      }}
+                      className="text-xs text-red-500 hover:text-red-700 underline"
+                    >
+                      Clear History
+                    </button>
+                  </div>
                   <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
                     {((editDoc as any).payments as Array<{ date: string; amountPaid: number; creditApplied: number; paymentMethod: string; notes: string }>).map((p, i) => (
                       <div key={i} className="flex items-start justify-between px-3 py-2 bg-white text-sm">
