@@ -245,7 +245,7 @@ export default function InventoryPage() {
   const currency = selectedSupplier?.preferredCurrency || 'EUR'
 
   const filtered = products.filter((p) => {
-    if (!p.brand.trim() && p.status === 'draft') return false
+    if (p.status === 'draft') return false
     // When a supplier is selected, only show products whose brand matches that supplier
     if (selectedSupplier) {
       const pb = p.brand.trim().toLowerCase()
