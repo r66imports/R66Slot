@@ -145,12 +145,13 @@ export default function CustomerPaymentsPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amountPaid: newAmtPaid,
+          amountPaid: Math.round(newAmtPaid * 100) / 100,
           paymentMethod: editForm.paymentMethod,
           paymentMethod2: editForm.paymentMethod2,
-          paymentMethod1Amount: newAmt1,
-          paymentMethod2Amount: newAmt2,
-          creditApplied: newCredit,
+          paymentMethod1Amount: Math.round(newAmt1 * 100) / 100,
+          paymentMethod2Amount: Math.round(newAmt2 * 100) / 100,
+          creditApplied: Math.round(newCredit * 100) / 100,
+          payments: [],
         }),
       })
 
@@ -202,6 +203,7 @@ export default function CustomerPaymentsPage() {
           paymentMethod2Amount: 0,
           creditApplied: 0,
           overpaymentCredit: 0,
+          payments: [],
         }),
       })
       // Return any previously applied credit back to the customer's balance
