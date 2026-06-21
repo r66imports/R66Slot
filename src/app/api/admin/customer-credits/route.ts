@@ -36,6 +36,23 @@ export async function GET() {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const { clientName } = await request.json()
+    if (!clientName) return NextResponse.json({ error: 'clientName required' }, { status: 400 })
+    const store = await getStore()
+    const key = clientKey(clientName)
+    if (store[key]) {
+      store[key].balance = 0
+      store[key].transactions = []
+      await blobWrite(KEY, store)
+    }
+    return NextResponse.json({ ok: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()

@@ -91,10 +91,6 @@ export default function CustomerPaymentsPage() {
   const [editDoc, setEditDoc] = useState<Invoice | null>(null)
   const [editForm, setEditForm] = useState({
     amountPaid: '',
-    paymentMethod: '',
-    paymentMethod2: '',
-    paymentMethod1Amount: '',
-    paymentMethod2Amount: '',
     creditApplied: '',
   })
   const [saving, setSaving] = useState(false)
@@ -123,10 +119,6 @@ export default function CustomerPaymentsPage() {
     setEditDoc(doc)
     setEditForm({
       amountPaid: doc.amountPaid != null && doc.amountPaid > 0 ? String(doc.amountPaid) : '',
-      paymentMethod: doc.paymentMethod || '',
-      paymentMethod2: doc.paymentMethod2 || '',
-      paymentMethod1Amount: doc.paymentMethod1Amount != null && doc.paymentMethod1Amount > 0 ? String(doc.paymentMethod1Amount) : '',
-      paymentMethod2Amount: doc.paymentMethod2Amount != null && doc.paymentMethod2Amount > 0 ? String(doc.paymentMethod2Amount) : '',
       creditApplied: doc.creditApplied != null && doc.creditApplied > 0 ? String(doc.creditApplied) : '',
     })
   }
@@ -138,18 +130,12 @@ export default function CustomerPaymentsPage() {
     try {
       const newAmtPaid = parseFloat(editForm.amountPaid) || 0
       const newCredit = parseFloat(editForm.creditApplied) || 0
-      const newAmt1 = parseFloat(editForm.paymentMethod1Amount) || 0
-      const newAmt2 = parseFloat(editForm.paymentMethod2Amount) || 0
 
       const patchRes = await fetch(`/api/admin/orders/documents/${editDoc.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amountPaid: Math.round(newAmtPaid * 100) / 100,
-          paymentMethod: editForm.paymentMethod,
-          paymentMethod2: editForm.paymentMethod2,
-          paymentMethod1Amount: Math.round(newAmt1 * 100) / 100,
-          paymentMethod2Amount: Math.round(newAmt2 * 100) / 100,
           creditApplied: Math.round(newCredit * 100) / 100,
           payments: [],
         }),
@@ -507,12 +493,13 @@ export default function CustomerPaymentsPage() {
                 <CreditSortBtn field="balance" label="Balance" right />
                 <th className="px-3 py-2.5 text-left font-semibold">Transactions</th>
                 <th className="px-3 py-2.5 text-left font-semibold">Last Activity</th>
+                <th className="px-3 py-2.5" />
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {sortedCredits.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-3 py-10 text-center text-gray-400">No credit records</td>
+                  <td colSpan={6} className="px-3 py-10 text-center text-gray-400">No credit records</td>
                 </tr>
               ) : sortedCredits.map(record => {
                 const isExpanded = expandedClient === record.clientName
@@ -528,6 +515,24 @@ export default function CustomerPaymentsPage() {
                       </td>
                       <td className="px-3 py-2.5 text-gray-500">{record.transactions.length} transaction{record.transactions.length !== 1 ? 's' : ''}</td>
                       <td className="px-3 py-2.5 text-gray-500 text-xs">{lastTxn ? fmtDate(lastTxn.date) : '—'}</td>
+                      <td className="px-3 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+                        {record.balance > 0.005 && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Reset ${record.clientName}'s credit balance to R0.00? This cannot be undone.`)) return
+                              await fetch('/api/admin/customer-credits', {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ clientName: record.clientName }),
+                              })
+                              await load()
+                            }}
+                            className="px-2.5 py-1 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 font-semibold"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </td>
                     </tr>
                     {isExpanded && txns.map(txn => (
                       <tr key={txn.id} className="bg-gray-50">
@@ -627,53 +632,6 @@ export default function CustomerPaymentsPage() {
                 </div>
               )}
 
-              {/* Payment methods */}
-              <div>
-                <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Payment Methods</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Method 1</label>
-                    <select
-                      value={editForm.paymentMethod}
-                      onChange={e => setEditForm(f => ({ ...f, paymentMethod: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                    >
-                      {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m || '— None —'}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Amount</label>
-                    <input
-                      type="number" min={0} step={0.01}
-                      value={editForm.paymentMethod1Amount}
-                      onChange={e => setEditForm(f => ({ ...f, paymentMethod1Amount: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Method 2</label>
-                    <select
-                      value={editForm.paymentMethod2}
-                      onChange={e => setEditForm(f => ({ ...f, paymentMethod2: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                    >
-                      {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m || '— None —'}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1 block">Amount</label>
-                    <input
-                      type="number" min={0} step={0.01}
-                      value={editForm.paymentMethod2Amount}
-                      onChange={e => setEditForm(f => ({ ...f, paymentMethod2Amount: e.target.value }))}
-                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-              </div>
-
               {/* Cash received */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 mb-1 block uppercase tracking-wide">Total Cash Received</label>
@@ -684,7 +642,7 @@ export default function CustomerPaymentsPage() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
                   placeholder="0.00"
                 />
-                <p className="text-xs text-gray-400 mt-1">The actual cash amount received (sum of methods above, or enter directly).</p>
+                <p className="text-xs text-gray-400 mt-1">Total cash received for this invoice.</p>
               </div>
 
               {/* Credit applied */}
