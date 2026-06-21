@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 
@@ -795,7 +795,7 @@ export default function SuppliersNetworkPage() {
                     <div className="text-right">
                       <p className="text-xs text-gray-500">Total Value</p>
                       <p className="text-lg font-bold text-gray-900">
-                        R {totalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        R {totalValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                       </p>
                     </div>
                   </div>
@@ -1196,12 +1196,12 @@ function BackorderTable({
                 <td className="px-3 py-3 text-center font-semibold text-gray-900">{b.qty}</td>
                 <td className="px-5 py-3 text-right text-gray-700">
                   {b.price > 0
-                    ? `R ${b.price.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ? `R ${b.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
                     : '—'}
                 </td>
                 <td className="px-5 py-3 text-right font-medium text-gray-900">
                   {b.price > 0
-                    ? `R ${(b.qty * b.price).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                    ? `R ${(b.qty * b.price).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
                     : '—'}
                 </td>
               </tr>
@@ -1213,7 +1213,7 @@ function BackorderTable({
               <td className="px-3 py-2.5 text-center text-xs font-bold text-gray-900">{subtotalQty}</td>
               <td className="px-5 py-2.5" />
               <td className="px-5 py-2.5 text-right text-xs font-bold text-gray-900">
-                R {subtotalValue.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                R {subtotalValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
               </td>
             </tr>
           </tfoot>

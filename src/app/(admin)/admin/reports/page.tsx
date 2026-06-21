@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useMemo } from 'react'
 
@@ -70,7 +70,7 @@ function parseSku(description: string): { sku: string; title: string } {
 }
 
 function fmtPrice(n: number) {
-  return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 }
 function fmtDate(d: string) {
   if (!d) return '—'

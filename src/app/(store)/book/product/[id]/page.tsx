@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
@@ -109,7 +109,7 @@ export default function BookProductPage() {
           <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left space-y-1">
             <p className="text-sm text-gray-600"><span className="font-medium">SKU:</span> {product.sku}</p>
             <p className="text-sm text-gray-600"><span className="font-medium">Qty:</span> {qty}</p>
-            <p className="text-sm text-gray-600"><span className="font-medium">Price:</span> R{((product.price || 0) * qty).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</p>
+            <p className="text-sm text-gray-600"><span className="font-medium">Price:</span> R{((product.price || 0) * qty).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>
           </div>
           <Link
             href="/"
@@ -157,10 +157,10 @@ export default function BookProductPage() {
                 <p className="text-xs text-gray-400 mb-4">SKU: {product.sku}</p>
               )}
               <p className="text-3xl font-bold text-red-600">
-                R{(price * qty).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                R{(price * qty).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
               </p>
               {qty > 1 && (
-                <p className="text-xs text-gray-400 mt-0.5">R{Number(price).toLocaleString('en-ZA', { minimumFractionDigits: 2 })} each</p>
+                <p className="text-xs text-gray-400 mt-0.5">R{Number(price).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} each</p>
               )}
             </div>
 

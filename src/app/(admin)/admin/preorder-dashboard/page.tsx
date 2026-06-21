@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 
@@ -745,11 +745,11 @@ export default function PreOrderDashboardPage() {
           <td style="font-family:monospace;font-weight:600">${item.sku}</td>
           <td>${item.description}</td>
           <td style="text-align:right">${customer.qty}</td>
-          <td style="text-align:right">R ${retailPrice.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</td>
-          <td style="text-align:right;font-weight:700">R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</td>
+          <td style="text-align:right">R ${retailPrice.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+          <td style="text-align:right;font-weight:700">R ${deposit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
         </tr></tbody></table>
         <div class="total-row"><p class="deposit-label">Deposit Due</p>
-        <p class="deposit-amount">R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</p></div>
+        <p class="deposit-amount">R ${deposit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p></div>
         ${bankHtml}
         <p class="note">This is a deposit quote. The balance is due on collection or as agreed. Please use your name as the payment reference.</p>
         </body></html>`
@@ -762,7 +762,7 @@ export default function PreOrderDashboardPage() {
 
         async function sendWhatsApp() {
           const phone = (customer.phone || '').replace(/\D/g, '').replace(/^0/, '27')
-          const msgText = `Hi ${customer.name.split(' ')[0]}, please find your deposit quote for *${item.description}* (${item.sku}).\n\nDeposit Due: *R ${deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}*\n\n${bank ? `Bank: ${bank.bankName}\nAccount: ${bank.accountName}\nAcc No: ${bank.accountNumber}\nBranch: ${bank.branchCode}\nRef: ${customer.name}` : ''}\n\nPlease use your name as reference. Thank you!`
+          const msgText = `Hi ${customer.name.split(' ')[0]}, please find your deposit quote for *${item.description}* (${item.sku}).\n\nDeposit Due: *R ${deposit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}*\n\n${bank ? `Bank: ${bank.bankName}\nAccount: ${bank.accountName}\nAcc No: ${bank.accountNumber}\nBranch: ${bank.branchCode}\nRef: ${customer.name}` : ''}\n\nPlease use your name as reference. Thank you!`
           const file = new File([html], `Deposit-Quote-${customer.name.replace(/\s+/g, '-')}.html`, { type: 'text/html' })
           // Try Web Share API (works on mobile — opens native share sheet including WhatsApp)
           if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -788,7 +788,7 @@ export default function PreOrderDashboardPage() {
               <div className="bg-gray-50 rounded-xl p-3 text-sm space-y-0.5">
                 <p className="font-semibold">{customer.name}</p>
                 <p className="text-gray-500 text-xs">{item.description}</p>
-                <p className="text-indigo-700 font-bold mt-1">Deposit: R {deposit.toLocaleString('en-ZA', { minimumFractionDigits:2, maximumFractionDigits:2 })}</p>
+                <p className="text-indigo-700 font-bold mt-1">Deposit: R {deposit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>
                 {!customer.phone && <p className="text-amber-600 text-xs mt-1">⚠ No phone number — PDF only</p>}
               </div>
               <div>

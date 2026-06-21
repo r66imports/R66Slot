@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useColumnResize } from '@/hooks/use-column-resize'
@@ -698,7 +698,7 @@ function ClientProfileDrawer({
 
 // ─── Customer Dashboard Modal ─────────────────────────────────────────────────
 
-const fmt = (n: number) => `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const fmt = (n: number) => `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 const fmtD = (iso: string) => new Date(iso).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
 const DATE_PRESETS = [
   { label: 'Last 30 days', days: 30 },

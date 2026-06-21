@@ -1,4 +1,4 @@
-import type { AuctionStatus } from '@/types/auction'
+﻿import type { AuctionStatus } from '@/types/auction'
 
 /**
  * Generate a URL-safe slug from a title
@@ -60,7 +60,7 @@ export function getStatusColor(status: AuctionStatus): string {
  * Format a price in Rand
  */
 export function formatPrice(amount: number): string {
-  return `R${amount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `R${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 }
 
 /**

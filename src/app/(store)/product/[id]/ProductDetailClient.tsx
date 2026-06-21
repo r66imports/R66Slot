@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -125,11 +125,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
           <div className="flex items-baseline gap-3">
             <span className="text-3xl font-bold text-gray-900">
-              {product.price > 0 ? `R${product.price.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}` : 'POA'}
+              {product.price > 0 ? `R${product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : 'POA'}
             </span>
             {product.compareAtPrice && product.compareAtPrice > product.price && (
               <span className="text-lg text-gray-400 line-through">
-                R{product.compareAtPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                R{product.compareAtPrice.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
               </span>
             )}
           </div>

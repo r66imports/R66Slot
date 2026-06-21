@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { useColumnResize } from '@/hooks/use-column-resize'
@@ -888,7 +888,7 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-3 py-2 text-right">
                       {product.price > 0
-                        ? <span className="text-xs font-medium text-gray-700">R {product.price.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        ? <span className="text-xs font-medium text-gray-700">R {product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
                         : <span className="text-xs text-gray-300">—</span>}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
@@ -1078,7 +1078,7 @@ export default function InventoryPage() {
                     </td>
                     <td className="px-4 py-2 text-right">
                       {product.price > 0
-                        ? <span className="text-xs font-medium text-gray-700">R {product.price.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        ? <span className="text-xs font-medium text-gray-700">R {product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
                         : <span className="text-xs text-gray-300">—</span>}
                     </td>
                     <td className="px-4 py-2 text-xs text-gray-500">{product.brand || '—'}</td>

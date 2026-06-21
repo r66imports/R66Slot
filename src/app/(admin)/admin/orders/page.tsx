@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -209,7 +209,7 @@ function fmtDateLong(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 function fmtPrice(n: number) {
-  return `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 }
 function docTotal(doc: OrderDocument) {
   const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
@@ -3019,7 +3019,7 @@ function OrdersPageInner() {
       const discAmt = sub * ((doc as any).discountPct || 0) / 100
       const ship = (doc as any).shippingCost || 0
       const total = sub - discAmt + ship
-      const fmtR = (n: number) => `R ${n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      const fmtR = (n: number) => `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 
       // Header
       pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')

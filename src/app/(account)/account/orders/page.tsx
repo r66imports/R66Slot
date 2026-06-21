@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
@@ -60,7 +60,7 @@ const TABS = [
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 function fmt(n: number) {
-  return 'R' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return 'R' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
 function getOutstanding(entry: Entry): number {
@@ -159,13 +159,13 @@ export default function OrdersPage() {
       const statusCls = outstanding > 0
         ? 'color:#b91c1c;font-weight:700'
         : 'color:#15803d;font-weight:700'
-      const statusLabel = outstanding > 0 ? `Due: R ${outstanding.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Paid'
+      const statusLabel = outstanding > 0 ? `Due: R ${outstanding.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : 'Paid'
       return `<tr>
         <td style="padding:8px 12px;font-size:12px;">${new Date(e.date).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' })}</td>
         <td style="padding:8px 12px;font-size:12px;font-weight:600;">#${e.ref}</td>
         <td style="padding:8px 12px;font-size:12px;">${e.status.charAt(0).toUpperCase() + e.status.slice(1)}</td>
-        <td style="padding:8px 12px;text-align:right;font-size:12px;">R ${e.total.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:8px 12px;text-align:right;font-size:12px;">R ${paid.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:12px;">R ${e.total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:12px;">R ${paid.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
         <td style="padding:8px 12px;text-align:right;font-size:12px;${statusCls}">${statusLabel}</td>
       </tr>`
     }).join('')
@@ -196,8 +196,8 @@ export default function OrdersPage() {
       <tbody>${rowsHtml}</tbody>
     </table>
     <div class="summary">
-      ${totalOutstanding > 0 ? `<p class="due">Amount Due: R ${totalOutstanding.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
-      ${totalCredit > 0 ? `<p class="credit">Credit: R ${totalCredit.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
+      ${totalOutstanding > 0 ? `<p class="due">Amount Due: R ${totalOutstanding.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>` : ''}
+      ${totalCredit > 0 ? `<p class="credit">Credit: R ${totalCredit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>` : ''}
       ${totalOutstanding === 0 && totalCredit === 0 ? '<p style="color:#15803d;font-weight:700;">All invoices paid — account is clear</p>' : ''}
     </div>
     </body></html>`

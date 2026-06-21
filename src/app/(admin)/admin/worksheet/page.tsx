@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -825,7 +825,7 @@ function WorksheetEditor({
   }
   // Markup applied on top of Final Landed: (wholesale + shipping + customs) × (1 + markup%)
   function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
-  function fmtFC(n: number) { return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  function fmtFC(n: number) { return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') }
 
   // JSS Calculator — wholesale in ZAR, shipping allocated proportionally
   const jssTotalWholesale = items.filter((it) => it.wholesalePrice > 0)
@@ -1118,7 +1118,7 @@ function WorksheetEditor({
       return `<tr>
         <td>${i + 1}</td><td style="font-family:monospace">${it.sku || '—'}</td>
         <td>${it.description || '—'}</td>
-        <td style="text-align:right">${it.retailPrice > 0 ? 'R ' + it.retailPrice.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}</td>
+        <td style="text-align:right">${it.retailPrice > 0 ? 'R ' + it.retailPrice.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '—'}</td>
         <td style="text-align:center">${it.inStock ?? 0}</td>
         <td style="text-align:center">${it.qty}</td>
         <td style="text-align:right">${currency} ${fmtFC(it.wholesalePrice)}</td>
@@ -2202,7 +2202,7 @@ function WorksheetEditor({
                       <div className="flex items-center justify-end gap-1">
                         <span className="text-xs text-gray-400">R</span>
                         <span className="w-24 text-xs text-right text-gray-700 px-2.5 py-1.5">
-                          {it.wholesalePrice > 0 ? calcRetail(it.wholesalePrice).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'}
+                          {it.wholesalePrice > 0 ? calcRetail(it.wholesalePrice).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') : '—'}
                         </span>
                       </div>
                     </td>}
@@ -3458,8 +3458,8 @@ function WorksheetInvoiceModal({
         <td style="padding:8px 12px;font-family:monospace;font-size:12px;font-weight:600;">${r.sku}</td>
         <td style="padding:8px 12px;font-size:13px;">${r.description}</td>
         <td style="padding:8px 12px;text-align:center;font-size:13px;">${r.qty}</td>
-        <td style="padding:8px 12px;text-align:right;font-size:13px;">R ${r.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">R ${lineTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:13px;">R ${r.unitCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">R ${lineTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
       </tr>`
     }).join('')
     const billedToBlock = `
@@ -3496,9 +3496,9 @@ function WorksheetInvoiceModal({
       <div class="info-box"><p class="info-label">Billed To</p>${billedToBlock}</div>
       <div class="info-box" style="flex:0;min-width:200px;">
         <p class="info-label">Invoice Total</p>
-        ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: R ${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-        <p style="font-size:13px;color:#6b7280;">VAT (${vatPct}%): R ${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>` : ''}
-        <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">R ${grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+        ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: R ${subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>
+        <p style="font-size:13px;color:#6b7280;">VAT (${vatPct}%): R ${vatAmt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>` : ''}
+        <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">R ${grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>
         <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ' · landed cost'}</p>
       </div>
     </div>
@@ -3511,9 +3511,9 @@ function WorksheetInvoiceModal({
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
       <tfoot>
-        ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">R ${subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
-        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">R ${vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>` : ''}
-        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">R ${grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
+        ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">R ${subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td></tr>
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">R ${vatAmt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td></tr>` : ''}
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">R ${grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td></tr>
       </tfoot>
     </table></body></html>`
     const win = window.open('', '_blank')
@@ -3528,7 +3528,7 @@ function WorksheetInvoiceModal({
             <h2 className="text-base font-semibold text-gray-900">{title ?? 'Create Invoice'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
               {supplierName && <span className="font-medium">{supplierName}</span>}
-              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} total
+              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · R {grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} total
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -3584,7 +3584,7 @@ function WorksheetInvoiceModal({
                         className="w-24 border-0 bg-transparent text-xs text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
                     </td>
                     <td className="px-3 py-1.5 text-right text-xs font-semibold text-gray-900">
-                      R {(row.qty * row.unitCost).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      R {(row.qty * row.unitCost).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
                     </td>
                   </tr>
                 ))}
@@ -3594,21 +3594,21 @@ function WorksheetInvoiceModal({
                   <>
                     <tr>
                       <td colSpan={4} className="px-3 py-1.5 text-right text-xs text-gray-500">Subtotal (excl. VAT)</td>
-                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">R {subtotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">R {subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="px-3 py-1.5 text-right text-xs text-gray-500">VAT ({vatPct}%)</td>
-                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">R {vatAmt.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">R {vatAmt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total (incl. VAT)</td>
-                      <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">R {grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
                     </tr>
                   </>
                 ) : (
                   <tr>
                     <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total</td>
-                    <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">R {grandTotal.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">R {grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
                   </tr>
                 )}
               </tfoot>
@@ -3651,8 +3651,8 @@ function WorksheetSupplierOrderModal({
 
   const curr = currency || 'ZAR'
   const currSym = ({ EUR: '€', GBP: '£', CNY: '¥', HKD: 'HK$', SGD: 'S$', ZAR: 'R', USD: '$' } as Record<string, string>)[curr] ?? (curr + ' ')
-  const fmtR = (n: number) => 'R ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const fmtC = (n: number) => currSym + ' ' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmtR = (n: number) => 'R ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const fmtC = (n: number) => currSym + ' ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
   const jdmItems = items.filter(it => it.costingEntity === 'JDM' && (it.landedCost || 0) > 0)
 
   const INV_CSS = `*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
@@ -3679,7 +3679,7 @@ function WorksheetSupplierOrderModal({
     const subtotal = invItems.reduce((s, it) => s + it.qty * it.unitPrice, 0)
     const vatAmt = vatPct ? subtotal * vatPct / 100 : 0
     const grand = subtotal + vatAmt
-    const fmtAmt = (n: number) => sym + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const fmtAmt = (n: number) => sym + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
     const rowsHtml = invItems.map((it, i) => {
       const lt = it.qty * it.unitPrice
       return `<tr>

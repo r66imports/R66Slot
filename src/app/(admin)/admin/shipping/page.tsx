@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 
@@ -24,7 +24,7 @@ interface AccountsData {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 function fmt(n: number) {
-  return 'R' + n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return 'R' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
 function fmtDate(iso: string) {
