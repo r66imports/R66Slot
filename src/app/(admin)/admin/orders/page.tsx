@@ -1069,6 +1069,7 @@ function CreateDocumentModal({
   stockDeductionEnabled = true,
   onCreated,
   onClose,
+  onRecordInlinePayment,
 }: {
   docType: DocType
   template: OrderTemplate
@@ -1080,7 +1081,9 @@ function CreateDocumentModal({
   stockDeductionEnabled?: boolean
   onCreated: (doc: OrderDocument) => void
   onClose: () => void
+  onRecordInlinePayment?: (amountPaid: number, paymentMethod: string, notes: string) => Promise<void>
 }) {
+  type InlineMethod = 'EFT' | 'Cash' | 'Card'
   const cfg = TAB_CFG[docType === 'quote' ? 'quotes' : docType === 'salesorder' ? 'salesorders' : 'invoices']
   const isQuote = docType === 'quote'
 
@@ -1108,6 +1111,29 @@ function CreateDocumentModal({
   const [enforceStockLimit, setEnforceStockLimit] = useState(false)
   const [priceMode, setPriceMode] = useState<'retail' | 'cost' | 'preorder'>('retail')
   const [fullScreen, setFullScreen] = useState(false)
+
+  // Inline payment recording
+  const [localPayments, setLocalPayments] = useState<any[]>((editDoc as any)?.payments || [])
+  const [inlineMethod, setInlineMethod] = useState<InlineMethod>('EFT')
+  const [inlineAmt, setInlineAmt] = useState('')
+  const [inlineNotes, setInlineNotes] = useState('')
+  const [inlineSaving, setInlineSaving] = useState(false)
+
+  const handleInlineRecord = async () => {
+    const amount = parseFloat(inlineAmt)
+    if (!amount || amount <= 0 || !onRecordInlinePayment) return
+    setInlineSaving(true)
+    const entry = { date: new Date().toISOString(), amountPaid: amount, creditApplied: 0, paymentMethod: inlineMethod, notes: inlineNotes }
+    setLocalPayments(prev => [...prev, entry])
+    setInlineAmt('')
+    setInlineNotes('')
+    try {
+      await onRecordInlinePayment(amount, inlineMethod, inlineNotes)
+    } catch {
+      setLocalPayments(prev => prev.slice(0, -1))
+    }
+    setInlineSaving(false)
+  }
 
   useEffect(() => {
     fetch('/api/admin/site-rules')
@@ -1706,6 +1732,68 @@ function CreateDocumentModal({
               </table>
             </div>
           </section>
+
+          {/* ── Inline Payment Section — show when editing any existing doc ── */}
+          {editDoc && (
+            <section>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Payments</h3>
+
+              {localPayments.length > 0 && (
+                <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden mb-3">
+                  {localPayments.map((p: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 bg-white text-sm">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-gray-400">{p.date ? new Date(p.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                        <span className="font-semibold text-gray-600 px-1.5 py-0.5 bg-gray-100 rounded">{p.paymentMethod || 'EFT'}</span>
+                        {p.notes ? <span className="text-gray-400">· {p.notes}</span> : null}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {(p.amountPaid || 0) > 0 && <span className="text-green-700 font-semibold">{fmtPrice(p.amountPaid)}</span>}
+                        {(p.creditApplied || 0) > 0 && <span className="text-blue-600 text-xs">+Credit {fmtPrice(p.creditApplied)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {onRecordInlinePayment && (
+                <div className="bg-gray-50 rounded-xl border border-gray-200 p-3">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Record Payment</div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex gap-1">
+                      {(['EFT', 'Cash', 'Card'] as const).map(m => (
+                        <button key={m} type="button" onClick={() => setInlineMethod(m)}
+                          className={`px-2.5 py-1.5 text-xs rounded-lg font-semibold border transition-colors ${inlineMethod === m ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                        >{m}</button>
+                      ))}
+                    </div>
+                    <input
+                      type="number" min={0} step="0.01"
+                      value={inlineAmt}
+                      onChange={e => setInlineAmt(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleInlineRecord()}
+                      placeholder="Amount (R)"
+                      className="w-28 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                    <input
+                      type="text"
+                      value={inlineNotes}
+                      onChange={e => setInlineNotes(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleInlineRecord()}
+                      placeholder="Reference (optional)"
+                      className="flex-1 min-w-[120px] border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleInlineRecord}
+                      disabled={inlineSaving || !inlineAmt || parseFloat(inlineAmt) <= 0}
+                      className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-40 font-semibold whitespace-nowrap"
+                    >{inlineSaving ? '…' : '+ Record'}</button>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div><label className="text-xs font-semibold text-gray-500 mb-1 block">Notes</label><textarea className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none" rows={3} value={form.notes} onChange={(e) => setField('notes', e.target.value)} /></div>
@@ -3128,6 +3216,42 @@ function OrdersPageInner() {
     setPaymentModal(null)
   }
 
+  const handleInlinePayment = async (amountPaid: number, paymentMethod: string, notes: string) => {
+    if (!editDocState) return
+    const doc = editDocState
+    const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+    const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
+    const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
+    const prevAmountPaid = (doc as any).amountPaid || 0
+    const prevCredit = (doc as any).creditApplied || 0
+    const prevDeposit = (doc as any).depositPaid || 0
+    const newAmountPaid = prevAmountPaid + amountPaid
+    const newOverpayment = Math.max(0, newAmountPaid + prevCredit + prevDeposit - invoiceTotal)
+    const fullySettled = newAmountPaid + prevCredit + prevDeposit >= invoiceTotal - 0.005
+    const payments = [
+      ...((doc as any).payments || []),
+      { date: new Date().toISOString(), amountPaid, creditApplied: 0, paymentMethod, notes },
+    ]
+    await fetch('/api/admin/customer-credits', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'record_payment', clientName: doc.clientName, invoiceNumber: doc.docNumber, amountPaid, creditApplied: 0, overpayment: newOverpayment, notes }),
+    }).catch(() => {})
+    const patchRes = await fetch(`/api/admin/orders/documents/${doc.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amountPaid: newAmountPaid, overpaymentCredit: newOverpayment, paymentMethod, payments, ...(fullySettled ? { status: 'paid' } : {}) }),
+    })
+    if (patchRes.ok) {
+      const updated = await patchRes.json()
+      setDocuments(prev => prev.map(d => d.id === updated.id ? updated : d))
+      setEditDocState(updated)
+    }
+    const key = doc.clientName.toLowerCase().replace(/\s+/g, '_')
+    fetch(`/api/admin/customer-credits/${key}`)
+      .then(r => r.ok ? r.json() : { balance: 0 })
+      .then(rec => setCreditBalances(prev => ({ ...prev, [key]: rec.balance ?? 0 })))
+      .catch(() => {})
+  }
+
   const handleSyncInventory = async () => {
     setSyncingInventory(true)
     setSyncResult(null)
@@ -4415,6 +4539,7 @@ function OrdersPageInner() {
             setEditDocState(null)
           }}
           onClose={() => setEditDocState(null)}
+          onRecordInlinePayment={handleInlinePayment}
         />
       )}
       {paymentModal && (
