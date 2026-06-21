@@ -146,9 +146,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       items: [
         { name: 'Site Orders', href: '/admin/site-orders' },
         { name: 'Orders', href: '/admin/orders' },
+        { name: 'Back Orders', href: '/admin/orders?tab=backorders' },
+        { name: 'Quotes', href: '/admin/orders?tab=quotes' },
+        { name: 'Sales Orders', href: '/admin/orders?tab=salesorders' },
+        { name: 'Invoices', href: '/admin/orders?tab=invoices' },
         { name: 'Pre-Orders', href: '/admin/preorder-list' },
         { name: 'Pre Order Dashboard', href: '/admin/preorder-dashboard' },
-        { name: 'Back Orders', href: '/admin/backorders' },
         { name: 'Suppliers Orders', href: '/admin/suppliers' },
         { name: 'Work Sheet', href: '/admin/worksheet' },
         { name: 'Price Lists', href: '/admin/price-lists' },

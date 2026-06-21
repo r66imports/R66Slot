@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import type { Backorder } from '@/types/backorder'
 import { useColumnResize } from '@/hooks/use-column-resize'
 
@@ -2653,13 +2654,15 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
-export default function OrdersPage() {
+function OrdersPageInner() {
+  const searchParams = useSearchParams()
   const [backorders, setBackorders] = useState<Backorder[]>([])
   const [documents, setDocuments] = useState<OrderDocument[]>([])
   const [template, setTemplate] = useState<OrderTemplate>(DEFAULT_TEMPLATE)
   const [clients, setClients] = useState<ClientContact[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<Tab>('backorders')
+  const initialTab = (['backorders', 'quotes', 'salesorders', 'invoices'] as Tab[]).find(t => t === searchParams.get('tab')) ?? 'backorders'
+  const [tab, setTab] = useState<Tab>(initialTab)
   const [docSortBy, setDocSortBy] = useState<string>('date')
   const [docSortDir, setDocSortDir] = useState<'asc' | 'desc'>('desc')
   const { widths: docColW, setWidth: setDocWidth } = useColumnResize('orders-docs', {
@@ -4441,3 +4444,5 @@ export default function OrdersPage() {
     </div>
   )
 }
+
+export default function OrdersPage() { return <Suspense><OrdersPageInner /></Suspense> }
