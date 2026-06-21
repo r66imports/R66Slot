@@ -587,6 +587,29 @@ export default function CustomerPaymentsPage() {
                 )}
               </div>
 
+              {/* Payment history */}
+              {((editDoc as any).payments || []).length > 0 && (
+                <div>
+                  <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Payment History</div>
+                  <div className="divide-y divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
+                    {((editDoc as any).payments as Array<{ date: string; amountPaid: number; creditApplied: number; paymentMethod: string; notes: string }>).map((p, i) => (
+                      <div key={i} className="flex items-start justify-between px-3 py-2 bg-white text-sm">
+                        <div>
+                          <span className="text-gray-500 text-xs">{p.date ? new Date(p.date).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+                          <span className="mx-2 text-gray-300">|</span>
+                          <span className="text-gray-700 font-medium">{p.paymentMethod || 'EFT'}</span>
+                          {p.notes ? <span className="ml-2 text-gray-400 text-xs">— {p.notes}</span> : null}
+                        </div>
+                        <div className="text-right ml-4 flex-shrink-0">
+                          {p.amountPaid > 0 && <div className="text-green-700 font-semibold">{fmtPrice(p.amountPaid)}</div>}
+                          {p.creditApplied > 0 && <div className="text-blue-600 text-xs">+Credit {fmtPrice(p.creditApplied)}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Payment methods */}
               <div>
                 <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Payment Methods</div>
