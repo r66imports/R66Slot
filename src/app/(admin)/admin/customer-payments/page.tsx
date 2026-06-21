@@ -74,7 +74,7 @@ export default function CustomerPaymentsPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [credits, setCredits] = useState<CreditStore>({})
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'payments' | 'credits'>('payments')
+  const [tab, setTab] = useState<'payments' | 'credits' | 'statements'>('payments')
 
   // Payments tab state
   const [search, setSearch] = useState('')
@@ -86,6 +86,12 @@ export default function CustomerPaymentsPage() {
   const [creditSort, setCreditSort] = useState<'clientName' | 'balance'>('balance')
   const [creditSortDir, setCreditSortDir] = useState<'asc' | 'desc'>('desc')
   const [expandedClient, setExpandedClient] = useState<string | null>(null)
+
+  // Statements tab state
+  const [stmtSearch, setStmtSearch] = useState('')
+  const [stmtEmailing, setStmtEmailing] = useState<string | null>(null) // clientName being emailed
+  const [stmtEmailAddr, setStmtEmailAddr] = useState('')
+  const [stmtEmailPrompt, setStmtEmailPrompt] = useState<string | null>(null) // clientName to confirm email for
 
   // Edit modal state
   const [editDoc, setEditDoc] = useState<Invoice | null>(null)
@@ -287,6 +293,127 @@ export default function CustomerPaymentsPage() {
     return { totalInvoiced, totalPaid, totalOutstanding, totalCredits }
   }, [invoices, credits])
 
+  const clientSummaries = useMemo(() => {
+    const map = new Map<string, { invoices: Invoice[]; email: string }>()
+    for (const inv of invoices) {
+      if (!map.has(inv.clientName)) map.set(inv.clientName, { invoices: [], email: inv.clientEmail || '' })
+      const entry = map.get(inv.clientName)!
+      entry.invoices.push(inv)
+      if (!entry.email && inv.clientEmail) entry.email = inv.clientEmail
+    }
+    return Array.from(map.entries())
+      .map(([name, { invoices: invs, email }]) => ({
+        clientName: name,
+        email,
+        count: invs.length,
+        totalInvoiced: invs.reduce((s, d) => s + invoiceTotal(d), 0),
+        totalSettledAmt: invs.reduce((s, d) => s + totalSettled(d), 0),
+        totalOutstanding: invs.reduce((s, d) => s + balanceDue(d), 0),
+        creditBalance: credits[name.toLowerCase().replace(/\s+/g, '_')]?.balance || 0,
+        invoiceList: invs.sort((a, b) => a.date.localeCompare(b.date)),
+      }))
+      .sort((a, b) => b.totalOutstanding - a.totalOutstanding)
+  }, [invoices, credits])
+
+  const filteredClientSummaries = useMemo(() =>
+    stmtSearch.trim()
+      ? clientSummaries.filter(c => c.clientName.toLowerCase().includes(stmtSearch.toLowerCase()))
+      : clientSummaries,
+    [clientSummaries, stmtSearch]
+  )
+
+  function generateStatementHTML(clientName: string): string {
+    const sum = clientSummaries.find(c => c.clientName === clientName)
+    if (!sum) return ''
+    const today = new Date().toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })
+    const rows = sum.invoiceList.map(d => {
+      const tot = invoiceTotal(d)
+      const settled = totalSettled(d)
+      const bal = balanceDue(d)
+      const isPaid = bal <= 0.005
+      const isPartial = settled > 0.005 && !isPaid
+      return `<tr style="background:${isPaid ? '#f0fdf4' : isPartial ? '#fff7ed' : '#fff'}">
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5e5">${fmtDate(d.date)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5e5;font-family:monospace;font-weight:700">${d.docNumber}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5e5;text-align:right">${fmtPrice(tot)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5e5;text-align:right">${(d.depositPaid || 0) > 0 ? fmtPrice(d.depositPaid!) : '—'}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5e5;text-align:right;color:#15803d">${(d.amountPaid || 0) > 0 ? fmtPrice(d.amountPaid!) : '—'}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5e5;text-align:right;color:#2563eb">${(d.creditApplied || 0) > 0 ? fmtPrice(d.creditApplied!) : '—'}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e5e5e5;text-align:right;font-weight:700;color:${isPaid ? '#15803d' : bal > 0 ? '#c0392b' : '#374151'}">${isPaid ? '✓ Paid' : fmtPrice(bal)}</td>
+      </tr>`
+    }).join('')
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Statement — ${clientName}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:32px;max-width:900px;margin:0 auto}@media print{body{padding:12px}}</style>
+</head><body>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:2px solid #1a1a1a;padding-bottom:16px">
+  <div><div style="font-size:22px;font-weight:900;letter-spacing:1px">R66SLOT</div><div style="font-size:11px;color:#666;margin-top:2px">Route 66 Imports (Pty) Ltd · Your Slot Car Specialists</div></div>
+  <div style="text-align:right"><div style="font-size:18px;font-weight:700;color:#c0392b">STATEMENT OF ACCOUNT</div><div style="font-size:11px;color:#666;margin-top:4px">Generated: ${today}</div></div>
+</div>
+<div style="margin-bottom:20px"><div style="font-size:15px;font-weight:700">${clientName}</div><div style="color:#666;font-size:11px;margin-top:2px">Account Statement — All Invoices</div></div>
+<table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+  <thead><tr style="background:#1a1a1a;color:#fff">
+    <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase">Date</th>
+    <th style="padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase">Invoice #</th>
+    <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase">Total</th>
+    <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase">Deposit</th>
+    <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase">Paid</th>
+    <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase">Credit</th>
+    <th style="padding:8px 10px;text-align:right;font-size:11px;text-transform:uppercase">Balance</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot><tr style="border-top:2px solid #1a1a1a;font-weight:700">
+    <td colspan="2" style="padding:10px 10px">TOTALS</td>
+    <td style="padding:10px 10px;text-align:right">${fmtPrice(sum.totalInvoiced)}</td>
+    <td></td>
+    <td style="padding:10px 10px;text-align:right;color:#15803d">${fmtPrice(sum.totalSettledAmt)}</td>
+    <td></td>
+    <td style="padding:10px 10px;text-align:right;font-weight:700;color:${sum.totalOutstanding > 0.005 ? '#c0392b' : '#15803d'}">${sum.totalOutstanding > 0.005 ? fmtPrice(sum.totalOutstanding) : '✓ CLEAR'}</td>
+  </tr></tfoot>
+</table>
+<div style="border:1px solid #e5e5e5;border-radius:8px;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+  <div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0"><span>Total Invoiced</span><span>${fmtPrice(sum.totalInvoiced)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0"><span>Total Settled</span><span>${fmtPrice(sum.totalSettledAmt)}</span></div>
+    ${sum.creditBalance > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;color:#15803d"><span>Credit Balance</span><span>${fmtPrice(sum.creditBalance)}</span></div>` : ''}
+  </div>
+  <div style="display:flex;align-items:center;justify-content:center">
+    <div style="text-align:center;padding:16px;border-radius:8px;background:${sum.totalOutstanding > 0.005 ? '#fef2f2' : '#f0fdf4'};border:2px solid ${sum.totalOutstanding > 0.005 ? '#fca5a5' : '#86efac'}">
+      <div style="font-size:11px;text-transform:uppercase;font-weight:700;color:${sum.totalOutstanding > 0.005 ? '#c0392b' : '#15803d'};margin-bottom:4px">${sum.totalOutstanding > 0.005 ? 'Amount Due' : 'All Clear'}</div>
+      <div style="font-size:22px;font-weight:900;color:${sum.totalOutstanding > 0.005 ? '#c0392b' : '#15803d'}">${sum.totalOutstanding > 0.005 ? fmtPrice(sum.totalOutstanding) : '✓'}</div>
+    </div>
+  </div>
+</div>
+<div style="border-top:1px solid #e5e5e5;padding-top:12px;text-align:center;color:#999;font-size:10px">
+  Generated ${today} · Route 66 Imports (Pty) Ltd · r66slot.co.za · VAT 4310297884
+</div>
+</body></html>`
+  }
+
+  function handleDownloadStatement(clientName: string) {
+    const html = generateStatementHTML(clientName)
+    const w = window.open('', '_blank')
+    if (w) { w.document.write(html); w.document.close() }
+  }
+
+  async function handleEmailStatement(clientName: string, email: string) {
+    if (!email) return
+    setStmtEmailing(clientName)
+    const html = generateStatementHTML(clientName)
+    const sum = clientSummaries.find(c => c.clientName === clientName)
+    const subject = `Statement of Account — ${clientName}`
+    try {
+      const res = await fetch('/api/admin/send-document', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: email, subject, html, documentType: 'Statement' }),
+      })
+      const result = await res.json()
+      if (result.success) alert(`✓ Statement emailed to ${email}`)
+      else alert(`Failed to send: ${result.error || 'Unknown error'}`)
+    } catch { alert('Network error — could not send email') }
+    setStmtEmailing(null)
+    setStmtEmailPrompt(null)
+  }
+
   const SortBtn = ({ field, label }: { field: SortField; label: string }) => (
     <th
       className="px-3 py-2.5 text-left font-semibold cursor-pointer hover:bg-gray-700 select-none whitespace-nowrap"
@@ -357,6 +484,7 @@ export default function CustomerPaymentsPage() {
         {([
           ['payments', `Payments (${invoices.length})`],
           ['credits', `Credits (${Object.keys(credits).length} clients)`],
+          ['statements', `Statements`],
         ] as const).map(([t, label]) => (
           <button
             key={t}
@@ -559,6 +687,96 @@ export default function CustomerPaymentsPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Statements Tab ── */}
+      {tab === 'statements' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search client…"
+              value={stmtSearch}
+              onChange={e => setStmtSearch(e.target.value)}
+              className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            />
+            <span className="text-xs text-gray-400 ml-auto">{filteredClientSummaries.length} clients</span>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-800 text-white text-xs">
+                  <th className="px-3 py-2.5 text-left font-semibold">Client</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">Invoices</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Total Invoiced</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Total Settled</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Outstanding</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Credit</th>
+                  <th className="px-3 py-2.5 text-left font-semibold">Statement</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredClientSummaries.length === 0 ? (
+                  <tr><td colSpan={7} className="px-3 py-10 text-center text-gray-400">No clients found</td></tr>
+                ) : filteredClientSummaries.map(c => {
+                  const isClear = c.totalOutstanding <= 0.005
+                  const isEmailing = stmtEmailing === c.clientName
+                  const isPrompting = stmtEmailPrompt === c.clientName
+                  return (
+                    <tr key={c.clientName} className={isClear ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}>
+                      <td className="px-3 py-2.5 font-medium text-gray-800">
+                        <div>{c.clientName}</div>
+                        {c.email && <div className="text-xs text-gray-400">{c.email}</div>}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-gray-500">{c.count}</td>
+                      <td className="px-3 py-2.5 text-right text-gray-700">{fmtPrice(c.totalInvoiced)}</td>
+                      <td className="px-3 py-2.5 text-right text-green-700">{c.totalSettledAmt > 0.005 ? fmtPrice(c.totalSettledAmt) : <span className="text-gray-300">—</span>}</td>
+                      <td className="px-3 py-2.5 text-right font-semibold">
+                        {isClear
+                          ? <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Clear</span>
+                          : <span className="text-orange-600">{fmtPrice(c.totalOutstanding)}</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        {c.creditBalance > 0.005 ? <span className="text-blue-600 font-medium">{fmtPrice(c.creditBalance)}</span> : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {isPrompting ? (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="email"
+                              value={stmtEmailAddr}
+                              onChange={e => setStmtEmailAddr(e.target.value)}
+                              placeholder="Email address"
+                              className="border border-gray-200 rounded px-2 py-1 text-xs w-44 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleEmailStatement(c.clientName, stmtEmailAddr)}
+                              disabled={isEmailing || !stmtEmailAddr}
+                              className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-40 font-semibold"
+                            >{isEmailing ? '…' : 'Send'}</button>
+                            <button onClick={() => setStmtEmailPrompt(null)} className="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => handleDownloadStatement(c.clientName)}
+                              className="px-2.5 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-700 font-semibold"
+                            >Download PDF</button>
+                            <button
+                              onClick={() => { setStmtEmailPrompt(c.clientName); setStmtEmailAddr(c.email) }}
+                              className="px-2.5 py-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 font-semibold"
+                            >Email</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
