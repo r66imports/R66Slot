@@ -183,7 +183,7 @@ async function buildSalesItems(from: string, to: string): Promise<{ items: Event
     const paymentTotals = { cash: 0, card: 0, eft: 0, other: 0 }
 
     for (const doc of docs) {
-      if (doc.status === 'archived' || doc.status === 'rejected') continue
+      if (doc.status === 'rejected') continue
       const d = new Date(doc.date || '')
       if (d < fromDate || d > toDate) continue
 
@@ -397,7 +397,7 @@ function SkuDetailModal({ item, event, onClose }: {
 
       const result: SkuInvoiceRow[] = []
       for (const doc of docs as RawInvoice[]) {
-        if (doc.status === 'archived' || doc.status === 'rejected') continue
+        if (doc.status === 'rejected') continue
         const d = new Date(doc.date || '')
         if (d < fromDate || d > toDate) continue
         for (const li of doc.lineItems) {
