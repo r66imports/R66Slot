@@ -48,6 +48,9 @@ export type CostingState = {
   useCustomRate: boolean
   calcMode: 'standard' | 'spareParts'
   sparePartsCost: string
+  sparePartsCurrencyCode: string
+  sparePartsCustomRate: string
+  useSparePartsCustomRate: boolean
 }
 
 export const INITIAL_COSTING_STATE: CostingState = {
@@ -67,6 +70,9 @@ export const INITIAL_COSTING_STATE: CostingState = {
   useCustomRate: false,
   calcMode: 'standard',
   sparePartsCost: '',
+  sparePartsCurrencyCode: 'ZAR',
+  sparePartsCustomRate: '',
+  useSparePartsCustomRate: false,
 }
 
 interface CostingModalProps {
@@ -240,60 +246,109 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
 
           {/* ── Spare Parts Calculator ── */}
           {s.calcMode === 'spareParts' && (() => {
+            const spCurrency = CURRENCIES.find(c => c.code === s.sparePartsCurrencyCode) || CURRENCIES[0]
+            const spRate = s.useSparePartsCustomRate && s.sparePartsCustomRate
+              ? parseFloat(s.sparePartsCustomRate) || (exchangeRates[spCurrency.code] || spCurrency.toZAR)
+              : exchangeRates[spCurrency.code] || spCurrency.toZAR
             const spCost = parseFloat(s.sparePartsCost) || 0
             const spShipping = spCost * 0.45
             const spLanded = spCost + spShipping
             const spVAT = spLanded * 0.15
             const spTotal = spLanded + spVAT
+            const spTotalZAR = spTotal * spRate
+            const isZAR = spCurrency.code === 'ZAR'
+            const sym = spCurrency.symbol
+            const fmt = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
             return (
               <div className="bg-white rounded-lg shadow border border-orange-200 overflow-hidden mb-4">
                 <div className="bg-orange-50 px-4 py-3 border-b border-orange-200">
                   <h3 className="text-sm font-bold text-orange-900 font-play">Spare Parts Calculator</h3>
-                  <p className="text-xs text-orange-700 font-play mt-0.5">Fixed formula: Cost + 45% Shipping &amp; Customs + 15% VAT</p>
+                  <p className="text-xs text-orange-700 font-play mt-0.5">Fixed formula: Cost + 45% Shipping &amp; Customs + 15% VAT → Final in ZAR</p>
                 </div>
                 <div className="grid grid-cols-2 divide-x divide-gray-200">
-                  {/* Left — input */}
-                  <div className="p-4 bg-gray-50">
-                    <label className="block text-xs font-bold text-gray-900 mb-1 font-play">Cost Price (ZAR)</label>
-                    <div className="relative">
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">R</span>
-                      <input
-                        type="number"
-                        value={s.sparePartsCost}
-                        onChange={(e) => update({ sparePartsCost: e.target.value })}
-                        placeholder="0.00"
-                        step="0.01"
-                        min="0"
-                        className="w-full pl-8 pr-2 py-1.5 text-sm font-semibold border-2 border-gray-300 rounded focus:ring-2 focus:ring-orange-400 font-play"
-                      />
+                  {/* Left — inputs */}
+                  <div className="p-4 bg-gray-50 space-y-3">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-900 mb-1 font-play">Currency</label>
+                      <select
+                        value={s.sparePartsCurrencyCode}
+                        onChange={(e) => update({ sparePartsCurrencyCode: e.target.value, useSparePartsCustomRate: false, sparePartsCustomRate: '' })}
+                        className="w-full px-2 py-1.5 text-xs border-2 border-gray-300 rounded focus:ring-2 focus:ring-orange-400 bg-white font-play"
+                      >
+                        {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.name}</option>)}
+                      </select>
                     </div>
-                    <div className="mt-4 space-y-2 text-xs text-gray-500 font-play">
-                      <div className="flex justify-between"><span>Shipping &amp; Customs rate:</span><span className="font-bold text-gray-700">45% (fixed)</span></div>
-                      <div className="flex justify-between"><span>VAT rate:</span><span className="font-bold text-gray-700">15% (fixed)</span></div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-900 mb-1 font-play">Cost Price ({spCurrency.code})</label>
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">{sym}</span>
+                        <input
+                          type="number"
+                          value={s.sparePartsCost}
+                          onChange={(e) => update({ sparePartsCost: e.target.value })}
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0"
+                          className="w-full pl-8 pr-2 py-1.5 text-sm font-semibold border-2 border-gray-300 rounded focus:ring-2 focus:ring-orange-400 font-play"
+                        />
+                      </div>
+                    </div>
+                    {!isZAR && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <input type="checkbox" id="spCustomRate" checked={s.useSparePartsCustomRate}
+                            onChange={(e) => update({ useSparePartsCustomRate: e.target.checked })} className="w-3 h-3" />
+                          <label htmlFor="spCustomRate" className="text-xs font-semibold text-gray-600 cursor-pointer font-play">
+                            Custom Rate (1 {spCurrency.code} = ? ZAR)
+                          </label>
+                        </div>
+                        {s.useSparePartsCustomRate && (
+                          <input type="number" value={s.sparePartsCustomRate}
+                            onChange={(e) => update({ sparePartsCustomRate: e.target.value })}
+                            placeholder={spRate.toFixed(4)} step="0.0001" min="0"
+                            className="w-full px-2 py-1.5 text-sm border-2 border-orange-300 rounded font-semibold font-play" />
+                        )}
+                        <div className="text-xs text-gray-500 mt-1 font-play">Rate: 1 {spCurrency.code} = R {spRate.toFixed(4)}</div>
+                      </div>
+                    )}
+                    <div className="space-y-1 text-xs text-gray-500 font-play pt-1 border-t border-gray-200">
+                      <div className="flex justify-between"><span>Shipping &amp; Customs:</span><span className="font-bold text-gray-700">45% (fixed)</span></div>
+                      <div className="flex justify-between"><span>VAT:</span><span className="font-bold text-gray-700">15% (fixed)</span></div>
                     </div>
                   </div>
                   {/* Right — breakdown */}
                   <div className="p-4 space-y-2">
                     <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
                       <span className="text-gray-600">Cost Price:</span>
-                      <span className="font-medium">R {spCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                      <span className="font-medium">{sym} {fmt(spCost)}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
                       <span className="text-gray-600">Shipping &amp; Customs (45%):</span>
-                      <span className="font-medium text-blue-600">+ R {spShipping.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                      <span className="font-medium text-blue-600">+ {sym} {fmt(spShipping)}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
                       <span className="text-gray-600">Landed Cost:</span>
-                      <span className="font-semibold text-gray-800">R {spLanded.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                      <span className="font-semibold text-gray-800">{sym} {fmt(spLanded)}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
                       <span className="text-gray-600">VAT (15%):</span>
-                      <span className="font-medium text-orange-600">+ R {spVAT.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                      <span className="font-medium text-orange-600">+ {sym} {fmt(spVAT)}</span>
                     </div>
+                    {!isZAR && spCost > 0 && (
+                      <div className="flex justify-between py-2 border-b border-gray-100 text-xs text-gray-400 font-play">
+                        <span>Subtotal ({spCurrency.code}):</span>
+                        <span>{sym} {fmt(spTotal)} × {spRate.toFixed(4)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between py-3 bg-orange-50 px-3 rounded-lg mt-2 font-play">
                       <span className="text-base font-bold text-orange-900">Selling Price (Incl. VAT):</span>
-                      <span className="text-2xl font-bold text-orange-600">R {spTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                      <span className="text-2xl font-bold text-orange-600">R {fmt(spTotalZAR)}</span>
                     </div>
+                    {!isZAR && spCost > 0 && (
+                      <div className="text-xs text-gray-400 text-right font-play">
+                        Rate: 1 {spCurrency.code} = R {spRate.toFixed(4)}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
