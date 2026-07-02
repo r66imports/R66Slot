@@ -46,6 +46,8 @@ export type CostingState = {
   includeVAT: boolean
   customRate: string
   useCustomRate: boolean
+  calcMode: 'standard' | 'spareParts'
+  sparePartsCost: string
 }
 
 export const INITIAL_COSTING_STATE: CostingState = {
@@ -63,6 +65,8 @@ export const INITIAL_COSTING_STATE: CostingState = {
   includeVAT: true,
   customRate: '',
   useCustomRate: false,
+  calcMode: 'standard',
+  sparePartsCost: '',
 }
 
 interface CostingModalProps {
@@ -207,8 +211,97 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
 
         {/* Modal Body */}
         <div className="p-6">
-          {/* Calculator */}
-          <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
+
+          {/* Calculator Mode Toggle */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => update({ calcMode: 'standard' })}
+              className={cn(
+                'flex-1 py-2 rounded-lg text-sm font-bold font-play border-2 transition-colors',
+                s.calcMode !== 'spareParts'
+                  ? 'bg-gray-800 text-white border-gray-900'
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+              )}
+            >
+              Standard Calculator
+            </button>
+            <button
+              onClick={() => update({ calcMode: 'spareParts' })}
+              className={cn(
+                'flex-1 py-2 rounded-lg text-sm font-bold font-play border-2 transition-colors',
+                s.calcMode === 'spareParts'
+                  ? 'bg-orange-600 text-white border-orange-700'
+                  : 'bg-white text-gray-500 border-gray-300 hover:border-gray-400'
+              )}
+            >
+              Spare Parts Calculator
+            </button>
+          </div>
+
+          {/* ── Spare Parts Calculator ── */}
+          {s.calcMode === 'spareParts' && (() => {
+            const spCost = parseFloat(s.sparePartsCost) || 0
+            const spShipping = spCost * 0.45
+            const spLanded = spCost + spShipping
+            const spVAT = spLanded * 0.15
+            const spTotal = spLanded + spVAT
+            return (
+              <div className="bg-white rounded-lg shadow border border-orange-200 overflow-hidden mb-4">
+                <div className="bg-orange-50 px-4 py-3 border-b border-orange-200">
+                  <h3 className="text-sm font-bold text-orange-900 font-play">Spare Parts Calculator</h3>
+                  <p className="text-xs text-orange-700 font-play mt-0.5">Fixed formula: Cost + 45% Shipping &amp; Customs + 15% VAT</p>
+                </div>
+                <div className="grid grid-cols-2 divide-x divide-gray-200">
+                  {/* Left — input */}
+                  <div className="p-4 bg-gray-50">
+                    <label className="block text-xs font-bold text-gray-900 mb-1 font-play">Cost Price (ZAR)</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">R</span>
+                      <input
+                        type="number"
+                        value={s.sparePartsCost}
+                        onChange={(e) => update({ sparePartsCost: e.target.value })}
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        className="w-full pl-8 pr-2 py-1.5 text-sm font-semibold border-2 border-gray-300 rounded focus:ring-2 focus:ring-orange-400 font-play"
+                      />
+                    </div>
+                    <div className="mt-4 space-y-2 text-xs text-gray-500 font-play">
+                      <div className="flex justify-between"><span>Shipping &amp; Customs rate:</span><span className="font-bold text-gray-700">45% (fixed)</span></div>
+                      <div className="flex justify-between"><span>VAT rate:</span><span className="font-bold text-gray-700">15% (fixed)</span></div>
+                    </div>
+                  </div>
+                  {/* Right — breakdown */}
+                  <div className="p-4 space-y-2">
+                    <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
+                      <span className="text-gray-600">Cost Price:</span>
+                      <span className="font-medium">R {spCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
+                      <span className="text-gray-600">Shipping &amp; Customs (45%):</span>
+                      <span className="font-medium text-blue-600">+ R {spShipping.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
+                      <span className="text-gray-600">Landed Cost:</span>
+                      <span className="font-semibold text-gray-800">R {spLanded.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
+                      <span className="text-gray-600">VAT (15%):</span>
+                      <span className="font-medium text-orange-600">+ R {spVAT.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                    </div>
+                    <div className="flex justify-between py-3 bg-orange-50 px-3 rounded-lg mt-2 font-play">
+                      <span className="text-base font-bold text-orange-900">Selling Price (Incl. VAT):</span>
+                      <span className="text-2xl font-bold text-orange-600">R {spTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* ── Standard Calculator ── */}
+          {s.calcMode !== 'spareParts' && <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden">
             <div className="grid grid-cols-2 divide-x divide-gray-200">
               {/* Left Column */}
               <div className="p-3 bg-gray-50">
@@ -354,10 +447,10 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
                 )}
               </div>
             </div>
-          </div>
+          </div>}
 
-          {/* Brand Presets */}
-          <div className="my-4 flex justify-center">
+          {/* Brand Presets — Standard only */}
+          {s.calcMode !== 'spareParts' && <div className="my-4 flex justify-center">
             <div className="grid grid-cols-4 gap-2 w-1/2">
               {(Object.keys(BRAND_DISCOUNTS) as (keyof typeof BRAND_DISCOUNTS)[]).map((brand) => (
                 <button key={brand} onClick={() => handleBrandClick(brand)}
@@ -373,10 +466,11 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
                 </button>
               ))}
             </div>
-          </div>
-          <p className="text-xs text-gray-600 text-center font-play">Enter retail price, then click a brand to auto-calculate cost price</p>
+          </div>}
+          {s.calcMode !== 'spareParts' && <p className="text-xs text-gray-600 text-center font-play">Enter retail price, then click a brand to auto-calculate cost price</p>}
 
-          {/* Wholesale Section */}
+          {/* Wholesale Section — Standard only */}
+          {s.calcMode !== 'spareParts' &&
           <div className="bg-white rounded-lg shadow border border-gray-200 overflow-hidden mt-4">
             <div className="bg-purple-50 px-3 py-2 border-b border-purple-200">
               <h2 className="text-sm font-bold text-purple-900 font-play">Wholesale % Costing</h2>
@@ -430,7 +524,7 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
                 </div>
               )}
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>
