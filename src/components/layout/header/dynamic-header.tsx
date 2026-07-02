@@ -215,7 +215,6 @@ export function DynamicHeader() {
     textColor: '#111827',
     navItems: [
       { label: 'New Arrivals', href: '/collections/new-arrivals' },
-      { label: 'Book for Next Shipment', href: '/book' },
     ],
     showSearch: true,
     showAccount: true,

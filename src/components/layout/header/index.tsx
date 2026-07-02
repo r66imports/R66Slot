@@ -76,13 +76,6 @@ export function Header() {
             >
               New Arrivals
             </Link>
-            <Link
-              href="/book"
-              className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-            >
-              Book for Next Shipment
-            </Link>
-
             {editorEnabled && isAdmin && (
               <Link
                 href="/r66-editor"
@@ -200,14 +193,6 @@ export function Header() {
               >
                 New Arrivals
               </Link>
-              <Link
-                href="/book"
-                className="text-sm font-medium text-gray-900 hover:text-primary transition-colors"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Book for Next Shipment
-              </Link>
-
               {editorEnabled && isAdmin && (
                 <Link
                   href="/r66-editor"
