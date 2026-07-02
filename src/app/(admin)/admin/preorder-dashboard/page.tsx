@@ -1267,6 +1267,45 @@ function ItemCard({
                 placeholder="0.00"
                 readOnly={autoCalc && hasWholesale}
               />
+              {autoCalc && hasWholesale && (() => {
+                const wp = parsePrice(form.wholesalePrice || '')
+                const curr = form.wholesaleCurrency || 'ZAR'
+                const isMotorhelix = form.supplier?.toLowerCase() === 'motorhelix' && curr === 'USD'
+                if (isMotorhelix) return null
+                const toZAR = curr === 'ZAR' ? 1 : (exchangeRates[curr] || 0)
+                if (!toZAR) return null
+                const costZAR = wp * toZAR
+                const withShipping = costZAR * (1 + costingSettings.shippingMarkup / 100)
+                const withMarkup = withShipping * (1 + costingSettings.markup / 100)
+                const final = costingSettings.includeVAT ? withMarkup * 1.15 : withMarkup
+                const fmt = (n: number) => `R${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
+                return (
+                  <div className="mt-1 text-[10px] text-gray-400 space-y-0.5 bg-gray-50 rounded px-2 py-1.5 border border-gray-100">
+                    <div className="flex justify-between">
+                      <span>Cost{curr !== 'ZAR' ? ` (${curr}→ZAR)` : ''}:</span>
+                      <span className="font-medium">{fmt(costZAR)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>+ Shipping & Customs ({costingSettings.shippingMarkup}%):</span>
+                      <span>{fmt(withShipping - costZAR)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>+ Markup ({costingSettings.markup}%):</span>
+                      <span>{fmt(withMarkup - withShipping)}</span>
+                    </div>
+                    {costingSettings.includeVAT && (
+                      <div className="flex justify-between">
+                        <span>+ VAT (15%):</span>
+                        <span>{fmt(final - withMarkup)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-semibold text-green-700 border-t border-gray-200 pt-0.5">
+                      <span>= Est. Retail:</span>
+                      <span>{fmt(final)}</span>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
             <div className="flex flex-col justify-end pb-1 gap-1">
               {(totalQty > 0 || minOrderQty > 0) && (
