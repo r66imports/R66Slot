@@ -1,374 +1,270 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { PriceGate } from '@/components/price-gate'
 
-type PreOrderPoster = {
+type Item = {
   id: string
-  orderType: 'new-order' | 'pre-order'
   sku: string
-  itemDescription: string
-  estimatedDeliveryDate: string
-  brand: string
   description: string
-  preOrderPrice: string
-  availableQty: number
-  imageUrl: string
-  createdAt: string
-  published: boolean
+  retailPrice: string
+  estimatedRetailPrice: string
+  eta: string
+  cutoffDate?: string
+  brand: string
+  unit: string
+  imageUrl?: string
+  isLocked?: boolean
+  availableQty?: number | null
+  resellerMoq?: number
+  myReservedQty?: number
 }
 
-type CustomerInfo = {
+type Customer = {
   id: string
   firstName: string
   lastName: string
   email: string
-  phone: string
+  phone?: string
 }
 
-export default function PublicPreOrderPage() {
+export default function PublicPreOrderItemPage() {
   const params = useParams()
-  const router = useRouter()
-  const posterId = params.id as string
+  const searchParams = useSearchParams()
+  const id = params.id as string
+  const isReseller = searchParams.get('reseller') === '1'
 
-  const [poster, setPoster] = useState<PreOrderPoster | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [selectedQty, setSelectedQty] = useState(1)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [orderPlaced, setOrderPlaced] = useState(false)
-  const [customer, setCustomer] = useState<CustomerInfo | null>(null)
+  const [item, setItem] = useState<Item | null>(null)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [customer, setCustomer] = useState<Customer | null>(null)
+  const [qty, setQty] = useState(1)
+  const [reserving, setReserving] = useState(false)
+  const [reserved, setReserved] = useState<{ totalQty: number } | null>(null)
+  const [reserveError, setReserveError] = useState('')
 
-  // Check if customer is logged in
   useEffect(() => {
-    checkCustomerAuth()
-    fetchPoster()
-  }, [posterId])
+    Promise.all([
+      fetch(`/api/preorder-item/${id}`).then(r => r.ok ? r.json() : Promise.reject()),
+      fetch('/api/auth/me').then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([itemData, custData]) => {
+      setItem(itemData)
+      if (custData) setCustomer(custData)
+      // Pre-fill qty to the reseller minimum — unless this reseller has already
+      // met the MOQ on a prior reservation, in which case any qty is fine.
+      const alreadyMetMoq = isReseller && (itemData?.myReservedQty ?? 0) >= (itemData?.resellerMoq ?? 1)
+      const rMoq = isReseller && !alreadyMetMoq ? Math.max(1, itemData?.resellerMoq ?? 1) : 1
+      setQty(rMoq)
+    }).catch(() => setError('Pre-order not found'))
+    .finally(() => setLoading(false))
+  }, [id, isReseller])
 
-  const checkCustomerAuth = async () => {
+  const handleReserve = async () => {
+    setReserving(true)
+    setReserveError('')
     try {
-      const response = await fetch('/api/auth/check')
-      if (response.ok) {
-        const data = await response.json()
-        if (data.authenticated && data.customer) {
-          setCustomer(data.customer)
-        }
-      }
-    } catch (error) {
-      console.error('Auth check error:', error)
-    }
-  }
-
-  const fetchPoster = async () => {
-    try {
-      const response = await fetch(`/api/preorder/${posterId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setPoster(data)
-      } else {
-        setError('Pre-order not found')
-      }
-    } catch (error) {
-      console.error('Error fetching poster:', error)
-      setError('Failed to load pre-order')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handlePlaceOrder = async () => {
-    if (!customer) {
-      // Redirect to login with return URL
-      router.push(`/account/login?returnUrl=/preorder/${posterId}`)
-      return
-    }
-
-    if (!poster) return
-
-    setIsSubmitting(true)
-
-    try {
-      const orderData = {
-        posterId: poster.id,
-        sku: poster.sku,
-        itemDescription: poster.itemDescription,
-        brand: poster.brand,
-        price: poster.preOrderPrice,
-        quantity: selectedQty,
-        totalAmount: (parseFloat(poster.preOrderPrice) * selectedQty).toFixed(2),
-        customerId: customer.id,
-        customerName: `${customer.firstName} ${customer.lastName}`,
-        customerEmail: customer.email,
-        customerPhone: customer.phone,
-        orderType: poster.orderType,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      }
-
-      const response = await fetch('/api/preorder/place-order', {
+      const res = await fetch(`/api/preorder-item/${id}/reserve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData),
+        body: JSON.stringify({ qty: Math.min(Math.max(qty, minQty), maxQty), source: isReseller ? 'reseller' : undefined, resellerMoq: isReseller ? (item?.resellerMoq ?? 1) : undefined }),
       })
-
-      if (response.ok) {
-        setOrderPlaced(true)
+      const data = await res.json()
+      if (res.ok) {
+        setReserved({ totalQty: data.totalQty })
       } else {
-        const data = await response.json()
-        setError(data.error || 'Failed to place order')
+        setReserveError(data.error || 'Failed to reserve')
       }
-    } catch (error) {
-      console.error('Error placing order:', error)
-      setError('Failed to place order. Please try again.')
+    } catch {
+      setReserveError('Something went wrong. Please try again.')
     } finally {
-      setIsSubmitting(false)
+      setReserving(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-play">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  const price = item
+    ? isReseller
+      ? parseFloat(item.estimatedRetailPrice || item.retailPrice || '0')
+      : parseFloat(item.retailPrice || item.estimatedRetailPrice || '0')
+    : 0
+  const moqAlreadyMet = isReseller && (item?.myReservedQty ?? 0) >= (item?.resellerMoq ?? 1)
+  const minQty = isReseller && !moqAlreadyMet ? Math.max(1, item?.resellerMoq ?? 1) : 1
+  const maxQty = item?.isLocked && item.availableQty != null ? item.availableQty : Infinity
 
-  if (error && !poster) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-play">
-        <div className="text-center">
-          <div className="text-6xl mb-4">😕</div>
-          <h1 className="text-2xl font-bold mb-2">Booking Not Found</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Link
-            href="/"
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-play hover:bg-blue-700"
-          >
-            Go to Homepage
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#111]">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>
+  )
 
-  if (orderPlaced) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center font-play">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
-          <div className="text-6xl mb-4">✅</div>
-          <h1 className="text-2xl font-bold mb-2 font-play">Order Placed Successfully!</h1>
-          <p className="text-gray-600 mb-4 font-play">
-            Thank you for booking your item. We will contact you shortly to confirm your order.
-          </p>
-          <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-gray-600 font-play">
-              <strong>Item:</strong> {poster?.itemDescription}
-            </p>
-            <p className="text-sm text-gray-600 font-play">
-              <strong>Quantity:</strong> {selectedQty}
-            </p>
-            <p className="text-sm text-gray-600 font-play">
-              <strong>Total:</strong> R{(parseFloat(poster?.preOrderPrice || '0') * selectedQty).toFixed(2)}
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-play hover:bg-blue-700 inline-block"
-          >
-            Continue Shopping
-          </Link>
-        </div>
+  if (error || !item) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#111] text-white">
+      <div className="text-center">
+        <div className="text-6xl mb-4">😕</div>
+        <h1 className="text-2xl font-bold mb-2">Pre-Order Not Found</h1>
+        <Link href="/pre-orders" className="mt-4 inline-block px-6 py-3 bg-primary text-white rounded-lg">See All Pre-Orders</Link>
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-gray-50 font-play">
+    <div className="min-h-screen bg-[#111] text-white font-play">
       {/* Header */}
-      <header className="bg-secondary text-white py-4">
-        <div className="max-w-4xl mx-auto px-4">
-          <Link href="/" className="text-2xl font-bold">
-            <span className="text-white">R66</span>
-            <span className="text-primary">SLOT</span>
-          </Link>
-        </div>
+      <header className="bg-primary py-4 px-6 flex items-center gap-4">
+        <Link href="/" className="text-2xl font-bold">
+          <span className="text-white">R66</span>
+          <span className="text-black">EMPORIUM</span>
+        </Link>
+        <Link href={isReseller ? '/resellers-pre-orders' : '/pre-orders'} className="ml-3 text-white/70 text-sm hover:text-white">
+          {isReseller ? '← Resellers' : '← All Pre-Orders'}
+        </Link>
+        <span className="ml-auto text-sm font-bold tracking-widest uppercase bg-black/30 px-4 py-1 rounded-full">
+          {isReseller ? 'RESELLER' : 'PRE ORDER'}
+        </span>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          {/* Order Type Badge */}
-          <div className={`py-3 px-4 text-center font-bold text-white font-play text-lg ${
-            poster?.orderType === 'pre-order' ? 'bg-orange-500' : 'bg-green-500'
-          }`}>
-            {poster?.orderType === 'pre-order' ? '🎯 PRE-ORDER' : '✨ NEW ORDER'}
+      <main className="max-w-3xl mx-auto px-4 py-10">
+        <div className="bg-[#1a1a1a] rounded-2xl overflow-hidden shadow-2xl">
+
+          {/* Product image */}
+          <div className="bg-[#1e1e1e] flex items-center justify-center" style={{ minHeight: 360 }}>
+            {item.imageUrl ? (
+              <img src={item.imageUrl} alt={item.description} className="max-h-[460px] max-w-full object-contain p-4" />
+            ) : (
+              <div className="text-gray-600 text-center py-20">
+                <div className="text-5xl mb-3">📦</div>
+                <p className="text-sm">No image available</p>
+              </div>
+            )}
           </div>
 
-          <div className="grid md:grid-cols-2 gap-0">
-            {/* Product Image */}
-            <div className="aspect-square bg-gray-100 flex items-center justify-center">
-              {poster?.imageUrl ? (
-                <img
-                  src={poster.imageUrl}
-                  alt={poster.itemDescription}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="text-gray-400 text-center p-8">
-                  <svg className="mx-auto h-24 w-24 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <p className="font-play">Product Image</p>
+          <div className="h-2 bg-primary w-full" />
+
+          <div className="p-8 space-y-6">
+            {/* Brand + SKU */}
+            <div className="flex items-center gap-3 flex-wrap">
+              {item.brand && <span className="bg-primary text-white text-sm font-bold px-4 py-1 rounded-full">{item.brand}</span>}
+              <span className="text-gray-400 text-sm">SKU: {item.sku}</span>
+            </div>
+
+            <h1 className="text-2xl font-bold leading-snug">{item.description}</h1>
+
+            <div>
+              <p className="text-gray-400 text-sm mb-1">{isReseller ? 'Reseller Price (Est. Retail)' : 'Retail Price'}</p>
+              <PriceGate>
+                <p className="text-4xl font-bold text-primary">{price > 0 ? `R ${price.toFixed(2)}` : 'POA'}</p>
+              </PriceGate>
+            </div>
+
+            {/* ETA + cutoff */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-[#111] rounded-xl p-4">
+                <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">ETA</p>
+                <p className="font-semibold text-lg">{item.eta || '—'}</p>
+              </div>
+              {item.cutoffDate && (
+                <div className="bg-[#111] rounded-xl p-4">
+                  <p className="text-gray-400 text-xs mb-1 uppercase tracking-wider">Order Cut-off</p>
+                  <p className="font-semibold text-lg">
+                    {new Date(item.cutoffDate).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Product Details */}
-            <div className="p-6 flex flex-col">
-              <div className="flex-1">
-                {/* SKU and Brand */}
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-sm text-gray-500 font-play">SKU: {poster?.sku}</p>
-                  {poster?.brand && (
-                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded font-play">
-                      {poster.brand}
-                    </span>
-                  )}
-                </div>
-
-                {/* Item Name */}
-                <h1 className="text-2xl font-bold mb-3 font-play">{poster?.itemDescription}</h1>
-
-                {/* Description */}
-                {poster?.description && (
-                  <p className="text-gray-600 mb-4 font-play">{poster.description}</p>
-                )}
-
-                {/* Delivery Date */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm text-gray-500 font-play">Estimated Delivery</p>
-                      <p className="font-semibold font-play text-lg">
-                        {poster?.estimatedDeliveryDate
-                          ? new Date(poster.estimatedDeliveryDate).toLocaleDateString('en-ZA', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })
-                          : 'TBA'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500 font-play">Available</p>
-                      <p className="font-semibold font-play">{poster?.availableQty} units</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Price */}
-                <div className="mb-6">
-                  <p className="text-sm text-gray-500 font-play">Book for Next Shipment Price</p>
-                  <p className="text-4xl font-bold text-primary font-play">
-                    R{poster?.preOrderPrice}
-                  </p>
-                </div>
+            {/* Reserve section */}
+            {reserved ? (
+              <div className="bg-green-900/40 border border-green-500 rounded-xl p-6 text-center">
+                <div className="text-4xl mb-3">✅</div>
+                <p className="font-bold text-green-400 text-lg">Reserved Successfully!</p>
+                <p className="text-gray-300 mt-2">You now have <strong>{reserved.totalQty}</strong> unit{reserved.totalQty !== 1 ? 's' : ''} reserved for this item.</p>
+                <p className="text-gray-400 text-sm mt-3">We'll contact you to confirm your deposit. A 50% deposit is required to secure your order.</p>
+                <Link href={isReseller ? '/resellers-pre-orders' : '/pre-orders'} className="mt-4 inline-block text-primary hover:underline text-sm">← Browse more {isReseller ? 'reseller' : ''} pre-orders</Link>
               </div>
-
-              {/* Order Section */}
-              <div className="border-t pt-4">
-                {/* Quantity Selector */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2 font-play">
-                    Select Quantity
-                  </label>
+            ) : item?.isLocked && maxQty === 0 ? (
+              <div className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 text-center space-y-2">
+                <div className="text-3xl">🔒</div>
+                <p className="font-semibold text-white">Reservations Closed</p>
+                <p className="text-gray-400 text-sm">The order cut-off has passed and all available stock has been reserved.</p>
+                <Link href="/pre-orders" className="mt-2 inline-block text-primary hover:underline text-sm">← Browse other pre-orders</Link>
+              </div>
+            ) : customer ? (
+              <div className="bg-[#111] rounded-xl p-6 space-y-4">
+                <p className="text-sm text-gray-400">Reserving as <span className="text-white font-semibold">{customer.firstName} {customer.lastName}</span></p>
+                {isReseller && minQty > 1 && (
+                  <div className="bg-purple-900/30 border border-purple-500/40 rounded-lg px-4 py-2 text-sm text-purple-300 font-medium">
+                    Reseller minimum order: {minQty} units
+                  </div>
+                )}
+                {item?.isLocked && maxQty < Infinity && (
+                  <div className="bg-orange-900/30 border border-orange-500/40 rounded-lg px-4 py-2 text-sm text-orange-300 font-medium">
+                    Only {maxQty} unit{maxQty !== 1 ? 's' : ''} remaining
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium">Quantity</label>
+                    {isReseller && minQty > 1 && (
+                      <span className="text-xs font-semibold text-purple-400 bg-purple-900/30 border border-purple-500/30 px-2 py-0.5 rounded-full">
+                        Min {minQty} units
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-3">
+                    <button onClick={() => setQty(q => Math.max(minQty, q - 1))} className="w-10 h-10 rounded-lg bg-[#1a1a1a] border border-white/10 text-xl hover:bg-white/10 transition-colors">−</button>
+                    <span className="w-12 text-center text-xl font-bold">{Math.min(Math.max(qty, minQty), maxQty)}</span>
                     <button
-                      onClick={() => setSelectedQty(Math.max(1, selectedQty - 1))}
-                      className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-xl hover:bg-gray-50"
-                    >
-                      -
-                    </button>
-                    <input
-                      type="number"
-                      value={selectedQty}
-                      onChange={(e) => {
-                        const val = parseInt(e.target.value) || 1
-                        setSelectedQty(Math.min(Math.max(1, val), poster?.availableQty || 10))
-                      }}
-                      min="1"
-                      max={poster?.availableQty || 10}
-                      className="w-20 h-10 text-center border border-gray-300 rounded-lg font-play text-lg"
-                    />
-                    <button
-                      onClick={() => setSelectedQty(Math.min((poster?.availableQty || 10), selectedQty + 1))}
-                      className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center text-xl hover:bg-gray-50"
-                    >
-                      +
-                    </button>
+                      onClick={() => setQty(q => Math.min(q + 1, maxQty))}
+                      disabled={qty >= maxQty}
+                      className="w-10 h-10 rounded-lg bg-[#1a1a1a] border border-white/10 text-xl hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >+</button>
                   </div>
                 </div>
-
-                {/* Total */}
-                <div className="bg-blue-50 rounded-lg p-4 mb-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-play">Total:</span>
-                    <span className="text-2xl font-bold text-blue-600 font-play">
-                      R{(parseFloat(poster?.preOrderPrice || '0') * selectedQty).toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Error Message */}
-                {error && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 font-play">
-                    {error}
+                {price > 0 && (
+                  <div className="bg-[#1a1a1a] rounded-lg p-4 flex justify-between items-center">
+                    <span className="text-gray-400 text-sm">Est. deposit (50%)</span>
+                    <span className="font-bold text-primary">R {(price * Math.min(qty, maxQty) * 0.5).toFixed(2)}</span>
                   </div>
                 )}
-
-                {/* Place Order Button */}
+                {reserveError && <p className="text-red-400 text-sm">{reserveError}</p>}
                 <button
-                  onClick={handlePlaceOrder}
-                  disabled={isSubmitting}
-                  className="w-full py-4 bg-blue-600 text-white font-bold rounded-lg font-play text-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  onClick={handleReserve}
+                  disabled={reserving || maxQty === 0}
+                  className="w-full py-4 bg-primary text-white font-bold rounded-xl text-lg hover:bg-red-700 disabled:opacity-50 transition-colors"
                 >
-                  {isSubmitting ? 'Placing Order...' : customer ? 'Place Order' : 'Sign In to Order'}
+                  {reserving ? 'Reserving…' : `Reserve ${Math.min(qty, maxQty)} Unit${Math.min(qty, maxQty) !== 1 ? 's' : ''}`}
                 </button>
-
-                {!customer && (
-                  <p className="text-center text-sm text-gray-500 mt-3 font-play">
-                    You need to <Link href={`/account/login?returnUrl=/preorder/${posterId}`} className="text-blue-600 hover:underline">sign in</Link> or{' '}
-                    <Link href={`/account/register?returnUrl=/preorder/${posterId}`} className="text-blue-600 hover:underline">create an account</Link> to place an order.
-                  </p>
-                )}
               </div>
-            </div>
+            ) : (
+              <div className="bg-[#111] rounded-xl p-6 text-center space-y-3">
+                <p className="text-gray-300">Sign in to reserve this item</p>
+                <Link
+                  href={`/account/login?returnUrl=/pre-order/${id}`}
+                  className="block w-full py-4 bg-primary text-white font-bold rounded-xl text-lg hover:bg-red-700 transition-colors"
+                >
+                  Sign In to Reserve
+                </Link>
+                <p className="text-gray-500 text-sm">
+                  Don't have an account?{' '}
+                  <Link href={`/account/register?returnUrl=/pre-order/${id}`} className="text-primary hover:underline">Create one</Link>
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Info Section */}
-        <div className="mt-8 bg-white rounded-lg shadow p-6">
-          <h3 className="font-bold mb-3 font-play">About Booking for Next Shipment</h3>
-          <ul className="space-y-2 text-sm text-gray-600 font-play">
-            <li>• Booking secures your item before it arrives in stock</li>
-            <li>• You will be contacted to confirm your order and payment details</li>
-            <li>• Estimated delivery dates are subject to supplier availability</li>
-            <li>• Contact us via WhatsApp for any questions</li>
-          </ul>
+        <div className="mt-6 bg-[#1a1a1a] rounded-xl p-6 text-sm text-gray-400 space-y-2">
+          <p className="font-semibold text-white mb-3">About Pre-Orders</p>
+          <p>• Pre-orders secure your item before it arrives in stock</p>
+          <p>• A 50% deposit is required to confirm your reservation</p>
+          <p>• ETA dates are subject to supplier availability</p>
+          <p>• Contact us via WhatsApp for any questions</p>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-secondary text-white py-6 mt-8">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <p className="font-play text-sm text-gray-400">
-            © {new Date().getFullYear()} R66SLOT - Premium Slot Cars & Collectibles
-          </p>
-        </div>
+      <footer className="bg-[#0a0a0a] text-gray-500 text-center py-6 mt-10 text-sm">
+        © {new Date().getFullYear()} R66SLOT · www.r66slot.co.za
       </footer>
     </div>
   )
