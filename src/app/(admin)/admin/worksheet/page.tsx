@@ -385,6 +385,8 @@ function WorksheetEditor({
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
         if (it.category) patch.categoryBrands = [it.category]
         if (it.unit) patch.itemCategories = [it.unit]
+        if (it.costingEntity === 'R66') { patch.salesAccount = ['Route 66 Imports PTY LTD']; patch.purchaseAccount = ['Route 66 Imports PTY LTD'] }
+        else if (it.costingEntity === 'JDM') { patch.salesAccount = ['JDM Garage PTY LTD']; patch.purchaseAccount = ['JDM Garage PTY LTD'] }
         if (Object.keys(patch).length === 0) { updated++; continue }
         const res = await fetch(`/api/admin/products/${prod.id}`, {
           method: 'PUT',
@@ -411,10 +413,9 @@ function WorksheetEditor({
     }
   }
 
-  // ── Update Products: runs costing update then opens Product Info modal ──
+  // ── Update Products: runs costing update (no modal) ──
   async function handleUpdateProducts() {
     await updateFinalCosting()
-    setShowProductInfo(true)
   }
 
   // ── Stock verification & send to inventory ──
@@ -431,10 +432,8 @@ function WorksheetEditor({
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
   const [showR66InvoiceModal, setShowR66InvoiceModal] = useState(false)
   const [showJDMInvoiceModal, setShowJDMInvoiceModal] = useState(false)
-  // ── Add to Database (no stock update) ──
-  const [showAddToDbModal, setShowAddToDbModal] = useState(false)
-  const [addToDbItems, setAddToDbItems] = useState<NewSkuRow[]>([])
-  const [savingAddToDb, setSavingAddToDb] = useState(false)
+  // ── Qty confirm dialog ──
+  const [showQtyConfirm, setShowQtyConfirm] = useState(false)
   // ── Send to Checklist ──
   const [sendingChecklist, setSendingChecklist] = useState(false)
   const [checklistSent, setChecklistSent] = useState(false)
@@ -630,66 +629,6 @@ function WorksheetEditor({
       await onRefresh()
     } finally {
       setSavingNewSkus(false)
-    }
-  }
-
-  // ── Add to Database (creates product record, no stock update) ──────────────
-  function addToDatabase() {
-    const newSkus: NewSkuRow[] = []
-    for (const it of items) {
-      if (!it.sku) continue
-      const inDb = products.some((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-      if (inDb) continue
-      const finalLanded = Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100
-      const retailZAR = it.retailPrice > 0
-        ? it.retailPrice
-        : Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100
-      newSkus.push({
-        wsId: it.id,
-        sku: it.sku,
-        description: it.description,
-        brand: '',
-        category: it.category || '',
-        unit: it.unit || '',
-        retailPrice: retailZAR,
-        costPrice: finalLanded,
-        qty: 0,
-      })
-    }
-    if (!newSkus.length) { alert('All items in this worksheet are already in the database.'); return }
-    setAddToDbItems(newSkus)
-    setShowAddToDbModal(true)
-  }
-
-  async function handleSaveAddToDb(rows: NewSkuRow[]) {
-    setSavingAddToDb(true)
-    const errors: string[] = []
-    try {
-      for (const row of rows) {
-        const res = await fetch('/api/admin/products', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sku: row.sku,
-            title: row.description || row.sku,
-            brand: row.brand,
-            description: '',
-            price: row.retailPrice,
-            cost_per_item: row.costPrice,
-            quantity: 0,
-            status: 'active',
-            categoryBrands: row.category ? [row.category] : [],
-            itemCategories: row.unit ? [row.unit] : [],
-          }),
-        })
-        if (!res.ok) errors.push(row.sku)
-      }
-      if (errors.length > 0) alert(`Failed to add: ${errors.join(', ')}`)
-      setShowAddToDbModal(false)
-      setAddToDbItems([])
-      await onRefresh()
-    } finally {
-      setSavingAddToDb(false)
     }
   }
 
@@ -1794,7 +1733,7 @@ function WorksheetEditor({
               </select>
             </div>
             <button
-              onClick={sendToInventory}
+              onClick={() => setShowQtyConfirm(true)}
               disabled={checkedItems.size === 0 || sendingInventory}
               className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
                 inventorySent ? 'bg-green-600 text-white' :
@@ -1876,14 +1815,6 @@ function WorksheetEditor({
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" /></svg>
               JDM Invoice
-            </button>
-            <button
-              onClick={addToDatabase}
-              disabled={!items.some((it) => it.sku && !products.some((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()))}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-40"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
-              Add to Database
             </button>
           </div>
         </div>
@@ -2431,20 +2362,35 @@ function WorksheetEditor({
         />
       )}
 
-      {/* ── Add to Database Modal (no stock update) ── */}
-      {showAddToDbModal && (
-        <NewSkuModal
-          rows={addToDbItems}
-          saving={savingAddToDb}
-          onSave={handleSaveAddToDb}
-          onClose={() => { setShowAddToDbModal(false); setAddToDbItems([]) }}
-          brandOptions={[...new Set(products.map((p) => p.brand).filter(Boolean))].sort()}
-          categoryOptions={[...new Set(products.map((p) => p.category).filter(Boolean))].sort()}
-          unitOptions={[...new Set(products.map((p) => p.unit).filter(Boolean))].sort()}
-          title="Add to Database"
-          subtitle="Creates product records without updating stock quantities"
-          saveLabel="Add to Database"
-        />
+      {showQtyConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold mb-1">Update Quantities</h3>
+            <p className="text-sm text-gray-500 mb-4">The following items will have their stock quantities updated:</p>
+            <div className="space-y-1 max-h-60 overflow-y-auto mb-4">
+              {items.filter(it => checkedItems.has(it.id) && it.sku && it.qty > 0 && !it.sentToInventory).map(it => (
+                <div key={it.id} className="flex items-center justify-between text-sm px-3 py-1.5 bg-gray-50 rounded-lg">
+                  <span className="font-mono text-xs text-gray-500 w-20 shrink-0">{it.sku}</span>
+                  <span className="flex-1 truncate text-gray-700 mx-2">{it.description}</span>
+                  <span className="font-semibold text-indigo-700 shrink-0">+{it.qty}</span>
+                </div>
+              ))}
+              {items.filter(it => checkedItems.has(it.id) && it.sku && it.qty > 0 && !it.sentToInventory).length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">No valid items selected.</p>
+              )}
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setShowQtyConfirm(false)} className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50">Cancel</button>
+              <button
+                onClick={async () => { setShowQtyConfirm(false); await sendToInventory() }}
+                disabled={items.filter(it => checkedItems.has(it.id) && it.sku && it.qty > 0 && !it.sentToInventory).length === 0}
+                className="px-4 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-semibold disabled:opacity-40"
+              >
+                Confirm Update
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Confirm Update Dialog (existing SKU — pricing only, no qty change) ── */}
