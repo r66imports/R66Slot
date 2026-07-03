@@ -604,16 +604,14 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
             </div>
           ) : (
             <div className="py-1.5">
-              <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Add to / Create</p>
+              <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Create New</p>
               {(['quote', 'salesorder', 'invoice'] as const).map(type => {
                 const icon = type === 'quote' ? '📄' : type === 'salesorder' ? '📦' : '🧾'
                 const label = type === 'quote' ? 'Quote' : type === 'salesorder' ? 'Sales Order' : 'Invoice'
-                const match = existingDocs.find(d => d.type === type)
                 return (
                   <button key={type}
                     onClick={() => {
-                      if (type === 'quote' && !match) {
-                        // Auto-match bank from the item's unit field (e.g. "Outlaw Garage", "JDM Garage")
+                      if (type === 'quote') {
                         const unitLower = (form.unit || '').toLowerCase().trim()
                         const autoBank = unitLower
                           ? bankAccounts.find((b: any) => {
@@ -624,16 +622,11 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
                         if (autoBank) sendTo('quote', undefined, autoBank.id)
                         else setPendingQuoteBank(true)
                       } else {
-                        sendTo(type, match || undefined)
+                        sendTo(type, undefined)
                       }
                     }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 font-medium flex items-center justify-between gap-2">
-                    <span>{icon} Add {label}</span>
-                    {match && (
-                      <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded leading-none">
-                        → {match.docNumber}
-                      </span>
-                    )}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium flex items-center gap-2">
+                    <span className="text-green-700">+ {icon} New {label}</span>
                   </button>
                 )
               })}
