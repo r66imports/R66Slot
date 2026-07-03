@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { PriceGate } from '@/components/price-gate'
 
 type Item = {
   id: string
@@ -152,9 +151,7 @@ export default function PublicPreOrderItemPage() {
 
             <div>
               <p className="text-gray-400 text-sm mb-1">{isReseller ? 'Reseller Price (Est. Retail)' : 'Retail Price'}</p>
-              <PriceGate>
-                <p className="text-4xl font-bold text-primary">{price > 0 ? `R ${price.toFixed(2)}` : 'POA'}</p>
-              </PriceGate>
+              <p className="text-4xl font-bold text-primary">{price > 0 ? `R ${price.toFixed(2)}` : 'POA'}</p>
             </div>
 
             {/* ETA + cutoff */}

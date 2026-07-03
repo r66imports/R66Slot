@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { PriceGate } from '@/components/price-gate'
 
 type Item = {
   id: string
@@ -533,17 +532,15 @@ export default function PreOrdersListPage() {
                       {item.description}
                     </h2>
 
-                    <PriceGate>
-                      <p
-                        className="font-bold text-lg"
-                        style={{
-                          color: isCyberpunk ? '#00ffff' : t.accent,
-                          textShadow: t.priceShadow,
-                        }}
-                      >
-                        {price > 0 ? `R ${price.toFixed(2)}` : 'POA'}
-                      </p>
-                    </PriceGate>
+                    <p
+                      className="font-bold text-lg"
+                      style={{
+                        color: isCyberpunk ? '#00ffff' : t.accent,
+                        textShadow: t.priceShadow,
+                      }}
+                    >
+                      {price > 0 ? `R ${price.toFixed(2)}` : 'POA'}
+                    </p>
 
                     <div
                       className="flex items-center justify-between text-xs pt-1"
