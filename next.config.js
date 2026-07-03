@@ -9,6 +9,10 @@ const nextConfig = {
         destination: 'https://www.r66slot.co.za/:path*',
         permanent: true,
       },
+      // Case-insensitive aliases for pre-orders page
+      { source: '/Pre-orders', destination: '/pre-orders', permanent: false },
+      { source: '/Pre-Orders', destination: '/pre-orders', permanent: false },
+      { source: '/PRE-ORDERS', destination: '/pre-orders', permanent: false },
     ]
   },
   images: {
