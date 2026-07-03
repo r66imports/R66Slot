@@ -346,8 +346,10 @@ function WorksheetEditor({
         const skuLower = it.sku.trim().toLowerCase()
         const prod = products.find((p) => p.sku.trim().toLowerCase() === skuLower)
         const finalLanded = it.wholesalePrice > 0 ? Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100 : 0
+        const landedRetail = it.wholesalePrice > 0 ? Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100 : 0
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
         const preOrderZAR = it.wholesalePrice > 0 ? Math.round(calcRetail(it.wholesalePrice) * 100) / 100 : 0
+        const acct = it.costingEntity === 'R66' ? ['Route 66 Imports PTY LTD'] : it.costingEntity === 'JDM' ? ['JDM Garage PTY LTD'] : null
 
         if (!prod) {
           // New SKU — add to products with qty=0 (no stock change)
@@ -361,11 +363,13 @@ function WorksheetEditor({
               description: '',
               price: retailZAR,
               cost_per_item: finalLanded,
-              compareAtPrice: finalLanded,
+              compareAtPrice: landedRetail || finalLanded,
+              preOrderPrice: preOrderZAR,
               quantity: 0,
               status: 'active',
               categoryBrands: it.category ? [it.category] : [],
               itemCategories: it.unit ? [it.unit] : [],
+              ...(acct ? { salesAccount: acct, purchaseAccount: acct } : {}),
             }),
           })
           if (!res.ok) {
@@ -380,13 +384,14 @@ function WorksheetEditor({
         // Existing product — update all applicable fields, quantity untouched
         const patch: Record<string, any> = {}
         if (it.description) patch.title = it.description
-        if (finalLanded > 0) { patch.costPerItem = finalLanded; patch.compareAtPrice = finalLanded }
+        if (finalLanded > 0) patch.costPerItem = finalLanded
+        if (landedRetail > 0) patch.compareAtPrice = landedRetail
+        else if (finalLanded > 0) patch.compareAtPrice = finalLanded
         if (retailZAR > 0) patch.price = retailZAR
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
         if (it.category) patch.categoryBrands = [it.category]
         if (it.unit) patch.itemCategories = [it.unit]
-        if (it.costingEntity === 'R66') { patch.salesAccount = ['Route 66 Imports PTY LTD']; patch.purchaseAccount = ['Route 66 Imports PTY LTD'] }
-        else if (it.costingEntity === 'JDM') { patch.salesAccount = ['JDM Garage PTY LTD']; patch.purchaseAccount = ['JDM Garage PTY LTD'] }
+        if (acct) { patch.salesAccount = acct; patch.purchaseAccount = acct }
         if (Object.keys(patch).length === 0) { updated++; continue }
         const res = await fetch(`/api/admin/products/${prod.id}`, {
           method: 'PUT',
