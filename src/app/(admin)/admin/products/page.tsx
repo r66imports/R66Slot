@@ -568,6 +568,17 @@ export default function ProductsPage() {
     }).catch(() => {})
   }, [])
 
+  // When typing in brands view and no brand matches the query, auto-load all products and switch to list view
+  useEffect(() => {
+    if (viewMode !== 'brands' || !searchQuery.trim()) return
+    const brandNames = Object.keys(brandGroups.groups).map(n => n.toLowerCase())
+    const hasMatch = brandNames.some(n => n.includes(searchQuery.toLowerCase()))
+    if (!hasMatch) {
+      fetchProducts('').then(() => setViewMode('products'))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery])
+
   const fetchBrandSummary = async () => {
     setIsLoading(true)
     try {
