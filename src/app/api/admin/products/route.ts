@@ -132,6 +132,22 @@ export async function GET(request: Request) {
       return NextResponse.json(result.rows.map(r => ({ brand: r.brand || '', supplier: r.supplier || '', count: parseInt(r.count) })), cache)
     }
 
+    // Inventory mode — lean response for the inventory page
+    if (searchParams.get('inventory') === '1') {
+      const result = await db.query(
+        `SELECT id, sku, title, brand, category_brands, price, quantity, status, image_url FROM products WHERE status != 'archived' ORDER BY sku ASC`
+      )
+      return NextResponse.json(result.rows.map((r: any) => ({
+        id: r.id, sku: r.sku || '', title: r.title || '',
+        brand: r.brand || '',
+        categoryBrands: Array.isArray(r.category_brands) ? r.category_brands : [],
+        price: parseFloat(r.price) || 0,
+        quantity: r.quantity ?? 0,
+        status: r.status || 'draft',
+        imageUrl: r.image_url || '',
+      })))
+    }
+
     // Lightweight mode — only return requested columns (avoids SELECT * on large tables)
     if (fields) {
       const allowed = new Set(['sku', 'cost_per_item', 'id', 'title', 'price', 'quantity', 'status', 'brand'])

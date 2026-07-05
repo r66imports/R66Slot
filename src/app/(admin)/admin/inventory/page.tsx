@@ -161,7 +161,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/admin/products').then((r) => r.json()),
+      fetch('/api/admin/products?inventory=1').then((r) => r.json()),
       fetch('/api/admin/inventory-counts').then((r) => r.ok ? r.json() : { counts: {}, date: '' }).catch(() => ({ counts: {}, date: '' })),
     ]).then(([productsData, countsData]) => {
       const list: Product[] = (productsData.products || productsData || []).map((p: any) => ({
