@@ -756,7 +756,7 @@ function ItemCard({
     if (!wp || !parsePrice(wp)) return
     const calc = calcRetailPrice(wp, curr, exchangeRates, costingSettings, form.supplier)
     if (calc) setForm(f => ({ ...f, estimatedRetailPrice: calc }))
-  }, [form.wholesalePrice, form.wholesaleCurrency, form.supplier, autoCalc])
+  }, [form.wholesalePrice, form.wholesaleCurrency, form.supplier, autoCalc, exchangeRates])
 
   // SRP2 + Discount2 → wholesale price 2
   useEffect(() => {
@@ -775,7 +775,7 @@ function ItemCard({
     if (!wp || !parsePrice(wp)) return
     const calc = calcRetailPrice(wp, curr, exchangeRates, costingSettings, form.supplier)
     if (calc) setForm(f => ({ ...f, estimatedRetailPrice2: calc }))
-  }, [(form as any).wholesalePrice2, (form as any).wholesaleCurrency2, form.supplier, autoCalc2])
+  }, [(form as any).wholesalePrice2, (form as any).wholesaleCurrency2, form.supplier, autoCalc2, exchangeRates])
 
   // Auto-set currency from supplier's preferredCurrency
   useEffect(() => {
@@ -1862,7 +1862,7 @@ export default function PreOrderDashboardPage() {
   const [suppliers, setSuppliers] = useState<SupplierContact[]>([])
   const [options, setOptions] = useState<DashboardOptions>({ brands: [], units: [], etas: [] })
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({})
-  const [costingSettings, setCostingSettings] = useState<CostingSettings>({ shippingMarkup: 45, markup: 30, includeVAT: true })
+  const [costingSettings, setCostingSettings] = useState<CostingSettings>({ shippingMarkup: 45, markup: 30, includeVAT: false })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
   const [showNew, setShowNew] = useState(false)
@@ -1906,9 +1906,7 @@ export default function PreOrderDashboardPage() {
     safeFetch('/api/admin/supplier-contacts', 10000).then(d => { if (Array.isArray(d)) setSuppliers(d) })
     safeFetch('/api/admin/contacts', 10000).then(d => { if (Array.isArray(d)) setContacts(d) })
     safeFetch('/api/admin/exchange-rate', 10000).then(d => { if (d?.rates) setExchangeRates(d.rates) })
-    safeFetch('/api/admin/cldc-scanner/settings-only', 10000).then(d => {
-      if (d) setCostingSettings({ shippingMarkup: d.shippingMarkup ?? 45, markup: d.markup ?? 30, includeVAT: d.includeVAT ?? true })
-    })
+    // cldc-scanner settings endpoint is R66Emporium-only; R66Slot uses fixed defaults above
   }, [safeFetch])
 
   useEffect(() => { load() }, [load])
