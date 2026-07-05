@@ -449,7 +449,7 @@ function DocumentBody({
             </div>
             {deposit > 0 && (
               <div className="flex justify-between py-1 border-b border-gray-100 text-sm mt-1">
-                <span className="text-gray-500">Deposit Paid</span>
+                <span className="text-gray-500">{data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span>
                 <span className="font-medium text-green-600">-{fmtPrice(deposit)}</span>
               </div>
             )}
@@ -476,7 +476,7 @@ function DocumentBody({
               const remaining = total - Math.max(deposit, data.amountPaid || 0) - (data.creditApplied || 0)
               return remaining > 0.005 ? (
                 <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
-                  <span>BALANCE DUE</span>
+                  <span>{data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}</span>
                   <span>{fmtPrice(remaining)}</span>
                 </div>
               ) : null
@@ -2027,11 +2027,11 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       ` : `
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
       ${depositHTML > 0 ? `
-      <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Deposit Paid</span><span style="font-weight:500;color:#16a34a">-${fmtPrice(depositHTML)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span><span style="font-weight:500;color:#16a34a">-${fmtPrice(depositHTML)}</span></div>
       ` : ''}
       ${creditAppliedHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #d1fae5"><span style="color:#16a34a;font-weight:600">Credit Applied</span><span style="color:#16a34a;font-weight:600">-${fmtPrice(creditAppliedHTML)}</span></div>` : ''}
       ${amountPaidHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #dbeafe"><span style="color:#2563eb;font-weight:600">Amount Paid</span><span style="color:#2563eb;font-weight:600">-${fmtPrice(amountPaidHTML)}</span></div>` : ''}
-      ${remainingHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>BALANCE DUE</span><span>${fmtPrice(remainingHTML)}</span></div>` : ''}
+      ${remainingHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}</span><span>${fmtPrice(remainingHTML)}</span></div>` : ''}
       `}
     </div>
   </div>
@@ -2084,10 +2084,10 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
     ...((data as any).preOrderDeposit && (data.depositPaid || 0) > 0
       ? [`Full Order Total:  ${fmtPrice(total)}`, `DEPOSIT DUE:  ${fmtPrice(data.depositPaid)}`, `BALANCE ON DELIVERY:  ${fmtPrice(total - (data.depositPaid || 0))}`]
       : [`TOTAL:  ${fmtPrice(total)}`,
-         ...((data.depositPaid || 0) > 0 ? [`Deposit Paid:  -${fmtPrice(data.depositPaid)}`] : []),
+         ...((data.depositPaid || 0) > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  -${fmtPrice(data.depositPaid)}`] : []),
          ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
          ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
-         ...((total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`BALANCE DUE:  ${fmtPrice(total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0))}`] : [])]),
+         ...((total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0))}`] : [])]),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
     banking,
