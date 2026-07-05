@@ -2629,6 +2629,7 @@ interface ProdInfoRow {
   itemCategories: string[]
   salesAccount: string[]
   purchaseAccount: string[]
+  scale: string
 }
 
 interface ProdOptions {
@@ -2683,7 +2684,10 @@ function ProductInfoModal({
 
     const built: ProdInfoRow[] = skuItems.map((it) => {
       const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase()) as any
-      const categoryBrands = Array.isArray(prod?.categoryBrands) ? prod.categoryBrands : []
+      const fromProd = Array.isArray(prod?.categoryBrands) && prod.categoryBrands.length > 0 ? prod.categoryBrands : []
+      const categoryBrands = fromProd.length > 0 ? fromProd : (it.category ? [it.category] : [])
+      const fromProdCats = Array.isArray(prod?.itemCategories) && prod.itemCategories.length > 0 ? prod.itemCategories : []
+      const itemCategories = fromProdCats.length > 0 ? fromProdCats : (it.unit ? [it.unit] : [])
       const existingSales = Array.isArray(prod?.salesAccount) ? prod.salesAccount : []
       const existingPurchase = Array.isArray(prod?.purchaseAccount) ? prod.purchaseAccount : []
       const brand = categoryBrands[0]
@@ -2696,9 +2700,10 @@ function ProductInfoModal({
         description: it.description,
         prodId: prod?.id ?? null,
         categoryBrands,
-        itemCategories: Array.isArray(prod?.itemCategories) ? prod.itemCategories : [],
+        itemCategories,
         salesAccount,
         purchaseAccount,
+        scale: prod?.scale || it.unit || '',
       }
     })
     setRows(built)
