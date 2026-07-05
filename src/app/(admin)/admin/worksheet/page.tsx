@@ -361,6 +361,7 @@ function WorksheetEditor({
               title: it.description || it.sku,
               brand: it.category || '',
               scale: it.unit || '',
+              supplier: supplier || '',
               description: '',
               price: retailZAR,
               cost_per_item: finalLanded,
@@ -392,6 +393,7 @@ function WorksheetEditor({
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
         if (it.category) { patch.brand = it.category; patch.categoryBrands = [it.category] }
         if (it.unit) { patch.scale = it.unit; patch.itemCategories = [it.unit] }
+        if (supplier) patch.supplier = supplier
         if (acct) { patch.salesAccount = acct; patch.purchaseAccount = acct }
         if (Object.keys(patch).length === 0) { updated++; continue }
         const res = await fetch(`/api/admin/products/${prod.id}`, {
