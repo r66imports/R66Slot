@@ -422,6 +422,7 @@ function WorksheetEditor({
   // ── Update Products: runs costing update (no modal) ──
   async function handleUpdateProducts() {
     await updateFinalCosting()
+    setShowProductInfo(true)
   }
 
   // ── Stock verification & send to inventory ──
