@@ -2281,7 +2281,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
     footRows.push(['', '', '', '', 'TOTAL', fmtPrice(total)])
     totalIdx = footRows.length - 1
     if (depositPDF > 0) {
-      footRows.push(['', '', '', '', 'Deposit Paid', `-${fmtPrice(depositPDF)}`])
+      footRows.push(['', '', '', '', data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `-${fmtPrice(depositPDF)}`])
       depositNoteIdx = footRows.length - 1
     }
     if (creditAppliedPDF > 0) {
@@ -2293,7 +2293,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
       amountPaidIdx = footRows.length - 1
     }
     if (remainingPDF > 0.005) {
-      footRows.push(['', '', '', '', 'BALANCE DUE', fmtPrice(remainingPDF)])
+      footRows.push(['', '', '', '', data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE', fmtPrice(remainingPDF)])
       balanceDueIdx = footRows.length - 1
     }
   }
