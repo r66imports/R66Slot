@@ -1785,6 +1785,8 @@ function ItemCard({
 }
 
 // ─── Supplier Section ─────────────────────────────────────────────────────────
+type SortBy = 'az' | 'sku' | 'brand' | 'price'
+
 function SupplierSection({
   supplierName, items, contacts, suppliers, options, exchangeRates, costingSettings,
   onSave, onDelete, onDuplicate, onAddOption, onSendToWorksheet,
@@ -1803,37 +1805,66 @@ function SupplierSection({
   onSendToWorksheet: (id: string, form: FormState) => Promise<void>
 }) {
   const [collapsed, setCollapsed] = useState(true)
+  const [sortBy, setSortBy] = useState<SortBy>('az')
   const alertCount = items.filter(i => cutoffAlert(i.cutoffDate).active && !i.orderPlaced).length
   const newOrderCount = items.reduce((s, i) => s + (i.customers ?? []).filter((c: any) => c.isNew).length, 0)
 
+  const sortedItems = [...items].sort((a, b) => {
+    switch (sortBy) {
+      case 'sku':   return a.sku.localeCompare(b.sku)
+      case 'brand': return (a.brand || '').localeCompare(b.brand || '')
+      case 'price': return parseFloat(a.retailPrice || '0') - parseFloat(b.retailPrice || '0')
+      case 'az':
+      default:      return a.description.localeCompare(b.description)
+    }
+  })
+
   return (
     <div className="space-y-3">
-      {/* Supplier header button */}
-      <button
-        onClick={() => setCollapsed(c => !c)}
-        className={`w-full flex items-center justify-between px-4 py-2.5 text-white rounded-xl shadow-sm transition-colors group ${newOrderCount > 0 ? 'bg-green-600 hover:bg-green-700 animate-pulse' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-      >
-        <div className="flex items-center gap-3">
+      {/* Supplier header */}
+      <div className={`w-full flex items-center justify-between px-4 py-2.5 text-white rounded-xl shadow-sm ${newOrderCount > 0 ? 'bg-green-600' : 'bg-indigo-600'}`}>
+        {/* Clickable left — collapse/expand */}
+        <button
+          type="button"
+          onClick={() => setCollapsed(c => !c)}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        >
           <span className="text-base font-bold tracking-wide">{supplierName || 'No Supplier'}</span>
-          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium shrink-0">{items.length} item{items.length !== 1 ? 's' : ''}</span>
           {newOrderCount > 0 && (
-            <span className="text-xs bg-white/30 text-white px-2 py-0.5 rounded-full font-bold">
+            <span className="text-xs bg-white/30 text-white px-2 py-0.5 rounded-full font-bold shrink-0 animate-pulse">
               🟢 {newOrderCount} new order{newOrderCount !== 1 ? 's' : ''}
             </span>
           )}
           {alertCount > 0 && (
-            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">
+            <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold shrink-0">
               ⚠ {alertCount} cutoff alert{alertCount !== 1 ? 's' : ''}
             </span>
           )}
+        </button>
+        {/* Right — sort + chevron */}
+        <div className="flex items-center gap-2 shrink-0 ml-3">
+          <select
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value as SortBy)}
+            onClick={e => e.stopPropagation()}
+            className="text-xs bg-white/20 text-white border border-white/30 rounded-lg px-2 py-1 focus:outline-none cursor-pointer"
+          >
+            <option value="az" className="text-gray-800">A-Z</option>
+            <option value="sku" className="text-gray-800">SKU</option>
+            <option value="brand" className="text-gray-800">Brand</option>
+            <option value="price" className="text-gray-800">Price</option>
+          </select>
+          <button type="button" onClick={() => setCollapsed(c => !c)} className="text-sm">
+            <span className={`inline-block transition-transform ${collapsed ? 'rotate-0' : 'rotate-180'}`}>▼</span>
+          </button>
         </div>
-        <span className={`text-sm transition-transform ${collapsed ? 'rotate-0' : 'rotate-180'}`}>▼</span>
-      </button>
+      </div>
 
       {/* Items grid */}
       {!collapsed && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pl-2">
-          {items.map(item => (
+          {sortedItems.map(item => (
             <ItemCard
               key={item.id}
               item={item}
