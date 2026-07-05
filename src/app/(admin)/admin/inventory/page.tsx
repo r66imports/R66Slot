@@ -148,16 +148,8 @@ export default function InventoryPage() {
   const [shopInventoryUnlocked, setShopInventoryUnlocked] = useState(false)
   const [localQuantities, setLocalQuantities] = useState<Record<string, string>>({})
 
-  // Brand box collapse — default all expanded (empty set = none collapsed)
-  const [collapsedBrands, setCollapsedBrands] = useState<Set<string>>(new Set())
-  function toggleBrand(brand: string) {
-    setCollapsedBrands(prev => {
-      const next = new Set(prev)
-      if (next.has(brand)) next.delete(brand)
-      else next.add(brand)
-      return next
-    })
-  }
+  // Brand tile selection — null = tile grid view
+  const [selectedBrand, setSelectedBrand] = useState<string | null>(null)
 
   // Reserved quantities from active Sales Orders (keyed by SKU uppercase)
   const [reserved, setReserved] = useState<Record<string, number>>({})
@@ -257,7 +249,6 @@ export default function InventoryPage() {
 
   const filtered = products.filter((p) => {
     if (p.status === 'draft') return false
-    // When a supplier is selected, only show products whose brand matches that supplier
     if (selectedSupplier) {
       const pb = p.brand.trim().toLowerCase()
       if (!pb) return false
@@ -265,6 +256,8 @@ export default function InventoryPage() {
       const sc = selectedSupplier.code.toLowerCase()
       const matches = pb === sn || pb === sc || sn.includes(pb) || pb.includes(sn) || (sc.length > 2 && pb.includes(sc))
       if (!matches) return false
+    } else if (selectedBrand) {
+      if ((p.brand || 'Unsorted') !== selectedBrand) return false
     }
     if (!search.trim()) return true
     const q = search.toLowerCase()
@@ -291,11 +284,12 @@ export default function InventoryPage() {
     ? filtered.filter((p) => getRestockQty(p) > 0)
     : []
 
-  // Brand groups for base-mode display
+  // Brand tiles: always built from ALL active products so tile counts are accurate regardless of search
   const brandGroups: [string, Product[]][] = (() => {
     if (hasSupplier) return []
     const map: Record<string, Product[]> = {}
-    for (const p of filtered) {
+    for (const p of products) {
+      if (p.status === 'draft') continue
       const b = p.brand || 'Unsorted'
       if (!map[b]) map[b] = []
       map[b].push(p)
@@ -307,7 +301,12 @@ export default function InventoryPage() {
     }).map(b => [b, map[b]])
   })()
 
-  // Global index map for keyboard navigation across brand groups
+  // In tile view, search filters by brand name
+  const filteredTiles = (!hasSupplier && !selectedBrand && search.trim())
+    ? brandGroups.filter(([b]) => b.toLowerCase().includes(search.toLowerCase()))
+    : brandGroups
+
+  // Global index map for Enter-key navigation in brand detail
   const filteredIndexMap = new Map(filtered.map((p, i) => [p.id, i]))
 
   // ─── Save stock quantity ────────────────────────────────────────────────────
@@ -801,7 +800,7 @@ export default function InventoryPage() {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="Search SKU, product name or brand…"
+          placeholder={hasSupplier ? 'Search SKU, product name or brand…' : selectedBrand ? `Search within ${selectedBrand}…` : 'Search brands…'}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -810,7 +809,13 @@ export default function InventoryPage() {
 
       {/* Stats bar */}
       <div className="flex gap-4 mb-4 text-sm text-gray-500">
-        <span>{filtered.length} products</span>
+        {selectedBrand ? (
+          <span>{filtered.length} products in {selectedBrand}</span>
+        ) : hasSupplier ? (
+          <span>{filtered.length} products</span>
+        ) : (
+          <span>{brandGroups.length} brands · {brandGroups.reduce((s, [, items]) => s + items.length, 0)} products</span>
+        )}
         {autoSaving && <span className="text-indigo-500 font-medium animate-pulse">Saving…</span>}
         {!autoSaving && changedCount > 0 && <span className="text-orange-600 font-medium">{changedCount} unsaved changes</span>}
         {hasSupplier && restockItems.length > 0 && (
@@ -1009,126 +1014,143 @@ export default function InventoryPage() {
             </tbody>
           </table>
         </div>
-      ) : (
-        /* ── Base mode — grouped by brand ── */
-        <div className="space-y-3">
-          {brandGroups.length === 0 && (
-            <div className="text-center py-12 text-gray-400">No products found</div>
+      ) : !selectedBrand ? (
+        /* ── Brand tile grid (like Products page) ── */
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          {filteredTiles.length === 0 && (
+            <div className="col-span-full text-center py-12 text-gray-400">No brands found</div>
           )}
-          {brandGroups.map(([brand, items]) => {
-            const isCollapsed = collapsedBrands.has(brand)
-            const brandValue = items.reduce((s, p) => s + p.quantity * p.price, 0)
-            const brandReservedTotal = items.reduce((s, p) => s + (reserved[(p.sku || '').trim().toUpperCase()] || 0), 0)
+          {filteredTiles.map(([brand, items]) => {
+            const stock = items.reduce((s, p) => s + p.quantity, 0)
+            const value = items.reduce((s, p) => s + p.quantity * p.price, 0)
             return (
-              <div key={brand} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => toggleBrand(brand)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200"
-                >
-                  <div className="flex items-center gap-3">
-                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    <span className="font-bold text-gray-800">{brand}</span>
-                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{items.length}</span>
-                    {brandReservedTotal > 0 && <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">{brandReservedTotal} reserved</span>}
+              <button
+                key={brand}
+                onClick={() => { setSelectedBrand(brand); setSearch('') }}
+                className="bg-white border border-gray-200 rounded-xl p-4 text-left hover:shadow-md hover:border-gray-300 transition-all"
+              >
+                <div className="font-bold text-gray-900 mb-3 text-sm">{brand}</div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">SKUs</span>
+                    <span className="font-semibold text-gray-700">{items.length}</span>
                   </div>
-                  <span className="text-xs text-gray-400 font-mono">
-                    R {brandValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-                  </span>
-                </button>
-
-                {!isCollapsed && (
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/60">
-                        <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-28">SKU</th>
-                        <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Product</th>
-                        <th className="text-right px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-28">Retail</th>
-                        <th className="text-center px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-32">
-                          <div className="flex items-center justify-center gap-1.5">
-                            Shop Inv
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setShopInventoryUnlocked(u => !u) }}
-                              title={shopInventoryUnlocked ? 'Lock editing' : 'Unlock editing'}
-                              className={`p-0.5 rounded transition-colors ${shopInventoryUnlocked ? 'text-blue-600' : 'text-gray-300 hover:text-gray-500'}`}
-                            >
-                              {shopInventoryUnlocked ? (
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
-                              ) : (
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
-                              )}
-                            </button>
-                          </div>
-                        </th>
-                        <th className="text-center px-4 py-2 text-xs font-semibold text-amber-500 uppercase w-20">Reserved</th>
-                        <th className="text-center px-4 py-2 text-xs font-semibold text-blue-500 uppercase w-20">Total</th>
-                        <th className="text-center px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-28">
-                          Inv Count
-                          {lastStockTakeDate && (
-                            <div className="text-[9px] text-gray-300 font-normal normal-case">
-                              {new Date(lastStockTakeDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })}
-                            </div>
-                          )}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((product) => {
-                        const globalIdx = filteredIndexMap.get(product.id) ?? 0
-                        const countVal = counts[product.id] ?? String(product.quantity)
-                        const isDirty = countVal !== savedCounts[product.id]
-                        const displayQty = localQuantities[product.id] ?? String(product.quantity)
-                        const qtyMismatch = countVal !== '' && displayQty !== '' && countVal !== displayQty
-                        const reservedQty = reserved[(product.sku || '').trim().toUpperCase()] || 0
-                        const totalInv = product.quantity + reservedQty
-                        return (
-                          <tr key={product.id} className={`border-b last:border-0 ${qtyMismatch ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                            <td className="px-4 py-2">
-                              <button onClick={() => openSkuPopup(product)} className="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline">{product.sku || '—'}</button>
-                            </td>
-                            <td className="px-4 py-2">
-                              <div className="flex items-center gap-2">
-                                {product.imageUrl && <img src={product.imageUrl} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />}
-                                <span className="font-medium text-gray-800 break-words">{product.title}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              {product.price > 0
-                                ? <span className="text-xs font-medium text-gray-700">R {product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
-                                : <span className="text-xs text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-2 text-center">
-                              {shopInventoryUnlocked ? (
-                                <input type="number" min="0" value={displayQty} onChange={(e) => setLocalQuantities(q => ({ ...q, [product.id]: e.target.value }))} onWheel={(e) => e.currentTarget.blur()} className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white" />
-                              ) : (
-                                <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : product.quantity === 0 ? 'text-red-500' : 'text-gray-700'}`}>{product.quantity}</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-center">
-                              {reservedQty > 0 ? <span className="text-sm font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{reservedQty}</span> : <span className="text-sm text-gray-300">—</span>}
-                            </td>
-                            <td className="px-4 py-2 text-center">
-                              <span className="text-sm font-semibold text-blue-700">{totalInv}</span>
-                            </td>
-                            <td className="px-4 py-2 text-center">
-                              <input
-                                ref={(el) => { inputRefs.current[product.id] = el }}
-                                type="number" min="0"
-                                value={countVal}
-                                onChange={(e) => { setCounts(c => ({ ...c, [product.id]: e.target.value })); scheduleAutoSave() }}
-                                onKeyDown={(e) => handleKey(e, product.id, globalIdx)}
-                                onWheel={(e) => e.currentTarget.blur()}
-                                className={`w-20 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'}`}
-                              />
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                )}
-              </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Stock</span>
+                    <span className="font-semibold text-gray-700">{stock}</span>
+                  </div>
+                  <div className="flex justify-between text-xs border-t border-gray-100 pt-1.5 mt-0.5">
+                    <span className="text-gray-500">Value</span>
+                    <span className="font-bold text-gray-900">R {value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                  </div>
+                </div>
+              </button>
             )
           })}
+        </div>
+      ) : (
+        /* ── Brand detail table ── */
+        <div>
+          <button
+            onClick={() => { setSelectedBrand(null); setSearch('') }}
+            className="flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 mb-4 font-medium"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            All Brands
+          </button>
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-28">SKU</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-28">Retail</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
+                    <div className="flex items-center justify-center gap-1.5">
+                      Shop Inv
+                      <button
+                        onClick={() => setShopInventoryUnlocked(u => !u)}
+                        title={shopInventoryUnlocked ? 'Lock editing' : 'Unlock editing'}
+                        className={`p-0.5 rounded transition-colors ${shopInventoryUnlocked ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-gray-600'}`}
+                      >
+                        {shopInventoryUnlocked ? (
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
+                        )}
+                      </button>
+                    </div>
+                  </th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-amber-600 uppercase w-20">Reserved</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-blue-600 uppercase w-20">Total</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase w-28">
+                    Inv Count
+                    {lastStockTakeDate && (
+                      <div className="text-[10px] text-gray-400 font-normal normal-case mt-0.5">
+                        Last: {new Date(lastStockTakeDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                    )}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((product) => {
+                  const globalIdx = filteredIndexMap.get(product.id) ?? 0
+                  const countVal = counts[product.id] ?? String(product.quantity)
+                  const isDirty = countVal !== savedCounts[product.id]
+                  const displayQty = localQuantities[product.id] ?? String(product.quantity)
+                  const qtyMismatch = countVal !== '' && displayQty !== '' && countVal !== displayQty
+                  const reservedQty = reserved[(product.sku || '').trim().toUpperCase()] || 0
+                  const totalInv = product.quantity + reservedQty
+                  return (
+                    <tr key={product.id} className={`border-b last:border-0 ${qtyMismatch ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                      <td className="px-4 py-2">
+                        <button onClick={() => openSkuPopup(product)} className="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline">{product.sku || '—'}</button>
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          {product.imageUrl && <img src={product.imageUrl} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />}
+                          <span className="font-medium text-gray-800 break-words">{product.title}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {product.price > 0
+                          ? <span className="text-xs font-medium text-gray-700">R {product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                          : <span className="text-xs text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        {shopInventoryUnlocked ? (
+                          <input type="number" min="0" value={displayQty} onChange={(e) => setLocalQuantities(q => ({ ...q, [product.id]: e.target.value }))} onWheel={(e) => e.currentTarget.blur()} className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white" />
+                        ) : (
+                          <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : product.quantity === 0 ? 'text-red-500' : 'text-gray-700'}`}>{product.quantity}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        {reservedQty > 0 ? <span className="text-sm font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{reservedQty}</span> : <span className="text-sm text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <span className="text-sm font-semibold text-blue-700">{totalInv}</span>
+                      </td>
+                      <td className="px-4 py-2 text-center">
+                        <input
+                          ref={(el) => { inputRefs.current[product.id] = el }}
+                          type="number" min="0"
+                          value={countVal}
+                          onChange={(e) => { setCounts(c => ({ ...c, [product.id]: e.target.value })); scheduleAutoSave() }}
+                          onKeyDown={(e) => handleKey(e, product.id, globalIdx)}
+                          onWheel={(e) => e.currentTarget.blur()}
+                          className={`w-20 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'}`}
+                        />
+                      </td>
+                    </tr>
+                  )
+                })}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={7} className="text-center py-12 text-gray-400">No products found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
