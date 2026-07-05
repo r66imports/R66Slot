@@ -2837,10 +2837,12 @@ function ProductInfoModal({
 
     for (const row of resolvedRows) {
       const payload = {
+        brand: row.categoryBrands[0] || null,
         categoryBrands: row.categoryBrands.length > 0 ? row.categoryBrands : null,
         itemCategories: row.itemCategories.length > 0 ? row.itemCategories : null,
         salesAccount: row.salesAccount.length > 0 ? row.salesAccount : null,
         purchaseAccount: row.purchaseAccount.length > 0 ? row.purchaseAccount : null,
+        scale: row.scale || null,
       }
       if (row.prodId) {
         const res = await fetch(`/api/admin/products/${row.prodId}`, {
