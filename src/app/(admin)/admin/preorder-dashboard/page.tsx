@@ -1785,7 +1785,7 @@ function ItemCard({
 }
 
 // ─── Supplier Section ─────────────────────────────────────────────────────────
-type SortBy = 'az' | 'sku' | 'brand' | 'price'
+type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date'
 
 function SupplierSection({
   supplierName, items, contacts, suppliers, options, exchangeRates, costingSettings,
@@ -1806,17 +1806,21 @@ function SupplierSection({
 }) {
   const [collapsed, setCollapsed] = useState(true)
   const [sortBy, setSortBy] = useState<SortBy>('az')
+  const [asc, setAsc] = useState(true)
   const alertCount = items.filter(i => cutoffAlert(i.cutoffDate).active && !i.orderPlaced).length
   const newOrderCount = items.reduce((s, i) => s + (i.customers ?? []).filter((c: any) => c.isNew).length, 0)
 
   const sortedItems = [...items].sort((a, b) => {
+    let cmp = 0
     switch (sortBy) {
-      case 'sku':   return a.sku.localeCompare(b.sku)
-      case 'brand': return (a.brand || '').localeCompare(b.brand || '')
-      case 'price': return parseFloat(a.retailPrice || '0') - parseFloat(b.retailPrice || '0')
+      case 'sku':   cmp = a.sku.localeCompare(b.sku); break
+      case 'brand': cmp = (a.brand || '').localeCompare(b.brand || ''); break
+      case 'price': cmp = parseFloat(a.retailPrice || '0') - parseFloat(b.retailPrice || '0'); break
+      case 'date':  cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break
       case 'az':
-      default:      return a.description.localeCompare(b.description)
+      default:      cmp = a.description.localeCompare(b.description)
     }
+    return asc ? cmp : -cmp
   })
 
   return (
@@ -1842,7 +1846,7 @@ function SupplierSection({
             </span>
           )}
         </button>
-        {/* Right — sort + chevron */}
+        {/* Right — sort + asc/desc + chevron */}
         <div className="flex items-center gap-2 shrink-0 ml-3">
           <select
             value={sortBy}
@@ -1854,7 +1858,16 @@ function SupplierSection({
             <option value="sku" className="text-gray-800">SKU</option>
             <option value="brand" className="text-gray-800">Brand</option>
             <option value="price" className="text-gray-800">Price</option>
+            <option value="date" className="text-gray-800">Date Added</option>
           </select>
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); setAsc(a => !a) }}
+            className="text-xs bg-white/20 border border-white/30 rounded-lg px-2 py-1 hover:bg-white/30 transition-colors font-bold"
+            title={asc ? 'Ascending' : 'Descending'}
+          >
+            {asc ? '↑' : '↓'}
+          </button>
           <button type="button" onClick={() => setCollapsed(c => !c)} className="text-sm">
             <span className={`inline-block transition-transform ${collapsed ? 'rotate-0' : 'rotate-180'}`}>▼</span>
           </button>
