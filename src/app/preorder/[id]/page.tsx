@@ -113,7 +113,7 @@ export default function PublicPreOrderItemPage() {
       <header className="bg-primary py-4 px-6 flex items-center gap-4">
         <Link href="/" className="text-2xl font-bold">
           <span className="text-white">R66</span>
-          <span className="text-black">EMPORIUM</span>
+          <span className="text-black">SLOT</span>
         </Link>
         <Link href={isReseller ? '/resellers-pre-orders' : '/pre-orders'} className="ml-3 text-white/70 text-sm hover:text-white">
           {isReseller ? '← Resellers' : '← All Pre-Orders'}
@@ -237,14 +237,14 @@ export default function PublicPreOrderItemPage() {
               <div className="bg-[#111] rounded-xl p-6 text-center space-y-3">
                 <p className="text-gray-300">Sign in to reserve this item</p>
                 <Link
-                  href={`/account/login?returnUrl=/pre-order/${id}`}
+                  href={`/account/login?returnUrl=/preorder/${id}`}
                   className="block w-full py-4 bg-primary text-white font-bold rounded-xl text-lg hover:bg-red-700 transition-colors"
                 >
                   Sign In to Reserve
                 </Link>
                 <p className="text-gray-500 text-sm">
                   Don't have an account?{' '}
-                  <Link href={`/account/register?returnUrl=/pre-order/${id}`} className="text-primary hover:underline">Create one</Link>
+                  <Link href={`/account/register?returnUrl=/preorder/${id}`} className="text-primary hover:underline">Create one</Link>
                 </p>
               </div>
             )}

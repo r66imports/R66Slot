@@ -327,10 +327,10 @@ export default function PreOrdersListPage() {
         <div className="py-3 px-6 flex items-center gap-4">
           <Link href="/" className="flex items-center gap-2 text-2xl font-bold">
             {headerLogo && (
-              <img src={headerLogo} alt="R66 Emporium" className="h-10 w-10 object-contain" />
+              <img src={headerLogo} alt="R66 Slot" className="h-10 w-10 object-contain" />
             )}
             <span style={{ color: t.logoR66 }}>R66</span>
-            <span style={{ color: t.logoEmporium }}>EMPORIUM</span>
+            <span style={{ color: t.logoEmporium }}>SLOT</span>
           </Link>
 
           <span
@@ -453,7 +453,7 @@ export default function PreOrdersListPage() {
               return (
                 <Link
                   key={item.id}
-                  href={`/pre-order/${item.id}`}
+                  href={`/preorder/${item.id}`}
                   className="group rounded-2xl overflow-hidden transition-all duration-200"
                   style={{
                     background: t.cardBg,
