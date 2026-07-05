@@ -14,7 +14,7 @@ function buildPool(): Pool {
     connectionString,
     ssl,
     max: 10,
-    connectionTimeoutMillis: 8000,
+    connectionTimeoutMillis: 3000,
     idleTimeoutMillis: 60000,
     statement_timeout: 30000,
   })
@@ -32,25 +32,28 @@ function getPool(): Pool {
   return _pool
 }
 
-// db.query() with up to 3 retries on connection errors (handles Railway
-// startup window where the DB takes a few seconds to become reachable)
+// db.query() with up to 3 retries on genuine network-level connection errors.
+// NOTE: only retries on OS-level errors (ECONNREFUSED, ETIMEDOUT etc.) —
+// NOT on pool exhaustion timeouts, which would destroy the pool unnecessarily
+// and cause the compounding 30-second stall.
 async function query(sql: string, params?: any[]): Promise<any> {
   const maxAttempts = 3
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await getPool().query(sql, params)
     } catch (err: any) {
-      const isConnErr =
+      const isNetworkErr =
         err?.code === 'ECONNREFUSED' ||
-        err?.code === 'ETIMEDOUT' ||
-        err?.message?.includes('timeout') ||
-        err?.message?.includes('connect')
+        err?.code === 'ECONNRESET' ||
+        err?.code === 'ENOTFOUND' ||
+        err?.code === 'ENETUNREACH' ||
+        err?.code === 'ETIMEDOUT'
 
-      if (isConnErr && attempt < maxAttempts) {
-        console.error(`[db] Connection error (attempt ${attempt}/${maxAttempts}), retrying in ${attempt * 2}s:`, err.message)
+      if (isNetworkErr && attempt < maxAttempts) {
+        console.error(`[db] Network error (attempt ${attempt}/${maxAttempts}), retrying in ${attempt}s:`, err.message)
         try { await _pool?.end() } catch { /* ignore */ }
         _pool = null
-        await new Promise(r => setTimeout(r, attempt * 2000))
+        await new Promise(r => setTimeout(r, attempt * 1000))
         continue
       }
       throw err

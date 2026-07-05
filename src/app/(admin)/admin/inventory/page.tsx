@@ -148,6 +148,17 @@ export default function InventoryPage() {
   const [shopInventoryUnlocked, setShopInventoryUnlocked] = useState(false)
   const [localQuantities, setLocalQuantities] = useState<Record<string, string>>({})
 
+  // Brand box collapse — default all expanded (empty set = none collapsed)
+  const [collapsedBrands, setCollapsedBrands] = useState<Set<string>>(new Set())
+  function toggleBrand(brand: string) {
+    setCollapsedBrands(prev => {
+      const next = new Set(prev)
+      if (next.has(brand)) next.delete(brand)
+      else next.add(brand)
+      return next
+    })
+  }
+
   // Reserved quantities from active Sales Orders (keyed by SKU uppercase)
   const [reserved, setReserved] = useState<Record<string, number>>({})
 
@@ -274,9 +285,30 @@ export default function InventoryPage() {
     return Math.max(0, shopQtyNum - currentQty)
   }
 
+  const hasSupplier = !!selectedSupplierId
+
   const restockItems = selectedSupplierId
     ? filtered.filter((p) => getRestockQty(p) > 0)
     : []
+
+  // Brand groups for base-mode display
+  const brandGroups: [string, Product[]][] = (() => {
+    if (hasSupplier) return []
+    const map: Record<string, Product[]> = {}
+    for (const p of filtered) {
+      const b = p.brand || 'Unsorted'
+      if (!map[b]) map[b] = []
+      map[b].push(p)
+    }
+    return Object.keys(map).sort((a, b) => {
+      if (a === 'Unsorted') return 1
+      if (b === 'Unsorted') return -1
+      return a.localeCompare(b)
+    }).map(b => [b, map[b]])
+  })()
+
+  // Global index map for keyboard navigation across brand groups
+  const filteredIndexMap = new Map(filtered.map((p, i) => [p.id, i]))
 
   // ─── Save stock quantity ────────────────────────────────────────────────────
 
@@ -683,7 +715,6 @@ export default function InventoryPage() {
 
   // ─── Render ─────────────────────────────────────────────────────────────────
 
-  const hasSupplier = !!selectedSupplierId
 
   // Compute Save All button dirty state
   const hasDirtyPricelist = hasSupplier && filtered.some((p) => {
@@ -979,161 +1010,125 @@ export default function InventoryPage() {
           </table>
         </div>
       ) : (
-        /* ── Base mode table (no supplier) ── */
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <table className="w-full text-sm table-fixed">
-            <colgroup>
-              <col style={{ width: colW.idx }} />
-              <col style={{ width: colW.sku }} />
-              <col style={{ width: colW.product }} />
-              <col style={{ width: colW.retail }} />
-              <col style={{ width: colW.brand }} />
-              <col style={{ width: colW.dbQty }} />
-              <col style={{ width: colW.count }} />
-            </colgroup>
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  #
-                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.idx; const onMove = (ev: MouseEvent) => setWidth('idx', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  SKU
-                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.sku; const onMove = (ev: MouseEvent) => setWidth('sku', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  Product
-                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.product; const onMove = (ev: MouseEvent) => setWidth('product', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  Retail
-                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.retail; const onMove = (ev: MouseEvent) => setWidth('retail', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  Brand
-                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.brand; const onMove = (ev: MouseEvent) => setWidth('brand', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  <div className="flex items-center justify-center gap-1.5">
-                    Shop Inventory
-                    <button
-                      onClick={() => setShopInventoryUnlocked(u => !u)}
-                      title={shopInventoryUnlocked ? 'Lock editing' : 'Unlock editing'}
-                      className={`p-0.5 rounded transition-colors ${shopInventoryUnlocked ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-gray-600'}`}
-                    >
-                      {shopInventoryUnlocked ? (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
-                      )}
-                    </button>
+        /* ── Base mode — grouped by brand ── */
+        <div className="space-y-3">
+          {brandGroups.length === 0 && (
+            <div className="text-center py-12 text-gray-400">No products found</div>
+          )}
+          {brandGroups.map(([brand, items]) => {
+            const isCollapsed = collapsedBrands.has(brand)
+            const brandValue = items.reduce((s, p) => s + p.quantity * p.price, 0)
+            const brandReservedTotal = items.reduce((s, p) => s + (reserved[(p.sku || '').trim().toUpperCase()] || 0), 0)
+            return (
+              <div key={brand} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => toggleBrand(brand)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors border-b border-gray-200"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    <span className="font-bold text-gray-800">{brand}</span>
+                    <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{items.length}</span>
+                    {brandReservedTotal > 0 && <span className="text-xs text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">{brandReservedTotal} reserved</span>}
                   </div>
-                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.dbQty; const onMove = (ev: MouseEvent) => setWidth('dbQty', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-amber-600 uppercase w-20">Reserved</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-blue-600 uppercase w-20">Total Inv</th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ position: 'relative' }}>
-                  <div>
-                    Inventory Count
-                    {lastStockTakeDate && (
-                      <div className="text-[10px] text-gray-400 font-normal normal-case mt-0.5">
-                        Last: {new Date(lastStockTakeDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </div>
-                    )}
-                  </div>
-                  <div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? colW.count; const onMove = (ev: MouseEvent) => setWidth('count', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((product, idx) => {
-                const countVal = counts[product.id] ?? String(product.quantity)
-                const isDirty = countVal !== savedCounts[product.id]
-                const displayQtyBase = localQuantities[product.id] ?? String(product.quantity)
-                const qtyMismatchBase = countVal !== '' && displayQtyBase !== '' && countVal !== displayQtyBase
-                const reservedQtyBase = reserved[(product.sku || '').trim().toUpperCase()] || 0
-                // DB qty already reflects SO deduction
-                const availableQtyBase = product.quantity
-                const totalInventoryQtyBase = product.quantity + reservedQtyBase
-                return (
-                  <tr key={product.id} className={`border-b last:border-0 ${qtyMismatchBase ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
-                    <td className="px-4 py-2 text-xs text-gray-400">{idx + 1}</td>
-                    <td className="px-4 py-2">
-                      <button
-                        onClick={() => openSkuPopup(product)}
-                        className="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
-                        title="View sales & purchase stats"
-                      >{product.sku || '—'}</button>
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        {product.imageUrl && (
-                          <img src={product.imageUrl} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />
-                        )}
-                        <span className="font-medium text-gray-800 break-words">{product.title}</span>
-                        {product.status === 'draft' && (
-                          <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">draft</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      {product.price > 0
-                        ? <span className="text-xs font-medium text-gray-700">R {product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
-                        : <span className="text-xs text-gray-300">—</span>}
-                    </td>
-                    <td className="px-4 py-2 text-xs text-gray-500">{product.brand || '—'}</td>
-                    <td className="px-4 py-2 text-center">
-                      {shopInventoryUnlocked ? (
-                        <input
-                          type="number"
-                          min="0"
-                          value={displayQtyBase}
-                          onChange={(e) => setLocalQuantities((q) => ({ ...q, [product.id]: e.target.value }))}
-                          onWheel={(e) => e.currentTarget.blur()}
-                          className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white"
-                        />
-                      ) : (
-                        <span className={`text-sm font-semibold ${qtyMismatchBase ? 'text-red-600' : availableQtyBase === 0 ? 'text-red-500' : 'text-gray-700'}`}>
-                          {availableQtyBase}
-                        </span>
-                      )}
-                    </td>
-                    {/* Reserved */}
-                    <td className="px-4 py-2 text-center">
-                      {reservedQtyBase > 0 ? (
-                        <span className="text-sm font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{reservedQtyBase}</span>
-                      ) : (
-                        <span className="text-sm text-gray-300">—</span>
-                      )}
-                    </td>
-                    {/* Total Inventory = available + reserved */}
-                    <td className="px-4 py-2 text-center">
-                      <span className="text-sm font-semibold text-blue-700">{totalInventoryQtyBase}</span>
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input
-                        ref={(el) => { inputRefs.current[product.id] = el }}
-                        type="number"
-                        min="0"
-                        value={countVal}
-                        onChange={(e) => { setCounts((c) => ({ ...c, [product.id]: e.target.value })); scheduleAutoSave() }}
-                        onKeyDown={(e) => handleKey(e, product.id, idx)}
-                        onWheel={(e) => e.currentTarget.blur()}
-                        className={`w-20 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                          isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'
-                        }`}
-                      />
-                    </td>
-                  </tr>
-                )
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="text-center py-12 text-gray-400">No products found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                  <span className="text-xs text-gray-400 font-mono">
+                    R {brandValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                  </span>
+                </button>
+
+                {!isCollapsed && (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/60">
+                        <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-28">SKU</th>
+                        <th className="text-left px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Product</th>
+                        <th className="text-right px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-28">Retail</th>
+                        <th className="text-center px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-32">
+                          <div className="flex items-center justify-center gap-1.5">
+                            Shop Inv
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShopInventoryUnlocked(u => !u) }}
+                              title={shopInventoryUnlocked ? 'Lock editing' : 'Unlock editing'}
+                              className={`p-0.5 rounded transition-colors ${shopInventoryUnlocked ? 'text-blue-600' : 'text-gray-300 hover:text-gray-500'}`}
+                            >
+                              {shopInventoryUnlocked ? (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 018 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
+                              ) : (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zM16 7V5a4 4 0 00-8 0v2" /></svg>
+                              )}
+                            </button>
+                          </div>
+                        </th>
+                        <th className="text-center px-4 py-2 text-xs font-semibold text-amber-500 uppercase w-20">Reserved</th>
+                        <th className="text-center px-4 py-2 text-xs font-semibold text-blue-500 uppercase w-20">Total</th>
+                        <th className="text-center px-4 py-2 text-xs font-semibold text-gray-400 uppercase w-28">
+                          Inv Count
+                          {lastStockTakeDate && (
+                            <div className="text-[9px] text-gray-300 font-normal normal-case">
+                              {new Date(lastStockTakeDate).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })}
+                            </div>
+                          )}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((product) => {
+                        const globalIdx = filteredIndexMap.get(product.id) ?? 0
+                        const countVal = counts[product.id] ?? String(product.quantity)
+                        const isDirty = countVal !== savedCounts[product.id]
+                        const displayQty = localQuantities[product.id] ?? String(product.quantity)
+                        const qtyMismatch = countVal !== '' && displayQty !== '' && countVal !== displayQty
+                        const reservedQty = reserved[(product.sku || '').trim().toUpperCase()] || 0
+                        const totalInv = product.quantity + reservedQty
+                        return (
+                          <tr key={product.id} className={`border-b last:border-0 ${qtyMismatch ? 'bg-red-50' : isDirty ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                            <td className="px-4 py-2">
+                              <button onClick={() => openSkuPopup(product)} className="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline">{product.sku || '—'}</button>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div className="flex items-center gap-2">
+                                {product.imageUrl && <img src={product.imageUrl} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />}
+                                <span className="font-medium text-gray-800 break-words">{product.title}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {product.price > 0
+                                ? <span className="text-xs font-medium text-gray-700">R {product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span>
+                                : <span className="text-xs text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {shopInventoryUnlocked ? (
+                                <input type="number" min="0" value={displayQty} onChange={(e) => setLocalQuantities(q => ({ ...q, [product.id]: e.target.value }))} onWheel={(e) => e.currentTarget.blur()} className="w-16 text-center text-sm px-2 py-1 border border-blue-300 rounded bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white" />
+                              ) : (
+                                <span className={`text-sm font-semibold ${qtyMismatch ? 'text-red-600' : product.quantity === 0 ? 'text-red-500' : 'text-gray-700'}`}>{product.quantity}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {reservedQty > 0 ? <span className="text-sm font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{reservedQty}</span> : <span className="text-sm text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <span className="text-sm font-semibold text-blue-700">{totalInv}</span>
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <input
+                                ref={(el) => { inputRefs.current[product.id] = el }}
+                                type="number" min="0"
+                                value={countVal}
+                                onChange={(e) => { setCounts(c => ({ ...c, [product.id]: e.target.value })); scheduleAutoSave() }}
+                                onKeyDown={(e) => handleKey(e, product.id, globalIdx)}
+                                onWheel={(e) => e.currentTarget.blur()}
+                                className={`w-20 text-center text-sm font-semibold px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 ${isDirty ? 'border-orange-400 bg-white' : 'border-gray-200 bg-gray-50'}`}
+                              />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
