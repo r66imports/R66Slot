@@ -47,6 +47,25 @@ export async function DELETE(request: Request) {
       store[key].transactions = []
       await blobWrite(KEY, store)
     }
+    // Also zero overpaymentCredit on all invoices for this client so computed balance
+    // cannot resurrect the phantom via the Math.max repair in handleRecordPayment
+    try {
+      const docs: any[] = await blobRead<any[]>('data/order-documents.json', [])
+      let changed = false
+      for (const doc of docs) {
+        if (
+          doc.type === 'invoice' &&
+          clientKey(doc.clientName || '') === key &&
+          (doc.overpaymentCredit || 0) > 0
+        ) {
+          doc.overpaymentCredit = 0
+          doc.showCreditOnInvoice = false
+          doc.updatedAt = new Date().toISOString()
+          changed = true
+        }
+      }
+      if (changed) await blobWrite('data/order-documents.json', docs)
+    } catch { /* non-fatal */ }
     return NextResponse.json({ ok: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

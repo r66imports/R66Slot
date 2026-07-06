@@ -1070,6 +1070,7 @@ function CreateDocumentModal({
   onCreated,
   onClose,
   onRecordInlinePayment,
+  onDocumentUpdated,
 }: {
   docType: DocType
   template: OrderTemplate
@@ -1082,6 +1083,7 @@ function CreateDocumentModal({
   onCreated: (doc: OrderDocument) => void
   onClose: () => void
   onRecordInlinePayment?: (amountPaid: number, paymentMethod: string, notes: string) => Promise<void>
+  onDocumentUpdated?: (doc: OrderDocument) => void
 }) {
   type InlineMethod = 'EFT' | 'Cash' | 'Card'
   const cfg = TAB_CFG[docType === 'quote' ? 'quotes' : docType === 'salesorder' ? 'salesorders' : 'invoices']
@@ -1133,6 +1135,41 @@ function CreateDocumentModal({
       setLocalPayments(prev => prev.slice(0, -1))
     }
     setInlineSaving(false)
+  }
+
+  const handleRemovePayment = async (index: number, p: any) => {
+    if (!editDoc || !(editDoc as any).id) return
+    const newPayments = localPayments.filter((_, i) => i !== index)
+    const newAmountPaid = Math.max(0, ((editDoc as any).amountPaid || 0) - (p.amountPaid || 0))
+    const newCreditApplied = Math.max(0, ((editDoc as any).creditApplied || 0) - (p.creditApplied || 0))
+    const sub = (editDoc.lineItems || []).reduce((s: number, li: any) => s + li.qty * li.unitPrice, 0)
+    const disc = sub * ((editDoc as any).discountPct || 0) / 100
+    const invTotal = sub - disc + ((editDoc as any).shippingCost || 0)
+    const depositPaid = (editDoc as any).depositPaid || 0
+    const newOverpaymentCredit = Math.max(0, newAmountPaid + newCreditApplied - Math.max(0, invTotal - depositPaid))
+    const nowUnpaid = newAmountPaid + newCreditApplied + depositPaid < invTotal - 0.005
+    const patchBody: Record<string, any> = { payments: newPayments, amountPaid: newAmountPaid, creditApplied: newCreditApplied, overpaymentCredit: newOverpaymentCredit }
+    if ((editDoc as any).status === 'paid' && nowUnpaid) patchBody.status = 'accepted'
+    const patchRes = await fetch(`/api/admin/orders/documents/${(editDoc as any).id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patchBody),
+    })
+    if (!patchRes.ok) return
+    const updated = await patchRes.json()
+    setLocalPayments(newPayments)
+    // Reverse credit effects in blob
+    const prevOverpayment = (editDoc as any).overpaymentCredit || 0
+    const overpayRemoved = Math.max(0, prevOverpayment - newOverpaymentCredit)
+    const creditRestored = Math.max(0, p.creditApplied || 0)
+    if (overpayRemoved > 0.005 || creditRestored > 0.005) {
+      fetch('/api/admin/customer-credits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'record_payment', clientName: (editDoc as any).clientName, invoiceNumber: (editDoc as any).docNumber, amountPaid: 0, creditApplied: overpayRemoved, overpayment: creditRestored }),
+      }).catch(() => {})
+    }
+    onDocumentUpdated?.(updated)
   }
 
   useEffect(() => {
@@ -1750,6 +1787,12 @@ function CreateDocumentModal({
                       <div className="flex items-center gap-3">
                         {(p.amountPaid || 0) > 0 && <span className="text-green-700 font-semibold">{fmtPrice(p.amountPaid)}</span>}
                         {(p.creditApplied || 0) > 0 && <span className="text-blue-600 text-xs">+Credit {fmtPrice(p.creditApplied)}</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePayment(i, p)}
+                          className="text-red-400 hover:text-red-600 text-base leading-none ml-1 transition-colors"
+                          title="Remove this payment"
+                        >×</button>
                       </div>
                     </div>
                   ))}
@@ -3134,24 +3177,9 @@ function OrdersPageInner() {
     const key = doc.clientName.toLowerCase().replace(/\s+/g, '_')
     const res = await fetch(`/api/admin/customer-credits/${key}`)
     const data = res.ok ? await res.json() : { balance: 0 }
-    const blobBalance = data.balance ?? 0
-
-    // Fallback: recompute from invoice documents in case blob is stale
-    // Sum overpaymentCredit on all invoices for this client, minus creditApplied
-    const computedBalance = Math.max(0, documents
-      .filter(d => d.type === 'invoice' && d.clientName.toLowerCase().replace(/\s+/g, '_') === key)
-      .reduce((s, d) => s + ((d as any).overpaymentCredit || 0) - ((d as any).creditApplied || 0), 0))
-
-    const balance = Math.max(blobBalance, computedBalance)
-
-    // If computed is higher than blob, repair the blob silently
-    if (computedBalance > blobBalance + 0.005) {
-      fetch('/api/admin/customer-credits', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'record_payment', clientName: doc.clientName, invoiceNumber: 'recompute', amountPaid: 0, creditApplied: 0, overpayment: computedBalance - blobBalance }),
-      }).catch(() => {})
-    }
+    // Blob is the ledger — trust it directly. The old Math.max(blob, computed) logic
+    // caused phantom credits to resurrect after admin cleared them.
+    const balance = data.balance ?? 0
 
     setClientCreditBalance(balance)
     setPaymentForm({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '' })
@@ -4540,6 +4568,14 @@ function OrdersPageInner() {
           }}
           onClose={() => setEditDocState(null)}
           onRecordInlinePayment={handleInlinePayment}
+          onDocumentUpdated={(updated) => {
+            setDocuments((prev) => prev.map((d) => d.id === updated.id ? updated : d))
+            const key = updated.clientName.toLowerCase().replace(/\s+/g, '_')
+            fetch(`/api/admin/customer-credits/${key}`)
+              .then(r => r.ok ? r.json() : { balance: 0 })
+              .then(rec => setCreditBalances(prev => ({ ...prev, [key]: rec.balance ?? 0 })))
+              .catch(() => {})
+          }}
         />
       )}
       {paymentModal && (
