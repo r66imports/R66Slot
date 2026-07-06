@@ -450,7 +450,7 @@ function DocumentBody({
             {deposit > 0 && (
               <div className="flex justify-between py-1 border-b border-gray-100 text-sm mt-1">
                 <span className="text-gray-500">{data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span>
-                <span className="font-medium text-green-600">-{fmtPrice(deposit)}</span>
+                <span className="font-medium text-green-600">{data.docType === 'quote' ? '' : '-'}{fmtPrice(deposit)}</span>
               </div>
             )}
             {(data.creditApplied || 0) > 0 && (
@@ -1326,6 +1326,12 @@ function CreateDocumentModal({
   const [shippingMethod, setShippingMethod] = useState<string>((editDoc as any)?.shippingMethod || '')
   const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
+  const [nonDepositPct, setNonDepositPct] = useState<number>(
+    isQuote && !(editDoc as any)?.depositMode && (editDoc as any)?.depositPct > 0
+      ? ((editDoc as any)?.depositPct as number) : 0
+  )
+  const nonDepositPctRef = useRef(nonDepositPct)
+  useEffect(() => { nonDepositPctRef.current = nonDepositPct }, [nonDepositPct])
   const [depositMode, setDepositMode] = useState<boolean>((editDoc as any)?.depositMode || !!(editDoc as any)?.preOrderDeposit || false)
   const [preOrderDeposit, setPreOrderDeposit] = useState<boolean>((editDoc as any)?.preOrderDeposit || false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
@@ -1339,6 +1345,13 @@ function CreateDocumentModal({
   const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
   const discountAmt = depositMode ? 0 : subtotal * discountPct / 100
   const total = subtotal - discountAmt + shippingCost
+  // Auto-adjust fixed deposit when items change (quotes only)
+  useEffect(() => {
+    if (isQuote && !depositMode && nonDepositPctRef.current > 0 && total > 0) {
+      setDepositPaid(Math.round(total * nonDepositPctRef.current / 100 * 100) / 100)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total])
   const depositAmount = depositMode ? Math.round(total * discountPct / 100 * 100) / 100 : depositPaid
   const creditAppliedAmt = (isQuote ? false : useCredit)
     ? Math.min(availableCredit, parseFloat(creditInput) || availableCredit)
@@ -1362,7 +1375,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : 0, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0, preOrderDeposit }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0, preOrderDeposit }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -1721,7 +1734,11 @@ function CreateDocumentModal({
                         <input type="number" min={0} step={0.01}
                           className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
                           value={depositPaid}
-                          onChange={(e) => setDepositPaid(Math.max(0, Number(e.target.value)))}
+                          onChange={(e) => {
+                            const val = Math.max(0, Number(e.target.value))
+                            setDepositPaid(val)
+                            if (isQuote && total > 0) setNonDepositPct(val / total * 100)
+                          }}
                         />
                       </td>
                       <td className="px-3 py-1.5 text-right text-green-600 font-medium">
@@ -2070,7 +2087,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       ` : `
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
       ${depositHTML > 0 ? `
-      <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span><span style="font-weight:500;color:#16a34a">-${fmtPrice(depositHTML)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span><span style="font-weight:500;color:#16a34a">${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositHTML)}</span></div>
       ` : ''}
       ${creditAppliedHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #d1fae5"><span style="color:#16a34a;font-weight:600">Credit Applied</span><span style="color:#16a34a;font-weight:600">-${fmtPrice(creditAppliedHTML)}</span></div>` : ''}
       ${amountPaidHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #dbeafe"><span style="color:#2563eb;font-weight:600">Amount Paid</span><span style="color:#2563eb;font-weight:600">-${fmtPrice(amountPaidHTML)}</span></div>` : ''}
@@ -2127,7 +2144,7 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
     ...((data as any).preOrderDeposit && (data.depositPaid || 0) > 0
       ? [`Full Order Total:  ${fmtPrice(total)}`, `DEPOSIT DUE:  ${fmtPrice(data.depositPaid)}`, `BALANCE ON DELIVERY:  ${fmtPrice(total - (data.depositPaid || 0))}`]
       : [`TOTAL:  ${fmtPrice(total)}`,
-         ...((data.depositPaid || 0) > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  -${fmtPrice(data.depositPaid)}`] : []),
+         ...((data.depositPaid || 0) > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  ${data.docType === 'quote' ? '' : '-'}${fmtPrice(data.depositPaid)}`] : []),
          ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
          ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
          ...((total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0))}`] : [])]),
@@ -2324,7 +2341,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
     footRows.push(['', '', '', '', 'TOTAL', fmtPrice(total)])
     totalIdx = footRows.length - 1
     if (depositPDF > 0) {
-      footRows.push(['', '', '', '', data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `-${fmtPrice(depositPDF)}`])
+      footRows.push(['', '', '', '', data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositPDF)}`])
       depositNoteIdx = footRows.length - 1
     }
     if (creditAppliedPDF > 0) {
