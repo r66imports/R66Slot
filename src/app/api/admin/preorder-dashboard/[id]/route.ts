@@ -108,6 +108,7 @@ export async function PATCH(
       'estimatedRetailPrice2', 'moq2Qty', 'moq2Enabled', 'moq2ResellerOnly',
       'showRetail',
       'onSalesPage', 'salesTier1Discount', 'salesTier2Discount',
+      'notes',
     ]
     const updated: PreOrderDashboardItem = { ...current, updatedAt: new Date().toISOString() }
     for (const field of allowedFields) {

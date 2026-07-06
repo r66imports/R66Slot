@@ -59,6 +59,7 @@ interface DashboardItem {
   onSalesPage?: boolean
   salesTier1Discount?: number | null
   salesTier2Discount?: number | null
+  notes?: string
   createdAt: string
   updatedAt?: string
 }
@@ -708,6 +709,7 @@ function ItemCard({
     shipmentStatus: item.shipmentStatus,
     linkedWsId: item.linkedWsId,
     showRetail: item.showRetail !== false,
+    notes: item.notes ?? '',
   })
   const formRef = useRef(form)
   formRef.current = form
@@ -1517,6 +1519,14 @@ function ItemCard({
             <label className="block text-xs text-gray-500 mb-0.5">Item Description</label>
             <input type="text" value={form.description} onChange={e => set('description', e.target.value)}
               className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Description" />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-xs text-gray-500 mb-0.5">Notes <span className="text-gray-400">(shown on poster)</span></label>
+            <textarea value={form.notes ?? ''} onChange={e => set('notes', e.target.value)}
+              rows={2}
+              className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 resize-none" placeholder="Extra info for the pre-order poster…" />
           </div>
 
           {/* Brand + Unit */}
