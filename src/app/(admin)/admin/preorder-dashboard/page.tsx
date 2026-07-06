@@ -368,7 +368,18 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   ctx.font = 'bold 46px Arial'
   const descLines = wrapTextLines(ctx, form.description || '—', W - 120)
   for (const line of descLines.slice(0, 3)) { ctx.fillText(line, 60, y); y += 72 }
-  y += 36
+  y += 24
+
+  // Notes
+  if (form.notes) {
+    ctx.fillStyle = '#aaaaaa'
+    ctx.font = 'italic 40px Arial'
+    const noteLines = wrapTextLines(ctx, form.notes, W - 120)
+    for (const line of noteLines.slice(0, 2)) { ctx.fillText(line, 60, y); y += 56 }
+    y += 16
+  } else {
+    y += 12
+  }
 
   // Price (omit if showRetail is explicitly false)
   if (form.showRetail !== false) {
@@ -393,18 +404,23 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   const moq = form.minOrderQty ?? 0
   const inStock = moq > 0 ? Math.max(0, moq - totalQty) : (form.extraQty ?? 0)
   const isSoldOut = !!form.orderPlaced && inStock === 0
-  {
+  ctx.textAlign = 'left'
+  if (isSoldOut) {
+    ctx.fillStyle = '#ef4444'
+    ctx.font = 'bold 52px Arial'
+    ctx.fillText('SOLD OUT', 60, y)
+  } else if (moq > 0) {
+    ctx.fillStyle = '#888888'
+    ctx.font = '38px Arial'
+    ctx.fillText('Qty Available', 60, y)
+    y += 54
+    ctx.fillStyle = '#22c55e'
+    ctx.font = 'bold 64px Arial'
+    ctx.fillText(`${totalQty} of ${moq} booked`, 60, y)
+  } else {
+    ctx.fillStyle = '#22c55e'
     ctx.font = 'bold 42px Arial'
-    ctx.textAlign = 'left'
-    if (isSoldOut) {
-      ctx.fillStyle = '#ef4444'
-      ctx.fillText('SOLD OUT', 60, y)
-    } else {
-      ctx.fillStyle = '#22c55e'
-      ctx.fillText('Pre-Order Qty Available', 60, y)
-    }
-    y += 60
-    y -= 60  // revert last spacing
+    ctx.fillText('Pre-Order Now', 60, y)
   }
 
   // Footer strip
