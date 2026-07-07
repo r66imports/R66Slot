@@ -240,7 +240,7 @@ export default function PreOrdersListPage() {
   ).slice().sort((a, b) => {
     const na = parseInt(a.sku.replace(/\D/g, ''), 10) || 0
     const nb = parseInt(b.sku.replace(/\D/g, ''), 10) || 0
-    return nb - na
+    return na - nb
   })
 
   const handleLogoClick = (name: string) => {
