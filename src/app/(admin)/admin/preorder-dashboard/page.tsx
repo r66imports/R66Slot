@@ -342,91 +342,106 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   ctx.fillStyle = ACCENT
   ctx.fillRect(40, sepY, W - 80, 8)
 
-  // Details
-  let y = sepY + 80
+  // Content — two-pass auto-spacing: measure sections, then distribute evenly
+  type Sec = { h: number; draw: (top: number) => void }
+  const secs: Sec[] = []
 
   // SKU
-  ctx.fillStyle = '#888888'
-  ctx.font = '38px Arial'
-  ctx.textAlign = 'left'
-  ctx.fillText(`SKU: ${sku || form.sku || '—'}`, 60, y)
-  y += 90
+  secs.push({ h: 46, draw: (top) => {
+    ctx.fillStyle = '#ffffff'; ctx.font = '38px Arial'; ctx.textAlign = 'left'
+    ctx.fillText(`SKU: ${sku || form.sku || '—'}`, 60, top + 38)
+  }})
 
   // Brand pill
   if (form.brand) {
-    const bw = ctx.measureText(form.brand).width + 52
-    ctx.fillStyle = ACCENT
-    ctx.beginPath(); ctx.roundRect(60, y - 50, bw, 64, 10); ctx.fill()
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 38px Arial'
-    ctx.fillText(form.brand, 86, y)
-    y += 100
+    secs.push({ h: 64, draw: (top) => {
+      ctx.font = 'bold 38px Arial'; ctx.textAlign = 'left'
+      const bw = ctx.measureText(form.brand).width + 52
+      ctx.fillStyle = ACCENT
+      ctx.beginPath(); ctx.roundRect(60, top, bw, 64, 10); ctx.fill()
+      ctx.fillStyle = '#ffffff'; ctx.fillText(form.brand, 86, top + 50)
+    }})
   }
 
   // Description
-  ctx.fillStyle = '#ffffff'
   ctx.font = 'bold 46px Arial'
-  const descLines = wrapTextLines(ctx, form.description || '—', W - 120)
-  for (const line of descLines.slice(0, 3)) { ctx.fillText(line, 60, y); y += 72 }
-  y += 24
+  const descLines = wrapTextLines(ctx, form.description || '—', W - 120).slice(0, 3)
+  secs.push({ h: descLines.length * 72, draw: (top) => {
+    ctx.fillStyle = '#ffffff'; ctx.font = 'bold 46px Arial'; ctx.textAlign = 'left'
+    descLines.forEach((ln, i) => ctx.fillText(ln, 60, top + 52 + i * 72))
+  }})
 
   // Notes
   if (form.notes) {
-    ctx.fillStyle = '#aaaaaa'
     ctx.font = 'italic 40px Arial'
-    const noteLines = wrapTextLines(ctx, form.notes, W - 120)
-    for (const line of noteLines.slice(0, 2)) { ctx.fillText(line, 60, y); y += 56 }
-    y += 16
-  } else {
-    y += 12
+    const noteLines = wrapTextLines(ctx, form.notes, W - 120).slice(0, 2)
+    secs.push({ h: noteLines.length * 52, draw: (top) => {
+      ctx.fillStyle = '#ffffff'; ctx.font = 'italic 40px Arial'; ctx.textAlign = 'left'
+      noteLines.forEach((ln, i) => ctx.fillText(ln, 60, top + 40 + i * 52))
+    }})
   }
 
-  // Price (omit if showRetail is explicitly false)
+  // Price
   if (form.showRetail !== false) {
     const price = parseFloat(form.retailPrice || form.estimatedRetailPrice || '0')
-    ctx.fillStyle = ACCENT
-    ctx.font = 'bold 104px Arial'
-    ctx.fillText(price > 0 ? `R ${price.toFixed(2)}` : 'POA', 60, y)
-    y += 136
+    const priceText = price > 0 ? `R ${price.toFixed(2)}` : 'POA'
+    secs.push({ h: 120, draw: (top) => {
+      ctx.fillStyle = ACCENT; ctx.font = 'bold 104px Arial'; ctx.textAlign = 'left'
+      ctx.fillText(priceText, 60, top + 104)
+    }})
   }
 
-  // ETA row
-  ctx.fillStyle = '#888888'
-  ctx.font = '42px Arial'
-  ctx.fillText('ETA', 60, y)
-  ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 42px Arial'
-  ctx.fillText(form.eta || '—', 180, y)
-  y += 86
+  // ETA
+  secs.push({ h: 50, draw: (top) => {
+    ctx.textAlign = 'left'
+    ctx.fillStyle = '#ffffff'; ctx.font = '42px Arial'; ctx.fillText('ETA', 60, top + 42)
+    ctx.font = 'bold 42px Arial'; ctx.fillText(form.eta || '—', 180, top + 42)
+  }})
 
-  // Availability status
+  // Availability
   const totalQty = form.customers.reduce((s, c) => s + c.qty, 0)
   const moq = form.minOrderQty ?? 0
   const inStock = moq > 0 ? Math.max(0, moq - totalQty) : (form.extraQty ?? 0)
   const isSoldOut = !!form.orderPlaced && inStock === 0
-  ctx.textAlign = 'left'
+
   if (isSoldOut) {
-    ctx.fillStyle = '#ef4444'
     ctx.font = 'bold 52px Arial'
-    ctx.fillText('SOLD OUT', 60, y)
+    const stw = ctx.measureText('SOLD OUT').width
+    const sbw = stw + 60, sbh = 96
+    secs.push({ h: sbh, draw: (top) => {
+      ctx.fillStyle = '#ef4444'
+      ctx.beginPath(); ctx.roundRect(60, top, sbw, sbh, 12); ctx.fill()
+      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 52px Arial'; ctx.textAlign = 'left'
+      ctx.fillText('SOLD OUT', 90, top + 64)
+    }})
   } else if (moq > 0) {
-    ctx.fillStyle = '#888888'
-    ctx.font = '38px Arial'
-    ctx.fillText('Qty Available', 60, y)
-    y += 52
     const qtyText = `${totalQty} of ${moq} Reserved`
     ctx.font = 'bold 64px Arial'
-    const tw = ctx.measureText(qtyText).width
-    const bx = 60, by = y, bw = tw + 60, bh = 108
-    ctx.fillStyle = '#FFD700'
-    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 12); ctx.fill()
-    ctx.fillStyle = '#000000'
-    ctx.fillText(qtyText, bx + 30, by + 72)
+    const qtw = ctx.measureText(qtyText).width
+    const qbw = qtw + 60, qbh = 108
+    secs.push({ h: 46 + 10 + qbh, draw: (top) => {
+      ctx.fillStyle = '#ffffff'; ctx.font = '38px Arial'; ctx.textAlign = 'left'
+      ctx.fillText('Qty Available', 60, top + 38)
+      const by = top + 56
+      ctx.fillStyle = '#FFD700'
+      ctx.beginPath(); ctx.roundRect(60, by, qbw, qbh, 12); ctx.fill()
+      ctx.fillStyle = '#000000'; ctx.font = 'bold 64px Arial'
+      ctx.fillText(qtyText, 90, by + 72)
+    }})
   } else {
-    ctx.fillStyle = '#22c55e'
-    ctx.font = 'bold 42px Arial'
-    ctx.fillText('Pre-Order Now', 60, y)
+    secs.push({ h: 50, draw: (top) => {
+      ctx.fillStyle = '#22c55e'; ctx.font = 'bold 42px Arial'; ctx.textAlign = 'left'
+      ctx.fillText('Pre-Order Now', 60, top + 42)
+    }})
   }
+
+  // Distribute sections evenly across the content area
+  const contentTop = sepY + 16
+  const contentBottom = H - 90
+  const totalH = secs.reduce((s, sec) => s + sec.h, 0)
+  const gap = Math.max(16, Math.floor((contentBottom - contentTop - totalH) / (secs.length + 1)))
+  let y = contentTop + gap
+  for (const sec of secs) { sec.draw(y); y += sec.h + gap }
 
   // Footer strip
   ctx.fillStyle = ACCENT
