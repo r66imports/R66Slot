@@ -234,9 +234,14 @@ export default function PreOrdersListPage() {
     setShowThemePicker(false)
   }
 
-  const filtered = activeBrand
+  const filtered = (activeBrand
     ? items.filter(item => item.brand?.toLowerCase() === activeBrand.toLowerCase())
     : items
+  ).slice().sort((a, b) => {
+    const na = parseInt(a.sku.replace(/\D/g, ''), 10) || 0
+    const nb = parseInt(b.sku.replace(/\D/g, ''), 10) || 0
+    return nb - na
+  })
 
   const handleLogoClick = (name: string) => {
     setActiveBrand(prev => (prev?.toLowerCase() === name.toLowerCase() ? null : name))
