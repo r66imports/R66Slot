@@ -413,10 +413,15 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
     ctx.fillStyle = '#888888'
     ctx.font = '38px Arial'
     ctx.fillText('Qty Available', 60, y)
-    y += 54
-    ctx.fillStyle = '#22c55e'
+    y += 52
+    const qtyText = `${totalQty} of ${moq} Reserved`
     ctx.font = 'bold 64px Arial'
-    ctx.fillText(`${totalQty} of ${moq} booked`, 60, y)
+    const tw = ctx.measureText(qtyText).width
+    const bx = 60, by = y, bw = tw + 60, bh = 108
+    ctx.fillStyle = '#FFD700'
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 12); ctx.fill()
+    ctx.fillStyle = '#000000'
+    ctx.fillText(qtyText, bx + 30, by + 72)
   } else {
     ctx.fillStyle = '#22c55e'
     ctx.font = 'bold 42px Arial'
