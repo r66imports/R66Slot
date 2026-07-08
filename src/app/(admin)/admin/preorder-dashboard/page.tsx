@@ -1831,7 +1831,7 @@ function ItemCard({
 }
 
 // ─── Supplier Section ─────────────────────────────────────────────────────────
-type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date'
+type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff'
 
 function SupplierSection({
   supplierName, items, contacts, suppliers, options, exchangeRates, costingSettings,
@@ -1862,7 +1862,8 @@ function SupplierSection({
       case 'sku':   cmp = a.sku.localeCompare(b.sku); break
       case 'brand': cmp = (a.brand || '').localeCompare(b.brand || ''); break
       case 'price': cmp = parseFloat(a.retailPrice || '0') - parseFloat(b.retailPrice || '0'); break
-      case 'date':  cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break
+      case 'date':   cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); break
+      case 'cutoff': cmp = (a.cutoffDate || '').localeCompare(b.cutoffDate || ''); break
       case 'az':
       default:      cmp = a.description.localeCompare(b.description)
     }
@@ -1905,6 +1906,7 @@ function SupplierSection({
             <option value="brand" className="text-gray-800">Brand</option>
             <option value="price" className="text-gray-800">Price</option>
             <option value="date" className="text-gray-800">Date Added</option>
+            <option value="cutoff" className="text-gray-800">Cut-off Alert</option>
           </select>
           <button
             type="button"
