@@ -2876,8 +2876,22 @@ function OrdersPageInner() {
   const [docSortBy, setDocSortBy] = useState<string>('date')
   const [docSortDir, setDocSortDir] = useState<'asc' | 'desc'>('desc')
   const { widths: docColW, setWidth: setDocWidth } = useColumnResize('orders-docs', {
-    docNumber: 100, date: 90, client: 150, description: 160, total: 90, status: 90, source: 90,
+    docNumber: 100, date: 90, client: 150, description: 160, total: 90, status: 90, paymentType: 110, source: 90,
   })
+  const docTableRef = useRef<HTMLDivElement>(null)
+  const DOC_COLS = ['docNumber', 'date', 'client', 'description', 'total', 'status', 'paymentType', 'source'] as const
+  const DOC_COL_DEFAULTS: Record<string, number> = { docNumber: 100, date: 90, client: 150, description: 160, total: 90, status: 90, paymentType: 110, source: 90 }
+  const DOC_ACTIONS_W = 84
+  const getDocContainerW = () => docTableRef.current?.offsetWidth ?? 1200
+  const cappedDocWidth = (col: string, w: number) => {
+    const other = DOC_COLS.filter(c => c !== col).reduce((s, c) => s + (docColW[c] ?? DOC_COL_DEFAULTS[c]), 0) + DOC_ACTIONS_W
+    return Math.min(Math.max(40, w), Math.max(40, getDocContainerW() - other))
+  }
+  const autoFitDocCols = () => {
+    const available = getDocContainerW() - DOC_ACTIONS_W
+    const total = DOC_COLS.reduce((s, c) => s + DOC_COL_DEFAULTS[c], 0)
+    DOC_COLS.forEach(c => setDocWidth(c, Math.max(40, Math.floor(available * (DOC_COL_DEFAULTS[c] / total)))))
+  }
   const [showTemplate, setShowTemplate] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [showPL, setShowPL] = useState(true)
@@ -4261,7 +4275,7 @@ function OrdersPageInner() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
+            <div ref={docTableRef} className="overflow-hidden">
               <table className="w-full text-sm table-fixed">
                 <colgroup>
                   <col style={{ width: docColW.docNumber }} />
@@ -4270,12 +4284,20 @@ function OrdersPageInner() {
                   <col style={{ width: docColW.description }} />
                   <col style={{ width: docColW.total }} />
                   <col style={{ width: docColW.status }} />
+                  <col style={{ width: docColW.paymentType }} />
                   <col style={{ width: docColW.source }} />
-                  <col style={{ width: 80 }} />
+                  <col style={{ width: DOC_ACTIONS_W }} />
                 </colgroup>
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider">
                     {(() => {
+                      const RHandle = ({ col }: { col: string }) => (
+                        <div
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? 100; const onMove = (ev: MouseEvent) => setDocWidth(col, cappedDocWidth(col, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }}
+                          onClick={e => e.stopPropagation()}
+                          className="absolute right-0 top-1 bottom-1 w-px bg-gray-300 cursor-col-resize hover:w-[3px] hover:bg-blue-400 select-none z-10 transition-all"
+                        />
+                      )
                       const SortTh = ({ col, label, align = 'left' }: { col: string; label: string; align?: 'left'|'right'|'center' }) => {
                         const active = docSortBy === col
                         return (
@@ -4284,21 +4306,29 @@ function OrdersPageInner() {
                             <span className="inline-flex items-center gap-1">{label}
                               <span className={`transition-opacity ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}>{active && docSortDir === 'desc' ? '↑' : '↓'}</span>
                             </span>
-                            <div onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? 100; const onMove = (ev: MouseEvent) => setDocWidth(col, Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} onClick={e => e.stopPropagation()} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" />
+                            <RHandle col={col} />
                           </th>
                         )
                       }
+                      const PlainTh = ({ col, label, align = 'center' }: { col: string; label: string; align?: string }) => (
+                        <th style={{ position: 'relative' }} className={`py-3 px-4 text-${align} text-gray-500`}>
+                          {label}<RHandle col={col} />
+                        </th>
+                      )
                       return (
                         <>
                           <SortTh col="docNumber" label="Doc #" />
                           <SortTh col="date" label="Date" />
                           <SortTh col="client" label="Client" />
-                          <th className="text-left py-3 px-4 text-gray-500" style={{ position: 'relative' }}>Description<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? docColW.description; const onMove = (ev: MouseEvent) => setDocWidth('description', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
+                          <PlainTh col="description" label="Description" align="left" />
                           <SortTh col="total" label="Total" align="right" />
                           <SortTh col="status" label="Status" align="center" />
-                          <th className="text-center py-3 px-4 text-gray-500">Payment Type</th>
-                          <th className="text-center py-3 px-4 text-gray-500" style={{ position: 'relative' }}>Source<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? docColW.source; const onMove = (ev: MouseEvent) => setDocWidth('source', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
-                          <th className="text-center py-3 px-4 text-gray-500">Actions</th>
+                          <PlainTh col="paymentType" label="Payment Type" />
+                          <PlainTh col="source" label="Source" />
+                          <th className="text-center py-3 px-4 text-gray-500 flex items-center justify-end gap-1.5">
+                            <span>Actions</span>
+                            <button onClick={autoFitDocCols} title="Auto-fit columns to page" className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 font-medium leading-none">Fit</button>
+                          </th>
                         </>
                       )
                     })()}
