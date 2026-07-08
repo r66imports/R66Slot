@@ -284,6 +284,16 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d')!
 
+  // Load Play font for qty section
+  if (!document.getElementById('play-font-link')) {
+    const link = document.createElement('link')
+    link.id = 'play-font-link'
+    link.rel = 'stylesheet'
+    link.href = 'https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=block'
+    document.head.appendChild(link)
+    await document.fonts.ready
+  }
+
   // Load product image first so we can extract its dominant colour
   const prod = form.imageUrl ? await loadImage(form.imageUrl) : null
   const hue = prod ? extractDominantHue(prod) : null
@@ -405,28 +415,31 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   const isSoldOut = !!form.orderPlaced && inStock === 0
 
   if (isSoldOut) {
-    ctx.font = 'bold 52px Arial'
+    ctx.font = '30px Play'
     const stw = ctx.measureText('SOLD OUT').width
-    const sbw = stw + 60, sbh = 96
+    const sbw = stw + 48, sbh = 56
     secs.push({ h: sbh, draw: (top) => {
       ctx.fillStyle = '#ef4444'
-      ctx.beginPath(); ctx.roundRect(60, top, sbw, sbh, 12); ctx.fill()
-      ctx.fillStyle = '#ffffff'; ctx.font = 'bold 52px Arial'; ctx.textAlign = 'left'
-      ctx.fillText('SOLD OUT', 90, top + 64)
+      ctx.beginPath(); ctx.roundRect(60, top, sbw, sbh, 8); ctx.fill()
+      ctx.fillStyle = '#ffffff'; ctx.font = '30px Play'; ctx.textAlign = 'left'
+      ctx.fillText('SOLD OUT', 84, top + 34)
     }})
   } else if (moq > 0) {
+    const labelText = 'Qty Available'
     const qtyText = `${totalQty} of ${moq} Reserved`
-    ctx.font = 'bold 64px Arial'
-    const qtw = ctx.measureText(qtyText).width
-    const qbw = qtw + 60, qbh = 108
-    secs.push({ h: 46 + 10 + qbh, draw: (top) => {
-      ctx.fillStyle = '#ffffff'; ctx.font = '38px Arial'; ctx.textAlign = 'left'
-      ctx.fillText('Qty Available', 60, top + 38)
-      const by = top + 56
+    ctx.font = '30px Play'
+    const labelW = ctx.measureText(labelText).width
+    const qtyW = ctx.measureText(qtyText).width
+    const bPadX = 20, bh = 56, gap = 20
+    secs.push({ h: bh, draw: (top) => {
+      ctx.font = '30px Play'; ctx.textAlign = 'left'
+      ctx.fillStyle = '#ffffff'
+      ctx.fillText(labelText, 60, top + 34)
+      const bx = 60 + labelW + gap
       ctx.fillStyle = '#FFD700'
-      ctx.beginPath(); ctx.roundRect(60, by, qbw, qbh, 12); ctx.fill()
-      ctx.fillStyle = '#000000'; ctx.font = 'bold 64px Arial'
-      ctx.fillText(qtyText, 90, by + 72)
+      ctx.beginPath(); ctx.roundRect(bx, top, qtyW + bPadX * 2, bh, 8); ctx.fill()
+      ctx.fillStyle = '#000000'
+      ctx.fillText(qtyText, bx + bPadX, top + 34)
     }})
   } else {
     secs.push({ h: 50, draw: (top) => {
