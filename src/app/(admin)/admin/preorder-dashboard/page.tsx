@@ -284,14 +284,15 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d')!
 
-  // Load Play font for qty section
-  if (!document.getElementById('play-font-link')) {
-    const link = document.createElement('link')
-    link.id = 'play-font-link'
-    link.rel = 'stylesheet'
-    link.href = 'https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=block'
-    document.head.appendChild(link)
-    await document.fonts.ready
+  // Load Play font via FontFace API — fetch CSS to get real WOFF2 URLs then load directly
+  if (!document.fonts.check('30px "Play"')) {
+    try {
+      const css = await fetch('https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=block').then(r => r.text())
+      const urls = [...css.matchAll(/url\(([^)]+\.woff2)\)/g)].map(m => m[1].replace(/['"]/g, '').trim())
+      const unique = [...new Set(urls)]
+      const loaded = await Promise.all(unique.map(url => new FontFace('Play', `url(${url})`).load()))
+      loaded.forEach(f => document.fonts.add(f))
+    } catch { /* fall back to system font */ }
   }
 
   // Load product image first so we can extract its dominant colour
@@ -430,12 +431,12 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
     ctx.font = '30px Play'
     const labelW = ctx.measureText(labelText).width
     const qtyW = ctx.measureText(qtyText).width
-    const bPadX = 20, bh = 56, gap = 20
+    const bPadX = 20, bh = 56, boxGap = 20
     secs.push({ h: bh, draw: (top) => {
       ctx.font = '30px Play'; ctx.textAlign = 'left'
       ctx.fillStyle = '#ffffff'
       ctx.fillText(labelText, 60, top + 34)
-      const bx = 60 + labelW + gap
+      const bx = 60 + labelW + boxGap
       ctx.fillStyle = '#FFD700'
       ctx.beginPath(); ctx.roundRect(bx, top, qtyW + bPadX * 2, bh, 8); ctx.fill()
       ctx.fillStyle = '#000000'
