@@ -196,7 +196,7 @@ export default function AccountingPage() {
             staffMember: li._staffMember || '',
             qty: li.qty || 1,
             billedAmount: (li.qty || 1) * (li.unitPrice || 0),
-            staffCost: li._serviceCost || 0,
+            staffCost: (li.qty || 1) * (li.unitPrice || 0),
             paidToStaff: !!svcStore.paid[key],
             paidToStaffAt: svcStore.paid[key],
             docNumber: doc.docNumber,

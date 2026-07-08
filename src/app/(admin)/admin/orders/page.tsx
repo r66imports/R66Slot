@@ -1586,7 +1586,7 @@ function CreateDocumentModal({
                           <td className="px-2 py-1.5 align-top pt-2">
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-200 text-orange-800">SVC</span>
                           </td>
-                          <td className="px-2 py-1.5" colSpan={2}>
+                          <td className="px-2 py-1.5">
                             <div className="flex flex-col gap-1">
                               <select
                                 value={li._serviceType || 'setup'}
@@ -1599,25 +1599,17 @@ function CreateDocumentModal({
                               >
                                 {SERVICE_TYPES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                               </select>
-                              <div className="flex gap-1">
-                                <input
-                                  type="text"
-                                  placeholder="Staff member"
-                                  value={li._staffMember || ''}
-                                  onChange={e => updateLine(li.id, '_staffMember', e.target.value)}
-                                  className="flex-1 border border-orange-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                />
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={0.01}
-                                  placeholder="Staff cost"
-                                  value={li._serviceCost ?? 0}
-                                  onChange={e => updateLine(li.id, '_serviceCost', Number(e.target.value))}
-                                  className="w-24 border border-orange-200 rounded px-2 py-1 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                />
-                              </div>
+                              <input
+                                type="text"
+                                placeholder="Staff member"
+                                value={li._staffMember || ''}
+                                onChange={e => updateLine(li.id, '_staffMember', e.target.value)}
+                                className="w-full border border-orange-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+                              />
                             </div>
+                          </td>
+                          <td className="px-2 py-1 align-top">
+                            <input type="number" min={1} className="w-full px-2 py-1.5 text-sm text-right rounded border border-orange-200 focus:outline-none focus:bg-orange-50" value={li.qty} onChange={(e) => updateLine(li.id, 'qty', Math.max(1, Number(e.target.value)))} />
                           </td>
                           <td className="px-2 py-1 align-top">
                             <input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded border border-orange-200 focus:outline-none focus:bg-orange-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} />
