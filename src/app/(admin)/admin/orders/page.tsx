@@ -5,6 +5,14 @@ import { useSearchParams } from 'next/navigation'
 import type { Backorder } from '@/types/backorder'
 import { useColumnResize } from '@/hooks/use-column-resize'
 
+// ─── Service types ────────────────────────────────────────────────────────────
+const SERVICE_TYPES = [
+  { id: 'setup',      label: 'Services - Setup' },
+  { id: 'tyretruing', label: 'Services - Tyre Truing' },
+  { id: 'braids',     label: 'Services - Braids' },
+  { id: 'wiring',     label: 'Services - Wiring' },
+]
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ClientContact {
@@ -31,6 +39,10 @@ interface LineItem {
   _stockQty?: number
   _backorder?: boolean
   _backorderSent?: boolean
+  _service?: boolean
+  _serviceType?: string
+  _serviceCost?: number
+  _staffMember?: string
 }
 
 interface OrderDocument {
@@ -1532,6 +1544,7 @@ function CreateDocumentModal({
                   Deposit
                 </button>
                 <button onClick={addLine} className="text-xs text-blue-600 hover:text-blue-800 font-semibold">+ Add Line</button>
+                <button onClick={() => setLineItems(p => [...p, { ...newLine(), _service: true, _serviceType: 'setup', _serviceCost: 0, _staffMember: '', description: 'Services - Setup' }])} className="text-xs text-orange-600 hover:text-orange-800 font-semibold">⚙ Add Service</button>
               </div>
             </div>
             <div className="border rounded-xl overflow-hidden">
@@ -1552,51 +1565,100 @@ function CreateDocumentModal({
                     const { sku: liSku } = splitSkuTitle(li.description || '')
                     const boHighlight = isQuote && (li._backorder || li._backorderSent)
                     return (
-                    <tr key={li.id} className={`border-b last:border-0 ${boHighlight ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
+                    <tr key={li.id} className={`border-b last:border-0 ${li._service ? 'bg-orange-50' : boHighlight ? 'bg-amber-50' : 'hover:bg-gray-50'}`}>
                       {isQuote && (
                         <td className="px-2 py-2 text-center align-top pt-3">
-                          <input
-                            type="checkbox"
-                            checked={!!(li._backorder || li._backorderSent)}
-                            disabled={!!li._backorderSent}
-                            title={li._backorderSent ? 'Sent to Backorders' : 'Queue for Backorders'}
-                            onChange={(e) => updateLine(li.id, '_backorder', e.target.checked)}
-                            className={`w-4 h-4 rounded ${li._backorderSent ? 'accent-green-600 cursor-not-allowed opacity-70' : 'accent-amber-500 cursor-pointer'}`}
-                          />
+                          {!li._service && (
+                            <input
+                              type="checkbox"
+                              checked={!!(li._backorder || li._backorderSent)}
+                              disabled={!!li._backorderSent}
+                              title={li._backorderSent ? 'Sent to Backorders' : 'Queue for Backorders'}
+                              onChange={(e) => updateLine(li.id, '_backorder', e.target.checked)}
+                              className={`w-4 h-4 rounded ${li._backorderSent ? 'accent-green-600 cursor-not-allowed opacity-70' : 'accent-amber-500 cursor-pointer'}`}
+                            />
+                          )}
                           {li._backorderSent && <div className="text-[9px] text-green-600 font-semibold mt-0.5 leading-none">Sent</div>}
                         </td>
                       )}
-                      <td className="px-2 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap align-top pt-3">{liSku || <span className="text-gray-300">—</span>}</td>
-                      <td className="px-2 py-1">
-                        <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} isQuote={isQuote} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); if (sku) updateLine(li.id, '_stockQty', stockQty) }} />
-                        {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
-                          <div className="flex gap-1 mt-1 flex-wrap">
-                            {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
-                            {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Book Now R{li._preOrderPrice.toFixed(2)}</button> : null}
-                            {li._costPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-1">
-                        <input
-                          type="number"
-                          min={1}
-                          max={!isQuote && enforceStockLimit && li._stockQty !== undefined ? li._stockQty : undefined}
-                          className={`w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50 ${!isQuote && enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty ? 'text-red-600 bg-red-50' : ''}`}
-                          value={li.qty}
-                          onChange={(e) => {
-                            const v = Number(e.target.value)
-                            const max = !isQuote && enforceStockLimit && li._stockQty !== undefined ? li._stockQty : Infinity
-                            updateLine(li.id, 'qty', Math.min(v, max))
-                          }}
-                        />
-                        {!isQuote && enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty && (
-                          <div className="text-[10px] text-red-500 font-medium mt-0.5 text-right">{li._stockQty} in stock</div>
-                        )}
-                      </td>
-                      <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
-                      <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>
-                      <td className="px-2 py-2 text-center">{lineItems.length > 1 && <button onClick={() => removeLine(li.id)} className="text-gray-300 hover:text-red-500 leading-none">✕</button>}</td>
+                      {li._service ? (
+                        <>
+                          <td className="px-2 py-1.5 align-top pt-2">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-200 text-orange-800">SVC</span>
+                          </td>
+                          <td className="px-2 py-1.5" colSpan={2}>
+                            <div className="flex flex-col gap-1">
+                              <select
+                                value={li._serviceType || 'setup'}
+                                onChange={e => {
+                                  const st = SERVICE_TYPES.find(s => s.id === e.target.value)
+                                  updateLine(li.id, '_serviceType', e.target.value)
+                                  updateLine(li.id, 'description', st?.label || e.target.value)
+                                }}
+                                className="w-full border border-orange-200 rounded px-2 py-1 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+                              >
+                                {SERVICE_TYPES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                              </select>
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  placeholder="Staff member"
+                                  value={li._staffMember || ''}
+                                  onChange={e => updateLine(li.id, '_staffMember', e.target.value)}
+                                  className="flex-1 border border-orange-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                />
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={0.01}
+                                  placeholder="Staff cost"
+                                  value={li._serviceCost ?? 0}
+                                  onChange={e => updateLine(li.id, '_serviceCost', Number(e.target.value))}
+                                  className="w-24 border border-orange-200 rounded px-2 py-1 text-xs text-right bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-2 py-1 align-top">
+                            <input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded border border-orange-200 focus:outline-none focus:bg-orange-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} />
+                          </td>
+                          <td className="px-3 py-2 text-right text-orange-600 font-medium whitespace-nowrap align-top pt-3">{fmtPrice(li.qty * li.unitPrice)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-2 py-2 font-mono text-xs text-indigo-600 whitespace-nowrap align-top pt-3">{liSku || <span className="text-gray-300">—</span>}</td>
+                          <td className="px-2 py-1">
+                            <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} isQuote={isQuote} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); if (sku) updateLine(li.id, '_stockQty', stockQty) }} />
+                            {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
+                              <div className="flex gap-1 mt-1 flex-wrap">
+                                {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
+                                {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Book Now R{li._preOrderPrice.toFixed(2)}</button> : null}
+                                {li._costPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-2 py-1">
+                            <input
+                              type="number"
+                              min={1}
+                              max={!isQuote && enforceStockLimit && li._stockQty !== undefined ? li._stockQty : undefined}
+                              className={`w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50 ${!isQuote && enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty ? 'text-red-600 bg-red-50' : ''}`}
+                              value={li.qty}
+                              onChange={(e) => {
+                                const v = Number(e.target.value)
+                                const max = !isQuote && enforceStockLimit && li._stockQty !== undefined ? li._stockQty : Infinity
+                                updateLine(li.id, 'qty', Math.min(v, max))
+                              }}
+                            />
+                            {!isQuote && enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty && (
+                              <div className="text-[10px] text-red-500 font-medium mt-0.5 text-right">{li._stockQty} in stock</div>
+                            )}
+                          </td>
+                          <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
+                          <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>
+                        </>
+                      )}
+                      <td className="px-2 py-2 text-center align-top pt-3">{lineItems.length > 1 && <button onClick={() => removeLine(li.id)} className="text-gray-300 hover:text-red-500 leading-none">✕</button>}</td>
                     </tr>
                   )})}
                 </tbody>
@@ -4234,6 +4296,7 @@ function OrdersPageInner() {
                           <th className="text-left py-3 px-4 text-gray-500" style={{ position: 'relative' }}>Description<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? docColW.description; const onMove = (ev: MouseEvent) => setDocWidth('description', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                           <SortTh col="total" label="Total" align="right" />
                           <SortTh col="status" label="Status" align="center" />
+                          <th className="text-center py-3 px-4 text-gray-500">Payment Type</th>
                           <th className="text-center py-3 px-4 text-gray-500" style={{ position: 'relative' }}>Source<div onMouseDown={(e) => { e.preventDefault(); const startX = e.clientX; const startW = (e.currentTarget as HTMLElement).closest('th')?.offsetWidth ?? docColW.source; const onMove = (ev: MouseEvent) => setDocWidth('source', Math.max(40, startW + ev.clientX - startX)); const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }; document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp) }} className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-blue-400/50 select-none z-10" /></th>
                           <th className="text-center py-3 px-4 text-gray-500">Actions</th>
                         </>
@@ -4253,6 +4316,7 @@ function OrdersPageInner() {
                       <td className="py-3 px-4 text-center">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
                       </td>
+                      <td className="py-3 px-4 text-center"></td>
                       <td className="py-3 px-4 text-center">
                         <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Back Order</span>
                       </td>
@@ -4320,6 +4384,16 @@ function OrdersPageInner() {
                               </span>
                             )}
                           </div>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {(doc as any).paymentMethod ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod}</span>
+                              {(doc as any).paymentMethod2 && (
+                                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod2}</span>
+                              )}
+                            </div>
+                          ) : null}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">

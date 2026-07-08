@@ -2,6 +2,55 @@
 
 import { useState, useEffect } from 'react'
 
+const SERVICE_TYPES = [
+  { id: 'setup',      label: 'Services - Setup' },
+  { id: 'tyretruing', label: 'Services - Tyre Truing' },
+  { id: 'braids',     label: 'Services - Braids' },
+  { id: 'wiring',     label: 'Services - Wiring' },
+]
+function svcLabel(id: string) { return SERVICE_TYPES.find(s => s.id === id)?.label ?? id }
+
+interface ManualServiceEntry {
+  id: string
+  source: 'manual'
+  serviceType: string
+  description: string
+  clientName: string
+  qty: number
+  billedAmount: number
+  staffCost: number
+  staffMember: string
+  paidToStaff: boolean
+  paidToStaffAt?: string
+  notes?: string
+  date: string
+  createdAt: string
+}
+
+interface ServiceStore {
+  entries: ManualServiceEntry[]
+  paid: Record<string, string>
+}
+
+interface ServiceLineItem {
+  key: string            // docId_lineItemId | manualEntry.id
+  source: 'document' | 'manual'
+  date: string
+  serviceType: string
+  description: string
+  clientName: string
+  staffMember: string
+  qty: number
+  billedAmount: number
+  staffCost: number
+  paidToStaff: boolean
+  paidToStaffAt?: string
+  docNumber?: string
+  docType?: string
+  docId?: string
+  lineItemId?: string
+}
+
 interface BankAccount {
   id: string
   companyName: string
@@ -19,7 +68,7 @@ interface OrderDoc {
   docNumber: string
   date: string
   clientName: string
-  lineItems: { qty: number; unitPrice: number; description: string }[]
+  lineItems: { id: string; qty: number; unitPrice: number; description: string; _service?: boolean; _serviceType?: string; _serviceCost?: number; _staffMember?: string }[]
   status: string
   discountPct?: number
   shippingCost?: number
@@ -41,6 +90,12 @@ function docSubtotal(doc: OrderDoc): number {
   return afterDiscount + (doc.shippingCost ?? 0)
 }
 
+const EMPTY_SVC_FORM = () => ({
+  serviceType: 'setup', description: SERVICE_TYPES[0].label, clientName: '',
+  staffMember: '', qty: 1, billedAmount: 0, staffCost: 0, notes: '',
+  date: new Date().toISOString().slice(0, 10),
+})
+
 export default function AccountingPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [docs, setDocs] = useState<OrderDoc[]>([])
@@ -50,8 +105,17 @@ export default function AccountingPage() {
   const [form, setForm] = useState(EMPTY_ACCOUNT())
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'stats' | 'banks'>('stats')
+  const [activeTab, setActiveTab] = useState<'stats' | 'banks' | 'services'>('stats')
   const [statPeriod, setStatPeriod] = useState<'all' | '30' | '90' | 'year'>('all')
+
+  // Services tab state
+  const [svcStore, setSvcStore] = useState<ServiceStore>({ entries: [], paid: {} })
+  const [svcLoaded, setSvcLoaded] = useState(false)
+  const [showSvcForm, setShowSvcForm] = useState(false)
+  const [svcForm, setSvcForm] = useState(EMPTY_SVC_FORM())
+  const [savingSvc, setSavingSvc] = useState(false)
+  const [svcFilter, setSvcFilter] = useState<'all' | string>('all')
+  const [svcPaidFilter, setSvcPaidFilter] = useState<'all' | 'unpaid' | 'paid'>('all')
 
   useEffect(() => {
     Promise.all([
@@ -63,6 +127,15 @@ export default function AccountingPage() {
       setLoading(false)
     })
   }, [])
+
+  // Load services data the first time the services tab is opened
+  useEffect(() => {
+    if (activeTab !== 'services' || svcLoaded) return
+    fetch('/api/admin/services').then(r => r.ok ? r.json() : { entries: [], paid: {} }).then(data => {
+      setSvcStore({ entries: data.entries ?? [], paid: data.paid ?? {} })
+      setSvcLoaded(true)
+    }).catch(() => setSvcLoaded(true))
+  }, [activeTab, svcLoaded])
 
   const save = async () => {
     setSaving(true)
@@ -102,6 +175,104 @@ export default function AccountingPage() {
     await fetch(`/api/admin/bank-accounts?id=${id}`, { method: 'DELETE' })
     setAccounts(prev => prev.filter(a => a.id !== id))
     setDeleting(null)
+  }
+
+  // ── Services helpers ──────────────────────────────────────────────────────
+
+  const allServiceItems: ServiceLineItem[] = [
+    // Document-derived services
+    ...docs.flatMap(doc =>
+      (doc.lineItems || [])
+        .filter((li: any) => li._service)
+        .map((li: any): ServiceLineItem => {
+          const key = `${doc.id}_${li.id}`
+          return {
+            key,
+            source: 'document',
+            date: doc.date || doc.createdAt?.slice(0, 10) || '',
+            serviceType: li._serviceType || 'setup',
+            description: li.description || '',
+            clientName: doc.clientName || '',
+            staffMember: li._staffMember || '',
+            qty: li.qty || 1,
+            billedAmount: (li.qty || 1) * (li.unitPrice || 0),
+            staffCost: li._serviceCost || 0,
+            paidToStaff: !!svcStore.paid[key],
+            paidToStaffAt: svcStore.paid[key],
+            docNumber: doc.docNumber,
+            docType: doc.type,
+            docId: doc.id,
+            lineItemId: li.id,
+          }
+        })
+    ),
+    // Manual entries
+    ...svcStore.entries.map((e): ServiceLineItem => ({
+      key: e.id,
+      source: 'manual',
+      date: e.date,
+      serviceType: e.serviceType,
+      description: e.description,
+      clientName: e.clientName,
+      staffMember: e.staffMember,
+      qty: e.qty,
+      billedAmount: e.billedAmount,
+      staffCost: e.staffCost,
+      paidToStaff: e.paidToStaff,
+      paidToStaffAt: e.paidToStaffAt,
+    })),
+  ].sort((a, b) => b.date.localeCompare(a.date))
+
+  const filteredServices = allServiceItems
+    .filter(s => svcFilter === 'all' || s.serviceType === svcFilter)
+    .filter(s => svcPaidFilter === 'all' || (svcPaidFilter === 'paid' ? s.paidToStaff : !s.paidToStaff))
+
+  const svcTotalBilled   = filteredServices.reduce((s, e) => s + e.billedAmount, 0)
+  const svcTotalCost     = filteredServices.reduce((s, e) => s + e.staffCost, 0)
+  const svcTotalPaid     = filteredServices.filter(e => e.paidToStaff).reduce((s, e) => s + e.staffCost, 0)
+  const svcTotalOwed     = filteredServices.filter(e => !e.paidToStaff).reduce((s, e) => s + e.staffCost, 0)
+
+  const togglePaid = async (item: ServiceLineItem) => {
+    const newPaid = !item.paidToStaff
+    if (item.source === 'document') {
+      await fetch('/api/admin/services', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: newPaid ? 'mark_paid_doc' : 'unmark_paid_doc', docId: item.docId, lineItemId: item.lineItemId }) })
+      setSvcStore(prev => {
+        const paid = { ...prev.paid }
+        if (newPaid) paid[item.key] = new Date().toISOString()
+        else delete paid[item.key]
+        return { ...prev, paid }
+      })
+    } else {
+      await fetch('/api/admin/services', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: newPaid ? 'mark_paid_manual' : 'unmark_paid_manual', id: item.key }) })
+      setSvcStore(prev => ({
+        ...prev,
+        entries: prev.entries.map(e => e.id === item.key
+          ? { ...e, paidToStaff: newPaid, paidToStaffAt: newPaid ? new Date().toISOString() : undefined }
+          : e),
+      }))
+    }
+  }
+
+  const deleteManualSvc = async (key: string) => {
+    await fetch('/api/admin/services', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'delete', id: key }) })
+    setSvcStore(prev => ({ ...prev, entries: prev.entries.filter(e => e.id !== key) }))
+  }
+
+  const saveSvc = async () => {
+    if (!svcForm.staffMember.trim()) return
+    setSavingSvc(true)
+    try {
+      const res = await fetch('/api/admin/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(svcForm) })
+      if (res.ok) {
+        const entry = await res.json()
+        setSvcStore(prev => ({ ...prev, entries: [entry, ...prev.entries] }))
+        setShowSvcForm(false)
+        setSvcForm(EMPTY_SVC_FORM())
+      }
+    } finally { setSavingSvc(false) }
   }
 
   // ── Profit Statistics ──────────────────────────────────────────────────────
@@ -169,6 +340,10 @@ export default function AccountingPage() {
           <button onClick={() => setActiveTab('banks')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'banks' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             🏦 Bank Accounts
+          </button>
+          <button onClick={() => setActiveTab('services')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'services' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            ⚙ Services
           </button>
         </div>
       </div>
@@ -472,6 +647,188 @@ export default function AccountingPage() {
                 </div>
               </div>
             ))
+          )}
+        </div>
+      )}
+
+      {/* ── SERVICES TAB ── */}
+      {activeTab === 'services' && (
+        <div className="space-y-4">
+          {!svcLoaded ? (
+            <div className="text-center py-20 text-gray-400 text-sm">Loading services…</div>
+          ) : (
+            <>
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total Billed', val: svcTotalBilled, color: 'text-gray-800' },
+                  { label: 'Total Staff Cost', val: svcTotalCost, color: 'text-orange-600' },
+                  { label: 'Paid to Staff', val: svcTotalPaid, color: 'text-green-600' },
+                  { label: 'Owed to Staff', val: svcTotalOwed, color: 'text-red-600' },
+                ].map(({ label, val, color }) => (
+                  <div key={label} className="bg-white rounded-2xl border border-gray-200 p-4">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
+                    <p className={`text-xl font-bold ${color}`}>
+                      R{val.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filter bar + Add button */}
+              <div className="flex flex-wrap items-center gap-2 justify-between">
+                <div className="flex flex-wrap gap-2">
+                  <select value={svcFilter} onChange={e => setSvcFilter(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+                    <option value="all">All Types</option>
+                    {SERVICE_TYPES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                  <select value={svcPaidFilter} onChange={e => setSvcPaidFilter(e.target.value as 'all' | 'paid' | 'unpaid')}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+                    <option value="all">All Status</option>
+                    <option value="unpaid">Owed to Staff</option>
+                    <option value="paid">Paid to Staff</option>
+                  </select>
+                </div>
+                <button onClick={() => setShowSvcForm(v => !v)}
+                  className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark">
+                  + Add Service
+                </button>
+              </div>
+
+              {/* Add form */}
+              {showSvcForm && (
+                <div className="bg-white rounded-2xl border border-primary/30 p-5 shadow-sm">
+                  <h3 className="font-semibold text-gray-800 mb-4">Manual Service Entry</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Date</label>
+                      <input type="date" value={svcForm.date} onChange={e => setSvcForm(f => ({ ...f, date: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Service Type *</label>
+                      <select value={svcForm.serviceType} onChange={e => setSvcForm(f => ({ ...f, serviceType: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+                        {SERVICE_TYPES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Staff Member *</label>
+                      <input value={svcForm.staffMember} onChange={e => setSvcForm(f => ({ ...f, staffMember: e.target.value }))}
+                        placeholder="Name"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</label>
+                      <input value={svcForm.description} onChange={e => setSvcForm(f => ({ ...f, description: e.target.value }))}
+                        placeholder="Service description"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Client</label>
+                      <input value={svcForm.clientName} onChange={e => setSvcForm(f => ({ ...f, clientName: e.target.value }))}
+                        placeholder="Client name"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Qty</label>
+                      <input type="number" min={1} value={svcForm.qty} onChange={e => setSvcForm(f => ({ ...f, qty: Number(e.target.value) }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Billed to Client (R)</label>
+                      <input type="number" step="0.01" min={0} value={svcForm.billedAmount} onChange={e => setSvcForm(f => ({ ...f, billedAmount: Number(e.target.value) }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Staff Cost (R)</label>
+                      <input type="number" step="0.01" min={0} value={svcForm.staffCost} onChange={e => setSvcForm(f => ({ ...f, staffCost: Number(e.target.value) }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={() => { setShowSvcForm(false); setSvcForm(EMPTY_SVC_FORM()) }}
+                      className="px-4 py-2 border border-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50">Cancel</button>
+                    <button onClick={saveSvc} disabled={savingSvc || !svcForm.staffMember.trim()}
+                      className="px-6 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50">
+                      {savingSvc ? 'Saving…' : 'Add Service'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Services table */}
+              {filteredServices.length === 0 ? (
+                <div className="text-center py-16 text-gray-400">
+                  <div className="text-4xl mb-3">⚙</div>
+                  <p className="font-medium">No services found</p>
+                  <p className="text-sm mt-1">Services added to quotes, sales orders and invoices will appear here.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="px-4 py-3 text-left">Date</th>
+                        <th className="px-4 py-3 text-left">Type</th>
+                        <th className="px-4 py-3 text-left">Description</th>
+                        <th className="px-4 py-3 text-left">Client</th>
+                        <th className="px-4 py-3 text-left">Staff</th>
+                        <th className="px-4 py-3 text-left">Source</th>
+                        <th className="px-4 py-3 text-right">Billed</th>
+                        <th className="px-4 py-3 text-right">Staff Cost</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredServices.map(item => (
+                        <tr key={item.key} className={`transition-colors ${item.paidToStaff ? 'bg-green-50/40' : ''}`}>
+                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{item.date || '—'}</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                              {svcLabel(item.serviceType)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 max-w-[160px] truncate">{item.description || '—'}</td>
+                          <td className="px-4 py-3 text-gray-600">{item.clientName || '—'}</td>
+                          <td className="px-4 py-3 font-medium text-gray-800">{item.staffMember || '—'}</td>
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                            {item.source === 'document'
+                              ? <span className="text-xs text-blue-600 font-medium">{item.docNumber ?? item.docType}</span>
+                              : <span className="text-xs text-gray-400">Manual</span>}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-gray-800">
+                            R{item.billedAmount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono text-orange-600">
+                            R{item.staffCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {item.paidToStaff
+                              ? <span className="inline-flex items-center gap-1 text-xs text-green-700 font-semibold">✓ Paid</span>
+                              : <span className="inline-flex items-center gap-1 text-xs text-red-600 font-semibold">Owed</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => togglePaid(item)}
+                                className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${item.paidToStaff ? 'border-gray-200 text-gray-500 hover:bg-gray-50' : 'border-green-300 text-green-700 hover:bg-green-50'}`}>
+                                {item.paidToStaff ? 'Unmark' : '✓ Mark Paid'}
+                              </button>
+                              {item.source === 'manual' && (
+                                <button onClick={() => deleteManualSvc(item.key)}
+                                  className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">✕</button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
