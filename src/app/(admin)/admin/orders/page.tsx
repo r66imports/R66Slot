@@ -2580,7 +2580,7 @@ function PaymentModal({
   onClose: () => void
 }) {
   const [saving, setSaving] = useState(false)
-  const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+  const subtotal = (doc.lineItems || []).reduce((s, li) => s + li.qty * li.unitPrice, 0)
   const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
   const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
   const existingAmountPaid = (doc as any).amountPaid || 0
@@ -3264,7 +3264,7 @@ function OrdersPageInner() {
   const handleInlinePayment = async (amountPaid: number, paymentMethod: string, notes: string) => {
     if (!editDocState) return
     const doc = editDocState
-    const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+    const subtotal = (doc.lineItems || []).reduce((s, li) => s + li.qty * li.unitPrice, 0)
     const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
     const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
     const prevAmountPaid = (doc as any).amountPaid || 0
@@ -4294,9 +4294,9 @@ function OrdersPageInner() {
                     const docBalance = Math.max(0, docTotal - amtPaid - ((doc as any).creditApplied || 0))
                     const isPartiallyPaid = doc.type === 'invoice' && amtPaid > 0 && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
                     const hasOutstanding = doc.type === 'invoice' && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
-                    const firstDesc = doc.lineItems[0]?.description || '—'
+                    const firstDesc = doc.lineItems?.[0]?.description || '—'
                     return (
-                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
+                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : (doc as any).depositReceived ? 'bg-yellow-50 hover:bg-yellow-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 text-xs">
                           <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
                           {(doc as any).sourceQuoteNumber && (
@@ -4360,6 +4360,16 @@ function OrdersPageInner() {
                                 if (res.ok) setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'paid' } : d))
                               },
                             }] : []),
+                            {
+                              label: (doc as any).depositReceived ? '✓ Deposit Received' : 'Deposit Paid',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+                              className: (doc as any).depositReceived ? 'text-yellow-600 font-semibold' : 'text-yellow-600',
+                              onClick: async () => {
+                                const newVal = !(doc as any).depositReceived
+                                const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ depositReceived: newVal }) })
+                                if (res.ok) setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, depositReceived: newVal } as any : d))
+                              },
+                            },
                             {
                               label: 'Edit',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
