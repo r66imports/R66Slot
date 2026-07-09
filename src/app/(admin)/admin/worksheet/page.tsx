@@ -2331,6 +2331,7 @@ function WorksheetEditor({
           supplierName={supplier}
           companyInfo={companyInfo}
           invoiceDate={worksheetDate}
+          rates={fxRates}
           items={items.filter((it) => it.sku && it.wholesalePrice > 0).map((it) => ({
             sku: it.sku, description: it.description, qty: it.qty,
             unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
@@ -2347,6 +2348,7 @@ function WorksheetEditor({
           invoiceDate={worksheetDate}
           title="R66 Imports Invoice"
           vatPct={15}
+          rates={fxRates}
           items={items.filter((it) => it.costingEntity === 'R66' && it.sku && it.wholesalePrice > 0).map((it) => ({
             sku: it.sku, description: it.description, qty: it.qty,
             unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
@@ -2363,6 +2365,7 @@ function WorksheetEditor({
           invoiceDate={worksheetDate}
           title="JDM Garage Invoice"
           vatPct={0}
+          rates={fxRates}
           items={items.filter((it) => it.costingEntity === 'JDM' && it.sku && it.wholesalePrice > 0).map((it) => ({
             sku: it.sku, description: it.description, qty: it.qty,
             unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
@@ -3391,7 +3394,7 @@ function NewSkuModal({
 const INV_CURRENCIES = ['ZAR', 'USD', 'EUR', 'GBP', 'SGD', 'CNY', 'HKD']
 
 function WorksheetInvoiceModal({
-  supplierName, companyInfo, invoiceDate, items, onClose, title, vatPct,
+  supplierName, companyInfo, invoiceDate, items, onClose, title, vatPct, rates,
 }: {
   supplierName: string
   companyInfo: CompanyInfo
@@ -3400,12 +3403,15 @@ function WorksheetInvoiceModal({
   onClose: () => void
   title?: string
   vatPct?: number  // 15 for R66, 0 or undefined for no VAT
+  rates?: Record<string, number>
 }) {
   const [poRef, setPoRef] = useState('')
   const [date, setDate] = useState(invoiceDate || new Date().toISOString().slice(0, 10))
   const [invCurrency, setInvCurrency] = useState('ZAR')
   const [rows, setRows] = useState(items.map(it => ({ ...it })))
   const sym = invCurrency === 'ZAR' ? 'R' : invCurrency
+  const rate = invCurrency === 'ZAR' ? 1 : ((rates ?? {})[invCurrency] ?? CURRENCY_DEFAULTS[invCurrency] ?? 1)
+  const fmt = (zarAmt: number) => (zarAmt / rate).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
   const subtotal = rows.reduce((s, r) => s + r.qty * r.unitCost, 0)
   const vatAmt = vatPct ? subtotal * vatPct / 100 : 0
@@ -3424,8 +3430,8 @@ function WorksheetInvoiceModal({
         <td style="padding:8px 12px;font-family:monospace;font-size:12px;font-weight:600;">${r.sku}</td>
         <td style="padding:8px 12px;font-size:13px;">${r.description}</td>
         <td style="padding:8px 12px;text-align:center;font-size:13px;">${r.qty}</td>
-        <td style="padding:8px 12px;text-align:right;font-size:13px;">${sym} ${r.unitCost.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
-        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">${sym} ${lineTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+        <td style="padding:8px 12px;text-align:right;font-size:13px;">${sym} ${fmt(r.unitCost)}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;font-size:13px;">${sym} ${fmt(lineTotal)}</td>
       </tr>`
     }).join('')
     const billedToBlock = `
@@ -3462,9 +3468,10 @@ function WorksheetInvoiceModal({
       <div class="info-box"><p class="info-label">Billed To</p>${billedToBlock}</div>
       <div class="info-box" style="flex:0;min-width:200px;">
         <p class="info-label">Invoice Total</p>
-        ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: ${sym} ${subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>
-        <p style="font-size:13px;color:#6b7280;">VAT (${vatPct}%): ${sym} ${vatAmt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>` : ''}
-        <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${sym} ${grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</p>
+        ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: ${sym} ${fmt(subtotal)}</p>
+        <p style="font-size:13px;color:#6b7280;">VAT (${vatPct}%): ${sym} ${fmt(vatAmt)}</p>` : ''}
+        <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${sym} ${fmt(grandTotal)}</p>
+        ${invCurrency !== 'ZAR' ? `<p style="font-size:11px;color:#9ca3af;margin-top:2px;">1 ${invCurrency} = R ${rate.toFixed(2)} (from ZAR)</p>` : ''}
         <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ' · landed cost'}</p>
       </div>
     </div>
@@ -3477,9 +3484,10 @@ function WorksheetInvoiceModal({
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
       <tfoot>
-        ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td></tr>
-        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${vatAmt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td></tr>` : ''}
-        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">${sym} ${grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td></tr>
+        ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(subtotal)}</td></tr>
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(vatAmt)}</td></tr>` : ''}
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">${sym} ${fmt(grandTotal)}</td></tr>
+        ${invCurrency !== 'ZAR' ? `<tr><td colspan="6" style="text-align:right;padding:6px 12px;color:#9ca3af;font-size:10px;">Exchange rate: 1 ${invCurrency} = R ${rate.toFixed(2)}</td></tr>` : ''}
       </tfoot>
     </table></body></html>`
     const win = window.open('', '_blank')
@@ -3494,7 +3502,7 @@ function WorksheetInvoiceModal({
             <h2 className="text-base font-semibold text-gray-900">{title ?? 'Create Invoice'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
               {supplierName && <span className="font-medium">{supplierName}</span>}
-              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · {sym} {grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} total
+              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · {sym} {fmt(grandTotal)} total{invCurrency !== 'ZAR' ? ` · 1 ${invCurrency} = R ${rate.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : ''}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -3557,7 +3565,7 @@ function WorksheetInvoiceModal({
                         className="w-24 border-0 bg-transparent text-xs text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
                     </td>
                     <td className="px-3 py-1.5 text-right text-xs font-semibold text-gray-900">
-                      {sym} {(row.qty * row.unitCost).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                      {sym} {fmt(row.qty * row.unitCost)}
                     </td>
                   </tr>
                 ))}
@@ -3567,21 +3575,21 @@ function WorksheetInvoiceModal({
                   <>
                     <tr>
                       <td colSpan={4} className="px-3 py-1.5 text-right text-xs text-gray-500">Subtotal (excl. VAT)</td>
-                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">{sym} {subtotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">{sym} {fmt(subtotal)}</td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="px-3 py-1.5 text-right text-xs text-gray-500">VAT ({vatPct}%)</td>
-                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">{sym} {vatAmt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+                      <td className="px-3 py-1.5 text-right text-xs text-gray-700">{sym} {fmt(vatAmt)}</td>
                     </tr>
                     <tr>
                       <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total (incl. VAT)</td>
-                      <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{sym} {grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+                      <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{sym} {fmt(grandTotal)}</td>
                     </tr>
                   </>
                 ) : (
                   <tr>
                     <td colSpan={4} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total</td>
-                    <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{sym} {grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</td>
+                    <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{sym} {fmt(grandTotal)}</td>
                   </tr>
                 )}
               </tfoot>
