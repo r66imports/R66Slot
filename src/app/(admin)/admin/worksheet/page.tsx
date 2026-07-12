@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -2658,6 +2659,7 @@ function ProductInfoModal({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [openDrop, setOpenDrop] = useState<string | null>(null)
+  const [dropRect, setDropRect] = useState<{ top: number; left: number; width: number } | null>(null)
   const [showSetup, setShowSetup] = useState(false)
   // Brand account setup state
   const [setupMap, setSetupMap] = useState<Record<string, { salesAccount: string[]; purchaseAccount: string[] }>>({})
@@ -2912,17 +2914,22 @@ function ProductInfoModal({
     const key = `${rowIdx}-categoryBrands`
     const selected = rows[rowIdx]?.categoryBrands || []
     const isOpen = openDrop === key
+    const btnRef = useRef<HTMLButtonElement>(null)
     return (
       <div className="relative" data-multiselect="true">
-        <button type="button" onClick={() => setOpenDrop(isOpen ? null : key)}
+        <button ref={btnRef} type="button" onClick={() => {
+          if (!isOpen) { const r = btnRef.current?.getBoundingClientRect(); if (r) setDropRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 220) }) }
+          setOpenDrop(isOpen ? null : key)
+        }}
           className="w-full min-w-[160px] px-3 py-2 border border-gray-200 rounded-lg text-left text-xs flex items-center justify-between bg-white hover:border-gray-400 focus:outline-none">
           <span className={`truncate max-w-[130px] ${selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>
             {selected.length === 0 ? '— Brand —' : selected.length === 1 ? selected[0] : `${selected.length} selected`}
           </span>
           <svg className="w-3 h-3 text-gray-400 flex-shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
         </button>
-        {isOpen && (
-          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[220px] max-h-72 flex flex-col">
+        {isOpen && dropRect && createPortal(
+          <div data-multiselect="true" style={{ position: 'fixed', top: dropRect.top, left: dropRect.left, width: dropRect.width, zIndex: 9999 }}
+            className="bg-white border border-gray-200 rounded-lg shadow-xl max-h-72 flex flex-col">
             <div className="overflow-y-auto flex-1">
               <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                 <input type="checkbox" checked={selected.length === 0} onChange={() => updateRow(rowIdx, { categoryBrands: [] })} className="rounded" readOnly />
@@ -2951,7 +2958,8 @@ function ProductInfoModal({
               />
               <button type="button" onClick={() => addNewBrand(newBrandInput)} className="px-2 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-600">Add</button>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     )
@@ -2964,17 +2972,22 @@ function ProductInfoModal({
     const key = `${rowIdx}-${field}`
     const selected = rows[rowIdx]?.[field] as string[]
     const isOpen = openDrop === key
+    const btnRef = useRef<HTMLButtonElement>(null)
     return (
       <div className="relative" data-multiselect="true">
-        <button type="button" onClick={() => setOpenDrop(isOpen ? null : key)}
+        <button ref={btnRef} type="button" onClick={() => {
+          if (!isOpen) { const r = btnRef.current?.getBoundingClientRect(); if (r) setDropRect({ top: r.bottom + 4, left: r.left, width: Math.max(r.width, 200) }) }
+          setOpenDrop(isOpen ? null : key)
+        }}
           className="w-full min-w-[160px] px-3 py-2 border border-gray-200 rounded-lg text-left text-xs flex items-center justify-between bg-white hover:border-gray-400 focus:outline-none">
           <span className={`truncate max-w-[130px] ${selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}`}>
             {selected.length === 0 ? `— ${label} —` : selected.length === 1 ? selected[0] : `${selected.length} selected`}
           </span>
           <svg className="w-3 h-3 text-gray-400 flex-shrink-0 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
         </button>
-        {isOpen && (
-          <div className="absolute z-[9999] top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl min-w-[200px] max-h-72 flex flex-col">
+        {isOpen && dropRect && createPortal(
+          <div data-multiselect="true" style={{ position: 'fixed', top: dropRect.top, left: dropRect.left, width: dropRect.width, zIndex: 9999 }}
+            className="bg-white border border-gray-200 rounded-lg shadow-xl max-h-72 flex flex-col">
             <div className="overflow-y-auto flex-1">
               <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                 <input type="checkbox" checked={selected.length === 0} onChange={() => updateRow(rowIdx, { [field]: [] } as any)} className="rounded" readOnly />
@@ -3005,7 +3018,8 @@ function ProductInfoModal({
                 <button type="button" onClick={() => addCategory(newCategoryInput)} className="px-2 py-1 text-xs bg-gray-800 text-white rounded hover:bg-gray-600">Add</button>
               </div>
             )}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     )
