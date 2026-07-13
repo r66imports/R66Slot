@@ -11,7 +11,12 @@ interface SupplierContact {
   code: string
   email: string
   phone: string
-  address?: string
+  contactName?: string
+  addressLine1?: string
+  addressLine2?: string
+  addressLine3?: string
+  postalCode?: string
+  city?: string
   country: string
   website: string
   notes: string
@@ -25,7 +30,12 @@ const EMPTY_FORM: Omit<SupplierContact, 'id'> = {
   code: '',
   email: '',
   phone: '',
-  address: '',
+  contactName: '',
+  addressLine1: '',
+  addressLine2: '',
+  addressLine3: '',
+  postalCode: '',
+  city: '',
   country: '',
   website: '',
   notes: '',
@@ -84,7 +94,12 @@ export default function SupplierContactsPage() {
       code: s.code,
       email: s.email,
       phone: s.phone,
-      address: s.address || '',
+      contactName: s.contactName || '',
+      addressLine1: s.addressLine1 || '',
+      addressLine2: s.addressLine2 || '',
+      addressLine3: s.addressLine3 || '',
+      postalCode: s.postalCode || '',
+      city: s.city || '',
       country: s.country,
       website: s.website,
       notes: s.notes,
@@ -195,7 +210,7 @@ export default function SupplierContactsPage() {
                     ) : '—'}
                   </td>
                   <td className="py-3 px-4 text-gray-700">{s.phone || '—'}</td>
-                  <td className="py-3 px-4 text-gray-600 text-xs">{s.address || '—'}</td>
+                  <td className="py-3 px-4 text-gray-600 text-xs">{s.addressLine1 || '—'}</td>
                   <td className="py-3 px-4 text-gray-700">{s.country || '—'}</td>
                   <td className="py-3 px-4">
                     {s.website ? (
@@ -312,12 +327,62 @@ export default function SupplierContactsPage() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Contact Name</label>
                   <input
                     type="text"
-                    value={form.address || ''}
-                    onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                    placeholder="Street address, city, postal code"
+                    value={form.contactName || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, contactName: e.target.value }))}
+                    placeholder="e.g. John Smith"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 1</label>
+                  <input
+                    type="text"
+                    value={form.addressLine1 || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, addressLine1: e.target.value }))}
+                    placeholder="Street / building"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 2</label>
+                  <input
+                    type="text"
+                    value={form.addressLine2 || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, addressLine2: e.target.value }))}
+                    placeholder="Suburb / district"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Address Line 3</label>
+                  <input
+                    type="text"
+                    value={form.addressLine3 || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, addressLine3: e.target.value }))}
+                    placeholder="Province / region"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Postal Code</label>
+                  <input
+                    type="text"
+                    value={form.postalCode || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, postalCode: e.target.value }))}
+                    placeholder="0000"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">City</label>
+                  <input
+                    type="text"
+                    value={form.city || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="City"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
                 </div>

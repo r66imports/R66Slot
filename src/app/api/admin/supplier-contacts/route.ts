@@ -10,7 +10,12 @@ export interface SupplierContact {
   code: string
   email: string
   phone: string
-  address?: string
+  contactName?: string
+  addressLine1?: string
+  addressLine2?: string
+  addressLine3?: string
+  postalCode?: string
+  city?: string
   country: string
   website: string
   notes: string
@@ -46,7 +51,12 @@ export async function POST(request: Request) {
       code: body.code?.trim() || '',
       email: body.email?.trim() || '',
       phone: body.phone?.trim() || '',
-      address: body.address?.trim() || '',
+      contactName: body.contactName?.trim() || '',
+      addressLine1: body.addressLine1?.trim() || '',
+      addressLine2: body.addressLine2?.trim() || '',
+      addressLine3: body.addressLine3?.trim() || '',
+      postalCode: body.postalCode?.trim() || '',
+      city: body.city?.trim() || '',
       country: body.country?.trim() || '',
       website: body.website?.trim() || '',
       notes: body.notes?.trim() || '',

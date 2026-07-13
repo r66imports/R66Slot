@@ -10,7 +10,12 @@ interface SupplierContact {
   companyName?: string
   email: string
   phone: string
-  address?: string
+  contactName?: string
+  addressLine1?: string
+  addressLine2?: string
+  addressLine3?: string
+  postalCode?: string
+  city?: string
   country: string
   website: string
   notes: string

@@ -5,6 +5,7 @@ const COMPANY_INFO_KEY = 'data/company-info.json'
 
 export interface CompanyInfo {
   name: string
+  contactPerson?: string
   address: string
   city: string
   postalCode: string
@@ -18,6 +19,7 @@ export interface CompanyInfo {
 
 const defaultInfo: CompanyInfo = {
   name: '',
+  contactPerson: '',
   address: '',
   city: '',
   postalCode: '',

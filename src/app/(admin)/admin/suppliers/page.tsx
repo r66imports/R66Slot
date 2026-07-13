@@ -21,6 +21,7 @@ interface Supplier {
 
 interface CompanyInfo {
   name: string
+  contactPerson?: string
   address: string
   city: string
   postalCode: string
@@ -65,6 +66,7 @@ const EMPTY_SUPPLIER: Omit<Supplier, 'id' | 'isActive' | 'createdAt'> = {
 
 const EMPTY_COMPANY: CompanyInfo = {
   name: '',
+  contactPerson: '',
   address: '',
   city: '',
   postalCode: '',
@@ -515,6 +517,15 @@ export default function SuppliersNetworkPage() {
                         />
                       </div>
                       <div className="col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Contact Person</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.contactPerson || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, contactPerson: e.target.value })}
+                          placeholder="e.g. Jacques Basson"
+                        />
+                      </div>
+                      <div className="col-span-2">
                         <label className="block text-xs text-gray-500 mb-1">Address</label>
                         <input
                           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -600,6 +611,7 @@ export default function SuppliersNetworkPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-semibold text-gray-900">{companyInfo.name}</p>
+                          {companyInfo.contactPerson && <p className="text-sm text-gray-600">{companyInfo.contactPerson}</p>}
                           {companyInfo.address && <p className="text-sm text-gray-500">{companyInfo.address}</p>}
                           {(companyInfo.city || companyInfo.postalCode) && (
                             <p className="text-sm text-gray-500">
@@ -609,7 +621,7 @@ export default function SuppliersNetworkPage() {
                           {companyInfo.phone && <p className="text-sm text-gray-500">{companyInfo.phone}</p>}
                           {companyInfo.email && <p className="text-sm text-gray-500">{companyInfo.email}</p>}
                           {companyInfo.vatNumber && (
-                            <p className="text-xs text-gray-400 mt-1">VAT: {companyInfo.vatNumber}</p>
+                            <p className="text-xs text-gray-400 mt-1">Tax No: {companyInfo.vatNumber}</p>
                           )}
                         </div>
                         <button
