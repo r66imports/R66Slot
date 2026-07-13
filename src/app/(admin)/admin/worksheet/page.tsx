@@ -3453,6 +3453,7 @@ function WorksheetInvoiceModal({
   rates?: Record<string, number>
   hideExchangeRate?: boolean
 }) {
+  const [invoiceNo, setInvoiceNo] = useState('')
   const [poRef, setPoRef] = useState('')
   const [date, setDate] = useState(invoiceDate || new Date().toISOString().slice(0, 10))
   const [invCurrency, setInvCurrency] = useState('ZAR')
@@ -3518,6 +3519,7 @@ function WorksheetInvoiceModal({
     </head><body>
     <div class="header">
       <div><p class="title">INVOICE</p>
+      ${invoiceNo ? `<p class="meta">Invoice #: <strong>${invoiceNo}</strong></p>` : ''}
       ${poRef ? `<p class="meta">Ref: <strong>${poRef}</strong></p>` : ''}
       <p class="meta">Date: ${displayDate}</p></div>
       ${supplierName ? `<div style="text-align:right"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#374151;margin-bottom:4px">From</p><p style="font-weight:700;font-size:15px;">${supplierName}</p>${supplierContact?.contactName ? `<p style="font-size:12px;margin-top:2px;">${supplierContact.contactName}</p>` : ''}${supplierContact?.addressLine1 ? `<p style="font-size:12px;margin-top:2px;">${supplierContact.addressLine1}</p>` : ''}${supplierContact?.addressLine2 ? `<p style="font-size:12px;">${supplierContact.addressLine2}</p>` : ''}${supplierContact?.addressLine3 ? `<p style="font-size:12px;">${supplierContact.addressLine3}</p>` : ''}${(supplierContact?.city || supplierContact?.postalCode) ? `<p style="font-size:12px;">${[supplierContact?.city, supplierContact?.postalCode].filter(Boolean).join(', ')}</p>` : ''}${supplierContact?.phone ? `<p style="font-size:12px;">${supplierContact.phone}</p>` : ''}${supplierContact?.email ? `<p style="font-size:12px;">${supplierContact.email}</p>` : ''}</div>` : ''}
@@ -3577,10 +3579,15 @@ function WorksheetInvoiceModal({
             {(companyInfo.city || companyInfo.postalCode) && <p className="text-xs text-gray-500">{[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>}
             {companyInfo.vatNumber && <p className="text-xs text-gray-400 mt-1">VAT: {companyInfo.vatNumber}</p>}
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Reference / Invoice #</label>
-              <input value={poRef} onChange={e => setPoRef(e.target.value)} placeholder="INV-001"
+              <label className="block text-xs font-medium text-gray-600 mb-1">Invoice #</label>
+              <input value={invoiceNo} onChange={e => setInvoiceNo(e.target.value)} placeholder="e.g. INV-2026-001"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Reference / PO #</label>
+              <input value={poRef} onChange={e => setPoRef(e.target.value)} placeholder="Supplier PO ref"
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <div>
