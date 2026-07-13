@@ -15,6 +15,14 @@ export interface CompanyInfo {
   website: string
   vatNumber: string
   registrationNumber: string
+  shipToName?: string
+  shipToContactName?: string
+  shipToEmail?: string
+  shipToPhone?: string
+  shipToAddress?: string
+  shipToCity?: string
+  shipToPostalCode?: string
+  shipToCountry?: string
 }
 
 const defaultInfo: CompanyInfo = {
@@ -29,6 +37,14 @@ const defaultInfo: CompanyInfo = {
   website: '',
   vatNumber: '',
   registrationNumber: '',
+  shipToName: '',
+  shipToContactName: '',
+  shipToEmail: '',
+  shipToPhone: '',
+  shipToAddress: '',
+  shipToCity: '',
+  shipToPostalCode: '',
+  shipToCountry: '',
 }
 
 export async function GET() {

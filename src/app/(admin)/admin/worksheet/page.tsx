@@ -9,6 +9,8 @@ import { useSearchParams } from 'next/navigation'
 interface CompanyInfo {
   name: string; contactPerson?: string; address: string; city: string; postalCode: string
   country: string; phone: string; email: string; vatNumber: string
+  shipToName?: string; shipToContactName?: string; shipToEmail?: string; shipToPhone?: string
+  shipToAddress?: string; shipToCity?: string; shipToPostalCode?: string; shipToCountry?: string
 }
 
 interface ProductRef {
@@ -3485,11 +3487,18 @@ function WorksheetInvoiceModal({
       ${companyInfo.contactPerson ? `<p style="font-size:12px;color:#374151;">${companyInfo.contactPerson}</p>` : ''}
       ${companyInfo.address ? `<p style="font-size:12px;color:#374151;">${companyInfo.address}</p>` : ''}
       ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
-      ${companyInfo.phone ? `<p style="font-size:12px;color:#374151;">${companyInfo.phone}</p>` : ''}
-      ${companyInfo.email ? `<p style="font-size:12px;color:#374151;">${companyInfo.email}</p>` : ''}
-      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">Tax No: ${companyInfo.vatNumber}</p>` : ''}
+      ${companyInfo.country ? `<p style="font-size:12px;color:#374151;">${companyInfo.country}</p>` : ''}
+      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">VAT# ${companyInfo.vatNumber}</p>` : ''}
       <p style="font-size:11px;color:#9ca3af;">Duty Code: 9503.00.90</p>
       <p style="font-size:11px;color:#9ca3af;">Import No: CU 25174181</p>`
+    const shipToBlock = companyInfo.shipToName ? `
+      <p style="font-size:13px;font-weight:700;">${companyInfo.shipToName}</p>
+      ${companyInfo.shipToContactName ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToContactName}</p>` : ''}
+      ${companyInfo.shipToEmail ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToEmail}</p>` : ''}
+      ${companyInfo.shipToPhone ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToPhone}</p>` : ''}
+      ${companyInfo.shipToAddress ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToAddress}</p>` : ''}
+      ${(companyInfo.shipToCity || companyInfo.shipToPostalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.shipToCity, companyInfo.shipToPostalCode].filter(Boolean).join(', ')}</p>` : ''}
+      ${companyInfo.shipToCountry ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToCountry}</p>` : ''}` : ''
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice – ${supplierName || 'Supplier'}</title>
     <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
@@ -3514,7 +3523,8 @@ function WorksheetInvoiceModal({
       ${supplierName ? `<div style="text-align:right"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">From</p><p style="font-weight:700;font-size:15px;">${supplierName}</p>${supplierContact?.contactName ? `<p style="font-size:12px;color:#374151;margin-top:2px;">${supplierContact.contactName}</p>` : ''}${supplierContact?.addressLine1 ? `<p style="font-size:12px;color:#374151;margin-top:2px;">${supplierContact.addressLine1}</p>` : ''}${supplierContact?.addressLine2 ? `<p style="font-size:12px;color:#374151;">${supplierContact.addressLine2}</p>` : ''}${supplierContact?.addressLine3 ? `<p style="font-size:12px;color:#374151;">${supplierContact.addressLine3}</p>` : ''}${(supplierContact?.city || supplierContact?.postalCode) ? `<p style="font-size:12px;color:#374151;">${[supplierContact?.city, supplierContact?.postalCode].filter(Boolean).join(', ')}</p>` : ''}${supplierContact?.phone ? `<p style="font-size:12px;color:#374151;">${supplierContact.phone}</p>` : ''}${supplierContact?.email ? `<p style="font-size:12px;color:#374151;">${supplierContact.email}</p>` : ''}</div>` : ''}
     </div>
     <div class="info-row">
-      <div class="info-box"><p class="info-label">Billed To</p>${billedToBlock}</div>
+      <div class="info-box"><p class="info-label">Bill To</p>${billedToBlock}</div>
+      ${shipToBlock ? `<div class="info-box"><p class="info-label">Ship To</p>${shipToBlock}</div>` : ''}
       <div class="info-box" style="flex:0;min-width:200px;">
         <p class="info-label">Invoice Total</p>
         ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: ${sym} ${fmt(subtotal)}</p>
@@ -3697,11 +3707,11 @@ function WorksheetSupplierOrderModal({
     tfoot tr{border-top:2px solid #111827}tfoot td{padding:10px 12px;font-weight:700;font-size:14px}@page{size:A4;margin:0}`
 
   function invoiceHTML(opts: {
-    fromBlock: string; billedToBlock: string; unitLabel: string; totalLabel: string;
+    fromBlock: string; billedToBlock: string; shipToBlock?: string; unitLabel: string; totalLabel: string;
     invItems: { sku: string; description: string; qty: number; unitPrice: number }[]
     vatPct?: number; totalNote: string; sym?: string
   }) {
-    const { fromBlock, billedToBlock, unitLabel, totalLabel, invItems, vatPct, totalNote, sym = 'R ' } = opts
+    const { fromBlock, billedToBlock, shipToBlock, unitLabel, totalLabel, invItems, vatPct, totalNote, sym = 'R ' } = opts
     const invNum = supplierInvNumber || ''
     const invDateDisplay = supplierInvDate
       ? new Date(supplierInvDate + 'T00:00:00').toLocaleDateString('en-ZA', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -3737,7 +3747,8 @@ function WorksheetSupplierOrderModal({
       <div style="text-align:right">${fromBlock}</div>
     </div>
     <div class="info-row">
-      <div class="info-box"><p class="lbl">Billed To</p>${billedToBlock}</div>
+      <div class="info-box"><p class="lbl">Bill To</p>${billedToBlock}</div>
+      ${shipToBlock ? `<div class="info-box"><p class="lbl">Ship To</p>${shipToBlock}</div>` : ''}
       <div class="info-box" style="flex:0;min-width:200px;">
         <p class="lbl">Invoice Total</p>
         ${vatPct ? `<p style="font-size:11px;color:#9ca3af;">Excl. VAT: ${fmtAmt(subtotal)}</p>
@@ -3770,11 +3781,18 @@ function WorksheetSupplierOrderModal({
       ${companyInfo.contactPerson ? `<p style="font-size:12px;color:#374151;">${companyInfo.contactPerson}</p>` : ''}
       ${companyInfo.address ? `<p style="font-size:12px;color:#374151;">${companyInfo.address}</p>` : ''}
       ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
-      ${companyInfo.phone ? `<p style="font-size:12px;color:#374151;">${companyInfo.phone}</p>` : ''}
-      ${companyInfo.email ? `<p style="font-size:12px;color:#374151;">${companyInfo.email}</p>` : ''}
-      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">Tax No: ${companyInfo.vatNumber}</p>` : ''}
+      ${companyInfo.country ? `<p style="font-size:12px;color:#374151;">${companyInfo.country}</p>` : ''}
+      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">VAT# ${companyInfo.vatNumber}</p>` : ''}
       <p style="font-size:11px;color:#9ca3af;">Duty Code: 9503.00.90</p>
       <p style="font-size:11px;color:#9ca3af;">Import No: CU 25174181</p>`
+    const shipTo = companyInfo.shipToName ? `
+      <p style="font-size:13px;font-weight:700;">${companyInfo.shipToName}</p>
+      ${companyInfo.shipToContactName ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToContactName}</p>` : ''}
+      ${companyInfo.shipToEmail ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToEmail}</p>` : ''}
+      ${companyInfo.shipToPhone ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToPhone}</p>` : ''}
+      ${companyInfo.shipToAddress ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToAddress}</p>` : ''}
+      ${(companyInfo.shipToCity || companyInfo.shipToPostalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.shipToCity, companyInfo.shipToPostalCode].filter(Boolean).join(', ')}</p>` : ''}
+      ${companyInfo.shipToCountry ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToCountry}</p>` : ''}` : undefined
     const supplierContact = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase())
     const fromBlock = `
       <p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">FROM</p>
@@ -3786,7 +3804,7 @@ function WorksheetSupplierOrderModal({
       ${(supplierContact?.city || supplierContact?.postalCode) ? `<p style="font-size:12px;color:#374151;">${[supplierContact?.city, supplierContact?.postalCode].filter(Boolean).join(', ')}</p>` : ''}
       ${supplierContact?.phone ? `<p style="font-size:12px;color:#374151;">${supplierContact.phone}</p>` : ''}
       ${supplierContact?.email ? `<p style="font-size:12px;color:#374151;">${supplierContact.email}</p>` : ''}`
-    openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, unitLabel: `Unit Cost (${curr})`, totalLabel: `Total (${curr})`, invItems, totalNote: 'wholesale cost', sym: currSym }))
+    openInvoice(invoiceHTML({ fromBlock, billedToBlock: billedTo, shipToBlock: shipTo, unitLabel: `Unit Cost (${curr})`, totalLabel: `Total (${curr})`, invItems, totalNote: 'wholesale cost', sym: currSym }))
   }
 
   function generateJDMSupplierInvoice() {

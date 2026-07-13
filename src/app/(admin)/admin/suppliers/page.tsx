@@ -31,6 +31,14 @@ interface CompanyInfo {
   website: string
   vatNumber: string
   registrationNumber: string
+  shipToName?: string
+  shipToContactName?: string
+  shipToEmail?: string
+  shipToPhone?: string
+  shipToAddress?: string
+  shipToCity?: string
+  shipToPostalCode?: string
+  shipToCountry?: string
 }
 
 
@@ -76,6 +84,14 @@ const EMPTY_COMPANY: CompanyInfo = {
   website: '',
   vatNumber: '',
   registrationNumber: '',
+  shipToName: '',
+  shipToContactName: '',
+  shipToEmail: '',
+  shipToPhone: '',
+  shipToAddress: '',
+  shipToCity: '',
+  shipToPostalCode: '',
+  shipToCountry: '',
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
@@ -507,13 +523,14 @@ export default function SuppliersNetworkPage() {
                   <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Company Information</p>
                     <div className="grid grid-cols-2 gap-3">
+                      <p className="col-span-2 text-xs font-semibold text-blue-600 uppercase tracking-wider pt-1">Bill To</p>
                       <div className="col-span-2">
                         <label className="block text-xs text-gray-500 mb-1">Company Name</label>
                         <input
                           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                           value={companyForm.name}
                           onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })}
-                          placeholder="Route 66 Slot Cars"
+                          placeholder="Route 66 Imports (PTY) LTD"
                         />
                       </div>
                       <div className="col-span-2">
@@ -586,6 +603,79 @@ export default function SuppliersNetworkPage() {
                           value={companyForm.registrationNumber}
                           onChange={(e) => setCompanyForm({ ...companyForm, registrationNumber: e.target.value })}
                           placeholder="Registration number"
+                        />
+                      </div>
+                      <p className="col-span-2 text-xs font-semibold text-blue-600 uppercase tracking-wider pt-2 border-t border-gray-100 mt-1">Ship To</p>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Ship To Name</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToName || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToName: e.target.value })}
+                          placeholder="Route 66 Slot Cars"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Contact Name</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToContactName || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToContactName: e.target.value })}
+                          placeholder="Jacques Basson"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Email</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToEmail || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToEmail: e.target.value })}
+                          placeholder="info@..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Phone</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToPhone || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToPhone: e.target.value })}
+                          placeholder="+27 ..."
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Address</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToAddress || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToAddress: e.target.value })}
+                          placeholder="Street address"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">City</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToCity || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToCity: e.target.value })}
+                          placeholder="City"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Postal Code</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToPostalCode || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToPostalCode: e.target.value })}
+                          placeholder="0000"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs text-gray-500 mb-1">Country</label>
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={companyForm.shipToCountry || ''}
+                          onChange={(e) => setCompanyForm({ ...companyForm, shipToCountry: e.target.value })}
+                          placeholder="South Africa"
                         />
                       </div>
                     </div>
