@@ -3484,32 +3484,32 @@ function WorksheetInvoiceModal({
     }).join('')
     const billedToBlock = `
       <p style="font-size:13px;font-weight:700;">${companyInfo.name || ''}</p>
-      ${companyInfo.contactPerson ? `<p style="font-size:12px;color:#374151;">${companyInfo.contactPerson}</p>` : ''}
-      ${companyInfo.address ? `<p style="font-size:12px;color:#374151;">${companyInfo.address}</p>` : ''}
-      ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
-      ${companyInfo.country ? `<p style="font-size:12px;color:#374151;">${companyInfo.country}</p>` : ''}
-      ${companyInfo.vatNumber ? `<p style="font-size:11px;color:#9ca3af;margin-top:4px;">VAT# ${companyInfo.vatNumber}</p>` : ''}
-      <p style="font-size:11px;color:#9ca3af;">Duty Code: 9503.00.90</p>
-      <p style="font-size:11px;color:#9ca3af;">Import No: CU 25174181</p>`
+      ${companyInfo.contactPerson ? `<p style="font-size:12px;">${companyInfo.contactPerson}</p>` : ''}
+      ${companyInfo.address ? `<p style="font-size:12px;">${companyInfo.address}</p>` : ''}
+      ${(companyInfo.city || companyInfo.postalCode) ? `<p style="font-size:12px;">${[companyInfo.city, companyInfo.postalCode].filter(Boolean).join(', ')}</p>` : ''}
+      ${companyInfo.country ? `<p style="font-size:12px;">${companyInfo.country}</p>` : ''}
+      ${companyInfo.vatNumber ? `<p style="font-size:11px;margin-top:4px;">VAT# ${companyInfo.vatNumber}</p>` : ''}
+      <p style="font-size:11px;">Duty Code: 9503.00.90</p>
+      <p style="font-size:11px;">Import No: CU 25174181</p>`
     const shipToBlock = companyInfo.shipToName ? `
       <p style="font-size:13px;font-weight:700;">${companyInfo.shipToName}</p>
-      ${companyInfo.shipToContactName ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToContactName}</p>` : ''}
-      ${companyInfo.shipToEmail ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToEmail}</p>` : ''}
-      ${companyInfo.shipToPhone ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToPhone}</p>` : ''}
-      ${companyInfo.shipToAddress ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToAddress}</p>` : ''}
-      ${(companyInfo.shipToCity || companyInfo.shipToPostalCode) ? `<p style="font-size:12px;color:#374151;">${[companyInfo.shipToCity, companyInfo.shipToPostalCode].filter(Boolean).join(', ')}</p>` : ''}
-      ${companyInfo.shipToCountry ? `<p style="font-size:12px;color:#374151;">${companyInfo.shipToCountry}</p>` : ''}` : ''
+      ${companyInfo.shipToContactName ? `<p style="font-size:12px;">${companyInfo.shipToContactName}</p>` : ''}
+      ${companyInfo.shipToEmail ? `<p style="font-size:12px;">${companyInfo.shipToEmail}</p>` : ''}
+      ${companyInfo.shipToPhone ? `<p style="font-size:12px;">${companyInfo.shipToPhone}</p>` : ''}
+      ${companyInfo.shipToAddress ? `<p style="font-size:12px;">${companyInfo.shipToAddress}</p>` : ''}
+      ${(companyInfo.shipToCity || companyInfo.shipToPostalCode) ? `<p style="font-size:12px;">${[companyInfo.shipToCity, companyInfo.shipToPostalCode].filter(Boolean).join(', ')}</p>` : ''}
+      ${companyInfo.shipToCountry ? `<p style="font-size:12px;">${companyInfo.shipToCountry}</p>` : ''}` : ''
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Invoice – ${supplierName || 'Supplier'}</title>
     <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;padding:20mm;background:white}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px}
     .title{font-size:28px;font-weight:800;color:#111827;margin-bottom:4px}
-    .meta{font-size:13px;color:#6b7280;margin-top:2px}
+    .meta{font-size:13px;color:#111827;margin-top:2px}
     .info-row{display:flex;gap:32px;margin-bottom:28px}
     .info-box{flex:1;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px}
-    .info-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#9ca3af;margin-bottom:6px}
+    .info-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#374151;margin-bottom:6px}
     table{width:100%;border-collapse:collapse}
     thead tr{border-bottom:2px solid #111827}
-    th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#6b7280}
+    th{padding:9px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#374151}
     th.right{text-align:right}th.center{text-align:center}
     tbody tr{border-bottom:1px solid #f3f4f6}tbody tr:nth-child(even){background:#f9fafb}
     tfoot tr{border-top:2px solid #111827}
@@ -3520,18 +3520,18 @@ function WorksheetInvoiceModal({
       <div><p class="title">INVOICE</p>
       ${poRef ? `<p class="meta">Ref: <strong>${poRef}</strong></p>` : ''}
       <p class="meta">Date: ${displayDate}</p></div>
-      ${supplierName ? `<div style="text-align:right"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">From</p><p style="font-weight:700;font-size:15px;">${supplierName}</p>${supplierContact?.contactName ? `<p style="font-size:12px;color:#374151;margin-top:2px;">${supplierContact.contactName}</p>` : ''}${supplierContact?.addressLine1 ? `<p style="font-size:12px;color:#374151;margin-top:2px;">${supplierContact.addressLine1}</p>` : ''}${supplierContact?.addressLine2 ? `<p style="font-size:12px;color:#374151;">${supplierContact.addressLine2}</p>` : ''}${supplierContact?.addressLine3 ? `<p style="font-size:12px;color:#374151;">${supplierContact.addressLine3}</p>` : ''}${(supplierContact?.city || supplierContact?.postalCode) ? `<p style="font-size:12px;color:#374151;">${[supplierContact?.city, supplierContact?.postalCode].filter(Boolean).join(', ')}</p>` : ''}${supplierContact?.phone ? `<p style="font-size:12px;color:#374151;">${supplierContact.phone}</p>` : ''}${supplierContact?.email ? `<p style="font-size:12px;color:#374151;">${supplierContact.email}</p>` : ''}</div>` : ''}
+      ${supplierName ? `<div style="text-align:right"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#374151;margin-bottom:4px">From</p><p style="font-weight:700;font-size:15px;">${supplierName}</p>${supplierContact?.contactName ? `<p style="font-size:12px;margin-top:2px;">${supplierContact.contactName}</p>` : ''}${supplierContact?.addressLine1 ? `<p style="font-size:12px;margin-top:2px;">${supplierContact.addressLine1}</p>` : ''}${supplierContact?.addressLine2 ? `<p style="font-size:12px;">${supplierContact.addressLine2}</p>` : ''}${supplierContact?.addressLine3 ? `<p style="font-size:12px;">${supplierContact.addressLine3}</p>` : ''}${(supplierContact?.city || supplierContact?.postalCode) ? `<p style="font-size:12px;">${[supplierContact?.city, supplierContact?.postalCode].filter(Boolean).join(', ')}</p>` : ''}${supplierContact?.phone ? `<p style="font-size:12px;">${supplierContact.phone}</p>` : ''}${supplierContact?.email ? `<p style="font-size:12px;">${supplierContact.email}</p>` : ''}</div>` : ''}
     </div>
     <div class="info-row">
       <div class="info-box"><p class="info-label">Bill To</p>${billedToBlock}</div>
       ${shipToBlock ? `<div class="info-box"><p class="info-label">Ship To</p>${shipToBlock}</div>` : ''}
       <div class="info-box" style="flex:0;min-width:200px;">
         <p class="info-label">Invoice Total</p>
-        ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: ${sym} ${fmt(subtotal)}</p>
-        <p style="font-size:13px;color:#6b7280;">VAT (${vatPct}%): ${sym} ${fmt(vatAmt)}</p>` : ''}
+        ${vatPct ? `<p style="font-size:13px;color:#374151;margin-top:4px;">Excl. VAT: ${sym} ${fmt(subtotal)}</p>
+        <p style="font-size:13px;color:#374151;">VAT (${vatPct}%): ${sym} ${fmt(vatAmt)}</p>` : ''}
         <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${sym} ${fmt(grandTotal)}</p>
-        ${invCurrency !== 'ZAR' && !hideExchangeRate ? `<p style="font-size:11px;color:#9ca3af;margin-top:2px;">1 ${invCurrency} = R ${rate.toFixed(2)} (from ZAR)</p>` : ''}
-        <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ' · landed cost'}</p>
+        ${invCurrency !== 'ZAR' && !hideExchangeRate ? `<p style="font-size:11px;color:#374151;margin-top:2px;">1 ${invCurrency} = R ${rate.toFixed(2)} (from ZAR)</p>` : ''}
+        <p style="font-size:11px;color:#374151;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ' · landed cost'}</p>
       </div>
     </div>
     <table>
@@ -3543,10 +3543,10 @@ function WorksheetInvoiceModal({
       </tr></thead>
       <tbody>${rowsHtml}</tbody>
       <tfoot>
-        ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(subtotal)}</td></tr>
-        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(vatAmt)}</td></tr>` : ''}
-        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">${sym} ${fmt(grandTotal)}</td></tr>
-        ${invCurrency !== 'ZAR' && !hideExchangeRate ? `<tr><td colspan="6" style="text-align:right;padding:6px 12px;color:#9ca3af;font-size:10px;">Exchange rate: 1 ${invCurrency} = R ${rate.toFixed(2)}</td></tr>` : ''}
+        ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#374151;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(subtotal)}</td></tr>
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#374151;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(vatAmt)}</td></tr>` : ''}
+        <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#374151;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">${sym} ${fmt(grandTotal)}</td></tr>
+        ${invCurrency !== 'ZAR' && !hideExchangeRate ? `<tr><td colspan="6" style="text-align:right;padding:6px 12px;color:#374151;font-size:10px;">Exchange rate: 1 ${invCurrency} = R ${rate.toFixed(2)}</td></tr>` : ''}
       </tfoot>
     </table></body></html>`
     const win = window.open('', '_blank')
