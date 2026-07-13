@@ -1833,6 +1833,7 @@ function WorksheetEditor({
             items={items}
             products={products}
             onClose={() => setShowProductInfo(false)}
+            onRefresh={onRefresh}
           />
         )}
 
@@ -2648,10 +2649,12 @@ function ProductInfoModal({
   items,
   products,
   onClose,
+  onRefresh,
 }: {
   items: WsItem[]
   products: ProductRef[]
   onClose: () => void
+  onRefresh?: () => void
 }) {
   const skuItems = items.filter((it) => it.sku.trim())
   const [rows, setRows] = useState<ProdInfoRow[]>([])
@@ -2885,6 +2888,7 @@ function ProductInfoModal({
     }
 
     setSaving(false)
+    onRefresh?.()
     if (failed.length) {
       alert(`Save failed for: ${failed.join(', ')}`)
     } else {
@@ -3196,10 +3200,10 @@ function ProductInfoModal({
                 const brand = row.categoryBrands[0]
                 const brandMap = brand ? opts.brandAccountMap[brand] : null
                 return (
-                  <tr key={row.wsId} className={`border-b border-gray-50 ${!row.prodId ? 'opacity-50' : ''}`}>
+                  <tr key={row.wsId} className="border-b border-gray-50">
                     <td className="py-2 pr-4">
                       <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{row.sku}</span>
-                      {!row.prodId && <span className="block text-[10px] text-red-400 mt-0.5">Not in DB</span>}
+                      {!row.prodId && <span className="block text-[10px] text-teal-500 mt-0.5">· new</span>}
                     </td>
                     <td className="py-2 pr-4 text-xs text-gray-600 max-w-[220px]">
                       <span className="truncate block">{row.description || '—'}</span>
