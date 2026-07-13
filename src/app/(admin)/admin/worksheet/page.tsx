@@ -2331,9 +2331,11 @@ function WorksheetEditor({
       {showInvoiceModal && (
         <WorksheetInvoiceModal
           supplierName={supplier}
+          supplierContact={suppliers.find(s => s.name === supplier)}
           companyInfo={companyInfo}
           invoiceDate={worksheetDate}
           rates={fxRates}
+          hideExchangeRate
           items={items.filter((it) => it.sku && it.wholesalePrice > 0).map((it) => ({
             sku: it.sku, description: it.description, qty: it.qty,
             unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
@@ -2346,6 +2348,7 @@ function WorksheetEditor({
       {showR66InvoiceModal && (
         <WorksheetInvoiceModal
           supplierName={supplier}
+          supplierContact={suppliers.find(s => s.name === supplier)}
           companyInfo={companyInfo}
           invoiceDate={worksheetDate}
           title="R66 Imports Invoice"
@@ -2363,6 +2366,7 @@ function WorksheetEditor({
       {showJDMInvoiceModal && (
         <WorksheetInvoiceModal
           supplierName={supplier}
+          supplierContact={suppliers.find(s => s.name === supplier)}
           companyInfo={{ ...companyInfo, name: 'JDM Garage PTY LTD' }}
           invoiceDate={worksheetDate}
           title="JDM Garage Invoice"
@@ -3412,9 +3416,10 @@ function NewSkuModal({
 const INV_CURRENCIES = ['ZAR', 'USD', 'EUR', 'GBP', 'SGD', 'CNY', 'HKD']
 
 function WorksheetInvoiceModal({
-  supplierName, companyInfo, invoiceDate, items, onClose, title, vatPct, rates,
+  supplierName, supplierContact, companyInfo, invoiceDate, items, onClose, title, vatPct, rates, hideExchangeRate,
 }: {
   supplierName: string
+  supplierContact?: SupplierContact
   companyInfo: CompanyInfo
   invoiceDate: string
   items: { sku: string; description: string; qty: number; unitCost: number }[]
@@ -3422,6 +3427,7 @@ function WorksheetInvoiceModal({
   title?: string
   vatPct?: number  // 15 for R66, 0 or undefined for no VAT
   rates?: Record<string, number>
+  hideExchangeRate?: boolean
 }) {
   const [poRef, setPoRef] = useState('')
   const [date, setDate] = useState(invoiceDate || new Date().toISOString().slice(0, 10))
@@ -3480,7 +3486,7 @@ function WorksheetInvoiceModal({
       <div><p class="title">INVOICE</p>
       ${poRef ? `<p class="meta">Ref: <strong>${poRef}</strong></p>` : ''}
       <p class="meta">Date: ${displayDate}</p></div>
-      ${supplierName ? `<div style="text-align:right"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">From</p><p style="font-weight:700;font-size:15px;">${supplierName}</p></div>` : ''}
+      ${supplierName ? `<div style="text-align:right"><p style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#9ca3af;margin-bottom:4px">From</p><p style="font-weight:700;font-size:15px;">${supplierName}</p>${supplierContact?.address ? `<p style="font-size:12px;color:#374151;margin-top:2px;">${supplierContact.address}</p>` : ''}${supplierContact?.phone ? `<p style="font-size:12px;color:#374151;">${supplierContact.phone}</p>` : ''}${supplierContact?.email ? `<p style="font-size:12px;color:#374151;">${supplierContact.email}</p>` : ''}</div>` : ''}
     </div>
     <div class="info-row">
       <div class="info-box"><p class="info-label">Billed To</p>${billedToBlock}</div>
@@ -3489,7 +3495,7 @@ function WorksheetInvoiceModal({
         ${vatPct ? `<p style="font-size:13px;color:#6b7280;margin-top:4px;">Excl. VAT: ${sym} ${fmt(subtotal)}</p>
         <p style="font-size:13px;color:#6b7280;">VAT (${vatPct}%): ${sym} ${fmt(vatAmt)}</p>` : ''}
         <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${sym} ${fmt(grandTotal)}</p>
-        ${invCurrency !== 'ZAR' ? `<p style="font-size:11px;color:#9ca3af;margin-top:2px;">1 ${invCurrency} = R ${rate.toFixed(2)} (from ZAR)</p>` : ''}
+        ${invCurrency !== 'ZAR' && !hideExchangeRate ? `<p style="font-size:11px;color:#9ca3af;margin-top:2px;">1 ${invCurrency} = R ${rate.toFixed(2)} (from ZAR)</p>` : ''}
         <p style="font-size:11px;color:#9ca3af;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ' · landed cost'}</p>
       </div>
     </div>
@@ -3505,7 +3511,7 @@ function WorksheetInvoiceModal({
         ${vatPct ? `<tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">Subtotal (excl. VAT)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(subtotal)}</td></tr>
         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">VAT (${vatPct}%)</td><td style="text-align:right;font-size:13px;font-weight:500;">${sym} ${fmt(vatAmt)}</td></tr>` : ''}
         <tr><td colspan="5" style="text-align:right;padding-right:12px;color:#6b7280;font-size:13px;">${vatPct ? 'Total (incl. VAT)' : 'Total'}</td><td style="text-align:right;">${sym} ${fmt(grandTotal)}</td></tr>
-        ${invCurrency !== 'ZAR' ? `<tr><td colspan="6" style="text-align:right;padding:6px 12px;color:#9ca3af;font-size:10px;">Exchange rate: 1 ${invCurrency} = R ${rate.toFixed(2)}</td></tr>` : ''}
+        ${invCurrency !== 'ZAR' && !hideExchangeRate ? `<tr><td colspan="6" style="text-align:right;padding:6px 12px;color:#9ca3af;font-size:10px;">Exchange rate: 1 ${invCurrency} = R ${rate.toFixed(2)}</td></tr>` : ''}
       </tfoot>
     </table></body></html>`
     const win = window.open('', '_blank')
@@ -3520,7 +3526,7 @@ function WorksheetInvoiceModal({
             <h2 className="text-base font-semibold text-gray-900">{title ?? 'Create Invoice'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
               {supplierName && <span className="font-medium">{supplierName}</span>}
-              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · {sym} {fmt(grandTotal)} total{invCurrency !== 'ZAR' ? ` · 1 ${invCurrency} = R ${rate.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : ''}
+              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · {sym} {fmt(grandTotal)} total{invCurrency !== 'ZAR' && !hideExchangeRate ? ` · 1 ${invCurrency} = R ${rate.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : ''}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
