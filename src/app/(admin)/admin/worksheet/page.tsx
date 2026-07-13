@@ -343,16 +343,34 @@ function WorksheetEditor({
     let updated = 0
     let created = 0
     try {
+      // Fresh fetch — avoids stale products state creating duplicates on repeated presses
+      const freshById: Record<string, string> = {}
+      try {
+        const res = await fetch('/api/admin/products', { cache: 'no-store' })
+        if (res.ok) {
+          const raw: any[] = await res.json()
+          for (const p of raw) {
+            if (p.sku) freshById[p.sku.trim().toLowerCase()] = p.id
+          }
+        }
+      } catch {}
+
+      // Deduplicate worksheet rows by SKU — process each SKU exactly once
+      const seenSkus = new Set<string>()
+
       for (const it of toProcess) {
         const skuLower = it.sku.trim().toLowerCase()
-        const prod = products.find((p) => p.sku.trim().toLowerCase() === skuLower)
+        if (seenSkus.has(skuLower)) continue
+        seenSkus.add(skuLower)
+
+        const prodId = freshById[skuLower]
         const finalLanded = it.wholesalePrice > 0 ? Math.round(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity) * 100) / 100 : 0
         const landedRetail = it.wholesalePrice > 0 ? Math.round(calcFinalRetail(it.wholesalePrice) * 100) / 100 : 0
         const retailZAR = Math.round((it.retailPrice || 0) * 100) / 100
         const preOrderZAR = it.wholesalePrice > 0 ? Math.round(calcRetail(it.wholesalePrice) * 100) / 100 : 0
         const acct = it.costingEntity === 'R66' ? ['Route 66 Imports PTY LTD'] : it.costingEntity === 'JDM' ? ['JDM Garage PTY LTD'] : null
 
-        if (!prod) {
+        if (!prodId) {
           // New SKU — add to products with qty=0 (no stock change)
           const res = await fetch('/api/admin/products', {
             method: 'POST',
@@ -379,6 +397,8 @@ function WorksheetEditor({
             const msg = await res.text().catch(() => res.status.toString())
             errors.push(`${it.sku} (new): ${msg}`)
           } else {
+            const created_ = await res.json().catch(() => null)
+            if (created_?.id) freshById[skuLower] = created_.id  // prevent re-creation if same SKU appears again
             created++
           }
           continue
@@ -397,7 +417,7 @@ function WorksheetEditor({
         if (supplier) patch.supplier = supplier
         if (acct) { patch.salesAccount = acct; patch.purchaseAccount = acct }
         if (Object.keys(patch).length === 0) { updated++; continue }
-        const res = await fetch(`/api/admin/products/${prod.id}`, {
+        const res = await fetch(`/api/admin/products/${prodId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
@@ -411,6 +431,7 @@ function WorksheetEditor({
       }
       await syncWholesalePricelist()
       await saveWorksheet()
+      onRefresh()  // refresh products state so next press uses current DB
       if (errors.length > 0) {
         alert(`Updated ${updated}, created ${created}.\n\nFailed:\n${errors.join('\n')}`)
       } else {
