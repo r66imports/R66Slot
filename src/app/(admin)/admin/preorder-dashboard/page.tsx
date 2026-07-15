@@ -2018,10 +2018,19 @@ function SupplierSection({
               </div>
               {/* Table */}
               <div className="flex-1 overflow-auto">
-                <table className="w-full text-sm border-collapse">
+                <table className="w-full text-sm border-collapse table-fixed">
+                  <colgroup>
+                    <col style={{width:'3%'}} />
+                    <col style={{width:'12%'}} />
+                    <col style={{width:'33%'}} />
+                    <col style={{width:'14%'}} />
+                    <col style={{width:'10%'}} />
+                    <col style={{width:'14%'}} />
+                    <col style={{width:'14%'}} />
+                  </colgroup>
                   <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs text-gray-400 font-semibold uppercase w-8">#</th>
+                      <th className="px-3 py-2 text-left text-xs text-gray-400 font-semibold uppercase">#</th>
                       {cols.map(col => (
                         <th
                           key={col.key}
@@ -2047,7 +2056,7 @@ function SupplierSection({
                         <tr key={item.id} className={`border-b border-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-indigo-50/30`}>
                           <td className="px-3 py-2 text-xs text-gray-300">{idx + 1}</td>
                           <td className="px-3 py-2 font-mono text-xs text-indigo-700 font-semibold whitespace-nowrap">{item.sku || '—'}</td>
-                          <td className="px-3 py-2 text-gray-800 font-medium">{item.description}</td>
+                          <td className="px-3 py-2 text-gray-800 font-medium truncate max-w-0" title={item.description}>{item.description}</td>
                           <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap tabular-nums">
                             {price > 0 ? `R ${price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : '—'}
                           </td>
