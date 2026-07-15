@@ -1867,6 +1867,10 @@ function SupplierSection({
   const [collapsed, setCollapsed] = useState(true)
   const [sortBy, setSortBy] = useState<SortBy>('az')
   const [asc, setAsc] = useState(true)
+  const [showItemsModal, setShowItemsModal] = useState(false)
+  const [modalFullscreen, setModalFullscreen] = useState(false)
+  const [modalSort, setModalSort] = useState<'sku' | 'description' | 'price' | 'qty' | 'eta' | 'cutoff'>('description')
+  const [modalAsc, setModalAsc] = useState(true)
   const alertCount = items.filter(i => cutoffAlert(i.cutoffDate).active && !i.orderPlaced).length
   const newOrderCount = items.reduce((s, i) => s + (i.customers ?? []).filter((c: any) => c.isNew).length, 0)
 
@@ -1906,6 +1910,13 @@ function SupplierSection({
               ⚠ {alertCount} cutoff alert{alertCount !== 1 ? 's' : ''}
             </span>
           )}
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); setShowItemsModal(true) }}
+            className="text-xs bg-white/20 border border-white/40 text-white px-2.5 py-0.5 rounded-full font-semibold hover:bg-white/30 transition-colors shrink-0"
+          >
+            📋 View All
+          </button>
         </button>
         {/* Right — sort + asc/desc + chevron */}
         <div className="flex items-center gap-2 shrink-0 ml-3">
@@ -1957,6 +1968,122 @@ function SupplierSection({
           ))}
         </div>
       )}
+
+      {/* ── All Items Modal ── */}
+      {showItemsModal && (() => {
+        const modalSorted = [...items].sort((a, b) => {
+          let cmp = 0
+          const qtyA = (a.customers ?? []).reduce((s: number, c: any) => s + c.qty, 0)
+          const qtyB = (b.customers ?? []).reduce((s: number, c: any) => s + c.qty, 0)
+          switch (modalSort) {
+            case 'sku': cmp = a.sku.localeCompare(b.sku); break
+            case 'price': cmp = parseFloat(a.retailPrice || '0') - parseFloat(b.retailPrice || '0'); break
+            case 'qty': cmp = qtyA - qtyB; break
+            case 'eta': cmp = (a.eta || '').localeCompare(b.eta || ''); break
+            case 'cutoff': cmp = (a.cutoffDate || '').localeCompare(b.cutoffDate || ''); break
+            default: cmp = a.description.localeCompare(b.description)
+          }
+          return modalAsc ? cmp : -cmp
+        })
+        const cols: { key: typeof modalSort; label: string }[] = [
+          { key: 'sku', label: 'SKU' },
+          { key: 'description', label: 'Description' },
+          { key: 'price', label: 'Retail Price' },
+          { key: 'qty', label: 'Qty Booked' },
+          { key: 'eta', label: 'ETA' },
+          { key: 'cutoff', label: 'Cut-off Date' },
+        ]
+        const totalQty = modalSorted.reduce((s, i) => s + (i.customers ?? []).reduce((ss: number, c: any) => ss + c.qty, 0), 0)
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className={`bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all ${modalFullscreen ? 'fixed inset-0 rounded-none' : 'w-full max-w-5xl max-h-[90vh]'}`}>
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 bg-gray-50 shrink-0">
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-gray-900 text-base">{supplierName || 'No Supplier'}</span>
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">{items.length} items</span>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{totalQty} total qty booked</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setModalFullscreen(f => !f)}
+                    className="text-gray-400 hover:text-gray-700 px-2 py-1 rounded hover:bg-gray-200 text-sm font-mono"
+                    title={modalFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                  >
+                    {modalFullscreen ? '⛶' : '⛶'}
+                    <span className="text-xs ml-1">{modalFullscreen ? 'Exit' : 'Full'}</span>
+                  </button>
+                  <button onClick={() => { setShowItemsModal(false); setModalFullscreen(false) }} className="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">×</button>
+                </div>
+              </div>
+              {/* Table */}
+              <div className="flex-1 overflow-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 border-b border-gray-200 z-10">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs text-gray-400 font-semibold uppercase w-8">#</th>
+                      {cols.map(col => (
+                        <th
+                          key={col.key}
+                          onClick={() => { if (modalSort === col.key) setModalAsc(a => !a); else { setModalSort(col.key); setModalAsc(true) } }}
+                          className="px-3 py-2 text-left text-xs text-gray-500 font-semibold uppercase tracking-wide cursor-pointer select-none hover:text-gray-800 hover:bg-gray-100 transition-colors"
+                        >
+                          <span className="inline-flex items-center gap-1">
+                            {col.label}
+                            {modalSort === col.key
+                              ? <span className="text-indigo-600">{modalAsc ? ' ↑' : ' ↓'}</span>
+                              : <span className="text-gray-300"> ↕</span>}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalSorted.map((item, idx) => {
+                      const qtyBooked = (item.customers ?? []).reduce((s: number, c: any) => s + c.qty, 0)
+                      const alert = cutoffAlert(item.cutoffDate)
+                      const price = parseFloat(item.retailPrice || item.estimatedRetailPrice || '0')
+                      return (
+                        <tr key={item.id} className={`border-b border-gray-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-indigo-50/30`}>
+                          <td className="px-3 py-2 text-xs text-gray-300">{idx + 1}</td>
+                          <td className="px-3 py-2 font-mono text-xs text-indigo-700 font-semibold whitespace-nowrap">{item.sku || '—'}</td>
+                          <td className="px-3 py-2 text-gray-800 font-medium">{item.description}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-gray-900 whitespace-nowrap tabular-nums">
+                            {price > 0 ? `R ${price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {qtyBooked > 0
+                              ? <span className="inline-block bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-0.5 rounded-full">{qtyBooked}</span>
+                              : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{item.eta || '—'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            {item.cutoffDate
+                              ? <span className={`text-xs font-semibold px-2 py-0.5 rounded ${alert.active && !item.orderPlaced ? 'bg-red-100 text-red-700' : 'text-gray-600'}`}>
+                                  {item.cutoffDate}
+                                  {alert.active && !item.orderPlaced && <span className="ml-1">⚠</span>}
+                                </span>
+                              : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                  <tfoot className="sticky bottom-0 bg-gray-50 border-t-2 border-gray-200">
+                    <tr>
+                      <td colSpan={4} className="px-3 py-2 text-xs text-gray-500 font-semibold">{items.length} items</td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="text-xs font-bold text-indigo-800">{totalQty}</span>
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
