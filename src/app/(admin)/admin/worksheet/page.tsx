@@ -360,10 +360,11 @@ function WorksheetEditor({
 
       // Deduplicate worksheet rows by SKU — process each SKU exactly once
       const seenSkus = new Set<string>()
+      const duplicateSkus: string[] = []
 
       for (const it of toProcess) {
         const skuLower = it.sku.trim().toLowerCase()
-        if (seenSkus.has(skuLower)) continue
+        if (seenSkus.has(skuLower)) { duplicateSkus.push(it.sku.toUpperCase()); continue }
         seenSkus.add(skuLower)
 
         const prodId = freshById[skuLower]
@@ -435,6 +436,7 @@ function WorksheetEditor({
       await syncWholesalePricelist()
       await saveWorksheet()
       onRefresh()  // refresh products state so next press uses current DB
+      if (duplicateSkus.length > 0) setDoubleSKUAlert(duplicateSkus)
       if (errors.length > 0) {
         alert(`Updated ${updated}, created ${created}.\n\nFailed:\n${errors.join('\n')}`)
       } else {
@@ -468,6 +470,7 @@ function WorksheetEditor({
   const [showJDMInvoiceModal, setShowJDMInvoiceModal] = useState(false)
   // ── Qty confirm dialog ──
   const [showQtyConfirm, setShowQtyConfirm] = useState(false)
+  const [doubleSKUAlert, setDoubleSKUAlert] = useState<string[]>([])
   // ── Send to Checklist ──
   const [sendingChecklist, setSendingChecklist] = useState(false)
   const [checklistSent, setChecklistSent] = useState(false)
@@ -979,6 +982,15 @@ function WorksheetEditor({
         ...(mappedEntity ? { costingEntity: mappedEntity } : {}),
       }
     }) : [newWsItem()])
+    // Detect duplicate SKUs in loaded worksheet
+    const skuCounts: Record<string, number> = {}
+    for (const it of sheet.items) {
+      if (!it.sku) continue
+      const k = it.sku.trim().toLowerCase()
+      skuCounts[k] = (skuCounts[k] || 0) + 1
+    }
+    const dupes = Object.entries(skuCounts).filter(([, c]) => c > 1).map(([sku]) => sku.toUpperCase())
+    if (dupes.length > 0) setDoubleSKUAlert(dupes)
     setShowArchive(false)
     setCheckedItems(new Set())
   }
@@ -2409,6 +2421,23 @@ function WorksheetEditor({
           <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-bold mb-1">Update Quantities</h3>
             <p className="text-sm text-gray-500 mb-4">The following items will have their stock quantities updated:</p>
+            {(() => {
+              const alreadySent = items.filter(it => checkedItems.has(it.id) && it.sku && it.sentToInventory)
+              if (!alreadySent.length) return null
+              return (
+                <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 mb-4">
+                  <p className="text-xs font-bold text-amber-800 mb-2">⚠️ {alreadySent.length} item{alreadySent.length !== 1 ? 's' : ''} already received via checklist — will be SKIPPED to prevent duplication:</p>
+                  <div className="space-y-1 max-h-28 overflow-y-auto">
+                    {alreadySent.map(it => (
+                      <div key={it.id} className="flex items-center gap-2 text-xs px-2 py-1 bg-amber-100 rounded">
+                        <span className="font-mono text-amber-700 shrink-0">{it.sku}</span>
+                        <span className="text-amber-600 truncate line-through">{it.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
             <div className="space-y-1 max-h-60 overflow-y-auto mb-4">
               {items.filter(it => checkedItems.has(it.id) && it.sku && it.qty > 0 && !it.sentToInventory).map(it => (
                 <div key={it.id} className="flex items-center justify-between text-sm px-3 py-1.5 bg-gray-50 rounded-lg">
@@ -2431,6 +2460,26 @@ function WorksheetEditor({
                 Confirm Update
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {doubleSKUAlert.length > 0 && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-2xl">⚠️</span>
+              <h3 className="text-base font-bold text-red-700">Duplicate SKUs Detected</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">The following SKUs appear more than once in this worksheet. Each will only be processed once — remove the duplicates to avoid errors:</p>
+            <div className="space-y-1 max-h-48 overflow-y-auto mb-4">
+              {doubleSKUAlert.map(sku => (
+                <div key={sku} className="font-mono text-sm px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-red-700">{sku}</div>
+              ))}
+            </div>
+            <button onClick={() => setDoubleSKUAlert([])} className="w-full px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700">
+              Understood
+            </button>
           </div>
         </div>
       )}
