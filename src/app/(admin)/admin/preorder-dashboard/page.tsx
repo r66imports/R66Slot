@@ -568,7 +568,42 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     setPendingQuoteBank(false)
     try {
       const target = existingDoc ?? null
-      if (target) {
+      if (target && convertToInvoice) {
+        // Mirror the Quotes page: create a brand-new invoice, then archive the source quote
+        const skuPrefix = form.sku ? `${form.sku} –` : null
+        const existingItems: any[] = target.lineItems || []
+        const existingIdx = skuPrefix ? existingItems.findIndex((i: any) => i.description?.startsWith(skuPrefix)) : -1
+        const mergedItems = existingIdx >= 0
+          ? existingItems.map((i: any, idx: number) =>
+              idx === existingIdx ? { ...i, qty: (Number(i.qty) || 0) + customer.qty } : i
+            )
+          : [...existingItems, lineItem()]
+        const allDocs: any[] = await fetch('/api/admin/orders/documents').then(r => r.json())
+        const invDocNumber = nextDocNumber(allDocs, 'invoice')
+        const newInvRes = await fetch('/api/admin/orders/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'invoice', docNumber: invDocNumber,
+            date: new Date().toISOString().slice(0, 10),
+            clientName: target.clientName, clientEmail: target.clientEmail || '',
+            clientPhone: target.clientPhone || '', clientAddress: target.clientAddress || '',
+            lineItems: mergedItems, notes: target.notes || '', terms: target.terms || '',
+            status: 'draft', discountPct: target.discountPct || 0,
+            sourceQuoteNumber: target.docNumber,
+          }),
+        })
+        if (newInvRes.ok) {
+          const newInv = await newInvRes.json()
+          // Archive the source quote so it disappears from Quotes
+          await fetch(`/api/admin/orders/documents/${target.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'archived' }),
+          })
+          notify(newInv.docNumber, newInv.id)
+        }
+      } else if (target) {
         // Merge qty if same SKU line item already exists on this document
         const skuPrefix = form.sku ? `${form.sku} –` : null
         const existingItems: any[] = target.lineItems || []
@@ -578,12 +613,10 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
               idx === existingIdx ? { ...i, qty: (Number(i.qty) || 0) + customer.qty } : i
             )
           : [...existingItems, lineItem()]
-        const patch: any = { lineItems: updatedItems }
-        if (convertToInvoice) patch.type = 'invoice'
         const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(patch),
+          body: JSON.stringify({ lineItems: updatedItems }),
         })
         if (res.ok) notify(target.docNumber, target.id)
       } else {
