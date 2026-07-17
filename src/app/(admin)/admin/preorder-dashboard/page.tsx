@@ -562,7 +562,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     onLinked?.(docNumber, docId)
   }
 
-  const sendTo = async (type: 'quote' | 'salesorder' | 'invoice', existingDoc?: any, bankAccountId?: string) => {
+  const sendTo = async (type: 'quote' | 'salesorder' | 'invoice', existingDoc?: any, bankAccountId?: string, convertToInvoice?: boolean) => {
     setLoading(true)
     setOpen(false)
     setPendingQuoteBank(false)
@@ -578,10 +578,12 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
               idx === existingIdx ? { ...i, qty: (Number(i.qty) || 0) + customer.qty } : i
             )
           : [...existingItems, lineItem()]
+        const patch: any = { lineItems: updatedItems }
+        if (convertToInvoice) patch.type = 'invoice'
         const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lineItems: updatedItems }),
+          body: JSON.stringify(patch),
         })
         if (res.ok) notify(target.docNumber, target.id)
       } else {
@@ -687,12 +689,22 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
                   <div className="border-t my-1" />
                   <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Add to Existing</p>
                   {existingDocs.map(doc => (
-                    <button key={doc.id} onClick={() => sendTo(doc.type, doc)}
-                      className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50">
-                      <span className="font-semibold text-indigo-700">{doc.docNumber}</span>
-                      <span className="text-gray-400 ml-1 capitalize">({doc.type})</span>
-                      {doc.clientName && <span className="text-gray-500 block text-[10px] truncate">{doc.clientName}</span>}
-                    </button>
+                    <div key={doc.id} className="flex items-center gap-1 px-2 py-1 hover:bg-indigo-50">
+                      <button onClick={() => sendTo(doc.type, doc)} className="flex-1 text-left py-1 text-xs min-w-0">
+                        <span className="font-semibold text-indigo-700">{doc.docNumber}</span>
+                        <span className="text-gray-400 ml-1 capitalize">({doc.type})</span>
+                        {doc.clientName && <span className="text-gray-500 block text-[10px] truncate">{doc.clientName}</span>}
+                      </button>
+                      {doc.type === 'quote' && (
+                        <button
+                          onClick={() => sendTo(doc.type, doc, undefined, true)}
+                          className="shrink-0 text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 border border-orange-300 rounded font-semibold hover:bg-orange-200 whitespace-nowrap"
+                          title="Add line item and convert this quote to an invoice"
+                        >
+                          → Invoice
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </>
               )}
