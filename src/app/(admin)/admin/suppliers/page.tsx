@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import Link from 'next/link'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -497,6 +498,13 @@ export default function SuppliersNetworkPage() {
       `}</style>
 
       <div className="p-6 max-w-7xl mx-auto">
+        {/* Nav */}
+        <div className="flex gap-2 mb-5">
+          <Link href="/admin/supplier-network" className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">← Supplier Network</Link>
+          <Link href="/admin/supplier-contacts" className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Supplier Contacts</Link>
+          <Link href="/admin/supplier-stock-sheets" className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Stock Sheets</Link>
+        </div>
+
         {/* Page Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

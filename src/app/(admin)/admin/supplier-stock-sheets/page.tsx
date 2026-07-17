@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 
 interface SupplierContact {
   id: string
   name: string
   code: string
   country: string
-  googleSheetsUrl?: string
 }
 
 interface StockSheet {
@@ -37,6 +37,7 @@ function fmtSize(bytes: number) {
 export default function SupplierStockSheetsPage() {
   const [suppliers, setSuppliers] = useState<SupplierContact[]>([])
   const [sheets, setSheets] = useState<StockSheet[]>([])
+  const [googleSheets, setGoogleSheets] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [selectedSupplier, setSelectedSupplier] = useState<string>('')
   const [filterSupplier, setFilterSupplier] = useState<string>('all')
@@ -45,19 +46,40 @@ export default function SupplierStockSheetsPage() {
   const [uploadError, setUploadError] = useState('')
   const [uploadSuccess, setUploadSuccess] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [gsUrlInput, setGsUrlInput] = useState('')
+  const [gsSaving, setGsSaving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
-    const [sc, ss] = await Promise.all([
+    const [sc, ss, gs] = await Promise.all([
       fetch('/api/admin/supplier-contacts').then(r => r.json()).catch(() => []),
       fetch('/api/admin/supplier-stock-sheets').then(r => r.json()).catch(() => []),
+      fetch('/api/admin/supplier-google-sheets').then(r => r.json()).catch(() => ({})),
     ])
     setSuppliers(Array.isArray(sc) ? sc : [])
     setSheets(Array.isArray(ss) ? ss : [])
+    setGoogleSheets(gs && typeof gs === 'object' ? gs : {})
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
+
+  // When supplier changes, populate the Google Sheets URL input
+  useEffect(() => {
+    setGsUrlInput(selectedSupplier ? (googleSheets[selectedSupplier] || '') : '')
+  }, [selectedSupplier, googleSheets])
+
+  async function saveGoogleSheetUrl() {
+    if (!selectedSupplier) return
+    setGsSaving(true)
+    await fetch('/api/admin/supplier-google-sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ supplierId: selectedSupplier, url: gsUrlInput.trim() }),
+    })
+    setGoogleSheets(prev => ({ ...prev, [selectedSupplier]: gsUrlInput.trim() }))
+    setGsSaving(false)
+  }
 
   async function handleUpload(file: File) {
     if (!selectedSupplier) { setUploadError('Select a supplier first.'); return }
@@ -107,48 +129,38 @@ export default function SupplierStockSheetsPage() {
   }
 
   const filtered = filterSupplier === 'all' ? sheets : sheets.filter(s => s.supplierId === filterSupplier)
+  const currentGsUrl = selectedSupplier ? (googleSheets[selectedSupplier] || '') : ''
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* Nav */}
+      <div className="flex gap-2">
+        <Link href="/admin/supplier-network" className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">← Supplier Network</Link>
+        <Link href="/admin/supplier-contacts" className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Supplier Contacts</Link>
+        <Link href="/admin/suppliers" className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50">Supplier Orders</Link>
+      </div>
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Stock Sheets</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Upload supplier stock lists in PDF or Excel format</p>
+        <p className="text-sm text-gray-500 mt-0.5">Upload supplier stock lists or link a Google Sheet per supplier</p>
       </div>
 
       {/* Upload panel */}
       <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 space-y-4">
-        <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">Upload New Sheet</h2>
-
+        {/* Supplier selector */}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Supplier <span className="text-red-500">*</span></label>
-            <div className="flex gap-2">
-              <select
-                value={selectedSupplier}
-                onChange={e => setSelectedSupplier(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              >
-                <option value="">— Select supplier —</option>
-                {suppliers.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}{s.country ? ` (${s.country})` : ''}</option>
-                ))}
-              </select>
-              {(() => {
-                const sup = suppliers.find(s => s.id === selectedSupplier)
-                return sup?.googleSheetsUrl ? (
-                  <a
-                    href={sup.googleSheetsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 whitespace-nowrap shrink-0"
-                    title="Open Google Sheet"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
-                    Open Sheet
-                  </a>
-                ) : null
-              })()}
-            </div>
+            <select
+              value={selectedSupplier}
+              onChange={e => setSelectedSupplier(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">— Select supplier —</option>
+              {suppliers.map(s => (
+                <option key={s.id} value={s.id}>{s.name}{s.country ? ` (${s.country})` : ''}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Notes (optional)</label>
@@ -161,6 +173,42 @@ export default function SupplierStockSheetsPage() {
             />
           </div>
         </div>
+
+        {/* Google Sheet URL — only shown when supplier selected */}
+        {selectedSupplier && (
+          <div className="border border-green-200 bg-green-50 rounded-xl p-4 space-y-2">
+            <label className="block text-xs font-bold text-green-800 uppercase tracking-wide">Google Sheet Link</label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={gsUrlInput}
+                onChange={e => setGsUrlInput(e.target.value)}
+                placeholder="Paste Google Sheets URL here…"
+                className="flex-1 px-3 py-2 border border-green-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              <button
+                onClick={saveGoogleSheetUrl}
+                disabled={gsSaving}
+                className="px-4 py-2 bg-green-700 text-white text-xs font-semibold rounded-lg hover:bg-green-800 disabled:opacity-50 whitespace-nowrap"
+              >
+                {gsSaving ? 'Saving…' : 'Save Link'}
+              </button>
+              {currentGsUrl && (
+                <a
+                  href={currentGsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-white border border-green-400 text-green-700 text-xs font-semibold rounded-lg hover:bg-green-50 whitespace-nowrap"
+                >
+                  Open Sheet ↗
+                </a>
+              )}
+            </div>
+            {currentGsUrl && (
+              <p className="text-[11px] text-green-600">Link saved — click <strong>Open Sheet ↗</strong> to view or edit in Google. Changes save automatically in your Drive.</p>
+            )}
+          </div>
+        )}
 
         {/* Drop zone */}
         <div
@@ -177,7 +225,7 @@ export default function SupplierStockSheetsPage() {
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.xls,.xlsx,.ods,.csv,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept=".pdf,.xls,.xlsx,.ods,.csv"
             className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(f) }}
           />
@@ -236,46 +284,48 @@ export default function SupplierStockSheetsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {filtered.map(sheet => (
-                <tr key={sheet.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <a href={sheet.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 hover:underline font-medium min-w-0">
-                      <span className="text-base shrink-0">{fileIcon(sheet.fileType)}</span>
-                      <span className="truncate max-w-xs">{sheet.filename}</span>
-                      <span className="text-[10px] uppercase font-mono bg-gray-100 text-gray-500 px-1 rounded shrink-0">{sheet.fileType}</span>
-                    </a>
-                  </td>
-                  <td className="px-4 py-3 text-gray-700 font-medium">{sheet.supplierName}</td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">{sheet.notes || '—'}</td>
-                  <td className="px-4 py-3 text-gray-400 text-xs tabular-nums">{fmtSize(sheet.fileSize)}</td>
-                  <td className="px-4 py-3 text-gray-400 text-xs">
-                    {new Date(sheet.uploadedAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {(() => {
-                        const sup = suppliers.find(s => s.id === sheet.supplierId)
-                        return sup?.googleSheetsUrl ? (
-                          <a href={sup.googleSheetsUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-xs px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100 font-medium">
-                            Sheet ↗
-                          </a>
-                        ) : null
-                      })()}
-                      <a href={sheet.url} target="_blank" rel="noopener noreferrer"
-                        className="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-100 font-medium">
-                        Download
+              {filtered.map(sheet => {
+                const gsUrl = googleSheets[sheet.supplierId]
+                return (
+                  <tr key={sheet.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3">
+                      <a href={sheet.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-indigo-600 hover:underline font-medium min-w-0">
+                        <span className="text-base shrink-0">{fileIcon(sheet.fileType)}</span>
+                        <span className="truncate max-w-xs">{sheet.filename}</span>
+                        <span className="text-[10px] uppercase font-mono bg-gray-100 text-gray-500 px-1 rounded shrink-0">{sheet.fileType}</span>
                       </a>
-                      <button
-                        onClick={() => handleDelete(sheet.id, sheet.filename)}
-                        className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-700">
+                      <div>{sheet.supplierName}</div>
+                      {gsUrl && (
+                        <a href={gsUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-[11px] text-green-600 hover:underline font-normal">
+                          📊 Open Google Sheet ↗
+                        </a>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs">{sheet.notes || '—'}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs tabular-nums">{fmtSize(sheet.fileSize)}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">
+                      {new Date(sheet.uploadedAt).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <a href={sheet.url} target="_blank" rel="noopener noreferrer"
+                          className="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-100 font-medium">
+                          Download
+                        </a>
+                        <button
+                          onClick={() => handleDelete(sheet.id, sheet.filename)}
+                          className="text-xs px-2 py-1 bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
