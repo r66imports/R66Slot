@@ -166,8 +166,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     {
       label: 'Supplier Network',
       items: [
-        { name: 'Supplier Network', href: '/admin/supplier-contacts' },
+        { name: 'Supplier Network', href: '/admin/supplier-network' },
+        { name: 'Supplier Contacts', href: '/admin/supplier-contacts' },
         { name: 'Supplier Orders', href: '/admin/suppliers' },
+        { name: 'Stock Sheets', href: '/admin/supplier-stock-sheets' },
       ],
     },
     {
