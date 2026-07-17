@@ -162,7 +162,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       items: [
         { name: 'Customers', href: '/admin/contacts' },
         { name: 'Customer Dashboard', href: '/admin/customer-dashboard' },
-        { name: 'Suppliers', href: '/admin/supplier-contacts' },
+      ],
+    },
+    {
+      label: 'Supplier Network',
+      items: [
+        { name: 'Supplier Network', href: '/admin/supplier-contacts' },
       ],
     },
     {
