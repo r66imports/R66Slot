@@ -22,6 +22,7 @@ interface SupplierContact {
   notes: string
   isActive?: boolean
   preferredCurrency?: string
+  googleSheetsUrl?: string
 }
 
 const EMPTY_FORM: Omit<SupplierContact, 'id'> = {
@@ -41,6 +42,7 @@ const EMPTY_FORM: Omit<SupplierContact, 'id'> = {
   notes: '',
   isActive: true,
   preferredCurrency: '',
+  googleSheetsUrl: '',
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -105,6 +107,7 @@ export default function SupplierContactsPage() {
       notes: s.notes,
       isActive: s.isActive !== false,
       preferredCurrency: s.preferredCurrency || '',
+      googleSheetsUrl: s.googleSheetsUrl || '',
     })
     setShowModal(true)
     setOpenActionId(null)
@@ -408,6 +411,29 @@ export default function SupplierContactsPage() {
                     placeholder="https://www.supplier.com"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Google Sheets URL</label>
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={form.googleSheetsUrl || ''}
+                    onChange={(e) => setForm((f) => ({ ...f, googleSheetsUrl: e.target.value }))}
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                  {form.googleSheetsUrl && (
+                    <a
+                      href={form.googleSheetsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 whitespace-nowrap flex items-center gap-1"
+                    >
+                      Open ↗
+                    </a>
+                  )}
                 </div>
               </div>
 

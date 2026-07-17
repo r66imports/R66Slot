@@ -20,6 +20,7 @@ export interface SupplierContact {
   website: string
   notes: string
   preferredCurrency?: string
+  googleSheetsUrl?: string
 }
 
 const DEFAULTS: SupplierContact[] = [

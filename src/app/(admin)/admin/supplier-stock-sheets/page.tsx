@@ -7,6 +7,7 @@ interface SupplierContact {
   name: string
   code: string
   country: string
+  googleSheetsUrl?: string
 }
 
 interface StockSheet {
@@ -121,16 +122,33 @@ export default function SupplierStockSheetsPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Supplier <span className="text-red-500">*</span></label>
-            <select
-              value={selectedSupplier}
-              onChange={e => setSelectedSupplier(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              <option value="">— Select supplier —</option>
-              {suppliers.map(s => (
-                <option key={s.id} value={s.id}>{s.name}{s.country ? ` (${s.country})` : ''}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={selectedSupplier}
+                onChange={e => setSelectedSupplier(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">— Select supplier —</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}{s.country ? ` (${s.country})` : ''}</option>
+                ))}
+              </select>
+              {(() => {
+                const sup = suppliers.find(s => s.id === selectedSupplier)
+                return sup?.googleSheetsUrl ? (
+                  <a
+                    href={sup.googleSheetsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white text-xs font-semibold rounded-lg hover:bg-green-700 whitespace-nowrap shrink-0"
+                    title="Open Google Sheet"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+                    Open Sheet
+                  </a>
+                ) : null
+              })()}
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Notes (optional)</label>
@@ -235,6 +253,15 @@ export default function SupplierStockSheetsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {(() => {
+                        const sup = suppliers.find(s => s.id === sheet.supplierId)
+                        return sup?.googleSheetsUrl ? (
+                          <a href={sup.googleSheetsUrl} target="_blank" rel="noopener noreferrer"
+                            className="text-xs px-2 py-1 bg-green-50 text-green-700 border border-green-200 rounded hover:bg-green-100 font-medium">
+                            Sheet ↗
+                          </a>
+                        ) : null
+                      })()}
                       <a href={sheet.url} target="_blank" rel="noopener noreferrer"
                         className="text-xs px-2 py-1 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded hover:bg-indigo-100 font-medium">
                         Download
