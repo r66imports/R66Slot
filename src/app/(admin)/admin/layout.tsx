@@ -152,7 +152,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Invoices', href: '/admin/orders?tab=invoices' },
         { name: 'Pre-Orders', href: '/admin/preorder-list' },
         { name: 'Pre Order Dashboard', href: '/admin/preorder-dashboard' },
-        { name: 'Work Sheet', href: '/admin/worksheet' },
         { name: 'Price Lists', href: '/admin/price-lists' },
       ],
     },

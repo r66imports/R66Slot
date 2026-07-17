@@ -39,6 +39,9 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Shipping', name: 'Packing List', href: '/admin/shipments' },
   // Auctions
   { group: 'Auctions', name: 'Auctions', href: '/admin/auctions' },
+  // Supplier Network
+  { group: 'Supplier Network', name: 'Supplier Network', href: '/admin/supplier-network' },
+  { group: 'Supplier Network', name: 'Stock Sheets', href: '/admin/supplier-stock-sheets' },
   // Blog
   { group: 'Blog', name: 'Blog', href: '/admin/blog' },
 ]
