@@ -590,6 +590,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
             clientPhone: target.clientPhone || '', clientAddress: target.clientAddress || '',
             lineItems: mergedItems, notes: target.notes || '', terms: target.terms || '',
             status: 'draft', discountPct: target.discountPct || 0,
+            depositMode: false,
             sourceQuoteNumber: target.docNumber,
           }),
         })
