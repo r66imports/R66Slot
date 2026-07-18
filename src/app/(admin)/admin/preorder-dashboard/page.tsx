@@ -571,7 +571,40 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       if (target && convertToInvoice) {
         // Mirror the Quotes page: create a brand-new invoice, then archive the source quote
         // Use the quote's line items as-is — do NOT add customer.qty (already captured in the quote)
-        const mergedItems: any[] = target.lineItems || []
+        let invoiceItems: any[] = (target.lineItems || []).map((i: any) => ({ ...i }))
+
+        // Stock cap: fetch available qty and cap each line item to what's actually in stock
+        try {
+          const [reservedMap, products]: [Record<string, number>, any[]] = await Promise.all([
+            fetch('/api/admin/inventory-reserved').then(r => r.json()),
+            fetch('/api/admin/products?fields=sku,quantity').then(r => r.json()),
+          ])
+          const stockMap: Record<string, number> = {}
+          for (const p of products) {
+            if (p.sku) stockMap[p.sku.toString().toUpperCase()] = p.quantity ?? 0
+          }
+          const warnings: string[] = []
+          invoiceItems = invoiceItems.map((item: any) => {
+            const rawSku = item.sku
+              ? item.sku.toString()
+              : (() => { const em = (item.description || '').indexOf('–'); return em > -1 ? item.description.slice(0, em).trim() : '' })()
+            const sku = rawSku.toUpperCase()
+            if (!sku || !(sku in stockMap)) return item
+            const available = Math.max(0, (stockMap[sku] || 0) - (reservedMap[sku] || 0))
+            const requested = Number(item.qty) || 0
+            if (requested > available) {
+              warnings.push(`• ${sku}: ${requested} requested → capped to ${available} (${stockMap[sku]} in stock, ${reservedMap[sku] || 0} reserved on SOs)`)
+              return { ...item, qty: available }
+            }
+            return item
+          })
+          if (warnings.length > 0) {
+            alert(`Stock cap applied — invoice quantities reduced:\n\n${warnings.join('\n')}`)
+          }
+        } catch {
+          // Non-fatal: proceed with original qtys if stock check fails
+        }
+
         const allDocs: any[] = await fetch('/api/admin/orders/documents').then(r => r.json())
         const invDocNumber = nextDocNumber(allDocs, 'invoice')
         const newInvRes = await fetch('/api/admin/orders/documents', {
@@ -582,7 +615,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
             date: new Date().toISOString().slice(0, 10),
             clientName: target.clientName, clientEmail: target.clientEmail || '',
             clientPhone: target.clientPhone || '', clientAddress: target.clientAddress || '',
-            lineItems: mergedItems, notes: target.notes || '', terms: target.terms || '',
+            lineItems: invoiceItems, notes: target.notes || '', terms: target.terms || '',
             status: 'draft', discountPct: target.discountPct || 0,
             depositMode: false,
             sourceQuoteNumber: target.docNumber,
