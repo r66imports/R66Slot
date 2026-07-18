@@ -570,14 +570,8 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       const target = existingDoc ?? null
       if (target && convertToInvoice) {
         // Mirror the Quotes page: create a brand-new invoice, then archive the source quote
-        const skuPrefix = form.sku ? `${form.sku} –` : null
-        const existingItems: any[] = target.lineItems || []
-        const existingIdx = skuPrefix ? existingItems.findIndex((i: any) => i.description?.startsWith(skuPrefix)) : -1
-        const mergedItems = existingIdx >= 0
-          ? existingItems.map((i: any, idx: number) =>
-              idx === existingIdx ? { ...i, qty: (Number(i.qty) || 0) + customer.qty } : i
-            )
-          : [...existingItems, lineItem()]
+        // Use the quote's line items as-is — do NOT add customer.qty (already captured in the quote)
+        const mergedItems: any[] = target.lineItems || []
         const allDocs: any[] = await fetch('/api/admin/orders/documents').then(r => r.json())
         const invDocNumber = nextDocNumber(allDocs, 'invoice')
         const newInvRes = await fetch('/api/admin/orders/documents', {
