@@ -590,10 +590,12 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
               : (() => { const em = (item.description || '').indexOf('–'); return em > -1 ? item.description.slice(0, em).trim() : '' })()
             const sku = rawSku.toUpperCase()
             if (!sku || !(sku in stockMap)) return item
-            const available = Math.max(0, (stockMap[sku] || 0) - (reservedMap[sku] || 0))
+            const totalStock = stockMap[sku] || 0
+            const available = Math.max(0, totalStock - (reservedMap[sku] || 0))
             const requested = Number(item.qty) || 0
-            if (requested > available) {
-              warnings.push(`• ${sku}: ${requested} requested → capped to ${available} (${stockMap[sku]} in stock, ${reservedMap[sku] || 0} reserved on SOs)`)
+            // Only cap if the product has physical stock in DB — 0 means pre-order/not yet arrived
+            if (totalStock > 0 && requested > available) {
+              warnings.push(`• ${sku}: ${requested} requested → capped to ${available} (${totalStock} in stock, ${reservedMap[sku] || 0} reserved on SOs)`)
               return { ...item, qty: available }
             }
             return item
