@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { Backorder } from '@/types/backorder'
 import { useColumnResize } from '@/hooks/use-column-resize'
 
@@ -3822,7 +3823,9 @@ function OrdersPageInner() {
         </div>
         <div className="flex gap-2 pb-2">
           <button onClick={() => setShowTemplate(true)} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium">Edit Template</button>
-          {tab !== 'backorders' && (
+          {tab === 'backorders' ? (
+            <Link href="/admin/backorders" className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Create Backorder</Link>
+          ) : (
             <button onClick={() => { setCompileClient(null); setShowCreate(true) }} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">{cfg.createLabel}</button>
           )}
         </div>
