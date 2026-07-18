@@ -573,6 +573,43 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         // Use the quote's line items as-is — qty is already correct from when the customer reserved
         const invoiceItems: any[] = target.lineItems || []
 
+        // Gate: check stock before allowing conversion
+        try {
+          const [reservedMap, products]: [Record<string, number>, any[]] = await Promise.all([
+            fetch('/api/admin/inventory-reserved').then(r => r.json()),
+            fetch('/api/admin/products?fields=sku,quantity').then(r => r.json()),
+          ])
+          const stockMap: Record<string, number> = {}
+          for (const p of products) {
+            if (p.sku) stockMap[p.sku.toString().toUpperCase()] = p.quantity ?? 0
+          }
+          const blockReasons: string[] = []
+          for (const item of invoiceItems) {
+            const rawSku = item.sku
+              ? item.sku.toString()
+              : (() => { const em = (item.description || '').indexOf('–'); return em > -1 ? item.description.slice(0, em).trim() : '' })()
+            const sku = rawSku.toUpperCase()
+            if (!sku || !(sku in stockMap)) continue
+            const totalStock = stockMap[sku] || 0
+            const requested = Number(item.qty) || 0
+            if (totalStock === 0) {
+              blockReasons.push(`• ${sku}: Worksheet Qty not updated`)
+            } else {
+              const available = Math.max(0, totalStock - (reservedMap[sku] || 0))
+              if (requested > available) {
+                blockReasons.push(`• ${sku}: Qty not available in Inventory (${available} available, ${requested} requested)`)
+              }
+            }
+          }
+          if (blockReasons.length > 0) {
+            alert(`Cannot create invoice:\n\n${blockReasons.join('\n')}`)
+            setLoading(false)
+            return
+          }
+        } catch {
+          // Non-fatal: allow conversion if stock check fails
+        }
+
         const allDocs: any[] = await fetch('/api/admin/orders/documents').then(r => r.json())
         const invDocNumber = nextDocNumber(allDocs, 'invoice')
         const newInvRes = await fetch('/api/admin/orders/documents', {
