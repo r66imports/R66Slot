@@ -688,16 +688,21 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       >
         {loading ? '…' : 'Send to →'}
       </button>
-      {linkedDocNumber && (
-        <a
-          href="/admin/orders"
-          target="_blank"
-          className="text-[10px] font-mono font-bold text-green-700 bg-green-100 border border-green-300 px-1.5 py-0.5 rounded leading-none hover:bg-green-200 whitespace-nowrap"
-          title="Open in Orders"
-        >
-          ✓ {linkedDocNumber}
-        </a>
-      )}
+      {linkedDocNumber && (() => {
+        const docTab = /^R66INV/i.test(linkedDocNumber) ? 'invoices'
+          : /^SO/i.test(linkedDocNumber) ? 'salesorders'
+          : 'quotes'
+        return (
+          <a
+            href={`/admin/orders?tab=${docTab}&open=${encodeURIComponent(linkedDocNumber)}`}
+            target="_blank"
+            className="text-[10px] font-mono font-bold text-green-700 bg-green-100 border border-green-300 px-1.5 py-0.5 rounded leading-none hover:bg-green-200 whitespace-nowrap"
+            title={`Open ${linkedDocNumber}`}
+          >
+            ✓ {linkedDocNumber}
+          </a>
+        )
+      })()}
       {open && (
         <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 min-w-[200px]">
           {pendingQuoteBank ? (

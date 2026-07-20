@@ -3516,6 +3516,19 @@ function OrdersPageInner() {
       .catch(() => {})
   }, [])
 
+  // Auto-open a specific document when ?open=R66INV23 is in the URL
+  const autoOpenedRef = useRef(false)
+  useEffect(() => {
+    if (loading || autoOpenedRef.current) return
+    const openNum = searchParams.get('open')
+    if (!openNum) return
+    const doc = documents.find(d => d.docNumber === openNum)
+    if (doc) {
+      autoOpenedRef.current = true
+      setEditDocState(doc)
+    }
+  }, [loading, documents, searchParams])
+
   // Pick up compile intent from backorders page (sessionStorage handoff)
   useEffect(() => {
     if (loading) return
