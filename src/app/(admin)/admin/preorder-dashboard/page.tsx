@@ -790,7 +790,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
 // ─── ItemCard ─────────────────────────────────────────────────────────────────
 function ItemCard({
   item, contacts, suppliers, options, exchangeRates, costingSettings,
-  onSave, onDelete, onDuplicate, onAddOption, onSendToWorksheet, isNew, onCancelNew,
+  onSave, onDelete, onDuplicate, onAddOption, onSendToWorksheet, isNew, onCancelNew, isSelected, onToggleSelect,
 }: {
   item: DashboardItem & { _draft?: boolean }
   contacts: Contact[]
@@ -805,6 +805,8 @@ function ItemCard({
   onSendToWorksheet: (id: string, form: FormState) => Promise<void>
   isNew?: boolean
   onCancelNew?: () => void
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
 }) {
   const [form, setForm] = useState<FormState>({
     sku: item.sku,
@@ -1120,6 +1122,16 @@ function ItemCard({
         <div className="flex items-center gap-1.5 min-w-0">
           {/* Left: badges + checkbox + autosave */}
           <div className="flex items-center gap-1.5 flex-wrap flex-1 min-w-0">
+            {!isNew && onToggleSelect && (
+              <input
+                type="checkbox"
+                checked={!!isSelected}
+                onChange={() => onToggleSelect(item.id)}
+                onClick={e => e.stopPropagation()}
+                className="w-3.5 h-3.5 accent-red-600 flex-shrink-0 cursor-pointer"
+                title="Select for bulk delete"
+              />
+            )}
             {alertRaw.active && !form.orderPlaced && cutoffColors && (
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${cutoffColors.badge}`}>
                 ⚠ Cut-off {alertRaw.days === 0 ? 'TODAY' : `in ${alertRaw.days}d`}
@@ -1932,7 +1944,7 @@ type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff'
 
 function SupplierSection({
   supplierName, items, contacts, suppliers, options, exchangeRates, costingSettings,
-  onSave, onDelete, onDuplicate, onAddOption, onSendToWorksheet,
+  onSave, onDelete, onDuplicate, onAddOption, onSendToWorksheet, selectedIds, onToggleSelect,
 }: {
   supplierName: string
   items: DashboardItem[]
@@ -1946,6 +1958,8 @@ function SupplierSection({
   onDuplicate: (id: string) => Promise<void>
   onAddOption: (type: 'brand' | 'unit' | 'eta', value: string) => Promise<void>
   onSendToWorksheet: (id: string, form: FormState) => Promise<void>
+  selectedIds: Set<string>
+  onToggleSelect: (id: string) => void
 }) {
   const [collapsed, setCollapsed] = useState(true)
   const [sortBy, setSortBy] = useState<SortBy>('az')
@@ -2047,6 +2061,8 @@ function SupplierSection({
               onDuplicate={onDuplicate}
               onAddOption={onAddOption}
               onSendToWorksheet={onSendToWorksheet}
+              isSelected={selectedIds.has(item.id)}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </div>
@@ -2192,6 +2208,9 @@ export default function PreOrderDashboardPage() {
   const [loadError, setLoadError] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [newDraft, setNewDraft] = useState<DashboardItem | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
 
   // Fetch with optional timeout — background fetches get 10s, critical data gets unlimited
   const safeFetch = useCallback(async (url: string, timeoutMs?: number): Promise<any> => {
@@ -2262,7 +2281,26 @@ export default function PreOrderDashboardPage() {
   const handleDelete = async (id: string) => {
     if (id.startsWith('_new_')) { cancelNew(); return }
     const res = await fetch(`/api/admin/preorder-dashboard/${id}`, { method: 'DELETE' })
-    if (res.ok) setItems(prev => prev.filter(i => i.id !== id))
+    if (res.ok) { setItems(prev => prev.filter(i => i.id !== id)); setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n }) }
+  }
+
+  const toggleSelect = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setBulkDeleting(true)
+    try {
+      await Promise.all([...selectedIds].map(id => fetch(`/api/admin/preorder-dashboard/${id}`, { method: 'DELETE' })))
+      setItems(prev => prev.filter(i => !selectedIds.has(i.id)))
+      setSelectedIds(new Set())
+      setBulkDeleteConfirm(false)
+    } finally {
+      setBulkDeleting(false)
+    }
   }
 
   const handleDuplicate = async (id: string) => {
@@ -2347,7 +2385,7 @@ export default function PreOrderDashboardPage() {
     return a.localeCompare(b)
   })
 
-  const sharedProps = { contacts, suppliers, options, exchangeRates, costingSettings, onSave: handleSave, onDelete: handleDelete, onDuplicate: handleDuplicate, onAddOption: handleAddOption, onSendToWorksheet: handleSendToWorksheet }
+  const sharedProps = { contacts, suppliers, options, exchangeRates, costingSettings, onSave: handleSave, onDelete: handleDelete, onDuplicate: handleDuplicate, onAddOption: handleAddOption, onSendToWorksheet: handleSendToWorksheet, selectedIds, onToggleSelect: toggleSelect }
 
   return (
     <div className="space-y-6">
@@ -2401,6 +2439,27 @@ export default function PreOrderDashboardPage() {
             <span key={c}><span className="font-medium text-gray-700">{c}</span> = R{exchangeRates[c].toFixed(2)}</span>
           ) : null)}
           <span className="ml-auto text-gray-400">Markup: {costingSettings.markup}% | Shipping: {costingSettings.shippingMarkup}%{costingSettings.includeVAT ? ' | +VAT' : ''}</span>
+        </div>
+      )}
+
+      {/* ── Bulk-select action bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-2 z-40 flex items-center gap-3 bg-red-600 text-white px-4 py-2.5 rounded-xl shadow-lg">
+          <span className="text-sm font-bold flex-1">{selectedIds.size} item{selectedIds.size > 1 ? 's' : ''} selected</span>
+          <button onClick={() => setSelectedIds(new Set())} className="text-sm text-red-200 hover:text-white underline">Deselect all</button>
+          {bulkDeleteConfirm ? (
+            <>
+              <span className="text-sm font-semibold">Delete {selectedIds.size} item{selectedIds.size > 1 ? 's' : ''}?</span>
+              <button onClick={() => setBulkDeleteConfirm(false)} className="text-sm px-3 py-1 rounded-lg border border-red-300 text-white hover:bg-red-500">Cancel</button>
+              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="text-sm px-3 py-1 rounded-lg bg-white text-red-700 font-bold hover:bg-red-50 disabled:opacity-60">
+                {bulkDeleting ? 'Deleting…' : 'Confirm Delete'}
+              </button>
+            </>
+          ) : (
+            <button onClick={() => setBulkDeleteConfirm(true)} className="text-sm px-3 py-1 rounded-lg bg-white text-red-700 font-bold hover:bg-red-50">
+              Delete Selected
+            </button>
+          )}
         </div>
       )}
 
