@@ -29,7 +29,7 @@ interface CostingSettings { shippingMarkup: number; markup: number; includeVAT: 
 type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff'
 
 const CURRENCIES = ['ZAR','USD','CNY','EUR','GBP','HKD','SGD','JPY','AUD','CAD']
-const PAGE_SIZE = 25
+const PAGE_SIZE = 10
 
 function parsePrice(v: string | undefined | null): number { return parseFloat((v||'').replace(/[^\d.-]/g,''))||0 }
 
@@ -815,7 +815,7 @@ export default function SupplierPreOrderPage() {
       )}
 
       {!loading && (
-        <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
           {pagedItems.length === 0 && !newItem ? (
             <div className="text-center py-20 text-gray-400">
               <div className="text-4xl mb-3">📦</div>
