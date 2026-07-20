@@ -117,10 +117,16 @@ async function saveItems(items: PreOrderDashboardItem[]): Promise<void> {
   setCache(items)
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const supplierFilter = searchParams.get('supplier')
     const items = await getItems()
     items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    if (supplierFilter !== null) {
+      const filtered = items.filter(i => (i.supplier?.trim() || '— No Supplier') === supplierFilter)
+      return NextResponse.json(filtered)
+    }
     return NextResponse.json(items)
   } catch (error) {
     console.error('Error fetching preorder dashboard items:', error)
