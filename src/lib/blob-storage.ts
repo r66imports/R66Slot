@@ -16,13 +16,72 @@ export async function blobRead<T = unknown>(key: string, fallback: T): Promise<T
   }
 }
 
-export async function blobWrite(key: string, data: unknown): Promise<void> {
+const CRITICAL_KEYS = new Set([
+  'data/preorder-dashboard.json',
+  'data/order-documents.json',
+  'data/contacts.json',
+  'data/customers.json',
+])
+
+export async function blobWrite(key: string, data: unknown, options?: { force?: boolean }): Promise<void> {
+  const isCritical = CRITICAL_KEYS.has(key)
+
+  if (!options?.force && Array.isArray(data) && data.length === 0 && isCritical) {
+    const cur = await db.query('SELECT value FROM json_store WHERE key = $1', [key])
+    if (cur.rows.length > 0) {
+      const existingArr = Array.isArray(cur.rows[0].value) ? cur.rows[0].value : []
+      if (existingArr.length > 0) {
+        throw new Error(
+          `[blobWrite] SAFETY BLOCK: refusing to overwrite ${existingArr.length} items with [] for "${key}". Pass { force: true } to override.`
+        )
+      }
+    }
+  }
+
+  if (!options?.force && Array.isArray(data) && isCritical) {
+    const cur = await db.query('SELECT value FROM json_store WHERE key = $1', [key])
+    if (cur.rows.length > 0) {
+      const existingArr = Array.isArray(cur.rows[0].value) ? cur.rows[0].value : []
+      if (existingArr.length >= 10 && data.length < existingArr.length * 0.2) {
+        throw new Error(
+          `[blobWrite] SAFETY BLOCK: new array has ${data.length} items vs current ${existingArr.length}. Pass { force: true } to override.`
+        )
+      }
+    }
+  }
+
+  if (isCritical) {
+    try {
+      await db.query(
+        `INSERT INTO json_store (key, value, updated_at)
+         SELECT $2, value, NOW() FROM json_store WHERE key = $1
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [key, `backup/${key}`]
+      )
+    } catch (e: any) {
+      console.warn(`[blobWrite] backup failed for "${key}":`, e?.message)
+    }
+  }
+
   await db.query(
     `INSERT INTO json_store (key, value, updated_at)
      VALUES ($1, $2, NOW())
      ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
     [key, JSON.stringify(data)]
   )
+}
+
+export async function blobRestore(key: string): Promise<{ restored: boolean; itemCount: number }> {
+  const backupKey = `backup/${key}`
+  const backup = await db.query('SELECT value FROM json_store WHERE key = $1', [backupKey])
+  if (!backup.rows.length) return { restored: false, itemCount: 0 }
+  await db.query(
+    `INSERT INTO json_store (key, value, updated_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+    [key, JSON.stringify(backup.rows[0].value)]
+  )
+  const val = backup.rows[0].value
+  return { restored: true, itemCount: Array.isArray(val) ? val.length : 1 }
 }
 
 export async function blobAppendArrayItem(key: string, item: unknown): Promise<void> {
