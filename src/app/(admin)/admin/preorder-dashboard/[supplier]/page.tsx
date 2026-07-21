@@ -611,6 +611,7 @@ export default function SupplierPreOrderPage() {
   const [costingSettings, setCostingSettings] = useState<CostingSettings>({ shippingMarkup: 20, markup: 30, includeVAT: true })
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [sortAsc, setSortAsc] = useState(false)
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -657,9 +658,17 @@ export default function SupplierPreOrderPage() {
     return sortAsc ? v : -v
   })
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+  const filtered = search.trim()
+    ? sorted.filter(i =>
+        i.description.toLowerCase().includes(search.toLowerCase()) ||
+        i.sku.toLowerCase().includes(search.toLowerCase()) ||
+        (i.brand || '').toLowerCase().includes(search.toLowerCase())
+      )
+    : sorted
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
-  const pagedItems = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+  const pagedItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
   const newOrders = items.reduce((s, i) => s + i.customers.filter(c => (c as any).isNew).length, 0)
 
   const startNew = () => {
@@ -796,10 +805,26 @@ export default function SupplierPreOrderPage() {
             {sortAsc ? '↑ Asc' : '↓ Desc'}
           </button>
           <div className="h-4 w-px bg-gray-200"/>
+          <div className="relative flex-1 min-w-[180px]">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
+            <input
+              type="text"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1) }}
+              placeholder="Search SKU, description, brand…"
+              className="w-full pl-7 pr-7 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+            />
+            {search && (
+              <button onClick={() => { setSearch(''); setPage(1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
+            )}
+          </div>
+          <div className="h-4 w-px bg-gray-200"/>
           <button onClick={() => { setViewAllSearch(''); setShowViewAll(true) }} className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 font-medium transition-colors">
             👁 View All ({items.length})
           </button>
-          <span className="ml-auto text-xs text-gray-400">Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, sorted.length)} of {sorted.length}</span>
+          <span className="ml-auto text-xs text-gray-400">
+            {search.trim() ? `${filtered.length} of ${sorted.length}` : `Showing ${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+          </span>
         </div>
       )}
 
