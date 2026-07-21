@@ -253,8 +253,10 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
             const spCost = parseFloat(s.sparePartsCost) || 0
             const spShipping = spCost * 0.45
             const spLanded = spCost + spShipping
-            const spVAT = spLanded * 0.15
-            const spTotal = spLanded + spVAT
+            const spMarkup = spLanded * 0.30
+            const spRetail = spLanded + spMarkup
+            const spVAT = spRetail * 0.15
+            const spTotal = spRetail + spVAT
             const spTotalZAR = spTotal * spRate
             const isZAR = spCurrency.code === 'ZAR'
             const sym = spCurrency.symbol
@@ -263,7 +265,7 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
               <div className="bg-white rounded-lg shadow border border-orange-200 overflow-hidden mb-4">
                 <div className="bg-orange-50 px-4 py-3 border-b border-orange-200">
                   <h3 className="text-sm font-bold text-orange-900 font-play">Spare Parts Calculator</h3>
-                  <p className="text-xs text-orange-700 font-play mt-0.5">Fixed formula: Cost + 45% Shipping &amp; Customs + 15% VAT → Final in ZAR</p>
+                  <p className="text-xs text-orange-700 font-play mt-0.5">Fixed formula: Cost + 45% Shipping &amp; Customs + 30% Markup + 15% VAT → Final in ZAR</p>
                 </div>
                 <div className="grid grid-cols-2 divide-x divide-gray-200">
                   {/* Left — inputs */}
@@ -331,6 +333,14 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
                       <span className="font-semibold text-gray-800">{sym} {fmt(spLanded)}</span>
                     </div>
                     <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
+                      <span className="text-gray-600">Markup (30%):</span>
+                      <span className="font-medium text-green-600">+ {sym} {fmt(spMarkup)}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
+                      <span className="text-gray-600">Retail (excl. VAT):</span>
+                      <span className="font-semibold text-gray-800">{sym} {fmt(spRetail)}</span>
+                    </div>
+                    <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
                       <span className="text-gray-600">VAT (15%):</span>
                       <span className="font-medium text-orange-600">+ {sym} {fmt(spVAT)}</span>
                     </div>
@@ -383,13 +393,6 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
                 </div>
 
                 <div className="mb-3">
-                  <div className="flex items-center gap-2 p-2 bg-white border border-gray-300 rounded w-full">
-                    <input type="checkbox" id="modalIncludeVAT" checked={s.includeVAT} onChange={(e) => update({ includeVAT: e.target.checked })} className="w-3 h-3" />
-                    <label htmlFor="modalIncludeVAT" className="text-xs font-medium text-gray-700 cursor-pointer font-play">Include VAT ({VAT_PERCENTAGE}%)</label>
-                  </div>
-                </div>
-
-                <div className="mb-3">
                   <label className="block text-xs font-semibold text-gray-600 mb-1 font-play">Shipping &amp; Customs (%)</label>
                   <div className="relative">
                     <input type="number" value={s.shippingCustomsMarkup} onChange={(e) => update({ shippingCustomsMarkup: e.target.value })} placeholder="45" step="0.1" min="0" max="1000"
@@ -437,17 +440,6 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
 
               {/* Right Column - Results */}
               <div className="bg-white">
-                {s.includeVAT && (
-                  <div className="border-b border-gray-200 flex">
-                    <button onClick={() => update({ activeTab: 'excl' })} className={cn('flex-1 px-4 py-2.5 text-xs font-semibold font-play', s.activeTab === 'excl' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:bg-gray-50')}>
-                      VAT Excluded
-                    </button>
-                    <button onClick={() => update({ activeTab: 'incl' })} className={cn('flex-1 px-4 py-2.5 text-xs font-semibold font-play', s.activeTab === 'incl' ? 'text-primary border-b-2 border-primary' : 'text-gray-600 hover:bg-gray-50')}>
-                      VAT Included
-                    </button>
-                  </div>
-                )}
-
                 <div className="p-4 space-y-2">
                   <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
                     <span className="text-gray-600">Cost Price:</span>
@@ -461,24 +453,10 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
                     <span className="text-gray-600">Markup ({markupPercentage}%):</span>
                     <span className="font-medium text-green-600">+ {selectedCurrency.symbol} {markupAmount.toFixed(2)}</span>
                   </div>
-                  {s.includeVAT && s.activeTab === 'incl' && (
-                    <>
-                      <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
-                        <span className="text-gray-600">Price Excl. VAT:</span>
-                        <span className="font-medium">{selectedCurrency.symbol} {priceExclVAT.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-100 text-sm font-play">
-                        <span className="text-gray-600">VAT ({VAT_PERCENTAGE}%):</span>
-                        <span className="font-medium text-orange-600">+ {selectedCurrency.symbol} {vatAmount.toFixed(2)}</span>
-                      </div>
-                    </>
-                  )}
                   <div className="flex justify-between py-3 bg-primary/5 px-3 rounded-lg mt-3 font-play">
-                    <span className="text-base font-bold">
-                      {!s.includeVAT ? 'Final Retail Price:' : s.activeTab === 'excl' ? 'Selling Price (Excl. VAT):' : 'Final Price (Incl. VAT):'}
-                    </span>
+                    <span className="text-base font-bold">Final Retail Price:</span>
                     <span className="text-2xl font-bold text-primary">
-                      {selectedCurrency.symbol} {(!s.includeVAT || s.activeTab === 'excl') ? priceExclVAT.toFixed(2) : priceInclVAT.toFixed(2)}
+                      {selectedCurrency.symbol} {priceExclVAT.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -487,15 +465,9 @@ export default function CostingModal({ costingState, setCostingState, onMinimize
                   <div className="px-4 pb-3">
                     <div className="bg-green-50 rounded-lg p-3 border border-green-300">
                       <h3 className="text-xs font-semibold text-green-900 mb-2 font-play">Converted to ZAR (1 {selectedCurrency.code} = R {currentRate.toFixed(4)})</h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white rounded p-2 border border-green-200 text-center">
-                          <div className="text-xs text-gray-600 font-play">Excl. VAT</div>
-                          <div className="text-base font-bold font-play">R {priceExclVAT_ZAR.toFixed(2)}</div>
-                        </div>
-                        <div className="bg-white rounded p-2 border border-green-200 text-center">
-                          <div className="text-xs text-gray-600 font-play">Incl. VAT</div>
-                          <div className="text-base font-bold text-primary font-play">R {priceInclVAT_ZAR.toFixed(2)}</div>
-                        </div>
+                      <div className="bg-white rounded p-2 border border-green-200 text-center">
+                        <div className="text-xs text-gray-600 font-play">Retail Price</div>
+                        <div className="text-base font-bold text-primary font-play">R {priceExclVAT_ZAR.toFixed(2)}</div>
                       </div>
                     </div>
                   </div>
