@@ -616,6 +616,8 @@ export default function SupplierPreOrderPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+  const [sendingToSO, setSendingToSO] = useState(false)
+  const [soResult, setSoResult] = useState<{ docNumber: string } | null>(null)
   const [newItem, setNewItem] = useState<(DashboardItem & { _draft?: boolean }) | null>(null)
   const [showViewAll, setShowViewAll] = useState(false)
   const [viewAllSearch, setViewAllSearch] = useState('')
@@ -746,6 +748,34 @@ export default function SupplierPreOrderPage() {
     } finally { setBulkDeleting(false) }
   }
 
+  const handleSendToSO = async () => {
+    const targetItems = selected.size > 0 ? items.filter(i => selected.has(i.id)) : filtered
+    if (!targetItems.length) return
+    setSendingToSO(true)
+    setSoResult(null)
+    try {
+      const docs: any[] = await fetch('/api/admin/orders/documents?type=salesorder').then(r => r.ok ? r.json() : []).catch(() => [])
+      const nums = docs.map((d: any) => { const m = /^SO(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 }).filter((n: number) => n > 0)
+      const nextNum = (nums.length ? Math.max(...nums) : 0) + 1
+      const docNumber = `SO${String(nextNum).padStart(3, '0')}`
+      const lineItems = targetItems.map(item => {
+        const totalQty = item.customers.reduce((sum, c) => sum + c.qty, 0) + (item.extraQty || 0)
+        const rate = item.wholesaleCurrency && item.wholesaleCurrency !== 'ZAR' ? (exchangeRates[item.wholesaleCurrency] || 1) : 1
+        const unitPrice = Math.round(parsePrice(item.wholesalePrice) * rate * 100) / 100
+        return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, sku: item.sku, description: `${item.sku} – ${item.description}`, qty: totalQty || 1, unitPrice, discountPct: 0 }
+      })
+      const res = await fetch('/api/admin/orders/documents', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docNumber, type: 'salesorder', clientName: supplierName, clientEmail: '', clientPhone: '', lineItems, discountPct: 0, depositMode: false, depositPct: 0, depositPaid: 0, shippingCost: 0, shippingMethod: '', trackingNumber: '' }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setSoResult({ docNumber: created.docNumber })
+        window.open('/admin/orders', '_blank')
+      }
+    } finally { setSendingToSO(false) }
+  }
+
   const SORT_OPTIONS: { value: SortBy; label: string }[] = [
     { value: 'date', label: 'Date Added' }, { value: 'az', label: 'A–Z' }, { value: 'sku', label: 'SKU' },
     { value: 'brand', label: 'Brand' }, { value: 'price', label: 'Price' }, { value: 'cutoff', label: 'Cut-off Date' },
@@ -822,6 +852,12 @@ export default function SupplierPreOrderPage() {
           <button onClick={() => { setViewAllSearch(''); setShowViewAll(true) }} className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 font-medium transition-colors">
             👁 View All ({items.length})
           </button>
+          <div className="h-4 w-px bg-gray-200"/>
+          <button onClick={handleSendToSO} disabled={sendingToSO} className="text-sm px-3 py-1.5 rounded-lg font-semibold bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60 whitespace-nowrap transition-colors">
+            {sendingToSO ? 'Creating…' : `📋 Send to SO${selected.size > 0 ? ` (${selected.size})` : ''}`}
+          </button>
+          {soResult && <span className="text-xs text-green-600 font-semibold whitespace-nowrap">✓ {soResult.docNumber}</span>}
+          <button onClick={() => { setSoResult(null); loadItems() }} className="text-sm px-2.5 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 font-medium transition-colors" title="Refresh items">↻</button>
           <span className="ml-auto text-xs text-gray-400">
             {search.trim() ? `${filtered.length} of ${sorted.length}` : `Showing ${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
           </span>
