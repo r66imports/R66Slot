@@ -34,6 +34,7 @@ interface LineItem {
   description: string
   qty: number
   unitPrice: number
+  discountPct?: number
   _retailPrice?: number
   _costPrice?: number
   _preOrderPrice?: number
@@ -224,8 +225,11 @@ function fmtDateLong(iso: string) {
 function fmtPrice(n: number) {
   return `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 }
+function lineAmt(li: LineItem) {
+  return li.qty * li.unitPrice * (1 - (li.discountPct || 0) / 100)
+}
 function docTotal(doc: OrderDocument) {
-  const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+  const sub = doc.lineItems.reduce((s, li) => s + lineAmt(li), 0)
   const disc = sub * ((doc as any).discountPct || 0) / 100
   const ship = (doc as any).shippingCost || 0
   return sub - disc + ship
@@ -332,7 +336,7 @@ function DocumentBody({
   template: OrderTemplate
   selectedBankAccount?: BankAccount
 }) {
-  const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const subtotal = data.lineItems.reduce((s, l) => s + lineAmt(l), 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shipping = data.shippingCost || 0
   const total = subtotal - discountAmt + shipping
@@ -412,7 +416,7 @@ function DocumentBody({
               <td className="px-3 py-2">{liTitle}</td>
               <td className="px-3 py-2 text-right">{li.qty}</td>
               <td className="px-3 py-2 text-right">{fmtPrice(li.unitPrice)}</td>
-              <td className="px-3 py-2 text-right font-medium">{fmtPrice(li.qty * li.unitPrice)}</td>
+              <td className="px-3 py-2 text-right font-medium">{fmtPrice(lineAmt(li))}</td>
             </tr>
             )
           })}
@@ -1155,7 +1159,7 @@ function CreateDocumentModal({
     const newPayments = localPayments.filter((_, i) => i !== index)
     const newAmountPaid = Math.max(0, ((editDoc as any).amountPaid || 0) - (p.amountPaid || 0))
     const newCreditApplied = Math.max(0, ((editDoc as any).creditApplied || 0) - (p.creditApplied || 0))
-    const sub = (editDoc.lineItems || []).reduce((s: number, li: any) => s + li.qty * li.unitPrice, 0)
+    const sub = (editDoc.lineItems || []).reduce((s: number, li: any) => s + lineAmt(li), 0)
     const disc = sub * ((editDoc as any).discountPct || 0) / 100
     const invTotal = sub - disc + ((editDoc as any).shippingCost || 0)
     const depositPaid = (editDoc as any).depositPaid || 0
@@ -1355,7 +1359,7 @@ function CreateDocumentModal({
   const [availableCredit, setAvailableCredit] = useState(0)
   const [useCredit, setUseCredit] = useState(false)
   const [creditInput, setCreditInput] = useState('')
-  const subtotal = lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const subtotal = lineItems.reduce((s, l) => s + lineAmt(l), 0)
   const discountAmt = depositMode ? 0 : subtotal * discountPct / 100
   const total = subtotal - discountAmt + shippingCost
   // Auto-adjust fixed deposit when items change (quotes only)
@@ -1557,6 +1561,7 @@ function CreateDocumentModal({
                     <th className="text-left px-3 py-2">Description</th>
                     <th className="text-right px-3 py-2 w-16">Qty</th>
                     <th className="text-right px-3 py-2 w-28">Unit Price</th>
+                    <th className="text-right px-3 py-2 w-16">Disc %</th>
                     <th className="text-right px-3 py-2 w-28">Total</th>
                     <th className="w-8"></th>
                   </tr>
@@ -1615,7 +1620,8 @@ function CreateDocumentModal({
                           <td className="px-2 py-1 align-top">
                             <input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded border border-orange-200 focus:outline-none focus:bg-orange-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} />
                           </td>
-                          <td className="px-3 py-2 text-right text-orange-600 font-medium whitespace-nowrap align-top pt-3">{fmtPrice(li.qty * li.unitPrice)}</td>
+                          <td className="px-2 py-1 align-top"><span className="text-gray-300 text-xs block text-right pt-2">—</span></td>
+                          <td className="px-3 py-2 text-right text-orange-600 font-medium whitespace-nowrap align-top pt-3">{fmtPrice(lineAmt(li))}</td>
                         </>
                       ) : (
                         <>
@@ -1648,7 +1654,18 @@ function CreateDocumentModal({
                             )}
                           </td>
                           <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
-                          <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">{fmtPrice(li.qty * li.unitPrice)}</td>
+                          <td className="px-2 py-1">
+                            <input type="number" min={0} max={100} step={0.5} placeholder="0"
+                              className={`w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-red-50 ${(li.discountPct || 0) > 0 ? 'border border-red-300 text-red-600 font-semibold' : 'focus:border-red-300'}`}
+                              value={(li.discountPct || 0) > 0 ? li.discountPct : ''}
+                              onChange={(e) => updateLine(li.id, 'discountPct', Math.max(0, Math.min(100, Number(e.target.value))))}
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-right text-gray-600 whitespace-nowrap">
+                            {(li.discountPct || 0) > 0 ? (
+                              <span className="text-red-600 font-medium">{fmtPrice(lineAmt(li))}</span>
+                            ) : fmtPrice(lineAmt(li))}
+                          </td>
                         </>
                       )}
                       <td className="px-2 py-2 text-center align-top pt-3">{lineItems.length > 1 && <button onClick={() => removeLine(li.id)} className="text-gray-300 hover:text-red-500 leading-none">✕</button>}</td>
@@ -1657,15 +1674,15 @@ function CreateDocumentModal({
                 </tbody>
                 <tfoot className="text-sm">
                   <tr className="border-t bg-gray-50">
-                    <td colSpan={4} className="px-3 py-2 text-right text-gray-500">Subtotal</td>
+                    <td colSpan={5} className="px-3 py-2 text-right text-gray-500">Subtotal</td>
                     <td className="px-3 py-2 text-right font-medium">{fmtPrice(subtotal)}</td><td />
                   </tr>
                   {/* Rule 5 — Shipping & Discounts: only shown when rule is active */}
                   {shippingEnabled ? (<>
                     <tr className="bg-gray-50">
-                      <td colSpan={3} className="px-3 py-1.5 text-right text-xs">
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-xs">
                         <span className={depositMode ? 'text-amber-700 font-semibold' : 'text-gray-500'}>
-                          {depositMode ? 'Deposit %' : 'Discount %'}
+                          {depositMode ? 'Deposit %' : 'Order Disc %'}
                         </span>
                       </td>
                       <td className="px-2 py-1">
@@ -1684,7 +1701,7 @@ function CreateDocumentModal({
                       <td />
                     </tr>
                     <tr className="bg-gray-50">
-                      <td colSpan={2} className="px-3 py-1.5 text-right text-gray-500 text-xs">Shipping</td>
+                      <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Shipping</td>
                       <td className="px-2 py-1">
                         <select
                           className="w-full px-2 py-1 text-sm rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
@@ -1718,7 +1735,7 @@ function CreateDocumentModal({
                     {shippingMethod && shippingMethod !== 'Collection' && (
                       <tr className="bg-gray-50">
                         <td colSpan={2} className="px-3 py-1.5 text-right text-gray-400 text-xs">Tracking #</td>
-                        <td colSpan={2} className="px-2 py-1">
+                        <td colSpan={3} className="px-2 py-1">
                           <input
                             type="text"
                             placeholder="Enter tracking number"
@@ -1735,7 +1752,7 @@ function CreateDocumentModal({
                     )}
                   </>) : (
                     <tr className="bg-amber-50">
-                      <td colSpan={6} className="px-3 py-2 text-xs text-amber-700 font-medium text-center">
+                      <td colSpan={7} className="px-3 py-2 text-xs text-amber-700 font-medium text-center">
                         Rule 5 inactive — Shipping &amp; Discounts are disabled. Enable in Site Rules to add these fields.
                       </td>
                     </tr>
@@ -1743,13 +1760,13 @@ function CreateDocumentModal({
                   {/* Rule 3 — Stock Deduction: show warning when inactive */}
                   {!stockDeductionEnabled && (docType === 'invoice' || docType === 'salesorder') && (
                     <tr className="bg-orange-50">
-                      <td colSpan={6} className="px-3 py-2 text-xs text-orange-700 font-medium text-center">
+                      <td colSpan={7} className="px-3 py-2 text-xs text-orange-700 font-medium text-center">
                         Rule 3 inactive — Stock will NOT be deducted when this document is saved.
                       </td>
                     </tr>
                   )}
                   <tr className="border-t bg-blue-50">
-                    <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-blue-800">
+                    <td colSpan={5} className="px-3 py-2.5 text-right font-bold text-blue-800">
                       {depositMode && discountPct > 0 ? `Deposit Due (${discountPct}%)` : 'Total'}
                     </td>
                     <td className="px-3 py-2.5 text-right font-bold text-blue-800">
@@ -1760,7 +1777,7 @@ function CreateDocumentModal({
                   {/* Credit allocation — invoices only */}
                   {!isQuote && availableCredit > 0 && (
                     <tr className="bg-green-50">
-                      <td colSpan={3} className="px-3 py-1.5 text-right text-xs">
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-xs">
                         <label className="flex items-center justify-end gap-1.5 cursor-pointer text-green-700 font-semibold">
                           <input type="checkbox" checked={useCredit} onChange={e => { setUseCredit(e.target.checked); setCreditInput('') }} className="accent-green-600 w-3.5 h-3.5" />
                           Apply Credit (R{availableCredit.toFixed(2)})
@@ -1784,7 +1801,7 @@ function CreateDocumentModal({
                   )}
                   {!depositMode && (
                     <tr className="bg-gray-50">
-                      <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
                       <td className="px-2 py-1">
                         <input type="number" min={0} step={0.01}
                           className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
@@ -1803,7 +1820,7 @@ function CreateDocumentModal({
                     </tr>
                   )}
                   <tr className="bg-gray-50">
-                    <td colSpan={3} className="px-3 py-1.5 text-right text-gray-500 text-xs">{depositMode ? 'Deposit Account' : 'Bank Details'}</td>
+                    <td colSpan={4} className="px-3 py-1.5 text-right text-gray-500 text-xs">{depositMode ? 'Deposit Account' : 'Bank Details'}</td>
                     <td colSpan={2} className="px-2 py-1">
                       <div className="flex gap-1">
                         <select
@@ -1831,7 +1848,7 @@ function CreateDocumentModal({
                   </tr>
                   {depositAmount > 0 && (
                     <tr className="border-t bg-orange-50">
-                      <td colSpan={4} className="px-3 py-2.5 text-right font-bold text-orange-700">
+                      <td colSpan={5} className="px-3 py-2.5 text-right font-bold text-orange-700">
                         {depositMode ? 'Balance on Delivery' : 'Balance Due'}
                       </td>
                       <td className="px-3 py-2.5 text-right font-bold text-orange-700">{fmtPrice(balanceDue)}</td><td />
@@ -2038,7 +2055,7 @@ function CreateDocumentModal({
 
 function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount): string {
   const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
-  const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const subtotal = data.lineItems.reduce((s, l) => s + lineAmt(l), 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shippingHTML = data.shippingCost || 0
   const total = subtotal - discountAmt + shippingHTML
@@ -2066,7 +2083,8 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word">${liTitle}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${li.qty}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${fmtPrice(li.unitPrice)}</td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600">${fmtPrice(li.qty * li.unitPrice)}</td>
+      ${(li.discountPct || 0) > 0 ? `<td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#dc2626;font-size:11px">${li.discountPct}%</td>` : '<td style="padding:7px 12px;border-bottom:1px solid #f3f4f6"></td>'}
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
@@ -2169,13 +2187,13 @@ function doPrint(data: DocViewData, template: OrderTemplate, selectedBankAccount
 
 async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
   const docLabel = data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
-  const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const subtotal = data.lineItems.reduce((s, l) => s + lineAmt(l), 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shippingEmail = data.shippingCost || 0
   const total = subtotal - discountAmt + shippingEmail
   const subject = `${docLabel} ${data.docNumber} – ${template.companyName || 'R66 Slot'}`
   const lines = data.lineItems.map((li, i) =>
-    `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}  =  ${fmtPrice(li.qty * li.unitPrice)}`
+    `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}${(li.discountPct || 0) > 0 ? `  -${li.discountPct}%` : ''}  =  ${fmtPrice(lineAmt(li))}`
   ).join('\n')
   const emailBank = resolveBank(selectedBankAccount, template)
   const banking = emailBank.bankName
@@ -2248,7 +2266,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   let y = 18
 
   const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
-  const subtotal = data.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const subtotal = data.lineItems.reduce((s, l) => s + lineAmt(l), 0)
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shippingPDF = data.shippingCost || 0
   const total = subtotal - discountAmt + shippingPDF
@@ -2415,10 +2433,10 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
 
   autoTable(doc, {
     startY: y,
-    head: [['#', 'SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
+    head: [['#', 'SKU', 'Description', 'Qty', 'Unit Price', 'Disc %', 'Total']],
     body: data.lineItems.map((li, i) => {
       const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
-      return [i + 1, liSku || '—', liTitle, li.qty, fmtPrice(li.unitPrice), fmtPrice(li.qty * li.unitPrice)]
+      return [i + 1, liSku || '—', liTitle, li.qty, fmtPrice(li.unitPrice), (li.discountPct || 0) > 0 ? `${li.discountPct}%` : '', fmtPrice(lineAmt(li))]
     }),
     foot: footRows,
     headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
@@ -2635,7 +2653,7 @@ function PaymentModal({
   onClose: () => void
 }) {
   const [saving, setSaving] = useState(false)
-  const subtotal = (doc.lineItems || []).reduce((s, li) => s + li.qty * li.unitPrice, 0)
+  const subtotal = (doc.lineItems || []).reduce((s, li) => s + lineAmt(li), 0)
   const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
   const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
   const existingAmountPaid = (doc as any).amountPaid || 0
@@ -3144,7 +3162,7 @@ function OrdersPageInner() {
       const autoTable = (await import('jspdf-autotable')).default
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
-      const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+      const sub = doc.lineItems.reduce((s, li) => s + lineAmt(li), 0)
       const discAmt = sub * ((doc as any).discountPct || 0) / 100
       const ship = (doc as any).shippingCost || 0
       const total = sub - discAmt + ship
@@ -3180,17 +3198,18 @@ function OrdersPageInner() {
       // Line items
       autoTable(pdf, {
         startY: 65,
-        head: [['SKU', 'Description', 'Qty', 'Unit Price', 'Total']],
+        head: [['SKU', 'Description', 'Qty', 'Unit Price', 'Disc %', 'Total']],
         body: doc.lineItems.map((li: any) => [
           li.sku || '—',
           li.description || '—',
           li.qty,
           fmtR(li.unitPrice),
-          fmtR(li.qty * li.unitPrice),
+          (li.discountPct || 0) > 0 ? `${li.discountPct}%` : '',
+          fmtR(lineAmt(li)),
         ]),
         headStyles: { fillColor: [17, 24, 39], textColor: 255, fontSize: 8, fontStyle: 'bold' },
         bodyStyles: { fontSize: 8 },
-        columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+        columnStyles: { 2: { halign: 'center' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
         margin: { left: 14, right: 14 },
       })
 
@@ -3290,7 +3309,7 @@ function OrdersPageInner() {
         notes: result.notes,
       }),
     })
-    const subtotal = paymentModal.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+    const subtotal = paymentModal.lineItems.reduce((s, li) => s + lineAmt(li), 0)
     const discountAmt = subtotal * ((paymentModal as any).discountPct || 0) / 100
     const invoiceTotal = subtotal - discountAmt + ((paymentModal as any).shippingCost || 0)
     // Accumulate onto any previously recorded payments/credits — multiple part-payments must add up, not overwrite
@@ -3333,7 +3352,7 @@ function OrdersPageInner() {
   const handleInlinePayment = async (amountPaid: number, paymentMethod: string, notes: string) => {
     if (!editDocState) return
     const doc = editDocState
-    const subtotal = (doc.lineItems || []).reduce((s, li) => s + li.qty * li.unitPrice, 0)
+    const subtotal = (doc.lineItems || []).reduce((s, li) => s + lineAmt(li), 0)
     const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
     const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
     const prevAmountPaid = (doc as any).amountPaid || 0
@@ -3562,8 +3581,8 @@ function OrdersPageInner() {
           else if (docSortBy === 'date')      { av = a.date || ''; bv = b.date || '' }
           else if (docSortBy === 'client')    { av = a.clientName || ''; bv = b.clientName || '' }
           else if (docSortBy === 'total')     {
-            av = a.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
-            bv = b.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+            av = a.lineItems.reduce((s, li) => s + lineAmt(li), 0)
+            bv = b.lineItems.reduce((s, li) => s + lineAmt(li), 0)
           }
           else if (docSortBy === 'status')    { av = a.status || ''; bv = b.status || '' }
           const cmp = typeof av === 'number' && typeof bv === 'number'
@@ -3583,7 +3602,7 @@ function OrdersPageInner() {
   const grandTotal =
     boRows.reduce((s, b) => s + b.price * b.qty, 0) +
     docRows.reduce((s, d) => {
-      const sub = d.lineItems.reduce((ls, li) => ls + li.qty * li.unitPrice, 0)
+      const sub = d.lineItems.reduce((ls, li) => ls + lineAmt(li), 0)
       const disc = sub * ((d as any).discountPct || 0) / 100
       const ship = (d as any).shippingCost || 0
       return s + sub - disc + ship
@@ -3613,7 +3632,7 @@ function OrdersPageInner() {
   const invoiceDocs = documents.filter((d) => d.type === 'invoice')
   const paidInvoices = invoiceDocs.filter((d) => d.status === 'paid' || d.status === 'complete')
   const docRevenue = (doc: OrderDocument) => {
-    const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+    const sub = doc.lineItems.reduce((s, li) => s + lineAmt(li), 0)
     const disc = sub * ((doc as any).discountPct || 0) / 100
     const ship = (doc as any).shippingCost || 0
     const dep = (doc as any).depositPaid || 0
@@ -4082,7 +4101,7 @@ function OrdersPageInner() {
               </thead>
               <tbody>
                 {binDocs.map((doc: any) => {
-                  const sub = (doc.lineItems || []).reduce((s: number, li: any) => s + li.qty * li.unitPrice, 0)
+                  const sub = (doc.lineItems || []).reduce((s: number, li: any) => s + lineAmt(li), 0)
                   const disc = sub * (doc.discountPct || 0) / 100
                   const ship = doc.shippingCost || 0
                   const docTotal = sub - disc + ship
@@ -4388,7 +4407,7 @@ function OrdersPageInner() {
 
                   {/* Standalone document rows */}
                   {pagedDocRows.map((doc) => {
-                    const sub = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
+                    const sub = doc.lineItems.reduce((s, li) => s + lineAmt(li), 0)
                     const disc = sub * ((doc as any).discountPct || 0) / 100
                     const ship = (doc as any).shippingCost || 0
                     const docTotal = sub - disc + ship
