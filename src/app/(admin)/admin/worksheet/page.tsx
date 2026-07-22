@@ -292,7 +292,7 @@ function WorksheetEditor({
       if (!prod) return it
       return {
         ...it,
-        retailPrice: it.retailPrice || prod.price,
+        retailPrice: it.retailPrice || prod.preOrderPrice || prod.price,
         preOrderPrice: it.preOrderPrice || prod.preOrderPrice || 0,
         inStock: prod.quantity,
       }
@@ -977,7 +977,7 @@ function WorksheetEditor({
         unit: it.unit ?? prod?.unit ?? '',
         category: it.category ?? prod?.category ?? '',
         inStock: it.inStock ?? prod?.quantity ?? 0,
-        retailPrice: it.retailPrice || prod?.price || 0,
+        retailPrice: it.retailPrice || prod?.preOrderPrice || prod?.price || 0,
         preOrderPrice: it.preOrderPrice || prod?.preOrderPrice || 0,
         ...(mappedEntity ? { costingEntity: mappedEntity } : {}),
       }
@@ -2046,7 +2046,7 @@ function WorksheetEditor({
                                 updateItem(it.id, {
                                   sku: p.sku, skuSearch: '', description: p.title,
                                   unit: p.unit, category: p.category,
-                                  inStock: p.quantity, retailPrice: p.price,
+                                  inStock: p.quantity, retailPrice: p.preOrderPrice || p.price,
                                   preOrderPrice: p.preOrderPrice || 0,
                                   ...(plEntry ? { wholesalePrice: plEntry.wholesalePrice } : {}),
                                   ...(mappedEntity ? { costingEntity: mappedEntity } : {}),
