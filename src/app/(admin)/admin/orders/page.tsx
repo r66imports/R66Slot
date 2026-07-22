@@ -2135,8 +2135,9 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       <col style="width:110px"/>
       <col/>
       <col style="width:36px"/>
-      <col style="width:90px"/>
-      <col style="width:90px"/>
+      <col style="width:100px"/>
+      <col style="width:56px"/>
+      <col style="width:100px"/>
     </colgroup>
     <thead><tr style="background:#1f2937;color:white">
       <th style="padding:8px 12px;text-align:left;font-size:13px">#</th>
@@ -2144,6 +2145,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       <th style="padding:8px 12px;text-align:left;font-size:13px">Description</th>
       <th style="padding:8px 12px;text-align:right;font-size:13px">Qty</th>
       <th style="padding:8px 12px;text-align:right;font-size:13px">Unit Price</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px">Disc %</th>
       <th style="padding:8px 12px;text-align:right;font-size:13px">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
