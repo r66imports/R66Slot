@@ -2076,22 +2076,22 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     : ''
 
   const hasDiscounts = data.lineItems.some(li => (li.discountPct || 0) > 0)
-  const cellBase = 'padding:8px 12px;border-bottom:1px solid #f3f4f6'
+  const cB = 'padding:5px 8px;border-bottom:1px solid #f3f4f6;font-size:11px;overflow:hidden'
   const rowsHTML = data.lineItems.map((li, i) => {
     const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
     const discCell = hasDiscounts
       ? ((li.discountPct || 0) > 0
-          ? `<td style="${cellBase};text-align:right;color:#dc2626;font-size:12px;white-space:nowrap">${li.discountPct}%</td>`
-          : `<td style="${cellBase}"></td>`)
+          ? `<td style="${cB};text-align:right;color:#dc2626">${li.discountPct}%</td>`
+          : `<td style="${cB}"></td>`)
       : ''
     return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
-      <td style="${cellBase};font-size:12px;color:#9ca3af;white-space:nowrap">${i + 1}</td>
-      <td style="${cellBase};font-family:monospace;font-size:12px;color:#4f46e5;white-space:nowrap">${liSku || '—'}</td>
-      <td style="${cellBase};word-break:break-word">${liTitle}</td>
-      <td style="${cellBase};text-align:right;white-space:nowrap">${li.qty}</td>
-      <td style="${cellBase};text-align:right;white-space:nowrap">${fmtPrice(li.unitPrice)}</td>
+      <td style="${cB};color:#9ca3af">${i + 1}</td>
+      <td style="${cB};font-family:monospace;color:#4f46e5">${liSku || '—'}</td>
+      <td style="${cB};word-break:break-word">${liTitle}</td>
+      <td style="${cB};text-align:right">${li.qty}</td>
+      <td style="${cB};text-align:right">${fmtPrice(li.unitPrice)}</td>
       ${discCell}
-      <td style="${cellBase};text-align:right;font-weight:600;white-space:nowrap${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
+      <td style="${cB};text-align:right;font-weight:600${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
@@ -2137,23 +2137,14 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
-    <colgroup>
-      <col style="width:30px"/>
-      <col style="width:90px"/>
-      <col/>
-      <col style="width:44px"/>
-      <col style="width:110px"/>
-      ${hasDiscounts ? '<col style="width:62px"/>' : ''}
-      <col style="width:110px"/>
-    </colgroup>
     <thead><tr style="background:#1f2937;color:white">
-      <th style="padding:8px 12px;text-align:left;font-size:13px">#</th>
-      <th style="padding:8px 12px;text-align:left;font-size:13px">SKU</th>
-      <th style="padding:8px 12px;text-align:left;font-size:13px">Description</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px">Qty</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px">Unit Price</th>
-      ${hasDiscounts ? '<th style="padding:8px 12px;text-align:right;font-size:13px">Disc %</th>' : ''}
-      <th style="padding:8px 12px;text-align:right;font-size:13px">Total</th>
+      <th style="width:26px;padding:6px 8px;text-align:left;font-size:11px">#</th>
+      <th style="width:82px;padding:6px 8px;text-align:left;font-size:11px">SKU</th>
+      <th style="padding:6px 8px;text-align:left;font-size:11px">Description</th>
+      <th style="width:34px;padding:6px 8px;text-align:right;font-size:11px">Qty</th>
+      <th style="width:100px;padding:6px 8px;text-align:right;font-size:11px">Unit Price</th>
+      ${hasDiscounts ? '<th style="width:52px;padding:6px 8px;text-align:right;font-size:11px">Disc %</th>' : ''}
+      <th style="width:100px;padding:6px 8px;text-align:right;font-size:11px">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
   </table>
