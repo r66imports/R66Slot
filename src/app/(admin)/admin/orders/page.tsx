@@ -2078,13 +2078,13 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   const rowsHTML = data.lineItems.map((li, i) => {
     const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
     return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#9ca3af">${i + 1}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-size:12px;color:#9ca3af;white-space:nowrap">${i + 1}</td>
       <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:11px;color:#4f46e5;white-space:nowrap">${liSku || '—'}</td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word">${liTitle}</td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${li.qty}</td>
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right">${fmtPrice(li.unitPrice)}</td>
-      ${(li.discountPct || 0) > 0 ? `<td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#dc2626;font-size:11px">${li.discountPct}%</td>` : '<td style="padding:7px 12px;border-bottom:1px solid #f3f4f6"></td>'}
-      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;word-break:break-word">${liTitle}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;white-space:nowrap">${li.qty}</td>
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;white-space:nowrap">${fmtPrice(li.unitPrice)}</td>
+      ${(li.discountPct || 0) > 0 ? `<td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;color:#dc2626;font-size:11px;white-space:nowrap">${li.discountPct}%</td>` : '<td style="padding:7px 12px;border-bottom:1px solid #f3f4f6"></td>'}
+      <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;white-space:nowrap${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
@@ -2129,24 +2129,15 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
-    <colgroup>
-      <col style="width:28px"/>
-      <col style="width:110px"/>
-      <col/>
-      <col style="width:36px"/>
-      <col style="width:100px"/>
-      <col style="width:56px"/>
-      <col style="width:100px"/>
-    </colgroup>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
     <thead><tr style="background:#1f2937;color:white">
-      <th style="padding:8px 12px;text-align:left;font-size:13px">#</th>
-      <th style="padding:8px 12px;text-align:left;font-size:13px">SKU</th>
+      <th style="padding:8px 12px;text-align:left;font-size:13px;white-space:nowrap;width:32px">#</th>
+      <th style="padding:8px 12px;text-align:left;font-size:13px;white-space:nowrap;width:110px">SKU</th>
       <th style="padding:8px 12px;text-align:left;font-size:13px">Description</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px">Qty</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px">Unit Price</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px">Disc %</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px">Total</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap;width:36px">Qty</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap;width:110px">Unit Price</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap;width:60px">Disc %</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap;width:110px">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
   </table>
