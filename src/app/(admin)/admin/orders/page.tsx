@@ -2076,23 +2076,36 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     : ''
 
   const hasDiscounts = data.lineItems.some(li => (li.discountPct || 0) > 0)
-  const cB = 'padding:5px 8px;border-bottom:1px solid #f3f4f6;font-size:11px;overflow:hidden'
+  const gridCols = `26px 82px 1fr 34px 100px ${hasDiscounts ? '52px ' : ''}100px`
+  const hC = 'padding:6px 8px;font-size:11px;font-weight:700;color:white'
+  const cB = 'padding:5px 8px;font-size:11px;overflow:hidden'
+  const gridHeader = `<div style="display:grid;grid-template-columns:${gridCols};background:#1f2937;border-radius:4px 4px 0 0">
+    <div style="${hC}">#</div>
+    <div style="${hC}">SKU</div>
+    <div style="${hC}">Description</div>
+    <div style="${hC};text-align:right">Qty</div>
+    <div style="${hC};text-align:right">Unit Price</div>
+    ${hasDiscounts ? `<div style="${hC};text-align:right">Disc %</div>` : ''}
+    <div style="${hC};text-align:right">Total</div>
+  </div>`
   const rowsHTML = data.lineItems.map((li, i) => {
     const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
+    const bg = i % 2 === 0 ? '#fff' : '#f9fafb'
+    const bdr = 'border-bottom:1px solid #f3f4f6'
     const discCell = hasDiscounts
       ? ((li.discountPct || 0) > 0
-          ? `<td style="${cB};text-align:right;color:#dc2626">${li.discountPct}%</td>`
-          : `<td style="${cB}"></td>`)
+          ? `<div style="${cB};${bdr};text-align:right;color:#dc2626">${li.discountPct}%</div>`
+          : `<div style="${cB};${bdr}"></div>`)
       : ''
-    return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fafb'}">
-      <td style="${cB};color:#9ca3af">${i + 1}</td>
-      <td style="${cB};font-family:monospace;color:#4f46e5">${liSku || '—'}</td>
-      <td style="${cB};word-break:break-word">${liTitle}</td>
-      <td style="${cB};text-align:right">${li.qty}</td>
-      <td style="${cB};text-align:right">${fmtPrice(li.unitPrice)}</td>
+    return `<div style="display:grid;grid-template-columns:${gridCols};background:${bg}">
+      <div style="${cB};${bdr};color:#9ca3af">${i + 1}</div>
+      <div style="${cB};${bdr};font-family:monospace;color:#4f46e5">${liSku || '—'}</div>
+      <div style="${cB};${bdr};word-break:break-word">${liTitle}</div>
+      <div style="${cB};${bdr};text-align:right">${li.qty}</div>
+      <div style="${cB};${bdr};text-align:right">${fmtPrice(li.unitPrice)}</div>
       ${discCell}
-      <td style="${cB};text-align:right;font-weight:600${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
-    </tr>`
+      <div style="${cB};${bdr};text-align:right;font-weight:600${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</div>
+    </div>`
   }).join('')
 
   const bank = resolveBank(selectedBankAccount, template)
@@ -2136,18 +2149,10 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
-    <thead><tr style="background:#1f2937;color:white">
-      <th style="width:26px;padding:6px 8px;text-align:left;font-size:11px">#</th>
-      <th style="width:82px;padding:6px 8px;text-align:left;font-size:11px">SKU</th>
-      <th style="padding:6px 8px;text-align:left;font-size:11px">Description</th>
-      <th style="width:34px;padding:6px 8px;text-align:right;font-size:11px">Qty</th>
-      <th style="width:100px;padding:6px 8px;text-align:right;font-size:11px">Unit Price</th>
-      ${hasDiscounts ? '<th style="width:52px;padding:6px 8px;text-align:right;font-size:11px">Disc %</th>' : ''}
-      <th style="width:100px;padding:6px 8px;text-align:right;font-size:11px">Total</th>
-    </tr></thead>
-    <tbody>${rowsHTML}</tbody>
-  </table>
+  <div style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:4px;overflow:hidden">
+    ${gridHeader}
+    ${rowsHTML}
+  </div>
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
     <div style="width:260px">
       ${((data.discountPct || 0) > 0 || shippingHTML > 0) ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>` : ''}
