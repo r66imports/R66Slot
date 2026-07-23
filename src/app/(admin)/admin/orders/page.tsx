@@ -2136,15 +2136,24 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
+    <colgroup>
+      <col style="width:30px"/>
+      <col style="width:90px"/>
+      <col/>
+      <col style="width:44px"/>
+      <col style="width:110px"/>
+      ${hasDiscounts ? '<col style="width:62px"/>' : ''}
+      <col style="width:110px"/>
+    </colgroup>
     <thead><tr style="background:#1f2937;color:white">
-      <th style="padding:8px 12px;text-align:left;font-size:13px;white-space:nowrap">#</th>
-      <th style="padding:8px 12px;text-align:left;font-size:13px;white-space:nowrap">SKU</th>
+      <th style="padding:8px 12px;text-align:left;font-size:13px">#</th>
+      <th style="padding:8px 12px;text-align:left;font-size:13px">SKU</th>
       <th style="padding:8px 12px;text-align:left;font-size:13px">Description</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap">Qty</th>
-      <th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap">Unit Price</th>
-      ${hasDiscounts ? '<th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap">Disc %</th>' : ''}
-      <th style="padding:8px 12px;text-align:right;font-size:13px;white-space:nowrap">Total</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px">Qty</th>
+      <th style="padding:8px 12px;text-align:right;font-size:13px">Unit Price</th>
+      ${hasDiscounts ? '<th style="padding:8px 12px;text-align:right;font-size:13px">Disc %</th>' : ''}
+      <th style="padding:8px 12px;text-align:right;font-size:13px">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
   </table>
