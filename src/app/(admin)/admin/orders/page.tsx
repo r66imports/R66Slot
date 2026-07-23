@@ -2116,15 +2116,11 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     body{font-family:Arial,sans-serif;margin:14px 18px;color:#111;font-size:13px}
     @media print{body{margin:10px 14px}}
     .it{width:100%;border-collapse:collapse;margin-bottom:16px}
-    .it th{background:#1f2937;color:white;font-size:11px;padding:6px 8px;font-weight:700;text-align:left}
-    .it td{font-size:11px;padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:left}
-    .c-num{width:26px}
-    .c-sku{width:80px;white-space:nowrap}
-    .c-desc{word-break:break-word}
-    .c-qty{width:32px;text-align:right!important;white-space:nowrap}
-    .c-price{width:96px;text-align:right!important;white-space:nowrap}
-    .c-disc{width:50px;text-align:right!important;white-space:nowrap}
-    .c-total{width:96px;text-align:right!important;white-space:nowrap;font-weight:600}
+    .it th,.it td{white-space:nowrap;padding:5px 8px;font-size:11px;border-bottom:1px solid #f3f4f6}
+    .it th{background:#1f2937;color:white;font-weight:700;border-bottom:none}
+    .c-qty,.c-price,.c-disc,.c-total{text-align:right}
+    .c-total{font-weight:600}
+    .c-desc{white-space:normal!important;word-break:break-word;width:99%}
   </style>
   </head><body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
