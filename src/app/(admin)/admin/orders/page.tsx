@@ -2076,36 +2076,24 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     : ''
 
   const hasDiscounts = data.lineItems.some(li => (li.discountPct || 0) > 0)
-  const W = { num: '26px', sku: '80px', qty: '32px', price: '96px', disc: '50px', total: '96px' }
-  const hS = (w: string, align = 'left') => `flex:0 0 ${w};min-width:${w};max-width:${w};padding:6px 8px;font-size:11px;font-weight:700;color:white;overflow:hidden;text-align:${align}`
-  const cS = (w: string, align = 'left', extra = '') => `flex:0 0 ${w};min-width:${w};max-width:${w};padding:5px 8px;font-size:11px;overflow:hidden;border-bottom:1px solid #f3f4f6;text-align:${align}${extra ? ';' + extra : ''}`
-  const gridHeader = '<div style="display:flex;background:#1f2937;border-radius:4px 4px 0 0">'
-    + `<div style="${hS(W.num)}">#</div>`
-    + `<div style="${hS(W.sku)}">SKU</div>`
-    + `<div style="flex:1 1 auto;min-width:0;padding:6px 8px;font-size:11px;font-weight:700;color:white;overflow:hidden">Description</div>`
-    + `<div style="${hS(W.qty, 'right')}">Qty</div>`
-    + `<div style="${hS(W.price, 'right')}">Unit Price</div>`
-    + (hasDiscounts ? `<div style="${hS(W.disc, 'right')}">Disc %</div>` : '')
-    + `<div style="${hS(W.total, 'right')}">Total</div>`
-    + '</div>'
   const rowsHTML = data.lineItems.map((li, i) => {
     const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
-    const bg = i % 2 === 0 ? '#fff' : '#f9fafb'
-    const discCell = hasDiscounts
+    const bg = i % 2 === 0 ? '#ffffff' : '#f9fafb'
+    const discTd = hasDiscounts
       ? ((li.discountPct || 0) > 0
-          ? `<div style="${cS(W.disc, 'right', 'color:#dc2626')}">${li.discountPct}%</div>`
-          : `<div style="${cS(W.disc)}"></div>`)
+          ? `<td class="c-disc" style="color:#dc2626">${li.discountPct}%</td>`
+          : `<td class="c-disc"></td>`)
       : ''
-    const totalExtra = (li.discountPct || 0) > 0 ? 'color:#dc2626;font-weight:600' : 'font-weight:600'
-    return '<div style="display:flex;background:' + bg + '">'
-      + `<div style="${cS(W.num, 'left', 'color:#9ca3af')}">${i + 1}</div>`
-      + `<div style="${cS(W.sku, 'left', 'font-family:monospace;color:#4f46e5')}">${liSku || '—'}</div>`
-      + `<div style="flex:1 1 auto;min-width:0;padding:5px 8px;font-size:11px;border-bottom:1px solid #f3f4f6;word-break:break-word">${liTitle}</div>`
-      + `<div style="${cS(W.qty, 'right')}">${li.qty}</div>`
-      + `<div style="${cS(W.price, 'right')}">${fmtPrice(li.unitPrice)}</div>`
-      + discCell
-      + `<div style="${cS(W.total, 'right', totalExtra)}">${fmtPrice(lineAmt(li))}</div>`
-      + '</div>'
+    const totalStyle = (li.discountPct || 0) > 0 ? ' style="color:#dc2626"' : ''
+    return `<tr style="background:${bg}">
+      <td class="c-num" style="color:#9ca3af">${i + 1}</td>
+      <td class="c-sku" style="font-family:monospace;color:#4f46e5">${liSku || '—'}</td>
+      <td class="c-desc">${liTitle}</td>
+      <td class="c-qty">${li.qty}</td>
+      <td class="c-price">${fmtPrice(li.unitPrice)}</td>
+      ${discTd}
+      <td class="c-total"${totalStyle}>${fmtPrice(lineAmt(li))}</td>
+    </tr>`
   }).join('')
 
   const bank = resolveBank(selectedBankAccount, template)
@@ -2123,7 +2111,21 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     : ''
 
   return `<!DOCTYPE html><html><head><title>${data.docNumber}</title>
-  <style>*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:30px 36px;color:#111;font-size:13px}@media print{body{margin:16px 20px}}</style>
+  <style>
+    *{box-sizing:border-box}
+    body{font-family:Arial,sans-serif;margin:14px 18px;color:#111;font-size:13px}
+    @media print{body{margin:10px 14px}}
+    .it{width:100%;border-collapse:collapse;margin-bottom:16px}
+    .it th{background:#1f2937;color:white;font-size:11px;padding:6px 8px;font-weight:700;text-align:left}
+    .it td{font-size:11px;padding:5px 8px;border-bottom:1px solid #f3f4f6;text-align:left}
+    .c-num{width:26px}
+    .c-sku{width:80px;white-space:nowrap}
+    .c-desc{word-break:break-word}
+    .c-qty{width:32px;text-align:right!important;white-space:nowrap}
+    .c-price{width:96px;text-align:right!important;white-space:nowrap}
+    .c-disc{width:50px;text-align:right!important;white-space:nowrap}
+    .c-total{width:96px;text-align:right!important;white-space:nowrap;font-weight:600}
+  </style>
   </head><body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
     <div>
@@ -2149,10 +2151,18 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
-  <div style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:4px;overflow:hidden">
-    ${gridHeader}
-    ${rowsHTML}
-  </div>
+  <table class="it">
+    <thead><tr>
+      <th class="c-num">#</th>
+      <th class="c-sku">SKU</th>
+      <th class="c-desc">Description</th>
+      <th class="c-qty">Qty</th>
+      <th class="c-price">Unit Price</th>
+      ${hasDiscounts ? '<th class="c-disc">Disc %</th>' : ''}
+      <th class="c-total">Total</th>
+    </tr></thead>
+    <tbody>${rowsHTML}</tbody>
+  </table>
   <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
     <div style="width:260px">
       ${((data.discountPct || 0) > 0 || shippingHTML > 0) ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>` : ''}
@@ -2182,14 +2192,12 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
 }
 
 function doPrint(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
-  const html = generateDocHTML(data, template, selectedBankAccount)
-  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const win = window.open(url, '_blank', 'width=1100,height=820')
+  const win = window.open('', '_blank', 'width=1280,height=900')
   if (!win) return
+  win.document.write(generateDocHTML(data, template, selectedBankAccount))
+  win.document.close()
   win.focus()
-  win.onload = () => { setTimeout(() => { win.print() }, 200) }
-  setTimeout(() => URL.revokeObjectURL(url), 10000)
+  setTimeout(() => { win.print() }, 600)
 }
 
 async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
