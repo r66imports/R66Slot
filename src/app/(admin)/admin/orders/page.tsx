@@ -4419,7 +4419,7 @@ function OrdersPageInner() {
                     const hasOutstanding = doc.type === 'invoice' && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
                     const firstDesc = doc.lineItems?.[0]?.description || '—'
                     return (
-                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : (doc as any).depositReceived ? 'bg-yellow-50 hover:bg-yellow-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
+                      <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : (doc as any).depositReceived ? 'bg-yellow-50 hover:bg-yellow-100' : (doc as any).shippingAdded ? 'bg-blue-50 hover:bg-blue-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 text-xs">
                           <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
                           {(doc as any).sourceQuoteNumber && (
@@ -4548,6 +4548,15 @@ function OrdersPageInner() {
                               className: (doc as any).sentToPackingList ? 'text-gray-400' : 'text-blue-600',
                               disabled: !!(doc as any).sentToPackingList,
                               onClick: () => { if (!(doc as any).sentToPackingList) handleSendToPackingList(doc) },
+                            }, {
+                              label: (doc as any).shippingAdded ? '✓ Shipping Added' : 'Add Shipping',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12h12L19 8M9 12h6m-6 4h6" /><rect x="9" y="11" width="6" height="5" rx="0.5" strokeWidth={0} fill="none" /></svg>,
+                              className: (doc as any).shippingAdded ? 'text-blue-600 font-semibold' : 'text-blue-600',
+                              onClick: async () => {
+                                const newVal = !(doc as any).shippingAdded
+                                const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ shippingAdded: newVal }) })
+                                if (res.ok) setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, shippingAdded: newVal } as any : d))
+                              },
                             }] : []),
                             ...(doc.type === 'invoice' ? [{
                               label: driveUploading === doc.id ? 'Uploading…' : (doc as any).driveFileId ? '✓ Saved to Drive' : 'Download to Drive',
