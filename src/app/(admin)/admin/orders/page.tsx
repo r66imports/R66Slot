@@ -2077,17 +2077,22 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
 
   const TD = 'padding:3px 7px;font-size:11px;border-bottom:1px solid #f3f4f6;vertical-align:middle'
   const TH = 'padding:6px 7px;font-size:11px;font-weight:700;background:#1f2937;color:white'
+  const hasDiscounts = data.lineItems.some(li => (li.discountPct || 0) > 0)
   const rowsHTML = data.lineItems.map((li, i) => {
     const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
     const bg = i % 2 === 0 ? '#ffffff' : '#f9fafb'
     const totalColor = (li.discountPct || 0) > 0 ? ';color:#dc2626' : ''
+    const discTd = hasDiscounts
+      ? `<td style="${TD};text-align:right;width:48px;color:${(li.discountPct||0)>0?'#dc2626':'#111'}">${(li.discountPct||0)>0?li.discountPct+'%':''}</td>`
+      : ''
     return `<tr style="background:${bg}">
       <td style="${TD};color:#9ca3af">${i + 1}</td>
       <td style="${TD};font-family:monospace;color:#4f46e5;white-space:nowrap">${liSku || '—'}</td>
       <td style="${TD}">${liTitle}</td>
-      <td style="${TD};text-align:right">${li.qty}</td>
-      <td style="${TD};text-align:right;width:105px">${fmtPrice(li.unitPrice)}</td>
-      <td style="${TD};text-align:right;font-weight:600;width:105px${totalColor}">${fmtPrice(lineAmt(li))}</td>
+      <td style="${TD};text-align:right;width:32px">${li.qty}</td>
+      <td style="${TD};text-align:right;width:95px">${fmtPrice(li.unitPrice)}</td>
+      ${discTd}
+      <td style="${TD};text-align:right;font-weight:600;width:95px${totalColor}">${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
@@ -2138,12 +2143,13 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   </div>
   <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
     <thead><tr>
-      <th style="${TH};text-align:left">#</th>
-      <th style="${TH};text-align:left">SKU</th>
+      <th style="${TH};text-align:left;width:24px">#</th>
+      <th style="${TH};text-align:left;width:62px">SKU</th>
       <th style="${TH};text-align:left">Description</th>
-      <th style="${TH};text-align:right;width:42px">Qty</th>
-      <th style="${TH};text-align:right;width:105px">Unit Price</th>
-      <th style="${TH};text-align:right;width:105px">Total</th>
+      <th style="${TH};text-align:right;width:32px">Qty</th>
+      <th style="${TH};text-align:right;width:95px">Unit Price</th>
+      ${hasDiscounts ? `<th style="${TH};text-align:right;width:48px">Disc %</th>` : ''}
+      <th style="${TH};text-align:right;width:95px">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
   </table>
