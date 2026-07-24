@@ -2112,13 +2112,13 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   return `<!DOCTYPE html><html><head><title>${data.docNumber}</title>
   <style>
     *{box-sizing:border-box}
-    body{font-family:Arial,sans-serif;margin:14px 18px;color:#111;font-size:13px}
-    @media print{body{margin:10px 14px}}
+    body{font-family:Arial,sans-serif;margin:14px 18px;color:#111;font-size:13px;min-width:800px}
+    @media print{body{margin:10px 14px;min-width:800px}}
     .it{width:100%;border-collapse:collapse;margin-bottom:16px}
     .it th,.it td{white-space:nowrap;padding:5px 8px;font-size:11px;border-bottom:1px solid #f3f4f6}
     .it th{background:#1f2937;color:white;font-weight:700;border-bottom:none}
     .c-qty,.c-price,.c-disc,.c-total{text-align:right}
-    .c-total{font-weight:600}
+    .c-total{font-weight:600;min-width:90px}
     .c-desc{white-space:normal!important;word-break:break-word}
   </style>
   </head><body>
@@ -2187,12 +2187,30 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
 }
 
 function doPrint(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
-  const win = window.open('', '_blank', 'width=1280,height=900')
-  if (!win) return
-  win.document.write(generateDocHTML(data, template, selectedBankAccount))
-  win.document.close()
-  win.focus()
-  setTimeout(() => { win.print() }, 600)
+  const html = generateDocHTML(data, template, selectedBankAccount)
+  document.getElementById('r66-print-overlay')?.remove()
+  const overlay = document.createElement('div')
+  overlay.id = 'r66-print-overlay'
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;flex-direction:column'
+  const bar = document.createElement('div')
+  bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 14px;background:#1f2937;flex-shrink:0'
+  const closeBtn = document.createElement('button')
+  closeBtn.textContent = '✕ Close'
+  closeBtn.style.cssText = 'padding:5px 12px;background:#374151;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px'
+  closeBtn.onclick = () => overlay.remove()
+  const printBtn = document.createElement('button')
+  printBtn.textContent = '🖨 Print'
+  printBtn.style.cssText = 'padding:5px 12px;background:#2563eb;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px'
+  const lbl = document.createElement('span')
+  lbl.textContent = data.docNumber
+  lbl.style.cssText = 'color:#9ca3af;font-size:13px'
+  bar.appendChild(closeBtn); bar.appendChild(printBtn); bar.appendChild(lbl)
+  const iframe = document.createElement('iframe')
+  iframe.style.cssText = 'flex:1;border:none;background:#fff'
+  iframe.setAttribute('srcdoc', html)
+  printBtn.onclick = () => iframe.contentWindow?.print()
+  overlay.appendChild(bar); overlay.appendChild(iframe)
+  document.body.appendChild(overlay)
 }
 
 async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
