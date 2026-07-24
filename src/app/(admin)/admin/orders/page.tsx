@@ -2416,14 +2416,14 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
 
   const hasDiscountsPDF = data.lineItems.some(li => (li.discountPct || 0) > 0)
   const numCols = hasDiscountsPDF ? 5 : 4
-  const mkFoot = (label: string, value: string): (string | number)[] => {
-    const row: (string | number)[] = Array(numCols).fill('')
-    row[numCols - 2] = label
-    row[numCols - 1] = value
-    return row
-  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mkFoot = (label: string, value: string): any[] => [
+    { content: label, colSpan: numCols - 1, styles: { halign: 'right' } },
+    { content: value, styles: { halign: 'right' } },
+  ]
 
-  const footRows: (string | number)[][] = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const footRows: any[][] = []
   let subtotalIdx = -1, discountIdx = -1, shippingIdx = -1
   if ((data.discountPct || 0) > 0 || shippingPDF > 0) { footRows.push(mkFoot('Subtotal', fmtPrice(subtotal))); subtotalIdx = footRows.length - 1 }
   if ((data.discountPct || 0) > 0) { footRows.push(mkFoot(`Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`)); discountIdx = footRows.length - 1 }
