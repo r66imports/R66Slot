@@ -2414,106 +2414,96 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   // depositPDF is often already folded into amountPaidPDF once recorded as a payment — take whichever is larger so it isn't counted twice
   const remainingPDF = total - Math.max(depositPDF, amountPaidPDF) - creditAppliedPDF
 
+  const hasDiscountsPDF = data.lineItems.some(li => (li.discountPct || 0) > 0)
+  const numCols = hasDiscountsPDF ? 5 : 4
+  const mkFoot = (label: string, value: string): (string | number)[] => {
+    const row: (string | number)[] = Array(numCols).fill('')
+    row[numCols - 2] = label
+    row[numCols - 1] = value
+    return row
+  }
+
   const footRows: (string | number)[][] = []
   let subtotalIdx = -1, discountIdx = -1, shippingIdx = -1
-  if ((data.discountPct || 0) > 0 || shippingPDF > 0) { footRows.push(['', '', '', '', 'Subtotal', fmtPrice(subtotal)]); subtotalIdx = footRows.length - 1 }
-  if ((data.discountPct || 0) > 0) { footRows.push(['', '', '', '', `Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`]); discountIdx = footRows.length - 1 }
-  if (shippingPDF > 0) { footRows.push(['', '', '', '', `Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF)]); shippingIdx = footRows.length - 1 }
+  if ((data.discountPct || 0) > 0 || shippingPDF > 0) { footRows.push(mkFoot('Subtotal', fmtPrice(subtotal))); subtotalIdx = footRows.length - 1 }
+  if ((data.discountPct || 0) > 0) { footRows.push(mkFoot(`Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`)); discountIdx = footRows.length - 1 }
+  if (shippingPDF > 0) { footRows.push(mkFoot(`Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF))); shippingIdx = footRows.length - 1 }
 
   let totalIdx = -1, balanceArrivalIdx = -1, depositNoteIdx = -1, creditIdx = -1, amountPaidIdx = -1, balanceDueIdx = -1
   if (isPreOrderPDF) {
-    footRows.push(['', '', '', '', 'Full Order Total', fmtPrice(total)])
-    totalIdx = footRows.length - 1
-    footRows.push(['', '', '', '', 'DEPOSIT DUE', fmtPrice(depositPDF)])
-    depositNoteIdx = footRows.length - 1
-    if (balanceOnDeliveryAmt > 0.005) {
-      footRows.push(['', '', '', '', 'BALANCE ON DELIVERY', fmtPrice(balanceOnDeliveryAmt)])
-      balanceArrivalIdx = footRows.length - 1
-    }
+    footRows.push(mkFoot('Full Order Total', fmtPrice(total))); totalIdx = footRows.length - 1
+    footRows.push(mkFoot('DEPOSIT DUE', fmtPrice(depositPDF))); depositNoteIdx = footRows.length - 1
+    if (balanceOnDeliveryAmt > 0.005) { footRows.push(mkFoot('BALANCE ON DELIVERY', fmtPrice(balanceOnDeliveryAmt))); balanceArrivalIdx = footRows.length - 1 }
   } else {
-    footRows.push(['', '', '', '', 'TOTAL', fmtPrice(total)])
-    totalIdx = footRows.length - 1
-    if (depositPDF > 0) {
-      footRows.push(['', '', '', '', data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositPDF)}`])
-      depositNoteIdx = footRows.length - 1
-    }
-    if (creditAppliedPDF > 0) {
-      footRows.push(['', '', '', '', 'Credit Applied', `-${fmtPrice(creditAppliedPDF)}`])
-      creditIdx = footRows.length - 1
-    }
-    if (amountPaidPDF > 0) {
-      footRows.push(['', '', '', '', 'Amount Paid', `-${fmtPrice(amountPaidPDF)}`])
-      amountPaidIdx = footRows.length - 1
-    }
-    if (remainingPDF > 0.005) {
-      footRows.push(['', '', '', '', data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE', fmtPrice(remainingPDF)])
-      balanceDueIdx = footRows.length - 1
-    }
+    footRows.push(mkFoot('TOTAL', fmtPrice(total))); totalIdx = footRows.length - 1
+    if (depositPDF > 0) { footRows.push(mkFoot(data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositPDF)}`)); depositNoteIdx = footRows.length - 1 }
+    if (creditAppliedPDF > 0) { footRows.push(mkFoot('Credit Applied', `-${fmtPrice(creditAppliedPDF)}`)); creditIdx = footRows.length - 1 }
+    if (amountPaidPDF > 0) { footRows.push(mkFoot('Amount Paid', `-${fmtPrice(amountPaidPDF)}`)); amountPaidIdx = footRows.length - 1 }
+    if (remainingPDF > 0.005) { footRows.push(mkFoot(data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE', fmtPrice(remainingPDF))); balanceDueIdx = footRows.length - 1 }
   }
+
+  const pdfHead = hasDiscountsPDF
+    ? [['Description', 'Qty', 'Unit Price', 'Disc %', 'Total']]
+    : [['Description', 'Qty', 'Unit Price', 'Total']]
+  const pdfBody = data.lineItems.map(li => {
+    const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
+    const desc = liSku ? `${liSku} – ${liTitle}` : liTitle
+    return hasDiscountsPDF
+      ? [desc, li.qty, fmtPrice(li.unitPrice), (li.discountPct || 0) > 0 ? `${li.discountPct}%` : '0%', fmtPrice(lineAmt(li))]
+      : [desc, li.qty, fmtPrice(li.unitPrice), fmtPrice(lineAmt(li))]
+  })
+  const pdfColStyles: Record<number, { halign?: 'left' | 'right'; cellWidth?: number }> = {
+    0: { halign: 'left' },
+    1: { cellWidth: 10, halign: 'right' },
+    2: { cellWidth: hasDiscountsPDF ? 28 : 30, halign: 'right' },
+    3: { cellWidth: hasDiscountsPDF ? 14 : 30, halign: 'right' },
+  }
+  if (hasDiscountsPDF) pdfColStyles[4] = { cellWidth: 28, halign: 'right' }
 
   autoTable(doc, {
     startY: y,
-    head: [['#', 'SKU', 'Description', 'Qty', 'Unit Price', 'Disc %', 'Total']],
-    body: data.lineItems.map((li, i) => {
-      const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
-      return [i + 1, liSku || '—', liTitle, li.qty, fmtPrice(li.unitPrice), (li.discountPct || 0) > 0 ? `${li.discountPct}%` : '', fmtPrice(lineAmt(li))]
-    }),
+    head: pdfHead,
+    body: pdfBody,
     foot: footRows,
-    headStyles: { fillColor: [31, 41, 55], fontSize: 8, fontStyle: 'bold', textColor: 255 },
-    bodyStyles: { fontSize: 8.5, textColor: [40, 40, 40] },
-    footStyles: { fontSize: 8.5, textColor: [80, 80, 80], fillColor: [255, 255, 255] },
+    headStyles: { fillColor: [31, 41, 55], fontSize: 7, fontStyle: 'bold', textColor: 255, cellPadding: 2.5 },
+    bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], cellPadding: 2 },
+    footStyles: { fontSize: 7.5, textColor: [80, 80, 80], fillColor: [255, 255, 255], cellPadding: 2 },
     alternateRowStyles: { fillColor: [249, 250, 251] },
-    columnStyles: {
-      0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 22 },
-      2: { cellWidth: 84, halign: 'left' },
-      3: { cellWidth: 8, halign: 'right' },
-      4: { cellWidth: 26, halign: 'right' },
-      5: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
-    },
+    columnStyles: pdfColStyles,
     margin: { left: margin, right: margin },
     didParseCell(hookData) {
       if (hookData.section !== 'foot') return
-      // Subtotal row — grey text
       if (hookData.row.index === subtotalIdx) {
         hookData.cell.styles.textColor = [107, 114, 128]
       }
-      // Discount row — red text
       if (hookData.row.index === discountIdx) {
         hookData.cell.styles.textColor = [239, 68, 68]
       }
-      // Shipping row — grey text
       if (hookData.row.index === shippingIdx) {
         hookData.cell.styles.textColor = [107, 114, 128]
       }
-      // TOTAL row — dark fill, white text
       if (hookData.row.index === totalIdx) {
         hookData.cell.styles.fillColor = [31, 41, 55]
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
       }
-      // BALANCE ON DELIVERY / BALANCE DUE ON ARRIVAL row — orange fill, white text
       if (balanceArrivalIdx >= 0 && hookData.row.index === balanceArrivalIdx) {
         hookData.cell.styles.fillColor = [234, 88, 12]
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
       }
-      // Deposit Paid / DEPOSIT DUE note — grey text, normal weight
       if (depositNoteIdx >= 0 && hookData.row.index === depositNoteIdx) {
         hookData.cell.styles.textColor = [107, 114, 128]
         hookData.cell.styles.fontStyle = 'normal'
       }
-      // Credit Applied — green text
       if (creditIdx >= 0 && hookData.row.index === creditIdx) {
         hookData.cell.styles.textColor = [22, 163, 74]
         hookData.cell.styles.fontStyle = 'bold'
       }
-      // Amount Paid — blue text
       if (amountPaidIdx >= 0 && hookData.row.index === amountPaidIdx) {
         hookData.cell.styles.textColor = [37, 99, 235]
         hookData.cell.styles.fontStyle = 'bold'
       }
-      // BALANCE DUE — orange fill, white text
       if (balanceDueIdx >= 0 && hookData.row.index === balanceDueIdx) {
         hookData.cell.styles.fillColor = [234, 88, 12]
         hookData.cell.styles.textColor = [255, 255, 255]
