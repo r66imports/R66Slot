@@ -2075,23 +2075,19 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       ).join('')}</div>`
     : ''
 
-  const hasDiscounts = data.lineItems.some(li => (li.discountPct || 0) > 0)
+  const TD = 'padding:3px 7px;font-size:11px;border-bottom:1px solid #f3f4f6;vertical-align:middle'
+  const TH = 'padding:6px 7px;font-size:11px;font-weight:700;background:#1f2937;color:white'
   const rowsHTML = data.lineItems.map((li, i) => {
     const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
     const bg = i % 2 === 0 ? '#ffffff' : '#f9fafb'
-    const discTd = hasDiscounts
-      ? ((li.discountPct || 0) > 0
-          ? `<td nowrap class="c-disc" style="color:#dc2626">${li.discountPct}%</td>`
-          : `<td nowrap class="c-disc"></td>`)
-      : ''
+    const totalColor = (li.discountPct || 0) > 0 ? ';color:#dc2626' : ''
     return `<tr style="background:${bg}">
-      <td nowrap class="c-num" style="color:#9ca3af">${i + 1}</td>
-      <td nowrap class="c-sku" style="font-family:monospace;color:#4f46e5">${liSku || '—'}</td>
-      <td class="c-desc">${liTitle}</td>
-      <td nowrap class="c-qty">${li.qty}</td>
-      <td nowrap class="c-price">${fmtPrice(li.unitPrice)}</td>
-      ${discTd}
-      <td nowrap class="c-total" style="white-space:nowrap;text-align:right;font-weight:600${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
+      <td style="${TD};color:#9ca3af">${i + 1}</td>
+      <td style="${TD};font-family:monospace;color:#4f46e5;white-space:nowrap">${liSku || '—'}</td>
+      <td style="${TD}">${liTitle}</td>
+      <td style="${TD};text-align:right">${li.qty}</td>
+      <td style="${TD};text-align:right;width:105px">${fmtPrice(li.unitPrice)}</td>
+      <td style="${TD};text-align:right;font-weight:600;width:105px${totalColor}">${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
@@ -2112,14 +2108,8 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   return `<!DOCTYPE html><html><head><title>${data.docNumber}</title>
   <style>
     *{box-sizing:border-box}
-    body{font-family:Arial,sans-serif;margin:14px 18px;color:#111;font-size:13px;min-width:800px}
-    @media print{body{margin:10px 14px;min-width:800px}}
-    .it{width:100%;border-collapse:collapse;margin-bottom:16px}
-    .it th,.it td{white-space:nowrap;padding:5px 8px;font-size:11px;border-bottom:1px solid #f3f4f6}
-    .it th{background:#1f2937;color:white;font-weight:700;border-bottom:none}
-    .c-qty,.c-price,.c-disc,.c-total{text-align:right}
-    .c-total{font-weight:600;min-width:90px}
-    .c-desc{white-space:normal!important;word-break:break-word}
+    body{font-family:Arial,sans-serif;margin:14px 18px;color:#111;font-size:13px}
+    @media print{body{margin:8px 12px}}
   </style>
   </head><body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
@@ -2146,15 +2136,14 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
-  <table class="it">
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
     <thead><tr>
-      <th nowrap class="c-num">#</th>
-      <th nowrap class="c-sku">SKU</th>
-      <th class="c-desc">Description</th>
-      <th nowrap class="c-qty">Qty</th>
-      <th nowrap class="c-price">Unit Price</th>
-      ${hasDiscounts ? '<th nowrap class="c-disc">Disc %</th>' : ''}
-      <th nowrap class="c-total">Total</th>
+      <th style="${TH};text-align:left">#</th>
+      <th style="${TH};text-align:left">SKU</th>
+      <th style="${TH};text-align:left">Description</th>
+      <th style="${TH};text-align:right;width:42px">Qty</th>
+      <th style="${TH};text-align:right;width:105px">Unit Price</th>
+      <th style="${TH};text-align:right;width:105px">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
   </table>
