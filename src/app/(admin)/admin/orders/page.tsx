@@ -2091,7 +2091,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       <td style="${TD};text-align:right;width:36px">${li.qty}</td>
       <td style="${TD};text-align:right;width:95px">${fmtPrice(li.unitPrice)}</td>
       ${discTd}
-      <td style="${TD};text-align:right;font-weight:700;width:95px${totalColor}">${fmtPrice(lineAmt(li))}</td>
+      <td style="${TD};text-align:right;font-weight:700;width:100px;white-space:nowrap${totalColor}">${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
@@ -2140,13 +2140,13 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     ${data.clientPhone ? `<div style="font-size:12px;color:#4b5563">${data.clientPhone}</div>` : ''}
     ${data.clientAddress ? `<div style="font-size:12px;color:#4b5563;white-space:pre-line">${data.clientAddress}</div>` : ''}
   </div>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:16px">
+  <table style="width:100%;border-collapse:collapse;margin-bottom:16px;table-layout:fixed">
     <thead><tr>
       <th style="${TH}">Description</th>
       <th style="${TH};text-align:right;width:36px">Qty</th>
-      <th style="${TH};text-align:right;width:95px">Unit Price</th>
-      ${hasDiscounts ? `<th style="${TH};text-align:right;width:48px">Disc %</th>` : ''}
-      <th style="${TH};text-align:right;width:95px">Total</th>
+      <th style="${TH};text-align:right;width:100px">Unit Price</th>
+      ${hasDiscounts ? `<th style="${TH};text-align:right;width:52px">Disc %</th>` : ''}
+      <th style="${TH};text-align:right;width:100px">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
   </table>
