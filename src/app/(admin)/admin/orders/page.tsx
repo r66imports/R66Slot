@@ -2939,6 +2939,7 @@ function OrdersPageInner() {
   const [binDocs, setBinDocs] = useState<any[]>([])
   const [binLoading, setBinLoading] = useState(false)
   const [clientSearch, setClientSearch] = useState('')
+  const [clientViewSearch, setClientViewSearch] = useState('')
   const [docPageSize, setDocPageSize] = useState(50)
   const [docPage, setDocPage] = useState(1)
   const [packingListResult, setPackingListResult] = useState<string | null>(null)
@@ -3578,6 +3579,24 @@ function OrdersPageInner() {
 
   const cfg = tab !== 'backorders' ? TAB_CFG[tab] : TAB_CFG.quotes // fallback, not used when tab=backorders
 
+  const clientViewSearchQ = clientViewSearch.toLowerCase().trim()
+  const clientViewGroups: { clientName: string; docs: OrderDocument[] }[] = (() => {
+    if (!clientViewSearchQ) return []
+    const matched = documents.filter(d => d.status !== 'archived' && d.clientName?.toLowerCase().includes(clientViewSearchQ))
+    const byClient: Record<string, OrderDocument[]> = {}
+    for (const doc of matched) {
+      const key = doc.clientName || 'Unknown'
+      if (!byClient[key]) byClient[key] = []
+      byClient[key].push(doc)
+    }
+    return Object.entries(byClient)
+      .map(([clientName, docs]) => ({
+        clientName,
+        docs: docs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      }))
+      .sort((a, b) => a.clientName.localeCompare(b.clientName))
+  })()
+
   const boRows = tab !== 'backorders' ? backorders.filter(cfg.boPhase) : []
   const searchLower = clientSearch.trim().toLowerCase()
   const docRows = tab !== 'backorders'
@@ -3843,6 +3862,105 @@ function OrdersPageInner() {
           </button>
         </div>
       </div>
+
+      {/* Client View Search */}
+      <div className="relative mb-4">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+        <input
+          type="text"
+          placeholder="Search client name to view all their orders…"
+          value={clientViewSearch}
+          onChange={e => setClientViewSearch(e.target.value)}
+          className="w-full pl-10 pr-8 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white shadow-sm"
+        />
+        {clientViewSearch && (
+          <button onClick={() => setClientViewSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg leading-none">✕</button>
+        )}
+      </div>
+
+      {/* Client View — shown when clientViewSearch is active */}
+      {clientViewSearchQ && (
+        <div className="space-y-4 mb-6">
+          {clientViewGroups.length === 0 ? (
+            <div className="text-center py-12 bg-white border border-gray-200 rounded-xl text-gray-400">
+              <p className="text-base font-semibold">No orders found for &ldquo;{clientViewSearch}&rdquo;</p>
+            </div>
+          ) : clientViewGroups.map(({ clientName, docs }) => {
+            const totalItems = docs.reduce((s, d) => s + d.lineItems.length, 0)
+            const clientTotal = docs.reduce((s, d) => s + d.lineItems.reduce((ss, li) => ss + lineAmt(li), 0), 0)
+            const typeBadge = (type: string) => {
+              if (type === 'quote') return <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">Quote</span>
+              if (type === 'salesorder') return <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-semibold">SO</span>
+              return <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">Invoice</span>
+            }
+            const statusBadge = (status: string) => {
+              const cls =
+                status === 'paid' ? 'bg-green-100 text-green-700' :
+                status === 'sent' ? 'bg-blue-100 text-blue-700' :
+                status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                'bg-gray-100 text-gray-500'
+              return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${cls}`}>{status}</span>
+            }
+            return (
+              <div key={clientName} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-gray-900">{clientName}</span>
+                    <span className="text-xs text-gray-400">{docs.length} doc{docs.length !== 1 ? 's' : ''} · {totalItems} item{totalItems !== 1 ? 's' : ''}</span>
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">{fmtPrice(clientTotal)}</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {docs.map(doc => {
+                    const docTotal = doc.lineItems.reduce((s, li) => s + lineAmt(li), 0)
+                    return (
+                      <div key={doc.id} className="px-5 py-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {typeBadge(doc.type)}
+                            <span className="font-semibold text-sm text-gray-800">{doc.docNumber}</span>
+                            <span className="text-xs text-gray-400">
+                              {new Date(doc.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                            {statusBadge(doc.status)}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-sm font-bold text-gray-800">{fmtPrice(docTotal)}</span>
+                            <button
+                              onClick={() => viewDocument(doc)}
+                              className="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 border border-blue-200 font-medium"
+                            >View</button>
+                          </div>
+                        </div>
+                        <table className="w-full text-xs border-collapse">
+                          <tbody>
+                            {doc.lineItems.map((li, i) => {
+                              const { sku: liSku, title: liTitle } = splitSkuTitle(li.description || '')
+                              return (
+                                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                  <td className="py-1 pr-3 text-gray-700 rounded-l">
+                                    {liSku && <span className="font-mono text-indigo-600 mr-1.5">{liSku}</span>}
+                                    {liTitle}
+                                  </td>
+                                  <td className="py-1 pr-3 text-right text-gray-400 w-10 whitespace-nowrap">×{li.qty}</td>
+                                  <td className="py-1 pr-3 text-right text-gray-500 w-24 whitespace-nowrap">{fmtPrice(li.unitPrice)}</td>
+                                  <td className="py-1 text-right font-semibold text-gray-800 w-24 whitespace-nowrap rounded-r">{fmtPrice(lineAmt(li))}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Tabs + Actions */}
       <div className="flex items-end justify-between border-b border-gray-200 mb-6">
