@@ -2084,7 +2084,6 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
           ? `<td nowrap class="c-disc" style="color:#dc2626">${li.discountPct}%</td>`
           : `<td nowrap class="c-disc"></td>`)
       : ''
-    const totalStyle = (li.discountPct || 0) > 0 ? ' style="color:#dc2626"' : ''
     return `<tr style="background:${bg}">
       <td nowrap class="c-num" style="color:#9ca3af">${i + 1}</td>
       <td nowrap class="c-sku" style="font-family:monospace;color:#4f46e5">${liSku || '—'}</td>
@@ -2092,7 +2091,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       <td nowrap class="c-qty">${li.qty}</td>
       <td nowrap class="c-price">${fmtPrice(li.unitPrice)}</td>
       ${discTd}
-      <td nowrap class="c-total"${totalStyle}>${fmtPrice(lineAmt(li))}</td>
+      <td nowrap class="c-total" style="white-space:nowrap;text-align:right;font-weight:600${(li.discountPct || 0) > 0 ? ';color:#dc2626' : ''}">${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
