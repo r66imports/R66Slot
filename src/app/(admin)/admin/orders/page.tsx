@@ -2081,18 +2081,18 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     const bg = i % 2 === 0 ? '#ffffff' : '#f9fafb'
     const discTd = hasDiscounts
       ? ((li.discountPct || 0) > 0
-          ? `<td class="c-disc" style="color:#dc2626">${li.discountPct}%</td>`
-          : `<td class="c-disc"></td>`)
+          ? `<td nowrap class="c-disc" style="color:#dc2626">${li.discountPct}%</td>`
+          : `<td nowrap class="c-disc"></td>`)
       : ''
     const totalStyle = (li.discountPct || 0) > 0 ? ' style="color:#dc2626"' : ''
     return `<tr style="background:${bg}">
-      <td class="c-num" style="color:#9ca3af">${i + 1}</td>
-      <td class="c-sku" style="font-family:monospace;color:#4f46e5">${liSku || '—'}</td>
+      <td nowrap class="c-num" style="color:#9ca3af">${i + 1}</td>
+      <td nowrap class="c-sku" style="font-family:monospace;color:#4f46e5">${liSku || '—'}</td>
       <td class="c-desc">${liTitle}</td>
-      <td class="c-qty">${li.qty}</td>
-      <td class="c-price">${fmtPrice(li.unitPrice)}</td>
+      <td nowrap class="c-qty">${li.qty}</td>
+      <td nowrap class="c-price">${fmtPrice(li.unitPrice)}</td>
       ${discTd}
-      <td class="c-total"${totalStyle}>${fmtPrice(lineAmt(li))}</td>
+      <td nowrap class="c-total"${totalStyle}>${fmtPrice(lineAmt(li))}</td>
     </tr>`
   }).join('')
 
@@ -2120,7 +2120,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
     .it th{background:#1f2937;color:white;font-weight:700;border-bottom:none}
     .c-qty,.c-price,.c-disc,.c-total{text-align:right}
     .c-total{font-weight:600}
-    .c-desc{white-space:normal!important;word-break:break-word;width:99%}
+    .c-desc{white-space:normal!important;word-break:break-word}
   </style>
   </head><body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
@@ -2149,13 +2149,13 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   </div>
   <table class="it">
     <thead><tr>
-      <th class="c-num">#</th>
-      <th class="c-sku">SKU</th>
+      <th nowrap class="c-num">#</th>
+      <th nowrap class="c-sku">SKU</th>
       <th class="c-desc">Description</th>
-      <th class="c-qty">Qty</th>
-      <th class="c-price">Unit Price</th>
-      ${hasDiscounts ? '<th class="c-disc">Disc %</th>' : ''}
-      <th class="c-total">Total</th>
+      <th nowrap class="c-qty">Qty</th>
+      <th nowrap class="c-price">Unit Price</th>
+      ${hasDiscounts ? '<th nowrap class="c-disc">Disc %</th>' : ''}
+      <th nowrap class="c-total">Total</th>
     </tr></thead>
     <tbody>${rowsHTML}</tbody>
   </table>
