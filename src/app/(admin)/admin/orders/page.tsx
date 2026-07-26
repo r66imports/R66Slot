@@ -4276,7 +4276,7 @@ function OrdersPageInner() {
         </div>
       ) : tab !== 'backorders' && loading ? (
         <div className="text-center py-16 text-gray-400">Loading...</div>
-      ) : tab !== 'backorders' && totalCount === 0 ? (
+      ) : tab !== 'backorders' && totalCount === 0 && !clientSearch ? (
         <div className="text-center py-16">
           <div className="text-5xl mb-4">{cfg.icon}</div>
           <p className="text-lg font-semibold text-gray-600">No {cfg.label} yet</p>
