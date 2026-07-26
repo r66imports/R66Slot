@@ -54,6 +54,8 @@ export default function SiteOrdersPage() {
   const [cancelling, setCancelling] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState<CheckoutOrder | null>(null)
   const [search, setSearch] = useState('')
+  const [pendingConvertOrder, setPendingConvertOrder] = useState<CheckoutOrder | null>(null)
+  const [existingClientInvoices, setExistingClientInvoices] = useState<any[]>([])
 
   useEffect(() => { load() }, [])
 
@@ -69,9 +71,29 @@ export default function SiteOrdersPage() {
   }
 
   async function sendToInvoice(order: CheckoutOrder) {
+    const docsRes = await fetch('/api/admin/orders/documents?type=invoice')
+    const allInvoices: any[] = docsRes.ok ? await docsRes.json() : []
+    const clientEmail = order.customer.email.toLowerCase()
+    const clientName = `${order.customer.firstName} ${order.customer.lastName}`.trim().toLowerCase()
+    const clientInvoices = allInvoices.filter((d: any) =>
+      d.status !== 'archived' && (
+        (d.clientEmail?.toLowerCase() === clientEmail) ||
+        d.clientName?.toLowerCase() === clientName
+      )
+    )
+    if (clientInvoices.length > 0) {
+      setExistingClientInvoices(clientInvoices)
+      setPendingConvertOrder(order)
+    } else {
+      await doCreateNewInvoice(order)
+    }
+  }
+
+  async function doCreateNewInvoice(order: CheckoutOrder) {
     setConverting(order.id)
+    setPendingConvertOrder(null)
+    setExistingClientInvoices([])
     try {
-      // Get next invoice number
       const docsRes = await fetch('/api/admin/orders/documents?type=invoice')
       const docs = docsRes.ok ? await docsRes.json() : []
       const nums = docs
@@ -117,7 +139,6 @@ export default function SiteOrdersPage() {
 
       if (!invoiceRes.ok) throw new Error('Failed to create invoice')
 
-      // Mark checkout order as invoiced
       await fetch('/api/checkout', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -125,8 +146,41 @@ export default function SiteOrdersPage() {
       })
 
       await load()
-    } catch (err) {
+    } catch {
       alert('Failed to create invoice. Please try again.')
+    } finally {
+      setConverting(null)
+    }
+  }
+
+  async function appendOrderToInvoice(order: CheckoutOrder, invoiceDoc: any) {
+    setConverting(order.id)
+    setPendingConvertOrder(null)
+    setExistingClientInvoices([])
+    try {
+      const newItems = order.items.map((item, i) => ({
+        id: `li_${Date.now()}_${i}`,
+        description: item.sku ? `${item.sku} \u2013 ${item.title}` : item.title,
+        qty: item.quantity,
+        unitPrice: item.price,
+      }))
+      const merged = [...(invoiceDoc.lineItems || []), ...newItems]
+      const res = await fetch(`/api/admin/orders/documents/${invoiceDoc.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineItems: merged }),
+      })
+      if (!res.ok) throw new Error('Failed to update invoice')
+
+      await fetch('/api/checkout', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: order.id, status: 'invoiced', invoiceRef: invoiceDoc.docNumber }),
+      })
+
+      await load()
+    } catch {
+      alert('Failed to add to invoice. Please try again.')
     } finally {
       setConverting(null)
     }
@@ -415,6 +469,46 @@ export default function SiteOrdersPage() {
           </table>
         )}
       </div>
+
+      {/* Add-to-existing-invoice picker */}
+      {pendingConvertOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Send to Invoice</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Order <span className="font-semibold text-gray-800">{pendingConvertOrder.orderNumber}</span> — {pendingConvertOrder.customer.firstName} {pendingConvertOrder.customer.lastName}
+            </p>
+            <div className="space-y-2 mb-4">
+              <button
+                onClick={() => doCreateNewInvoice(pendingConvertOrder)}
+                className="w-full text-left px-4 py-3 rounded-xl border-2 border-indigo-400 bg-indigo-50 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+              >
+                + Create New Invoice
+              </button>
+              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide pt-1">Add to Existing</p>
+              {existingClientInvoices.map((inv: any) => (
+                <button
+                  key={inv.id}
+                  onClick={() => appendOrderToInvoice(pendingConvertOrder, inv)}
+                  className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-gray-800">{inv.docNumber}</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${STATUS_STYLES[inv.status] ?? STATUS_STYLES.pending}`}>{inv.status}</span>
+                  </div>
+                  <div className="text-xs text-gray-400 mt-0.5">{inv.date}</div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setPendingConvertOrder(null); setExistingClientInvoices([]) }}
+              className="w-full px-4 py-2 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Cancel confirmation modal */}
       {confirmCancel && (
