@@ -754,24 +754,33 @@ export default function SupplierPreOrderPage() {
     setSendingToSO(true)
     setSoResult(null)
     try {
-      const docs: any[] = await fetch('/api/admin/orders/documents?type=salesorder').then(r => r.ok ? r.json() : []).catch(() => [])
-      const nums = docs.map((d: any) => { const m = /^SO(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 }).filter((n: number) => n > 0)
-      const nextNum = (nums.length ? Math.max(...nums) : 0) + 1
-      const docNumber = `SO${String(nextNum).padStart(3, '0')}`
-      const lineItems = targetItems.map(item => {
+      const results = await Promise.all(targetItems.map(item => {
         const totalQty = item.customers.reduce((sum, c) => sum + c.qty, 0) + (item.extraQty || 0)
-        const rate = item.wholesaleCurrency && item.wholesaleCurrency !== 'ZAR' ? (exchangeRates[item.wholesaleCurrency] || 1) : 1
-        const unitPrice = Math.round(parsePrice(item.wholesalePrice) * rate * 100) / 100
-        return { id: `li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, sku: item.sku, description: `${item.sku} – ${item.description}`, qty: totalQty || 1, unitPrice, discountPct: 0 }
-      })
-      const res = await fetch('/api/admin/orders/documents', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ docNumber, type: 'salesorder', clientName: supplierName, clientEmail: '', clientPhone: '', lineItems, discountPct: 0, depositMode: false, depositPct: 0, depositPaid: 0, shippingCost: 0, shippingMethod: '', trackingNumber: '' }),
-      })
-      if (res.ok) {
-        const created = await res.json()
-        setSoResult({ docNumber: created.docNumber })
-        window.open('/admin/orders', '_blank')
+        const rawPrice = parsePrice(item.wholesalePrice)
+        const currency = item.wholesaleCurrency || 'ZAR'
+        const customerLabel = item.customers.length === 1
+          ? item.customers[0].name || '1 customer'
+          : `${item.customers.length} customers`
+        return fetch('/api/admin/backorders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName: customerLabel,
+            sku: item.sku,
+            description: item.description,
+            brand: item.brand || '',
+            qty: totalQty || 1,
+            price: rawPrice,
+            supplierName,
+            notes: `${currency} ${rawPrice.toFixed(2)} – Pre-Order Dashboard`,
+            source: 'preorder-dashboard',
+          }),
+        })
+      }))
+      const allOk = results.every(r => r.ok)
+      if (allOk) {
+        setSoResult({ docNumber: `${targetItems.length} item${targetItems.length !== 1 ? 's' : ''}` })
+        window.location.href = '/admin/suppliers'
       }
     } finally { setSendingToSO(false) }
   }

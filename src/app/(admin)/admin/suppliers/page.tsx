@@ -1268,17 +1268,28 @@ function SupplierCard({
 
 // ─── Backorder Table (per supplier group) ───────────────────────────────────
 
+function parseCurrency(notes?: string): string | null {
+  const m = (notes || '').match(/^([A-Z]{3}) /)
+  return m ? m[1] : null
+}
+
+function fmtPrice(price: number, currency: string | null): string {
+  const label = currency && currency !== 'ZAR' ? currency : 'R'
+  return `${label} ${price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
+}
+
 function BackorderTable({
   backorders,
 }: {
   backorders: Backorder[]
 }) {
   const subtotalQty = backorders.reduce((s, b) => s + b.qty, 0)
+  const currencies = Array.from(new Set(backorders.map(b => parseCurrency(b.notes))))
+  const singleCurrency = currencies.length === 1 ? currencies[0] : null
   const subtotalValue = backorders.reduce((s, b) => s + b.qty * b.price, 0)
 
   return (
     <div className="bg-white overflow-hidden">
-      {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -1294,28 +1305,27 @@ function BackorderTable({
             </tr>
           </thead>
           <tbody>
-            {backorders.map((b, i) => (
-              <tr key={b.id} className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
-                <td className="px-5 py-3 text-xs text-gray-400">{i + 1}</td>
-                <td className="px-3 py-3 font-mono text-xs text-gray-700">{b.sku}</td>
-                <td className="px-3 py-3 text-gray-800 max-w-xs">
-                  <span className="line-clamp-2">{b.description}</span>
-                </td>
-                <td className="px-3 py-3 text-gray-600 text-xs">{b.brand || '—'}</td>
-                <td className="px-3 py-3 text-gray-600 text-xs">{b.clientName}</td>
-                <td className="px-3 py-3 text-center font-semibold text-gray-900">{b.qty}</td>
-                <td className="px-5 py-3 text-right text-gray-700">
-                  {b.price > 0
-                    ? `R ${b.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
-                    : '—'}
-                </td>
-                <td className="px-5 py-3 text-right font-medium text-gray-900">
-                  {b.price > 0
-                    ? `R ${(b.qty * b.price).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
-                    : '—'}
-                </td>
-              </tr>
-            ))}
+            {backorders.map((b, i) => {
+              const cur = parseCurrency(b.notes)
+              return (
+                <tr key={b.id} className={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
+                  <td className="px-5 py-3 text-xs text-gray-400">{i + 1}</td>
+                  <td className="px-3 py-3 font-mono text-xs text-gray-700">{b.sku}</td>
+                  <td className="px-3 py-3 text-gray-800 max-w-xs">
+                    <span className="line-clamp-2">{b.description}</span>
+                  </td>
+                  <td className="px-3 py-3 text-gray-600 text-xs">{b.brand || '—'}</td>
+                  <td className="px-3 py-3 text-gray-600 text-xs">{b.clientName}</td>
+                  <td className="px-3 py-3 text-center font-semibold text-gray-900">{b.qty}</td>
+                  <td className="px-5 py-3 text-right text-gray-700">
+                    {b.price > 0 ? fmtPrice(b.price, cur) : '—'}
+                  </td>
+                  <td className="px-5 py-3 text-right font-medium text-gray-900">
+                    {b.price > 0 ? fmtPrice(b.qty * b.price, cur) : '—'}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
           <tfoot>
             <tr className="border-t border-gray-200 bg-gray-50/80">
@@ -1323,7 +1333,7 @@ function BackorderTable({
               <td className="px-3 py-2.5 text-center text-xs font-bold text-gray-900">{subtotalQty}</td>
               <td className="px-5 py-2.5" />
               <td className="px-5 py-2.5 text-right text-xs font-bold text-gray-900">
-                R {subtotalValue.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                {fmtPrice(subtotalValue, singleCurrency)}
               </td>
             </tr>
           </tfoot>
