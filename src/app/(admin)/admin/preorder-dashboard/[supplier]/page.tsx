@@ -311,7 +311,9 @@ function ItemCard({
   const addToExistingWorksheet=async(ws:any)=>{
     setShowWsPicker(false);setSendingWs(true)
     try{
-      const totalQty=formRef.current.customers.reduce((sum,c)=>sum+c.qty,0)
+      const customerQty=formRef.current.customers.reduce((sum,c)=>sum+c.qty,0)
+      const moq=formRef.current.minOrderQty??0
+      const totalQty=moq>0?moq:customerQty
       const newLineItem={id:`ws_${Date.now()}_item`,sku:formRef.current.sku,skuSearch:formRef.current.sku,description:formRef.current.description,unit:formRef.current.unit||'',category:formRef.current.brand||'',inStock:0,retailPrice:parsePrice(formRef.current.retailPrice||formRef.current.estimatedRetailPrice),preOrderPrice:0,qty:totalQty||1,wholesalePrice:parsePrice(formRef.current.wholesalePrice||'0'),retailOverride:'',sentToInventory:false}
       const updated={...ws,items:[...(ws.items||[]),newLineItem],preOrderItemId:item.id}
       const res=await fetch('/api/admin/worksheets',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(updated)})
@@ -719,7 +721,9 @@ export default function SupplierPreOrderPage() {
   }
 
   const handleSendToWorksheet = async (id: string, form: FormState) => {
-    const totalQty = form.customers.reduce((sum, c) => sum + c.qty, 0)
+    const customerQty = form.customers.reduce((sum, c) => sum + c.qty, 0)
+    const moq = form.minOrderQty ?? 0
+    const totalQty = moq > 0 ? moq : customerQty
     const res = await fetch('/api/admin/worksheets', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -755,7 +759,9 @@ export default function SupplierPreOrderPage() {
     setSoResult(null)
     try {
       const results = await Promise.all(targetItems.map(item => {
-        const totalQty = item.customers.reduce((sum, c) => sum + c.qty, 0) + (item.extraQty || 0)
+        const customerQty = item.customers.reduce((sum, c) => sum + c.qty, 0) + (item.extraQty || 0)
+        const moq = item.minOrderQty ?? 0
+        const totalQty = moq > 0 ? moq : customerQty
         const rawPrice = parsePrice(item.wholesalePrice)
         const currency = item.wholesaleCurrency || 'ZAR'
         const customerLabel = item.customers.length === 1
