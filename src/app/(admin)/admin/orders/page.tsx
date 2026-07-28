@@ -1222,6 +1222,13 @@ function CreateDocumentModal({
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    fetch('/api/admin/shipping-network')
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) => setNetworkCouriers(data.filter((c) => c.isActive !== false).map((c) => ({ id: c.id, name: c.name }))))
+      .catch(() => {})
+  }, [])
+
   // Enrich existing line items with stock/price data once products load
   // (needed for edit mode — _stockQty is only set on fresh product selection otherwise)
   useEffect(() => {
@@ -1341,6 +1348,7 @@ function CreateDocumentModal({
   const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.depositMode ? ((editDoc as any)?.depositPct || 0) : ((editDoc as any)?.discountPct || 0))
   const [shippingCost, setShippingCost] = useState<number>((editDoc as any)?.shippingCost || 0)
   const [shippingMethod, setShippingMethod] = useState<string>((editDoc as any)?.shippingMethod || '')
+  const [networkCouriers, setNetworkCouriers] = useState<{ id: string; name: string }[]>([])
   const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
   const [nonDepositPct, setNonDepositPct] = useState<number>(
@@ -1711,10 +1719,9 @@ function CreateDocumentModal({
                           <option value="">— None —</option>
                           <option value="Pudo Locker-to-Locker">Pudo Locker-to-Locker</option>
                           <option value="Pudo Door-to-Door">Pudo Door-to-Door</option>
-                          <option value="The Courier Guy">The Courier Guy</option>
-                          <option value="Fastway Courier">Fastway Courier</option>
-                          <option value="Aramex">Aramex</option>
-                          <option value="PostNet-to-PostNet">PostNet-to-PostNet</option>
+                          {networkCouriers.map((c) => (
+                            <option key={c.id} value={c.name}>{c.name}</option>
+                          ))}
                           <option value="Collection">Collection (Self-Collect)</option>
                           <option value="Other">Other</option>
                         </select>
