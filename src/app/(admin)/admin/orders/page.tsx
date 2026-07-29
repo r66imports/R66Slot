@@ -2890,6 +2890,38 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
   )
 }
 
+// ─── Confirm Delete Modal ────────────────────────────────────────────────────
+
+function ConfirmDeleteModal({ label, onConfirm, onClose }: { label: string; onConfirm: () => void | Promise<void>; onClose: () => void }) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <div className="fixed inset-0 bg-black/40 z-[300] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+            <IconTrash />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Delete this document?</h3>
+            <p className="text-sm text-gray-500 mt-1 break-words">{label}</p>
+            <p className="text-xs text-gray-400 mt-1">This action cannot be undone.</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-6">
+          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button
+            disabled={busy}
+            onClick={async () => { setBusy(true); await onConfirm(); setBusy(false); onClose() }}
+            className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+          >
+            {busy ? 'Deleting…' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 function OrdersPageInner() {
@@ -2931,6 +2963,7 @@ function OrdersPageInner() {
   const [allBankAccounts, setAllBankAccounts] = useState<BankAccount[]>([])
   const [editDocState, setEditDocState] = useState<OrderDocument | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<{ label: string; onConfirm: () => void | Promise<void> } | null>(null)
   const [checkedBoIds, setCheckedBoIds] = useState<Set<string>>(new Set())
   const [pendingCompile, setPendingCompile] = useState<{ ids: string[]; docType: DocType } | null>(null)
   const [syncingInventory, setSyncingInventory] = useState(false)
@@ -4522,18 +4555,16 @@ function OrdersPageInner() {
                           { label: 'Push to Sage', onClick: () => {}, disabled: true, className: 'text-gray-400' },
                           'separator' as const,
                           {
-                            label: deleteConfirm === b.id ? 'Confirm Delete' : 'Delete',
+                            label: 'Delete',
                             icon: <IconTrash />,
                             className: 'text-red-500',
-                            onClick: async () => {
-                              if (deleteConfirm === b.id) {
+                            onClick: () => setConfirmDelete({
+                              label: `${cfg.boDocNum(b)} — ${b.clientName}`,
+                              onConfirm: async () => {
                                 const res = await fetch(`/api/admin/backorders/${b.id}`, { method: 'DELETE' })
                                 if (res.ok) setBackorders((prev) => prev.filter((x) => x.id !== b.id))
-                                setDeleteConfirm(null)
-                              } else {
-                                setDeleteConfirm(b.id)
-                              }
-                            },
+                              },
+                            }),
                           },
                         ]} />
                       </td>
@@ -4728,16 +4759,13 @@ function OrdersPageInner() {
                               },
                             },
                             {
-                              label: deleteConfirm === doc.id ? 'Confirm Delete' : 'Delete',
+                              label: 'Delete',
                               icon: <IconTrash />,
                               className: 'text-red-500',
-                              onClick: () => {
-                                if (deleteConfirm === doc.id) {
-                                  deleteDocument(doc.id)
-                                } else {
-                                  setDeleteConfirm(doc.id)
-                                }
-                              },
+                              onClick: () => setConfirmDelete({
+                                label: `${doc.docNumber} — ${doc.clientName}`,
+                                onConfirm: () => deleteDocument(doc.id),
+                              }),
                             },
                           ]} />
                         </td>
@@ -4902,6 +4930,13 @@ function OrdersPageInner() {
           onAppend={(target) => handleAppendQuoteToInvoice(sendToInvoiceQuote, target)}
           onClose={() => setSendToInvoiceQuote(null)}
           busy={appendingToInvoice}
+        />
+      )}
+      {confirmDelete && (
+        <ConfirmDeleteModal
+          label={confirmDelete.label}
+          onConfirm={confirmDelete.onConfirm}
+          onClose={() => setConfirmDelete(null)}
         />
       )}
     </div>
