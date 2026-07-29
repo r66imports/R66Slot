@@ -4008,7 +4008,7 @@ function OrdersPageInner() {
           {TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setShowArchive(false); setShowBin(false); setClientSearch('') }}
+              onClick={() => { setTab(t.key); setShowArchive(false); setShowBin(false) }}
               className={`flex items-center gap-2 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
                 tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800'
               }`}
