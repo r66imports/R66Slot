@@ -495,7 +495,7 @@ function ItemCard({
               <input type="text" value={form.supplier} onChange={e=>{set('supplier',e.target.value);setSupplierOpen(true)}} onFocus={()=>setSupplierOpen(true)} className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Supplier name"/>
               {supplierOpen&&suppliers.length>0&&(
                 <ul className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto mt-0.5">
-                  {suppliers.filter(s=>!form.supplier||s.name.toLowerCase().includes(form.supplier.toLowerCase())).map(s=>(
+                  {suppliers.filter(s=>!form.supplier||(s.name||'').toLowerCase().includes(form.supplier.toLowerCase())).map(s=>(
                     <li key={s.id} onMouseDown={()=>{set('supplier',s.name);setSupplierOpen(false)}} className="px-3 py-2 cursor-pointer hover:bg-indigo-50 text-sm flex items-center justify-between">
                       <span>{s.name}</span>{s.preferredCurrency&&<span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{s.preferredCurrency}</span>}
                     </li>
@@ -636,7 +636,7 @@ export default function SupplierPreOrderPage() {
     Promise.all([
       loadItems(),
       fetch('/api/admin/contacts').then(r => r.json()).then(d => setContacts(Array.isArray(d) ? d : [])).catch(() => {}),
-      fetch('/api/admin/contacts?type=supplier').then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : [])).catch(() => {}),
+      fetch('/api/admin/supplier-contacts').then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : [])).catch(() => {}),
       fetch('/api/admin/preorder-dashboard/options').then(r => r.json()).then(d => { if (d && !d.error) setOptions(d) }).catch(() => {}),
       fetch('/api/admin/exchange-rates').then(r => r.json()).then(d => { if (d?.rates) setExchangeRates(d.rates) }).catch(() => {}),
       fetch('/api/admin/costing-settings').then(r => r.json()).then(d => { if (d && !d.error) setCostingSettings(d) }).catch(() => {}),
