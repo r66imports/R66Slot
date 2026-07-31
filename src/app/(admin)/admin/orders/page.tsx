@@ -4736,6 +4736,7 @@ function OrdersPageInner() {
                               className: hasOutstanding ? 'text-gray-300' : 'text-gray-500',
                               disabled: hasOutstanding,
                               onClick: async () => {
+                                if (!window.confirm(`Archive ${doc.docNumber} for ${doc.clientName}?\n\nThis moves it out of the active list.`)) return
                                 const res = await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
                                 if (res.ok) {
                                   const updated = await res.json()
