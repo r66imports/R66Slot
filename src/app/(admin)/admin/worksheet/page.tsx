@@ -69,11 +69,13 @@ interface WsSheet {
   exchangeRate: number
   markupPct: number
   shippingPct: number
+  handlingPct?: number
   vatPct: number
   finalCurrency: string
   finalExRate: number
   finalShippingCost: number
   finalCustomsCost: number
+  finalHandlingCharge?: number
   finalMarkupPct: number
   finalVatPct: number
   finalDiscountPct?: number
@@ -225,6 +227,7 @@ function WorksheetEditor({
   const [exchangeRate, setExchangeRate] = useState(18.5)
   const [markupPct, setMarkupPct] = useState(0)
   const [shippingPct, setShippingPct] = useState(0)
+  const [handlingPct, setHandlingPct] = useState(0)
   const [vatPct, setVatPct] = useState(0)
 
   // ── Final Costing Calculator ──
@@ -232,6 +235,7 @@ function WorksheetEditor({
   const [finalExRate, setFinalExRate] = useState(18.5)
   const [finalShippingCost, setFinalShippingCost] = useState(0)
   const [finalCustomsCost, setFinalCustomsCost] = useState(0)
+  const [finalHandlingCharge, setFinalHandlingCharge] = useState(0)
   const [finalMarkupPct, setFinalMarkupPct] = useState(30)
   const [finalVatPct, setFinalVatPct] = useState(0)
   const [finalDiscountPct, setFinalDiscountPct] = useState(0)
@@ -781,7 +785,7 @@ function WorksheetEditor({
     return cutMode ? afterScs * (1 - cutDiscountPct / 100) : afterScs
   }
   function calcLanded(w: number) {
-    return effectiveW(w) * exchangeRate * (1 + shippingPct / 100)
+    return effectiveW(w) * exchangeRate * (1 + (shippingPct + handlingPct) / 100)
   }
   function calcRetail(w: number) { return calcLanded(w) * (1 + markupPct / 100) * (1 + vatPct / 100) }
 
@@ -791,15 +795,18 @@ function WorksheetEditor({
     .reduce((sum, it) => sum + it.qty * effectiveFinalW(it.wholesalePrice) * finalExRate, 0)
   const shippingPctCalc = totalWholesaleZAR > 0 ? (finalShippingCost / totalWholesaleZAR) * 100 : 0
   const customsPctCalc = totalWholesaleZAR > 0 ? (finalCustomsCost / totalWholesaleZAR) * 100 : 0
+  // Handling Charge is entered in the calculator's own currency and auto-converted to ZAR before deriving its %
+  const finalHandlingCostZAR = finalHandlingCharge * finalExRate
+  const handlingPctCalc = totalWholesaleZAR > 0 ? (finalHandlingCostZAR / totalWholesaleZAR) * 100 : 0
 
   function calcFinalLanded(w: number) {
-    return effectiveFinalW(w) * finalExRate * (1 + (shippingPctCalc + customsPctCalc) / 100)
+    return effectiveFinalW(w) * finalExRate * (1 + (shippingPctCalc + customsPctCalc + handlingPctCalc) / 100)
   }
   function calcEntityFinalLanded(w: number, entity?: 'R66' | 'JDM' | '') {
     const base = calcFinalLanded(w)
     return entity === 'R66' ? base * 1.15 : base
   }
-  // Markup applied on top of Final Landed: (wholesale + shipping + customs) × (1 + markup%)
+  // Markup applied on top of Final Landed: (wholesale + shipping + customs + handling) × (1 + markup%)
   function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
   function fmtFC(n: number) { return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') }
 
@@ -883,8 +890,8 @@ function WorksheetEditor({
       supplier,
       date: worksheetDate,
       archived: false,
-      currency, exchangeRate, markupPct, shippingPct, vatPct,
-      finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalMarkupPct, finalVatPct, finalDiscountPct,
+      currency, exchangeRate, markupPct, shippingPct, handlingPct, vatPct,
+      finalCurrency, finalExRate, finalShippingCost, finalCustomsCost, finalHandlingCharge, finalMarkupPct, finalVatPct, finalDiscountPct,
       slsMode, slsDiscountPct, finalSlsDiscountPct,
       jssMode, jssShippingCost, jssVatPct, jssDiscountPct, jssMarkupPct,
       cutMode, cutDiscountPct,
@@ -944,11 +951,13 @@ function WorksheetEditor({
     setExchangeRate(sheet.exchangeRate ?? 18.5)
     setMarkupPct(sheet.markupPct ?? 0)
     setShippingPct(sheet.shippingPct ?? 0)
+    setHandlingPct(sheet.handlingPct ?? 0)
     setVatPct(sheet.vatPct ?? 0)
     setFinalCurrency(sheet.finalCurrency)
     setFinalExRate(sheet.finalExRate ?? sheet.exchangeRate ?? 18.5)
     setFinalShippingCost(sheet.finalShippingCost ?? 0)
     setFinalCustomsCost(sheet.finalCustomsCost ?? 0)
+    setFinalHandlingCharge(sheet.finalHandlingCharge ?? 0)
     setFinalMarkupPct(sheet.finalMarkupPct ?? 30)
     setFinalVatPct(sheet.finalVatPct ?? 0)
     setFinalDiscountPct((sheet as any).finalDiscountPct ?? 0)
@@ -1159,6 +1168,7 @@ function WorksheetEditor({
     <div><span>Currency </span><strong>${currency}</strong></div>
     <div><span>Ex Rate </span><strong>1 ${currency} = R${exchangeRate}</strong></div>
     <div><span>Shipping &amp; Customs </span><strong>${shippingPct}%</strong></div>
+    <div><span>Handling </span><strong>${handlingPct}%</strong></div>
     <div><span>Markup </span><strong>${markupPct}%</strong></div>
     <div><span>VAT </span><strong>${vatPct}%</strong></div>
   </div>
@@ -1167,6 +1177,7 @@ function WorksheetEditor({
     <div><span style="color:#065f46">Final Ex Rate </span><strong>1 ${finalCurrency} = R${finalExRate}</strong></div>
     <div><span style="color:#065f46">Total Shipping </span><strong>R ${fmtFC(finalShippingCost)} (${shippingPctCalc.toFixed(2)}%)</strong></div>
     <div><span style="color:#065f46">Total Customs </span><strong>R ${fmtFC(finalCustomsCost)} (${customsPctCalc.toFixed(2)}%)</strong></div>
+    <div><span style="color:#065f46">Total Handling </span><strong>R ${fmtFC(finalHandlingCostZAR)} (${handlingPctCalc.toFixed(2)}%)</strong></div>
     <div><span style="color:#065f46">Final Markup </span><strong>${finalMarkupPct}%</strong></div>
     <div><span style="color:#065f46">Final VAT </span><strong>${finalVatPct}%</strong></div>
   </div>
@@ -1481,6 +1492,11 @@ function WorksheetEditor({
               className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
           <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500">Handling Charge %</label>
+            <input type="number" min={0} step={1} value={handlingPct} onChange={(e) => setHandlingPct(Number(e.target.value))}
+              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-24 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
+          </div>
+          <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Markup %</label>
             <input type="number" min={0} step={1} value={markupPct} onChange={(e) => setMarkupPct(Number(e.target.value))}
               className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
@@ -1590,6 +1606,22 @@ function WorksheetEditor({
               <label className="text-xs text-gray-400">Customs %</label>
               <div className="px-2.5 py-1.5 text-sm w-20 bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-800 font-semibold text-center">
                 {customsPctCalc.toFixed(2)}%
+              </div>
+            </div>
+          </div>
+
+          {/* Handling charge input (in the calculator's own currency, auto-converted to ZAR) + derived % */}
+          <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500">Handling Charge ({finalCurrency})</label>
+              <input type="number" min={0} step={0.01} value={finalHandlingCharge || ''} placeholder="0.00"
+                onChange={(e) => setFinalHandlingCharge(Number(e.target.value))}
+                className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-36 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-400">Handling %</label>
+              <div className="px-2.5 py-1.5 text-sm w-20 bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-800 font-semibold text-center">
+                {handlingPctCalc.toFixed(2)}%
               </div>
             </div>
           </div>
