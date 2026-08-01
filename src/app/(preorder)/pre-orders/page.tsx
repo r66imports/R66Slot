@@ -361,7 +361,7 @@ export default function PreOrdersListPage() {
           >
             <span
               className="text-xs font-semibold uppercase tracking-wider shrink-0 mr-1"
-              style={{ color: isCyberpunk ? 'rgba(255,0,255,0.6)' : 'rgba(255,255,255,0.5)' }}
+              style={{ color: isCyberpunk ? 'rgba(255,0,255,0.6)' : 'rgba(255,255,255,0.85)' }}
             >
               Filter:
             </span>
