@@ -356,7 +356,7 @@ export default function PreOrdersListPage() {
         {/* Brand logo filter strip */}
         {logos.length > 0 && (
           <div
-            className="px-6 py-2 flex items-center gap-2 overflow-x-auto"
+            className="px-6 py-2 flex items-center gap-2 flex-wrap"
             style={{ background: t.brandStrip }}
           >
             <span
@@ -385,7 +385,7 @@ export default function PreOrdersListPage() {
                     <img src={logo.imageUrl} alt={logo.name} className="h-6 object-contain" />
                   )}
                   {logo.name && (
-                    <span className="text-xs font-bold">{logo.name}</span>
+                    <span className="text-xl font-bold">{logo.name}</span>
                   )}
                 </button>
               )
