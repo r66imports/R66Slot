@@ -143,7 +143,7 @@ export default function PublicPreOrderItemPage() {
           <div className="p-8 space-y-6">
             {/* Brand + SKU */}
             <div className="flex items-center gap-3 flex-wrap">
-              {item.brand && <span className="bg-primary text-white text-sm font-bold px-4 py-1 rounded-full">{item.brand}</span>}
+              {item.brand && <span className="inline-block max-w-full bg-primary text-white text-xl font-bold px-4 py-1 rounded-full whitespace-normal break-words text-center leading-tight">{item.brand}</span>}
               <span className="text-gray-400 text-sm">SKU: {item.sku}</span>
             </div>
 
