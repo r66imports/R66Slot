@@ -53,6 +53,7 @@ type Theme = {
   // brand strip
   brandStrip: string
   brandChipBg: string
+  brandChipText?: string
   brandChipActive: string
   brandChipActiveText: string
   // cards
@@ -154,6 +155,7 @@ const THEMES: Record<string, Theme> = {
     badgeLabelBg: 'rgba(196,18,48,0.15)',
     brandStrip: 'rgba(255,255,255,0.08)',
     brandChipBg: 'rgba(255,255,255,0.12)',
+    brandChipText: '#ffffff',
     brandChipActive: '#C41230',
     brandChipActiveText: '#ffffff',
     cardBg: '#ffffff',
@@ -373,7 +375,7 @@ export default function PreOrdersListPage() {
                   className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all shrink-0"
                   style={{
                     background: isActive ? t.brandChipActive : t.brandChipBg,
-                    color: isActive ? t.brandChipActiveText : t.text,
+                    color: isActive ? t.brandChipActiveText : (t.brandChipText ?? t.text),
                     transform: isActive ? 'scale(1.05)' : 'scale(1)',
                     boxShadow: isActive && isCyberpunk ? '0 0 12px rgba(255,0,255,0.6)' : isActive ? '0 2px 8px rgba(0,0,0,0.3)' : 'none',
                     border: isCyberpunk ? `1px solid ${isActive ? '#ff00ff' : 'rgba(255,0,255,0.2)'}` : 'none',
