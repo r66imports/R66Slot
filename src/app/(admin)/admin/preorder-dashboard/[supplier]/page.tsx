@@ -26,7 +26,7 @@ interface DashboardItem {
 type FormState = Omit<DashboardItem, 'id' | 'createdAt'>
 interface DashboardOptions { brands: string[]; units: string[]; etas: string[] }
 interface CostingSettings { shippingMarkup: number; markup: number; includeVAT: boolean }
-type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff'
+type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff' | 'new'
 
 const CURRENCIES = ['ZAR','USD','CNY','EUR','GBP','HKD','SGD','JPY','AUD','CAD']
 const PAGE_SIZE = 10
@@ -647,6 +647,13 @@ export default function SupplierPreOrderPage() {
     if (!loading && searchParams.get('new') === '1') startNew()
   }, [loading])
 
+  // Most recent reservation timestamp among an item's not-yet-seen customers (0 if none)
+  const latestNewReservedAt = (i: DashboardItem) => {
+    const newCustomers = i.customers.filter(c => (c as any).isNew)
+    if (!newCustomers.length) return 0
+    return Math.max(...newCustomers.map(c => new Date((c as any).reservedAt || 0).getTime()))
+  }
+
   const sorted = [...items].sort((a, b) => {
     let v = 0
     if (sortBy === 'az') v = a.description.localeCompare(b.description)
@@ -654,6 +661,7 @@ export default function SupplierPreOrderPage() {
     else if (sortBy === 'brand') v = a.brand.localeCompare(b.brand)
     else if (sortBy === 'price') v = parsePrice(a.estimatedRetailPrice) - parsePrice(b.estimatedRetailPrice)
     else if (sortBy === 'date') v = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    else if (sortBy === 'new') v = latestNewReservedAt(a) - latestNewReservedAt(b)
     else if (sortBy === 'cutoff') {
       const da = a.cutoffDate ? new Date(a.cutoffDate).getTime() : Infinity
       const db2 = b.cutoffDate ? new Date(b.cutoffDate).getTime() : Infinity
@@ -662,18 +670,26 @@ export default function SupplierPreOrderPage() {
     return sortAsc ? v : -v
   })
 
+  // "New Orders" filters the list down to items with at least one not-yet-seen reservation
+  const newFiltered = sortBy === 'new' ? sorted.filter(i => i.customers.some(c => (c as any).isNew)) : sorted
+
   const filtered = search.trim()
-    ? sorted.filter(i =>
+    ? newFiltered.filter(i =>
         i.description.toLowerCase().includes(search.toLowerCase()) ||
         i.sku.toLowerCase().includes(search.toLowerCase()) ||
         (i.brand || '').toLowerCase().includes(search.toLowerCase())
       )
-    : sorted
+    : newFiltered
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pagedItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
   const newOrders = items.reduce((s, i) => s + i.customers.filter(c => (c as any).isNew).length, 0)
+
+  // Fall back to Date Added if the New Orders filter is active but everything's since been marked seen
+  useEffect(() => {
+    if (sortBy === 'new' && newOrders === 0) setSortBy('date')
+  }, [sortBy, newOrders])
 
   const startNew = () => {
     const draft: DashboardItem & { _draft: boolean } = {
@@ -792,6 +808,7 @@ export default function SupplierPreOrderPage() {
   }
 
   const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+    ...(newOrders > 0 ? [{ value: 'new' as SortBy, label: `🆕 New Orders (${newOrders})` }] : []),
     { value: 'date', label: 'Date Added' }, { value: 'az', label: 'A–Z' }, { value: 'sku', label: 'SKU' },
     { value: 'brand', label: 'Brand' }, { value: 'price', label: 'Price' }, { value: 'cutoff', label: 'Cut-off Date' },
   ]
