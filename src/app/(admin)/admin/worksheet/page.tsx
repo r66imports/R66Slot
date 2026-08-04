@@ -92,7 +92,14 @@ interface WsSheet {
   trackingNumber?: string
   supplierInvNumber?: string
   supplierInvDate?: string
+  supplierPayments?: SupplierPayment[]
   items: WsItem[]
+}
+
+interface SupplierPayment {
+  id: string
+  amountForeign: number
+  amountZAR: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -115,6 +122,10 @@ function newWsItem(): WsItem {
 
 function newSheetId() {
   return `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+}
+
+function newSupplierPayment(): SupplierPayment {
+  return { id: `pmt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, amountForeign: 0, amountZAR: 0 }
 }
 
 function formatDisplayDate(iso: string): string {
@@ -252,6 +263,19 @@ function WorksheetEditor({
   const [jssVatPct, setJssVatPct] = useState(15)
   const [jssDiscountPct, setJssDiscountPct] = useState(2.5)
   const [jssMarkupPct, setJssMarkupPct] = useState(30)
+
+  // ── Supplier Payments ──
+  const [supplierPayments, setSupplierPayments] = useState<SupplierPayment[]>([])
+
+  function addSupplierPayment() {
+    setSupplierPayments(prev => [...prev, newSupplierPayment()])
+  }
+  function updateSupplierPayment(id: string, patch: Partial<SupplierPayment>) {
+    setSupplierPayments(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
+  }
+  function removeSupplierPayment(id: string) {
+    setSupplierPayments(prev => prev.filter(p => p.id !== id))
+  }
 
   // ── Items ──
   const [items, setItems] = useState<WsItem[]>([newWsItem()])
@@ -798,6 +822,13 @@ function WorksheetEditor({
   // Handling Charge is entered in the calculator's own currency and auto-converted to ZAR before deriving its %
   const finalHandlingCostZAR = finalHandlingCharge * finalExRate
   const handlingPctCalc = totalWholesaleZAR > 0 ? (finalHandlingCostZAR / totalWholesaleZAR) * 100 : 0
+  // Total wholesale converted back into the supplier's own currency, for comparing against payments made
+  const totalWholesaleForeign = finalExRate > 0 ? totalWholesaleZAR / finalExRate : 0
+
+  // ── Supplier Payments — each row's own rate, plus a blended rate across all of them ──
+  const totalPaidForeign = supplierPayments.reduce((s, p) => s + p.amountForeign, 0)
+  const totalPaidZAR = supplierPayments.reduce((s, p) => s + p.amountZAR, 0)
+  const blendedPaymentRate = totalPaidForeign > 0 ? totalPaidZAR / totalPaidForeign : 0
 
   function calcFinalLanded(w: number) {
     return effectiveFinalW(w) * finalExRate * (1 + (shippingPctCalc + customsPctCalc + handlingPctCalc) / 100)
@@ -898,6 +929,7 @@ function WorksheetEditor({
       trackingNumber,
       supplierInvNumber,
       supplierInvDate,
+      supplierPayments,
       items: items.map((it) => ({ ...it, skuSearch: '' })),
     }
   }
@@ -968,6 +1000,7 @@ function WorksheetEditor({
     setJssShippingCost((sheet as any).jssShippingCost ?? 0)
     setJssVatPct((sheet as any).jssVatPct ?? 15)
     setJssDiscountPct((sheet as any).jssDiscountPct ?? 2.5)
+    setSupplierPayments(Array.isArray(sheet.supplierPayments) ? sheet.supplierPayments : [])
     setJssMarkupPct((sheet as any).jssMarkupPct ?? 30)
     setCutMode((sheet as any).cutMode ?? false)
     setCutDiscountPct((sheet as any).cutDiscountPct ?? 10)
@@ -1012,14 +1045,17 @@ function WorksheetEditor({
     setExchangeRate(fxRates['USD'] ?? CURRENCY_DEFAULTS['USD'])
     setMarkupPct(0)
     setShippingPct(0)
+    setHandlingPct(0)
     setVatPct(0)
     setFinalCurrency('USD')
     setFinalExRate(fxRates['USD'] ?? CURRENCY_DEFAULTS['USD'])
     setFinalShippingCost(0)
     setFinalCustomsCost(0)
+    setFinalHandlingCharge(0)
     setFinalMarkupPct(30)
     setFinalVatPct(0)
     setFinalDiscountPct(0)
+    setSupplierPayments([])
     setTrackingNumber('')
     setTrackingEditMode(false)
     setSupplierInvNumber('')
@@ -1782,6 +1818,87 @@ function WorksheetEditor({
           </div>
         </div>
       )}
+
+      {/* ── Supplier Payments ── */}
+      <div className="border border-indigo-100 rounded-xl px-5 py-4 bg-indigo-50/40">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-700">Payments</p>
+            <p className="text-xs text-indigo-500 mt-0.5">
+              Log each payment made to the supplier to work out the real exchange rate you paid.
+              {totalWholesaleForeign > 0 && <span className="ml-1 text-indigo-600">Worksheet total: {finalCurrency} {fmtFC(totalWholesaleForeign)}</span>}
+            </p>
+          </div>
+          <button type="button" onClick={addSupplierPayment}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors whitespace-nowrap">
+            + Add Payment
+          </button>
+        </div>
+
+        {supplierPayments.length > 0 && (
+          <div className="space-y-2">
+            {supplierPayments.map((p, idx) => {
+              const rowRate = p.amountForeign > 0 ? p.amountZAR / p.amountForeign : 0
+              return (
+                <div key={p.id} className="flex flex-wrap items-end gap-3 bg-white border border-indigo-100 rounded-lg px-3 py-2">
+                  <span className="text-xs text-gray-400 w-5 text-center">{idx + 1}</span>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500">Payment ({finalCurrency})</label>
+                    <input type="number" min={0} step={0.01} value={p.amountForeign || ''} placeholder="0.00"
+                      onChange={(e) => updateSupplierPayment(p.id, { amountForeign: Number(e.target.value) })}
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500">Payment (ZAR)</label>
+                    <input type="number" min={0} step={0.01} value={p.amountZAR || ''} placeholder="0.00"
+                      onChange={(e) => updateSupplierPayment(p.id, { amountZAR: Number(e.target.value) })}
+                      className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-32 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-400">Rate</label>
+                    <div className="px-2.5 py-1.5 text-xs font-semibold text-indigo-800 bg-indigo-100 border border-indigo-200 rounded-lg text-center whitespace-nowrap">
+                      {rowRate > 0 ? `1 ${finalCurrency} = R${rowRate.toFixed(4)}` : '—'}
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => removeSupplierPayment(p.id)}
+                    className="ml-auto text-gray-300 hover:text-red-500 transition-colors text-base leading-none" title="Remove payment">
+                    🗑️
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {supplierPayments.length === 0 && (
+          <p className="text-xs text-indigo-400 italic">No payments logged yet — click &ldquo;+ Add Payment&rdquo; for each amount you send the supplier.</p>
+        )}
+
+        {supplierPayments.length > 0 && (
+          <div className="flex flex-wrap items-center gap-4 mt-3 pt-3 border-t border-indigo-200">
+            <div>
+              <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">Total Paid ({finalCurrency})</p>
+              <p className="text-sm font-bold text-indigo-900">{fmtFC(totalPaidForeign)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">Total Paid (ZAR)</p>
+              <p className="text-sm font-bold text-indigo-900">R {fmtFC(totalPaidZAR)}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">Blended Exchange Rate</p>
+              <p className="text-sm font-bold text-indigo-900">{blendedPaymentRate > 0 ? `1 ${finalCurrency} = R${blendedPaymentRate.toFixed(4)}` : '—'}</p>
+            </div>
+            {totalWholesaleForeign > 0 && (
+              <div>
+                <p className="text-[10px] font-semibold text-indigo-500 uppercase tracking-wide">Remaining</p>
+                <p className={`text-sm font-bold ${totalWholesaleForeign - totalPaidForeign > 0.005 ? 'text-amber-600' : 'text-green-600'}`}>
+                  {finalCurrency} {fmtFC(Math.max(0, totalWholesaleForeign - totalPaidForeign))}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* ── Items table ── */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
