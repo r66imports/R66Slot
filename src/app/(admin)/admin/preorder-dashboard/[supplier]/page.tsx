@@ -130,14 +130,19 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
 }) {
   const [open,setOpen]=useState(false); const [mode,setMode]=useState<'new'|'existing'>('new')
   const [docs,setDocs]=useState<any[]>([]); const [loading,setLoading]=useState(false)
+  const [docSearch,setDocSearch]=useState('')
   const [sending,setSending]=useState(false); const ref=useRef<HTMLDivElement>(null)
   useEffect(()=>{
     const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node)) setOpen(false)}
     document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h)
   },[])
   const loadDocs = async (m: 'new'|'existing') => {
-    if(m==='existing'){setLoading(true);try{const d=await fetch('/api/admin/orders/bootstrap').then(r=>r.json());setDocs([...(d.quotes||[]).filter((q:any)=>q.status==='open'),(d.salesOrders||[]).filter((s:any)=>s.status!=='closed'),(d.invoices||[]).filter((i:any)=>i.status==='unpaid')].flat())}catch{}finally{setLoading(false)}}
+    if(m==='existing'){setLoading(true);setDocSearch('');try{const d=await fetch('/api/admin/orders/bootstrap').then(r=>r.json());setDocs([...(d.quotes||[]).filter((q:any)=>q.status==='open'),(d.salesOrders||[]).filter((s:any)=>s.status!=='closed'),(d.invoices||[]).filter((i:any)=>i.status==='unpaid')].flat())}catch{}finally{setLoading(false)}}
   }
+  const docSearchQ=docSearch.trim().toLowerCase()
+  const docsToShow=docSearchQ
+    ?docs.filter(d=>(d.docNumber||d.quoteNumber||d.soNumber||'').toLowerCase().includes(docSearchQ)||(d.clientName||'').toLowerCase().includes(docSearchQ))
+    :docs
   const send = async (docType: string, targetDocId?: string) => {
     setSending(true);setOpen(false)
     try {
@@ -172,16 +177,24 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
             </div>
           )}
           {mode==='existing'&&(
-            <div className="max-h-48 overflow-y-auto p-1.5">
-              {loading?<p className="text-[11px] text-gray-400 text-center py-3">Loading…</p>
-                :docs.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No open documents</p>
-                :docs.map(d=>(
-                  <button key={d.id} onClick={()=>send('existing',d.id)} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 transition-colors">
-                    <span className="font-semibold">{d.docNumber||d.quoteNumber||d.soNumber}</span>
-                    {d.clientName&&<span className="text-gray-400 ml-1">· {d.clientName}</span>}
-                  </button>
-                ))
-              }
+            <div className="p-1.5">
+              {!loading&&docs.length>0&&(
+                <input type="text" value={docSearch} onChange={e=>setDocSearch(e.target.value)}
+                  placeholder="Search Quote/SO/Invoice…"
+                  className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1 mb-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+              )}
+              <div className="max-h-48 overflow-y-auto">
+                {loading?<p className="text-[11px] text-gray-400 text-center py-3">Loading…</p>
+                  :docs.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No open documents</p>
+                  :docsToShow.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No matches</p>
+                  :docsToShow.map(d=>(
+                    <button key={d.id} onClick={()=>send('existing',d.id)} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 transition-colors">
+                      <span className="font-semibold">{d.docNumber||d.quoteNumber||d.soNumber}</span>
+                      {d.clientName&&<span className="text-gray-400 ml-1">· {d.clientName}</span>}
+                    </button>
+                  ))
+                }
+              </div>
             </div>
           )}
         </div>
