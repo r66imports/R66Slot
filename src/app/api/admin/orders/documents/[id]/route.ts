@@ -45,9 +45,21 @@ export async function PATCH(
     // Rule 3 — Stock Deduction: only adjust stock if the rule is active
     if (stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
       if (prev.stockDeducted !== false && wasStockable && isCancelled && !wasCancelled) {
-        // Being cancelled/archived — restore stock (handles both stockDeducted:true and legacy undefined)
-        await adjustStock(prev.lineItems, 'add')
-        body.stockDeducted = false
+        // Being cancelled/archived — restore stock UNLESS it's a fully-paid invoice being archived.
+        // A paid invoice means the sale completed; stock is legitimately gone and must stay deducted.
+        let shouldRestore = true
+        if (newStatus === 'archived' && prev.type === 'invoice') {
+          const lineTotal = prev.lineItems.reduce((s: number, li: any) => s + li.qty * (li.unitPrice || 0), 0)
+          const disc = lineTotal * ((prev as any).discountPct || 0) / 100
+          const ship = (prev as any).shippingCost || 0
+          const total = lineTotal - disc + ship
+          const paid = ((prev as any).amountPaid || 0) + ((prev as any).creditApplied || 0)
+          if (total > 0 && total - paid <= 0.005) shouldRestore = false
+        }
+        if (shouldRestore) {
+          await adjustStock(prev.lineItems, 'add')
+          body.stockDeducted = false
+        }
       } else if (prev.stockDeducted !== false && wasStockable && !isCancelled && body.lineItems) {
         // Active invoice/SO with changed line items — reverse old qty, apply new qty (handles legacy undefined)
         await adjustStock(prev.lineItems, 'add')
