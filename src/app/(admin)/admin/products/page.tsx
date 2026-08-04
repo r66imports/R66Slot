@@ -1423,10 +1423,10 @@ export default function ProductsPage() {
                         {/* Product */}
                         <td className="py-2 px-2">
                           <div className="flex items-center gap-2">
-                            <div className="w-14 h-14 bg-gray-100 rounded flex-shrink-0 flex items-center justify-center overflow-hidden">
+                            <div className="w-[150px] h-[150px] bg-gray-100 rounded flex-shrink-0 flex items-center justify-center overflow-hidden">
                               {product.imageUrl
                                 ? <img src={product.imageUrl} alt="" className="w-full h-full object-cover" />
-                                : <span className="text-gray-400 text-[10px]">IMG</span>}
+                                : <span className="text-gray-400 text-sm">IMG</span>}
                             </div>
                             <div>
                               <span className={`font-medium break-words block ${colW.title < 120 ? 'text-[10px]' : colW.title < 155 ? 'text-[11px]' : 'text-xs'}`}>{product.title}</span>
