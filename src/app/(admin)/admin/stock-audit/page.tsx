@@ -46,6 +46,7 @@ export default function StockAuditPage() {
   const [filter, setFilter] = useState<'all' | 'unsynced' | 'oversold' | 'ok'>('all')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [detail, setDetail] = useState<SkuAuditRow | null>(null)
+  const [supplierNames, setSupplierNames] = useState<string[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -62,11 +63,19 @@ export default function StockAuditPage() {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    fetch('/api/admin/supplier-contacts')
+      .then(r => r.ok ? r.json() : [])
+      .then((list: any[]) => setSupplierNames(Array.isArray(list) ? list.map(s => s.name).filter(Boolean) : []))
+      .catch(() => {})
+  }, [])
 
-  // Unique suppliers from rows
-  const suppliers = data
-    ? ['all', ...Array.from(new Set(data.rows.map(r => r.supplier).filter(Boolean))).sort()]
-    : ['all']
+  // Every supplier from Supplier Network Contacts, plus any supplier name seen in the audit rows
+  // that isn't in that list (e.g. a legacy/typo'd name), so nothing already filterable is lost.
+  const suppliers = ['all', ...Array.from(new Set([
+    ...supplierNames,
+    ...(data ? data.rows.map(r => r.supplier).filter(Boolean) : []),
+  ])).sort()]
 
   const filtered = data?.rows.filter(row => {
     if (filter !== 'all' && row.status !== filter) return false
