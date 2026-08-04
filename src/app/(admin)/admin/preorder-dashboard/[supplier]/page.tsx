@@ -690,7 +690,8 @@ export default function SupplierPreOrderPage() {
     ? newFiltered.filter(i =>
         i.description.toLowerCase().includes(search.toLowerCase()) ||
         i.sku.toLowerCase().includes(search.toLowerCase()) ||
-        (i.brand || '').toLowerCase().includes(search.toLowerCase())
+        (i.brand || '').toLowerCase().includes(search.toLowerCase()) ||
+        i.customers.some(c => c.linkedDocNumber?.toLowerCase().includes(search.toLowerCase()))
       )
     : newFiltered
 
@@ -828,7 +829,10 @@ export default function SupplierPreOrderPage() {
 
   const fxPairs = Object.entries(exchangeRates).filter(([cur]) => cur !== 'ZAR' && items.some(i => i.wholesaleCurrency === cur))
   const viewAllFiltered = showViewAll
-    ? sorted.filter(i => !viewAllSearch || i.description.toLowerCase().includes(viewAllSearch.toLowerCase()) || i.sku.toLowerCase().includes(viewAllSearch.toLowerCase()))
+    ? sorted.filter(i => !viewAllSearch ||
+        i.description.toLowerCase().includes(viewAllSearch.toLowerCase()) ||
+        i.sku.toLowerCase().includes(viewAllSearch.toLowerCase()) ||
+        i.customers.some(c => c.linkedDocNumber?.toLowerCase().includes(viewAllSearch.toLowerCase())))
     : []
 
   return (
