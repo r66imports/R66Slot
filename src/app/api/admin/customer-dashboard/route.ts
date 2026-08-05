@@ -5,7 +5,7 @@ const DOCS_KEY    = 'data/order-documents.json'
 const CREDITS_KEY = 'data/customer-credits.json'
 
 function docTotal(doc: any): number {
-  const sub = (doc.lineItems || []).reduce((s: number, li: any) => s + (li.qty || 0) * (li.unitPrice || 0), 0)
+  const sub = (doc.lineItems || []).reduce((s: number, li: any) => s + (li.qty || 0) * (li.unitPrice || 0) * (1 - ((li.discountPct || 0) / 100)), 0)
   const disc = sub * ((doc.discountPct || 0) / 100)
   return sub - disc + (doc.shippingCost || 0)
 }
