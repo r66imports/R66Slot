@@ -312,15 +312,18 @@ function WorksheetEditor({
   }, [supplier, suppliers])
 
   // ── Backfill retailPrice/inStock when products load ──
-  // inStock always reflects live DB quantity so manual inventory fixes are visible
+  // inStock always reflects live DB quantity so manual inventory fixes are visible.
+  // Retail (ZAR) defaults to the Pre Order Price (calcRetail from wholesale) when there's
+  // no existing product to backfill from — e.g. a new SKU not yet in Inventory.
   useEffect(() => {
     if (products.length === 0) return
     setItems((prev) => prev.map((it) => {
       const prod = products.find((p) => p.sku === it.sku)
-      if (!prod) return it
+      const fallbackRetail = it.wholesalePrice > 0 ? Math.round(calcRetail(it.wholesalePrice) * 100) / 100 : 0
+      if (!prod) return it.retailPrice ? it : { ...it, retailPrice: fallbackRetail }
       return {
         ...it,
-        retailPrice: it.retailPrice || prod.preOrderPrice || prod.price,
+        retailPrice: it.retailPrice || prod.preOrderPrice || prod.price || fallbackRetail,
         preOrderPrice: it.preOrderPrice || prod.preOrderPrice || 0,
         inStock: prod.quantity,
       }
@@ -2278,7 +2281,12 @@ function WorksheetEditor({
                           <div className="flex items-center justify-end gap-1">
                             <span className="text-[10px] text-gray-400">Base</span>
                             <input type="number" min={0} step={0.01} value={it.wholesalePrice || ''} placeholder="0.00"
-                              onChange={(e) => updateItem(it.id, { wholesalePrice: Number(e.target.value) })}
+                              onChange={(e) => {
+                                const wp = Number(e.target.value)
+                                const patch: Partial<WsItem> = { wholesalePrice: wp }
+                                if (!it.retailPrice && wp > 0) patch.retailPrice = Math.round(calcRetail(wp) * 100) / 100
+                                updateItem(it.id, patch)
+                              }}
                               onFocus={() => setActiveSkuRow(null)}
                               className="w-20 border border-gray-200 rounded px-2 py-0.5 text-[10px] text-right focus:outline-none focus:ring-1 focus:ring-rose-400 text-gray-500"
                             />
@@ -2294,7 +2302,12 @@ function WorksheetEditor({
                         <div className="flex items-center justify-end">
                           <span className="text-xs text-gray-400 mr-1">{currency}</span>
                           <input type="number" min={0} step={0.01} value={it.wholesalePrice || ''} placeholder="0.00"
-                            onChange={(e) => updateItem(it.id, { wholesalePrice: Number(e.target.value) })}
+                            onChange={(e) => {
+                              const wp = Number(e.target.value)
+                              const patch: Partial<WsItem> = { wholesalePrice: wp }
+                              if (!it.retailPrice && wp > 0) patch.retailPrice = Math.round(calcRetail(wp) * 100) / 100
+                              updateItem(it.id, patch)
+                            }}
                             onFocus={() => setActiveSkuRow(null)}
                             className="w-24 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-right focus:outline-none focus:ring-2 focus:ring-blue-400"
                           />
