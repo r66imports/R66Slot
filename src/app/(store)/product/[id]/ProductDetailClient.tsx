@@ -95,10 +95,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* ── Left: Images ── */}
         <div>
-          <div className="rounded-xl overflow-hidden bg-gray-50 border border-gray-100 mb-3 flex items-center justify-center" style={{ minHeight: '340px' }}>
+          <div className="rounded-xl overflow-hidden bg-gray-50 border border-gray-100 mb-3 flex items-center justify-center" style={{ minHeight: '680px' }}>
             {allImages.length > 0 ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={allImages[activeImg]} alt={product.title} className="w-full object-contain" style={{ maxHeight: '480px' }} />
+              <img src={allImages[activeImg]} alt={product.title} className="w-full object-contain" style={{ maxHeight: '960px' }} />
             ) : (
               <span className="text-gray-300 text-8xl">🏎️</span>
             )}
