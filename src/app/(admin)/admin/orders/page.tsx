@@ -4597,6 +4597,10 @@ function OrdersPageInner() {
                           <div className="font-semibold">{fmtPrice(docTotal)}</div>
                           {isPartiallyPaid && <div className="text-[10px] text-red-600 font-semibold mt-0.5">Due {fmtPrice(docBalance)}</div>}
                           {amtPaid > 0 && !isPartiallyPaid && doc.status !== 'paid' && doc.status !== 'archived' && <div className="text-[10px] text-green-600 mt-0.5">Paid {fmtPrice(amtPaid)}</div>}
+                          {/* Pre Order Deposit quotes: show the deposit due/received even before a formal Record Payment */}
+                          {(doc as any).preOrderDeposit && amtPaid === 0 && ((doc as any).depositPaid || 0) > 0.005 && doc.status !== 'archived' && (
+                            <div className="text-[10px] text-amber-600 font-semibold mt-0.5">Deposit {fmtPrice((doc as any).depositPaid)}</div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">
