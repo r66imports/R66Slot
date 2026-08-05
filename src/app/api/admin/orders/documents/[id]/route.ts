@@ -49,7 +49,7 @@ export async function PATCH(
         // A paid invoice means the sale completed; stock is legitimately gone and must stay deducted.
         let shouldRestore = true
         if (newStatus === 'archived' && prev.type === 'invoice') {
-          const lineTotal = prev.lineItems.reduce((s: number, li: any) => s + li.qty * (li.unitPrice || 0), 0)
+          const lineTotal = prev.lineItems.reduce((s: number, li: any) => s + li.qty * (li.unitPrice || 0) * (1 - ((li.discountPct || 0) / 100)), 0)
           const disc = lineTotal * ((prev as any).discountPct || 0) / 100
           const ship = (prev as any).shippingCost || 0
           const total = lineTotal - disc + ship

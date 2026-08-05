@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import React from 'react'
 
-type LineItem = { qty: number; unitPrice: number }
+type LineItem = { qty: number; unitPrice: number; discountPct?: number }
 
 type Invoice = {
   id: string
@@ -57,7 +57,7 @@ function fmtDate(d: string): string {
 }
 
 function invoiceTotal(doc: Invoice): number {
-  const sub = doc.lineItems.reduce((s, l) => s + l.qty * l.unitPrice, 0)
+  const sub = doc.lineItems.reduce((s, l) => s + l.qty * l.unitPrice * (1 - (l.discountPct || 0) / 100), 0)
   const disc = sub * (doc.discountPct || 0) / 100
   return sub - disc + (doc.shippingCost || 0)
 }
