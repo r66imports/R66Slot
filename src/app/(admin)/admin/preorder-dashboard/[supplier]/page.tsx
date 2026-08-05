@@ -129,31 +129,80 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   onLinked: (docNumber: string, docId: string) => void
 }) {
   const [open,setOpen]=useState(false); const [mode,setMode]=useState<'new'|'existing'>('new')
-  const [docs,setDocs]=useState<any[]>([]); const [loading,setLoading]=useState(false)
+  const [docs,setDocs]=useState<any[]>([]); const [allDocs,setAllDocs]=useState<any[]>([]); const [loading,setLoading]=useState(false)
   const [docSearch,setDocSearch]=useState('')
   const [sending,setSending]=useState(false); const ref=useRef<HTMLDivElement>(null)
   useEffect(()=>{
     const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node)) setOpen(false)}
     document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h)
   },[])
-  const loadDocs = async (m: 'new'|'existing') => {
-    if(m==='existing'){setLoading(true);setDocSearch('');try{const d=await fetch('/api/admin/orders/bootstrap').then(r=>r.json());setDocs([...(d.quotes||[]).filter((q:any)=>q.status==='open'),(d.salesOrders||[]).filter((s:any)=>s.status!=='closed'),(d.invoices||[]).filter((i:any)=>i.status==='unpaid')].flat())}catch{}finally{setLoading(false)}}
+
+  const openStatuses=['draft','sent','accepted','pending','processing','active']
+  const isOpenDoc=(d:any)=>d.type==='invoice'?d.status!=='archived':openStatuses.includes(d.status)
+
+  const loadDocs = async () => {
+    setLoading(true); setDocSearch('')
+    try{
+      const all:any[]=await fetch('/api/admin/orders/documents').then(r=>r.ok?r.json():[])
+      const openDocs=(Array.isArray(all)?all:[]).filter(isOpenDoc)
+      setAllDocs(openDocs)
+      setDocs(openDocs.filter((d:any)=>
+        (customer.email&&d.clientEmail?.toLowerCase()===customer.email.toLowerCase())||
+        d.clientName?.toLowerCase()===customer.name.toLowerCase()
+      ))
+    }catch{setDocs([]);setAllDocs([])}
+    finally{setLoading(false)}
   }
+
   const docSearchQ=docSearch.trim().toLowerCase()
+  // Typing a search widens the list from just this customer's docs to every open Quote/SO/Invoice
   const docsToShow=docSearchQ
-    ?docs.filter(d=>(d.docNumber||d.quoteNumber||d.soNumber||'').toLowerCase().includes(docSearchQ)||(d.clientName||'').toLowerCase().includes(docSearchQ))
+    ?allDocs.filter(d=>(d.docNumber||'').toLowerCase().includes(docSearchQ)||(d.clientName||'').toLowerCase().includes(docSearchQ))
     :docs
-  const send = async (docType: string, targetDocId?: string) => {
-    setSending(true);setOpen(false)
-    try {
-      const lineItem = { id:`li_${Date.now()}`, sku:`${form.sku} – ${form.description}`, description:form.description, qty:customer.qty, unitPrice, total:unitPrice*customer.qty }
-      const res = await fetch('/api/admin/orders/from-preorder', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ docType, targetDocId, customerId:customer.id, customerName:customer.name, lineItem, preOrderSku:form.sku })
-      })
-      if(res.ok){ const d=await res.json(); onLinked(d.docNumber||'',d.id||'') }
-    } finally { setSending(false) }
+
+  const nextDocNumber=(existing:any[],type:'quote'|'salesorder'|'invoice')=>{
+    if(type==='quote'){const nums=existing.map((d:any)=>{const m=/^QR66(\d+)$/i.exec(d.docNumber||'');return m?parseInt(m[1],10):0});return `QR66${Math.max(0,...nums)+1}`}
+    if(type==='salesorder'){const nums=existing.map((d:any)=>{const m=/^SO(\d+)$/i.exec(d.docNumber||'');return m?parseInt(m[1],10):0});return `SO${String(Math.max(0,...nums)+1).padStart(3,'0')}`}
+    const nums=existing.map((d:any)=>{const m=/^INV(\d+)$/i.exec(d.docNumber||'');return m?parseInt(m[1],10):0}).filter((n:number)=>n>0)
+    const next=(nums.length>0?Math.max(...nums):25)+1
+    return `INV${String(next).padStart(4,'0')}`
   }
+
+  const lineItem=()=>({id:`li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,description:`${form.sku} – ${form.description}`,qty:customer.qty,unitPrice})
+
+  const createNew = async (type:'quote'|'salesorder'|'invoice') => {
+    setSending(true);setOpen(false)
+    try{
+      const existingRaw=await fetch(`/api/admin/orders/documents?type=${type}`).then(r=>r.ok?r.json():[])
+      const docNumber=nextDocNumber(Array.isArray(existingRaw)?existingRaw:[],type)
+      const res=await fetch('/api/admin/orders/documents',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          type,docNumber,date:new Date().toISOString().slice(0,10),
+          clientName:customer.name,clientEmail:customer.email||'',clientPhone:(customer as any).phone||'',clientAddress:'',
+          lineItems:[lineItem()],notes:`Pre-order: ${form.supplier||''} — ${form.description}`,terms:'',status:'draft',
+        }),
+      })
+      if(res.ok){const doc=await res.json();if(doc.id) onLinked(doc.docNumber,doc.id)}
+    }catch{}
+    finally{setSending(false)}
+  }
+
+  const appendToExisting = async (target:any) => {
+    setSending(true);setOpen(false)
+    try{
+      const skuPrefix=form.sku?`${form.sku} –`:null
+      const existingItems:any[]=target.lineItems||[]
+      const existingIdx=skuPrefix?existingItems.findIndex((i:any)=>i.description?.startsWith(skuPrefix)):-1
+      const updatedItems=existingIdx>=0
+        ?existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)
+        :[...existingItems,lineItem()]
+      const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lineItems:updatedItems})})
+      if(res.ok) onLinked(target.docNumber,target.id)
+    }catch{}
+    finally{setSending(false)}
+  }
+
   return (
     <div ref={ref} className="relative ml-auto">
       {customer.linkedDocNumber ? (
@@ -165,32 +214,31 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-52 overflow-hidden">
           <div className="flex border-b border-gray-100">
             <button onClick={()=>{setMode('new')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='new'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Create New</button>
-            <button onClick={()=>{setMode('existing');loadDocs('existing')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='existing'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Add to Existing</button>
+            <button onClick={()=>{setMode('existing');loadDocs()}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='existing'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Add to Existing</button>
           </div>
           {mode==='new'&&(
             <div className="p-1.5 space-y-0.5">
-              {(['quote','so','invoice'] as const).map(t=>(
-                <button key={t} onClick={()=>send(t)} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">
-                  {t==='quote'?'📄 New Quote':t==='so'?'📋 New Sales Order':'🧾 New Invoice'}
-                </button>
-              ))}
+              <button onClick={()=>createNew('quote')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📄 New Quote</button>
+              <button onClick={()=>createNew('salesorder')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📋 New Sales Order</button>
+              <button onClick={()=>createNew('invoice')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">🧾 New Invoice</button>
             </div>
           )}
           {mode==='existing'&&(
             <div className="p-1.5">
-              {!loading&&docs.length>0&&(
+              {!loading&&allDocs.length>0&&(
                 <input type="text" value={docSearch} onChange={e=>setDocSearch(e.target.value)}
-                  placeholder="Search Quote/SO/Invoice…"
+                  placeholder="Search any Quote/SO/Invoice…"
                   className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1 mb-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
               )}
               <div className="max-h-48 overflow-y-auto">
                 {loading?<p className="text-[11px] text-gray-400 text-center py-3">Loading…</p>
-                  :docs.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No open documents</p>
+                  :allDocs.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No open documents</p>
                   :docsToShow.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No matches</p>
                   :docsToShow.map(d=>(
-                    <button key={d.id} onClick={()=>send('existing',d.id)} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 transition-colors">
-                      <span className="font-semibold">{d.docNumber||d.quoteNumber||d.soNumber}</span>
-                      {d.clientName&&<span className="text-gray-400 ml-1">· {d.clientName}</span>}
+                    <button key={d.id} onClick={()=>appendToExisting(d)} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 transition-colors">
+                      <span className="font-semibold">{d.docNumber}</span>
+                      <span className="text-gray-400 ml-1 capitalize">({d.type})</span>
+                      {d.clientName&&<span className="text-gray-500 block text-[10px] truncate">{d.clientName}</span>}
                     </button>
                   ))
                 }
