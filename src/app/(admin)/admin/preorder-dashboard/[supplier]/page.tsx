@@ -131,25 +131,34 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   const [open,setOpen]=useState(false); const [mode,setMode]=useState<'new'|'existing'>('new')
   const [docs,setDocs]=useState<any[]>([]); const [allDocs,setAllDocs]=useState<any[]>([]); const [loading,setLoading]=useState(false)
   const [docSearch,setDocSearch]=useState('')
+  const [bankAccounts,setBankAccounts]=useState<any[]>([])
+  const [pendingQuoteBank,setPendingQuoteBank]=useState(false)
+  const [pendingConvertQuote,setPendingConvertQuote]=useState<any>(null)
+  const [linkedDocNumber,setLinkedDocNumber]=useState(customer.linkedDocNumber||'')
   const [sending,setSending]=useState(false); const ref=useRef<HTMLDivElement>(null)
   useEffect(()=>{
     const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node)) setOpen(false)}
     document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h)
   },[])
+  useEffect(()=>{setLinkedDocNumber(customer.linkedDocNumber||'')},[customer.linkedDocNumber])
 
   const openStatuses=['draft','sent','accepted','pending','processing','active']
   const isOpenDoc=(d:any)=>d.type==='invoice'?d.status!=='archived':openStatuses.includes(d.status)
 
   const loadDocs = async () => {
-    setLoading(true); setDocSearch('')
+    setLoading(true); setDocSearch(''); setMode('new')
     try{
-      const all:any[]=await fetch('/api/admin/orders/documents').then(r=>r.ok?r.json():[])
+      const [all,banks]=await Promise.all([
+        fetch('/api/admin/orders/documents').then(r=>r.ok?r.json():[]),
+        fetch('/api/admin/bank-accounts').then(r=>r.ok?r.json():[]).catch(()=>[]),
+      ])
       const openDocs=(Array.isArray(all)?all:[]).filter(isOpenDoc)
       setAllDocs(openDocs)
       setDocs(openDocs.filter((d:any)=>
         (customer.email&&d.clientEmail?.toLowerCase()===customer.email.toLowerCase())||
         d.clientName?.toLowerCase()===customer.name.toLowerCase()
       ))
+      setBankAccounts(Array.isArray(banks)?banks:[])
     }catch{setDocs([]);setAllDocs([])}
     finally{setLoading(false)}
   }
@@ -169,23 +178,99 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   }
 
   const lineItem=()=>({id:`li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,description:`${form.sku} – ${form.description}`,qty:customer.qty,unitPrice})
+  const notify=(docNumber:string,docId:string)=>{setLinkedDocNumber(docNumber);onLinked(docNumber,docId)}
 
-  const createNew = async (type:'quote'|'salesorder'|'invoice') => {
-    setSending(true);setOpen(false)
+  // A visible line for the invoice's Notes so the customer can see each deposit that was allocated
+  // when several Quotes get consolidated onto one Invoice.
+  const depositNoteFor=(quoteDoc:any)=>{
+    const deposit=Number(quoteDoc.amountPaid||0)+Number(quoteDoc.creditApplied||0)
+    if(deposit<=0.005) return null
+    const dateStr=new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'})
+    return `Deposit R${deposit.toFixed(2)} allocated from Quote ${quoteDoc.docNumber} (${dateStr})`
+  }
+
+  const appendQuoteToInvoice=async(quoteDoc:any,invoiceDoc:any)=>{
+    setSending(true);setOpen(false);setPendingConvertQuote(null)
+    try{
+      const merged=[...(invoiceDoc.lineItems||[]),...(quoteDoc.lineItems||[])]
+      const depositNote=depositNoteFor(quoteDoc)
+      const mergedNotes=[invoiceDoc.notes,depositNote].filter(Boolean).join('\n')
+      const mergedPayments=[
+        ...(invoiceDoc.payments||[]),
+        ...(quoteDoc.payments||[]).map((p:any)=>({...p,notes:[p.notes,`From Quote ${quoteDoc.docNumber}`].filter(Boolean).join(' — ')})),
+      ]
+      const res=await fetch(`/api/admin/orders/documents/${invoiceDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        lineItems:merged,
+        notes:mergedNotes,
+        amountPaid:Number(invoiceDoc.amountPaid||0)+Number(quoteDoc.amountPaid||0),
+        creditApplied:Number(invoiceDoc.creditApplied||0)+Number(quoteDoc.creditApplied||0),
+        payments:mergedPayments,
+      })})
+      if(res.ok){
+        await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
+        notify(invoiceDoc.docNumber,invoiceDoc.id)
+      }
+    }catch{}
+    setSending(false)
+  }
+
+  const createNew = async (type:'quote'|'salesorder'|'invoice',bankAccountId?:string) => {
+    setSending(true);setOpen(false);setPendingQuoteBank(false)
     try{
       const existingRaw=await fetch(`/api/admin/orders/documents?type=${type}`).then(r=>r.ok?r.json():[])
       const docNumber=nextDocNumber(Array.isArray(existingRaw)?existingRaw:[],type)
-      const res=await fetch('/api/admin/orders/documents',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          type,docNumber,date:new Date().toISOString().slice(0,10),
-          clientName:customer.name,clientEmail:customer.email||'',clientPhone:(customer as any).phone||'',clientAddress:'',
-          lineItems:[lineItem()],notes:`Pre-order: ${form.supplier||''} — ${form.description}`,terms:'',status:'draft',
-        }),
-      })
-      if(res.ok){const doc=await res.json();if(doc.id) onLinked(doc.docNumber,doc.id)}
+      const body:any={
+        type,docNumber,date:new Date().toISOString().slice(0,10),
+        clientName:customer.name,clientEmail:customer.email||'',clientPhone:customer.phone||'',clientAddress:'',
+        lineItems:[lineItem()],notes:`Pre-order: ${form.supplier||''} — ${form.description}`,terms:'',status:'draft',
+      }
+      if(bankAccountId) body.bankAccountId=bankAccountId
+      const res=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      if(res.ok){const doc=await res.json();if(doc.id) notify(doc.docNumber,doc.id)}
     }catch{}
     finally{setSending(false)}
+  }
+
+  // Converts a Quote straight into a new Invoice, blocking if Inventory can't cover the line items
+  const convertQuoteToInvoice = async (quoteDoc:any) => {
+    setSending(true);setOpen(false);setPendingConvertQuote(null)
+    try{
+      const invoiceItems:any[]=quoteDoc.lineItems||[]
+      try{
+        const [reservedMap,products]:[Record<string,number>,any[]]=await Promise.all([
+          fetch('/api/admin/inventory-reserved').then(r=>r.json()),
+          fetch('/api/admin/products?fields=sku,quantity').then(r=>r.json()),
+        ])
+        const stockMap:Record<string,number>={}
+        for(const p of products){if(p.sku) stockMap[p.sku.toString().toUpperCase()]=p.quantity??0}
+        const blockReasons:string[]=[]
+        for(const item of invoiceItems){
+          const rawSku=item.sku?item.sku.toString():(()=>{const em=(item.description||'').indexOf('–');return em>-1?item.description.slice(0,em).trim():''})()
+          const sku=rawSku.toUpperCase()
+          if(!sku||!(sku in stockMap)) continue
+          const totalStock=stockMap[sku]||0; const requested=Number(item.qty)||0
+          if(totalStock===0){blockReasons.push(`• ${sku}: Worksheet Qty not updated`)}
+          else{const available=Math.max(0,totalStock-(reservedMap[sku]||0));if(requested>available) blockReasons.push(`• ${sku}: Qty not available in Inventory (${available} available, ${requested} requested)`)}
+        }
+        if(blockReasons.length>0){window.alert(`Cannot create invoice:\n\n${blockReasons.join('\n')}`);setSending(false);return}
+      }catch{}
+      const allDocs:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json())
+      const invDocNumber=nextDocNumber(allDocs,'invoice')
+      const depositNote=depositNoteFor(quoteDoc)
+      const newInvRes=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        type:'invoice',docNumber:invDocNumber,date:new Date().toISOString().slice(0,10),
+        clientName:quoteDoc.clientName,clientEmail:quoteDoc.clientEmail||'',clientPhone:quoteDoc.clientPhone||'',clientAddress:quoteDoc.clientAddress||'',
+        lineItems:invoiceItems,notes:[quoteDoc.notes,depositNote].filter(Boolean).join('\n'),terms:quoteDoc.terms||'',status:'draft',
+        discountPct:quoteDoc.discountPct||0,sourceQuoteNumber:quoteDoc.docNumber,
+        amountPaid:quoteDoc.amountPaid||0,creditApplied:quoteDoc.creditApplied||0,payments:quoteDoc.payments||[],
+      })})
+      if(newInvRes.ok){
+        const newInv=await newInvRes.json()
+        await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
+        notify(newInv.docNumber,newInv.id)
+      }
+    }catch{}
+    setSending(false)
   }
 
   const appendToExisting = async (target:any) => {
@@ -198,52 +283,103 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         ?existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)
         :[...existingItems,lineItem()]
       const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lineItems:updatedItems})})
-      if(res.ok) onLinked(target.docNumber,target.id)
+      if(res.ok) notify(target.docNumber,target.id)
     }catch{}
     finally{setSending(false)}
   }
 
   return (
     <div ref={ref} className="relative ml-auto">
-      {customer.linkedDocNumber ? (
-        <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-md px-2 py-0.5 cursor-pointer hover:bg-indigo-100" onClick={()=>{if(customer.linkedDocId)window.open(`/admin/orders?doc=${customer.linkedDocId}`,'_blank')}}>{customer.linkedDocNumber}</span>
-      ) : (
-        <button disabled={sending} onClick={e=>{e.stopPropagation();setMode('new');setOpen(o=>!o)}} className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50 whitespace-nowrap">{sending?'Sending…':'→ Send to'}</button>
+      {linkedDocNumber ? (()=>{
+        const docTab=/^INV/i.test(linkedDocNumber)?'invoices':/^SO/i.test(linkedDocNumber)?'salesorders':'quotes'
+        return <a href={`/admin/orders?tab=${docTab}&open=${encodeURIComponent(linkedDocNumber)}`} target="_blank" rel="noreferrer"
+          className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-100 whitespace-nowrap">{linkedDocNumber}</a>
+      })() : (
+        <button disabled={sending} onClick={e=>{e.stopPropagation();loadDocs();setOpen(o=>!o)}} className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50 whitespace-nowrap">{sending?'Sending…':'→ Send to'}</button>
       )}
       {open&&(
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-52 overflow-hidden">
-          <div className="flex border-b border-gray-100">
-            <button onClick={()=>{setMode('new')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='new'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Create New</button>
-            <button onClick={()=>{setMode('existing');loadDocs()}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='existing'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Add to Existing</button>
-          </div>
-          {mode==='new'&&(
-            <div className="p-1.5 space-y-0.5">
-              <button onClick={()=>createNew('quote')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📄 New Quote</button>
-              <button onClick={()=>createNew('salesorder')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📋 New Sales Order</button>
-              <button onClick={()=>createNew('invoice')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">🧾 New Invoice</button>
-            </div>
-          )}
-          {mode==='existing'&&(
-            <div className="p-1.5">
-              {!loading&&allDocs.length>0&&(
-                <input type="text" value={docSearch} onChange={e=>setDocSearch(e.target.value)}
-                  placeholder="Search any Quote/SO/Invoice…"
-                  className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1 mb-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-              )}
-              <div className="max-h-48 overflow-y-auto">
-                {loading?<p className="text-[11px] text-gray-400 text-center py-3">Loading…</p>
-                  :allDocs.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No open documents</p>
-                  :docsToShow.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No matches</p>
-                  :docsToShow.map(d=>(
-                    <button key={d.id} onClick={()=>appendToExisting(d)} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 transition-colors">
-                      <span className="font-semibold">{d.docNumber}</span>
-                      <span className="text-gray-400 ml-1 capitalize">({d.type})</span>
-                      {d.clientName&&<span className="text-gray-500 block text-[10px] truncate">{d.clientName}</span>}
-                    </button>
-                  ))
-                }
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-56 overflow-hidden">
+          {pendingConvertQuote?(
+            <div className="py-1.5">
+              <div className="flex items-center gap-2 px-3 py-1 border-b border-gray-100 mb-1">
+                <button onClick={()=>setPendingConvertQuote(null)} className="text-[10px] text-gray-400 hover:text-gray-600">← Back</button>
+                <p className="text-[10px] font-bold text-gray-500 truncate">Convert {pendingConvertQuote.docNumber}</p>
               </div>
+              <button onClick={()=>convertQuoteToInvoice(pendingConvertQuote)}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium text-green-700">+ 🧾 New Invoice</button>
+              <div className="border-t my-1"/>
+              <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Add to Existing</p>
+              {docs.filter((d:any)=>d.type==='invoice').map((inv:any)=>(
+                <button key={inv.id} onClick={()=>appendQuoteToInvoice(pendingConvertQuote,inv)}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 font-medium">
+                  <span className="font-semibold text-indigo-700">{inv.docNumber}</span>
+                  <span className="text-gray-400 ml-1 capitalize text-[10px]">({inv.status})</span>
+                </button>
+              ))}
             </div>
+          ):pendingQuoteBank?(
+            <div className="py-1.5">
+              <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Send funds to</p>
+              {bankAccounts.length===0&&<p className="px-3 py-2 text-xs text-gray-400">No bank accounts found</p>}
+              {bankAccounts.map((b:any)=>(
+                <button key={b.id} onClick={()=>createNew('quote',b.id)} className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium">
+                  <span className="text-green-800">🏦 {b.companyName||b.bankName}</span>
+                  {b.companyName&&b.bankName&&<span className="text-gray-400 block text-[10px]">{b.bankName}</span>}
+                </button>
+              ))}
+              <div className="border-t my-1"/>
+              <button onClick={()=>setPendingQuoteBank(false)} className="w-full text-left px-3 py-1.5 text-[10px] text-gray-400 hover:text-gray-600">← Back</button>
+            </div>
+          ):(
+            <>
+              <div className="flex border-b border-gray-100">
+                <button onClick={()=>{setMode('new')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='new'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Create New</button>
+                <button onClick={()=>{setMode('existing')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='existing'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Add to Existing</button>
+              </div>
+              {mode==='new'&&(
+                <div className="p-1.5 space-y-0.5">
+                  <button onClick={()=>{
+                    const unitLower=(form.unit||'').toLowerCase().trim()
+                    const autoBank=unitLower?bankAccounts.find((b:any)=>{const name=(b.companyName||'').toLowerCase();return name&&(name.includes(unitLower)||unitLower.includes(name))}):null
+                    if(autoBank) createNew('quote',autoBank.id); else setPendingQuoteBank(true)
+                  }} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📄 New Quote</button>
+                  <button onClick={()=>createNew('salesorder')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📋 New Sales Order</button>
+                  <button onClick={()=>createNew('invoice')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">🧾 New Invoice</button>
+                </div>
+              )}
+              {mode==='existing'&&(
+                <div className="p-1.5">
+                  {!loading&&allDocs.length>0&&(
+                    <input type="text" value={docSearch} onChange={e=>setDocSearch(e.target.value)}
+                      placeholder="Search any Quote/SO/Invoice…"
+                      className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1 mb-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+                  )}
+                  <div className="max-h-48 overflow-y-auto">
+                    {loading?<p className="text-[11px] text-gray-400 text-center py-3">Loading…</p>
+                      :allDocs.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No open documents</p>
+                      :docsToShow.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No matches</p>
+                      :docsToShow.map(d=>(
+                        <div key={d.id} className="flex items-center gap-1 px-1 py-0.5 hover:bg-indigo-50 rounded-lg">
+                          <button onClick={()=>appendToExisting(d)} className="flex-1 text-left px-2 py-1 text-[11px] min-w-0">
+                            <span className="font-semibold text-gray-700">{d.docNumber}</span>
+                            <span className="text-gray-400 ml-1 capitalize">({d.type})</span>
+                            {d.clientName&&<span className="text-gray-500 block text-[10px] truncate">{d.clientName}</span>}
+                          </button>
+                          {d.type==='quote'&&(
+                            <button onClick={()=>{
+                              const clientInvoices=docs.filter((x:any)=>x.type==='invoice')
+                              if(clientInvoices.length>0) setPendingConvertQuote(d)
+                              else convertQuoteToInvoice(d)
+                            }}
+                              className="shrink-0 text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 border border-orange-300 rounded font-semibold hover:bg-orange-200 whitespace-nowrap">→ Invoice</button>
+                          )}
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
