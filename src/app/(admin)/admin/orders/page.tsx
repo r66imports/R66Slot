@@ -1436,7 +1436,8 @@ function CreateDocumentModal({
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 ${fullScreen ? '' : 'p-4'}`}>
-      <div className={`bg-white flex flex-col relative ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh]'}`}>
+      <div className={`bg-white flex flex-col relative ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-6xl'}`}
+        style={fullScreen ? undefined : { aspectRatio: '16 / 9', maxHeight: '92vh' }}>
         <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
           <h2 className="text-lg font-bold">
             {editDoc
@@ -3367,7 +3368,8 @@ function OrdersPageInner() {
     const newAmountPaid = ((paymentModal as any).amountPaid || 0) + result.amountPaid
     const newCreditApplied = ((paymentModal as any).creditApplied || 0) + result.creditApplied
     const newOverpaymentCredit = ((paymentModal as any).overpaymentCredit || 0) + result.overpaymentCredit
-    const fullySettled = newAmountPaid + newCreditApplied + ((paymentModal as any).depositPaid || 0) >= invoiceTotal - 0.005
+    // depositPaid is the expected deposit, not a separate prior payment — use Max so it isn't counted twice
+    const fullySettled = Math.max(newAmountPaid, (paymentModal as any).depositPaid || 0) + newCreditApplied >= invoiceTotal - 0.005
     const payments = [
       ...((paymentModal as any).payments || []),
       { date: new Date().toISOString(), amountPaid: result.amountPaid, creditApplied: result.creditApplied, paymentMethod: result.paymentMethod, notes: result.notes },
@@ -3410,8 +3412,9 @@ function OrdersPageInner() {
     const prevCredit = (doc as any).creditApplied || 0
     const prevDeposit = (doc as any).depositPaid || 0
     const newAmountPaid = prevAmountPaid + amountPaid
-    const newOverpayment = Math.max(0, newAmountPaid + prevCredit + prevDeposit - invoiceTotal)
-    const fullySettled = newAmountPaid + prevCredit + prevDeposit >= invoiceTotal - 0.005
+    const effectivePaid = Math.max(newAmountPaid, prevDeposit)
+    const newOverpayment = Math.max(0, effectivePaid + prevCredit - invoiceTotal)
+    const fullySettled = effectivePaid + prevCredit >= invoiceTotal - 0.005
     const payments = [
       ...((doc as any).payments || []),
       { date: new Date().toISOString(), amountPaid, creditApplied: 0, paymentMethod, notes },
