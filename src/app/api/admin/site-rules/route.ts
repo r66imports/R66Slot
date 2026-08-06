@@ -408,6 +408,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Admin Invoices', 'Customer Payments', 'Customer Account'],
     category: 'Invoices',
   },
+  {
+    id: 'document_totals_block_order',
+    name: 'Rule 46 — Document Totals Block: Fixed Row Order & Colours',
+    description: `Every Quote, Sales Order and Invoice — including Pre-Order Deposit quotes — renders one single totals block in this fixed order: Subtotal, Discount, Shipping, TOTAL, Deposit to Pay / Deposit Paid, Credit Applied, Amount Paid, BALANCE ON ARRIVAL / BALANCE DUE. The deposit row always sits between TOTAL and the balance row — never below the balance. Colours are fixed: TOTAL is a dark navy bar (#1f2937) with white bold text, the deposit row is a RED bar (#dc2626) with white bold text, and the balance row is an orange bar (#ea580c) with white bold text. Pre-Order Deposit docs have no separate layout — the only thing that differs is the document title ("PRE ORDER DEPOSIT") and that the deposit amount is auto-computed from Deposit % rather than entered. There are no "Full Order Total", "DEPOSIT DUE", "% Deposit Payable", "BALANCE ON DELIVERY" or "BALANCE DUE ON ARRIVAL" variants. Rows are omitted when their value is zero. Per Rule 45(3) this block must be identical across all four output paths — the React preview (DocumentBody), Print / View (generateDocHTML), Email (doEmail) and Download PDF (jsPDF footRows + didParseCell) — so any change to the order or colours must be made in all four.`,
+    active: true,
+    appliesTo: ['Admin Invoices', 'Admin Quotes', 'Admin Sales Orders'],
+    category: 'Invoices',
+  },
 ]
 
 export async function GET() {

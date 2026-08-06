@@ -359,7 +359,6 @@ function DocumentBody({
   // depositPaid dollar figure can go stale if line items changed since it was last saved (e.g. via
   // appending a quote into an existing doc), so it's a fallback only for non-% flat deposits.
   const deposit = data.preOrderDeposit && data.depositPct ? Math.round(total * data.depositPct / 100 * 100) / 100 : (data.depositPaid || 0)
-  const balanceDuePreview = total - deposit
   const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
   const logoUrl = normalizeMediaUrl(template.logoUrl || '')
@@ -462,61 +461,46 @@ function DocumentBody({
               </div>
             )}
           </>)}
-          {(data as any).preOrderDeposit && deposit > 0 ? (<>
-            <div className="flex justify-between py-1 border-b border-gray-100 text-xs text-gray-400 mt-1">
-              <span>Full Order Total</span>
-              <span>{fmtPrice(total)}</span>
+          {/* Pre Order Deposit docs use this same layout — TOTAL, then the deposit row, then
+              the balance bar. The deposit never sits below the balance. */}
+          <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
+            <span>TOTAL</span>
+            <span>{fmtPrice(total)}</span>
+          </div>
+          {deposit > 0 && (
+            <div className="flex justify-between py-2 bg-red-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
+              <span>{data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span>
+              <span>{data.docType === 'quote' ? '' : '-'}{fmtPrice(deposit)}</span>
             </div>
-            <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
-              <span>DEPOSIT DUE</span>
-              <span>{fmtPrice(deposit)}</span>
+          )}
+          {(data.creditApplied || 0) > 0 && (
+            <div className="flex justify-between py-1 border-b border-green-100 text-sm mt-1">
+              <span className="text-green-600 font-medium">Credit Applied</span>
+              <span className="font-medium text-green-600">-{fmtPrice(data.creditApplied)}</span>
             </div>
-            {balanceDuePreview > 0.005 && (
+          )}
+          {(data.overpaymentCredit || 0) > 0 && data.showCreditOnInvoice && (
+            <div className="flex justify-between py-1 border-b border-amber-100 text-sm mt-1">
+              <span className="text-amber-600 font-medium">Overpayment Credit <span className="text-[10px] font-normal">(carried to your account)</span></span>
+              <span className="font-medium text-amber-600">{fmtPrice(data.overpaymentCredit)}</span>
+            </div>
+          )}
+          {(data.amountPaid || 0) > 0 && (
+            <div className="flex justify-between py-1 border-b border-blue-100 text-sm mt-1">
+              <span className="text-blue-600 font-medium">Amount Paid</span>
+              <span className="font-medium text-blue-600">-{fmtPrice(data.amountPaid)}</span>
+            </div>
+          )}
+          {(() => {
+            // deposit is often already folded into amountPaid once recorded as a payment — take whichever is larger so it isn't counted twice
+            const remaining = total - Math.max(deposit, data.amountPaid || 0) - (data.creditApplied || 0)
+            return remaining > 0.005 ? (
               <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
-                <span>BALANCE ON DELIVERY</span>
-                <span>{fmtPrice(balanceDuePreview)}</span>
+                <span>{data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}</span>
+                <span>{fmtPrice(remaining)}</span>
               </div>
-            )}
-          </>) : (<>
-            <div className="flex justify-between py-2 mt-1 bg-gray-800 text-white px-3 rounded-lg text-sm font-bold">
-              <span>TOTAL</span>
-              <span>{fmtPrice(total)}</span>
-            </div>
-            {deposit > 0 && (
-              <div className="flex justify-between py-1 border-b border-gray-100 text-sm mt-1">
-                <span className="text-gray-500">{data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span>
-                <span className="font-medium text-green-600">{data.docType === 'quote' ? '' : '-'}{fmtPrice(deposit)}</span>
-              </div>
-            )}
-            {(data.creditApplied || 0) > 0 && (
-              <div className="flex justify-between py-1 border-b border-green-100 text-sm mt-1">
-                <span className="text-green-600 font-medium">Credit Applied</span>
-                <span className="font-medium text-green-600">-{fmtPrice(data.creditApplied)}</span>
-              </div>
-            )}
-            {(data.overpaymentCredit || 0) > 0 && data.showCreditOnInvoice && (
-              <div className="flex justify-between py-1 border-b border-amber-100 text-sm mt-1">
-                <span className="text-amber-600 font-medium">Overpayment Credit <span className="text-[10px] font-normal">(carried to your account)</span></span>
-                <span className="font-medium text-amber-600">{fmtPrice(data.overpaymentCredit)}</span>
-              </div>
-            )}
-            {(data.amountPaid || 0) > 0 && (
-              <div className="flex justify-between py-1 border-b border-blue-100 text-sm mt-1">
-                <span className="text-blue-600 font-medium">Amount Paid</span>
-                <span className="font-medium text-blue-600">-{fmtPrice(data.amountPaid)}</span>
-              </div>
-            )}
-            {(() => {
-              // deposit is often already folded into amountPaid once recorded as a payment — take whichever is larger so it isn't counted twice
-              const remaining = total - Math.max(deposit, data.amountPaid || 0) - (data.creditApplied || 0)
-              return remaining > 0.005 ? (
-                <div className="flex justify-between py-2 bg-orange-600 text-white px-3 rounded-lg text-sm font-bold mt-1">
-                  <span>{data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}</span>
-                  <span>{fmtPrice(remaining)}</span>
-                </div>
-              ) : null
-            })()}
-          </>)}
+            ) : null
+          })()}
         </div>
       </div>
 
@@ -2085,7 +2069,6 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   const shippingHTML = data.shippingCost || 0
   const total = subtotal - discountAmt + shippingHTML
   const depositHTML = data.preOrderDeposit && data.depositPct ? Math.round(total * data.depositPct / 100 * 100) / 100 : (data.depositPaid || 0)
-  const balanceDueHTML = total - depositHTML
   const creditAppliedHTML = data.creditApplied || 0
   const amountPaidHTML = data.amountPaid || 0
   // depositHTML is often already folded into amountPaidHTML once recorded as a payment — take whichever is larger so it isn't counted twice
@@ -2180,19 +2163,15 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       ${((data.discountPct || 0) > 0 || shippingHTML > 0) ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Subtotal</span><span style="font-weight:500">${fmtPrice(subtotal)}</span></div>` : ''}
       ${(data.discountPct || 0) > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#ef4444">Discount (${data.discountPct}%)</span><span style="font-weight:500;color:#ef4444">-${fmtPrice(discountAmt)}</span></div>` : ''}
       ${shippingHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}</span><span style="font-weight:500">${fmtPrice(shippingHTML)}</span></div>` : ''}
-      ${(data as any).preOrderDeposit && depositHTML > 0 ? `
-      <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f3f4f6"><span style="color:#9ca3af;font-size:11px">Full Order Total</span><span style="color:#9ca3af;font-size:11px">${fmtPrice(total)}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>DEPOSIT DUE</span><span>${fmtPrice(depositHTML)}</span></div>
-      ${balanceDueHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>BALANCE ON DELIVERY</span><span>${fmtPrice(balanceDueHTML)}</span></div>` : ''}
-      ` : `
+      <!-- Pre Order Deposit docs use this same layout — TOTAL, then the deposit row, then the
+           balance bar. The deposit never sits below the balance. -->
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#1f2937;color:white;border-radius:8px;font-weight:700"><span>TOTAL</span><span>${fmtPrice(total)}</span></div>
       ${depositHTML > 0 ? `
-      <div style="display:flex;justify-content:space-between;padding:4px 0;margin-top:4px;border-bottom:1px solid #f3f4f6"><span style="color:#6b7280">${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span><span style="font-weight:500;color:#16a34a">${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositHTML)}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#dc2626;color:white;border-radius:8px;font-weight:700"><span>${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span><span>${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositHTML)}</span></div>
       ` : ''}
       ${creditAppliedHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #d1fae5"><span style="color:#16a34a;font-weight:600">Credit Applied</span><span style="color:#16a34a;font-weight:600">-${fmtPrice(creditAppliedHTML)}</span></div>` : ''}
       ${amountPaidHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #dbeafe"><span style="color:#2563eb;font-weight:600">Amount Paid</span><span style="color:#2563eb;font-weight:600">-${fmtPrice(amountPaidHTML)}</span></div>` : ''}
       ${remainingHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}</span><span>${fmtPrice(remainingHTML)}</span></div>` : ''}
-      `}
     </div>
   </div>
   ${(data.shippingMethod || data.trackingNumber) ? `<div style="margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">${data.shippingMethod ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase">Shipping:</span><span style="font-size:12px;font-weight:600;background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:2px 10px;border-radius:99px">${data.shippingMethod}</span>` : ''}${data.trackingNumber ? `<span style="font-size:11px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-left:8px">Tracking:</span><span style="font-size:12px;font-weight:600;background:#f3f4f6;color:#374151;font-family:monospace;padding:2px 10px;border-radius:99px">${data.trackingNumber}</span>` : ''}</div>` : ''}
@@ -2261,13 +2240,12 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
     ...((data.discountPct || 0) > 0 || shippingEmail > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`] : []),
     ...((data.discountPct || 0) > 0 ? [`Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
     ...(shippingEmail > 0 ? [`Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}:  ${fmtPrice(shippingEmail)}`] : []),
-    ...((data as any).preOrderDeposit && liveDepositEmail > 0
-      ? [`Full Order Total:  ${fmtPrice(total)}`, `DEPOSIT DUE:  ${fmtPrice(liveDepositEmail)}`, `BALANCE ON DELIVERY:  ${fmtPrice(total - liveDepositEmail)}`]
-      : [`TOTAL:  ${fmtPrice(total)}`,
-         ...(liveDepositEmail > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  ${data.docType === 'quote' ? '' : '-'}${fmtPrice(liveDepositEmail)}`] : []),
-         ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
-         ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
-         ...((total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0))}`] : [])]),
+    // Pre Order Deposit docs use this same order — TOTAL, deposit, then balance.
+    `TOTAL:  ${fmtPrice(total)}`,
+    ...(liveDepositEmail > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  ${data.docType === 'quote' ? '' : '-'}${fmtPrice(liveDepositEmail)}`] : []),
+    ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
+    ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
+    ...((total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0))}`] : []),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
     banking,
@@ -2436,8 +2414,6 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   const creditAppliedPDF = data.creditApplied || 0
   const amountPaidPDF = data.amountPaid || 0
   const depositPDF = data.preOrderDeposit && data.depositPct ? Math.round(total * data.depositPct / 100 * 100) / 100 : (data.depositPaid || 0)
-  const isPreOrderPDF = !!(data as any).preOrderDeposit && depositPDF > 0
-  const balanceOnDeliveryAmt = total - depositPDF
   // depositPDF is often already folded into amountPaidPDF once recorded as a payment — take whichever is larger so it isn't counted twice
   const remainingPDF = total - Math.max(depositPDF, amountPaidPDF) - creditAppliedPDF
 
@@ -2456,18 +2432,14 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   if ((data.discountPct || 0) > 0) { footRows.push(mkFoot(`Discount (${data.discountPct}%)`, `-${fmtPrice(discountAmt)}`)); discountIdx = footRows.length - 1 }
   if (shippingPDF > 0) { footRows.push(mkFoot(`Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}`, fmtPrice(shippingPDF))); shippingIdx = footRows.length - 1 }
 
-  let totalIdx = -1, balanceArrivalIdx = -1, depositNoteIdx = -1, creditIdx = -1, amountPaidIdx = -1, balanceDueIdx = -1
-  if (isPreOrderPDF) {
-    footRows.push(mkFoot('Full Order Total', fmtPrice(total))); totalIdx = footRows.length - 1
-    footRows.push(mkFoot('DEPOSIT DUE', fmtPrice(depositPDF))); depositNoteIdx = footRows.length - 1
-    if (balanceOnDeliveryAmt > 0.005) { footRows.push(mkFoot('BALANCE ON DELIVERY', fmtPrice(balanceOnDeliveryAmt))); balanceArrivalIdx = footRows.length - 1 }
-  } else {
-    footRows.push(mkFoot('TOTAL', fmtPrice(total))); totalIdx = footRows.length - 1
-    if (depositPDF > 0) { footRows.push(mkFoot(data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositPDF)}`)); depositNoteIdx = footRows.length - 1 }
-    if (creditAppliedPDF > 0) { footRows.push(mkFoot('Credit Applied', `-${fmtPrice(creditAppliedPDF)}`)); creditIdx = footRows.length - 1 }
-    if (amountPaidPDF > 0) { footRows.push(mkFoot('Amount Paid', `-${fmtPrice(amountPaidPDF)}`)); amountPaidIdx = footRows.length - 1 }
-    if (remainingPDF > 0.005) { footRows.push(mkFoot(data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE', fmtPrice(remainingPDF))); balanceDueIdx = footRows.length - 1 }
-  }
+  // Pre Order Deposit docs use this same layout — TOTAL, then the deposit row, then the balance
+  // bar. The deposit never sits below the balance.
+  let totalIdx = -1, depositNoteIdx = -1, creditIdx = -1, amountPaidIdx = -1, balanceDueIdx = -1
+  footRows.push(mkFoot('TOTAL', fmtPrice(total))); totalIdx = footRows.length - 1
+  if (depositPDF > 0) { footRows.push(mkFoot(data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositPDF)}`)); depositNoteIdx = footRows.length - 1 }
+  if (creditAppliedPDF > 0) { footRows.push(mkFoot('Credit Applied', `-${fmtPrice(creditAppliedPDF)}`)); creditIdx = footRows.length - 1 }
+  if (amountPaidPDF > 0) { footRows.push(mkFoot('Amount Paid', `-${fmtPrice(amountPaidPDF)}`)); amountPaidIdx = footRows.length - 1 }
+  if (remainingPDF > 0.005) { footRows.push(mkFoot(data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE', fmtPrice(remainingPDF))); balanceDueIdx = footRows.length - 1 }
 
   const pdfHead = hasDiscountsPDF
     ? [['Description', 'Qty', 'Unit Price', 'Disc %', 'Total']]
@@ -2514,14 +2486,10 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
       }
-      if (balanceArrivalIdx >= 0 && hookData.row.index === balanceArrivalIdx) {
-        hookData.cell.styles.fillColor = [234, 88, 12]
+      if (depositNoteIdx >= 0 && hookData.row.index === depositNoteIdx) {
+        hookData.cell.styles.fillColor = [220, 38, 38]
         hookData.cell.styles.textColor = [255, 255, 255]
         hookData.cell.styles.fontStyle = 'bold'
-      }
-      if (depositNoteIdx >= 0 && hookData.row.index === depositNoteIdx) {
-        hookData.cell.styles.textColor = [107, 114, 128]
-        hookData.cell.styles.fontStyle = 'normal'
       }
       if (creditIdx >= 0 && hookData.row.index === creditIdx) {
         hookData.cell.styles.textColor = [22, 163, 74]
