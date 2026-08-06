@@ -134,6 +134,8 @@ interface DocViewData {
   shippingMethod: string
   trackingNumber: string
   depositPaid: number
+  preOrderDeposit?: boolean
+  depositPct?: number
   paymentMethod: string
   paymentMethod2: string
   paymentMethod1Amount: number
@@ -340,7 +342,10 @@ function DocumentBody({
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shipping = data.shippingCost || 0
   const total = subtotal - discountAmt + shipping
-  const deposit = data.depositPaid || 0
+  // Recompute fresh from the live total whenever this is a % based Pre Order Deposit — the stored
+  // depositPaid dollar figure can go stale if line items changed since it was last saved (e.g. via
+  // appending a quote into an existing doc), so it's a fallback only for non-% flat deposits.
+  const deposit = data.preOrderDeposit && data.depositPct ? Math.round(total * data.depositPct / 100 * 100) / 100 : (data.depositPaid || 0)
   const balanceDuePreview = total - deposit
   const docTitle = (data as any).preOrderDeposit ? 'PRE ORDER DEPOSIT' : data.docType === 'quote' ? 'QUOTE' : data.docType === 'salesorder' ? 'SALES ORDER' : 'INVOICE'
   const activeImages = (template.imageBlock ?? []).filter(Boolean).map(normalizeMediaUrl)
@@ -2067,7 +2072,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shippingHTML = data.shippingCost || 0
   const total = subtotal - discountAmt + shippingHTML
-  const depositHTML = data.depositPaid || 0
+  const depositHTML = data.preOrderDeposit && data.depositPct ? Math.round(total * data.depositPct / 100 * 100) / 100 : (data.depositPaid || 0)
   const balanceDueHTML = total - depositHTML
   const creditAppliedHTML = data.creditApplied || 0
   const amountPaidHTML = data.amountPaid || 0
@@ -2219,6 +2224,8 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
   const discountAmt = subtotal * (data.discountPct || 0) / 100
   const shippingEmail = data.shippingCost || 0
   const total = subtotal - discountAmt + shippingEmail
+  // Recompute fresh from the live total for % based Pre Order Deposits — see note in DocumentBody
+  const liveDepositEmail = data.preOrderDeposit && data.depositPct ? Math.round(total * data.depositPct / 100 * 100) / 100 : (data.depositPaid || 0)
   const subject = `${docLabel} ${data.docNumber} – ${template.companyName || 'R66 Slot'}`
   const lines = data.lineItems.map((li, i) =>
     `  ${i + 1}. ${li.description}  ×${li.qty}  @  ${fmtPrice(li.unitPrice)}${(li.discountPct || 0) > 0 ? `  -${li.discountPct}%` : ''}  =  ${fmtPrice(lineAmt(li))}`
@@ -2242,13 +2249,13 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
     ...((data.discountPct || 0) > 0 || shippingEmail > 0 ? [`Subtotal:  ${fmtPrice(subtotal)}`] : []),
     ...((data.discountPct || 0) > 0 ? [`Discount (${data.discountPct}%):  -${fmtPrice(discountAmt)}`] : []),
     ...(shippingEmail > 0 ? [`Shipping${data.shippingMethod ? ` (${data.shippingMethod})` : ''}:  ${fmtPrice(shippingEmail)}`] : []),
-    ...((data as any).preOrderDeposit && (data.depositPaid || 0) > 0
-      ? [`Full Order Total:  ${fmtPrice(total)}`, `DEPOSIT DUE:  ${fmtPrice(data.depositPaid)}`, `BALANCE ON DELIVERY:  ${fmtPrice(total - (data.depositPaid || 0))}`]
+    ...((data as any).preOrderDeposit && liveDepositEmail > 0
+      ? [`Full Order Total:  ${fmtPrice(total)}`, `DEPOSIT DUE:  ${fmtPrice(liveDepositEmail)}`, `BALANCE ON DELIVERY:  ${fmtPrice(total - liveDepositEmail)}`]
       : [`TOTAL:  ${fmtPrice(total)}`,
-         ...((data.depositPaid || 0) > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  ${data.docType === 'quote' ? '' : '-'}${fmtPrice(data.depositPaid)}`] : []),
+         ...(liveDepositEmail > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  ${data.docType === 'quote' ? '' : '-'}${fmtPrice(liveDepositEmail)}`] : []),
          ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
          ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
-         ...((total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(data.depositPaid || 0, data.amountPaid || 0) - (data.creditApplied || 0))}`] : [])]),
+         ...((total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0))}`] : [])]),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
     banking,
@@ -2416,7 +2423,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   // ── Line items table ─────────────────────────────────────────────────────────
   const creditAppliedPDF = data.creditApplied || 0
   const amountPaidPDF = data.amountPaid || 0
-  const depositPDF = data.depositPaid || 0
+  const depositPDF = data.preOrderDeposit && data.depositPct ? Math.round(total * data.depositPct / 100 * 100) / 100 : (data.depositPaid || 0)
   const isPreOrderPDF = !!(data as any).preOrderDeposit && depositPDF > 0
   const balanceOnDeliveryAmt = total - depositPDF
   // depositPDF is often already folded into amountPaidPDF once recorded as a payment — take whichever is larger so it isn't counted twice
@@ -3002,10 +3009,20 @@ function OrdersPageInner() {
     try {
       const newItems = quote.lineItems.map((li, i) => ({ ...li, id: `li_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}` }))
       const mergedItems = [...target.lineItems, ...newItems]
+      const patchBody: Record<string, any> = { lineItems: mergedItems }
+      // Merging line items changes the subtotal — recompute the stored deposit so it doesn't go
+      // stale relative to the new total (View/Print/Email/PDF read this field directly).
+      const targetDepositPct = (target as any).depositPct || 0
+      if ((target as any).preOrderDeposit && targetDepositPct > 0) {
+        const newSubtotal = mergedItems.reduce((s, li) => s + lineAmt(li), 0)
+        const newDiscAmt = newSubtotal * ((target as any).discountPct || 0) / 100
+        const newTotal = newSubtotal - newDiscAmt + ((target as any).shippingCost || 0)
+        patchBody.depositPaid = Math.round(newTotal * targetDepositPct / 100 * 100) / 100
+      }
       const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineItems: mergedItems }),
+        body: JSON.stringify(patchBody),
       })
       if (res.ok) {
         const updated = await res.json()
@@ -3798,6 +3815,8 @@ function OrdersPageInner() {
     shippingMethod: (doc as any).shippingMethod || '',
     trackingNumber: (doc as any).trackingNumber || '',
     depositPaid: (doc as any).depositPaid || 0,
+    preOrderDeposit: (doc as any).preOrderDeposit || false,
+    depositPct: (doc as any).depositPct || 0,
     paymentMethod: (doc as any).paymentMethod || '',
     paymentMethod2: (doc as any).paymentMethod2 || '',
     paymentMethod1Amount: (doc as any).paymentMethod1Amount || 0,
