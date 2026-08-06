@@ -242,6 +242,19 @@ function docBalanceDue(doc: OrderDocument) {
   const settled = Math.max((doc as any).amountPaid || 0, (doc as any).depositPaid || 0) + ((doc as any).creditApplied || 0)
   return Math.max(0, total - settled)
 }
+// Payment methods actually recorded against a doc. The payments[] history is the source of
+// truth (Rule 44) — the flat paymentMethod/paymentMethod2 fields are only a fallback for
+// legacy docs written before payments[] existed.
+function docPaymentMethods(doc: any): string[] {
+  const fromHistory = Array.from(new Set(
+    ((doc?.payments as any[]) || [])
+      .filter((p) => (p?.amountPaid || 0) > 0 || (p?.creditApplied || 0) > 0)
+      .map((p) => String(p?.paymentMethod || '').trim())
+      .filter(Boolean)
+  ))
+  if (fromHistory.length) return fromHistory
+  return [doc?.paymentMethod, doc?.paymentMethod2].map((m) => String(m || '').trim()).filter(Boolean)
+}
 // Extract SKU and description from a line item description string.
 // Handles em-dash: "SKU – Title" and space-hyphen-space: "SKU - Title"
 // Does NOT split on hyphens within SKU codes like "SC-5068" or "SWAX/54.5"
@@ -1121,10 +1134,9 @@ function CreateDocumentModal({
     notes: editDoc?.notes || '',
     terms: editDoc?.terms || template[cfg.termsKey] as string,
     status: (editDoc?.status || 'draft') as 'draft' | 'sent' | 'accepted' | 'rejected' | 'complete',
-    paymentMethod: (editDoc as any)?.paymentMethod || '',
-    paymentMethod2: (editDoc as any)?.paymentMethod2 || '',
-    paymentMethod1Amount: (editDoc as any)?.paymentMethod1Amount || 0,
-    paymentMethod2Amount: (editDoc as any)?.paymentMethod2Amount || 0,
+    // Rule 44 — payment method/amounts are NOT captured on this form. They are owned by
+    // Record Payment only. Keeping them here made every "Update Invoice" write back the
+    // stale value the modal opened with, wiping a method recorded while the modal was open.
   })
   const [lineItems, setLineItems] = useState<LineItem[]>(
     editDoc?.lineItems?.length ? editDoc.lineItems : prefilledItems?.length ? prefilledItems : [newLine()]
@@ -1405,7 +1417,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, paymentMethod: form.paymentMethod, paymentMethod2: form.paymentMethod2, paymentMethod1Amount: form.paymentMethod1Amount || 0, paymentMethod2Amount: form.paymentMethod2Amount || 0, preOrderDeposit }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, preOrderDeposit }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -4603,6 +4615,7 @@ function OrdersPageInner() {
                     const docBalance = Math.max(0, docTotal - amtPaid - ((doc as any).creditApplied || 0))
                     const isPartiallyPaid = doc.type === 'invoice' && amtPaid > 0 && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
                     const hasOutstanding = doc.type === 'invoice' && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
+                    const payMethods = docPaymentMethods(doc)
                     const firstDesc = doc.lineItems?.[0]?.description || '—'
                     return (
                       <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : (doc as any).depositReceived ? 'bg-yellow-50 hover:bg-yellow-100' : (doc as any).shippingAdded ? 'bg-blue-50 hover:bg-blue-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
@@ -4635,12 +4648,11 @@ function OrdersPageInner() {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-center">
-                          {(doc as any).paymentMethod ? (
+                          {payMethods.length > 0 ? (
                             <div className="flex flex-col items-center gap-0.5">
-                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod}</span>
-                              {(doc as any).paymentMethod2 && (
-                                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{(doc as any).paymentMethod2}</span>
-                              )}
+                              {payMethods.map((m, i) => (
+                                <span key={m} title={`Payment method: ${m}`} className={`text-xs px-2 py-0.5 rounded-full bg-gray-100 ${i === 0 ? 'text-gray-700' : 'text-gray-500'}`}>{m}</span>
+                              ))}
                             </div>
                           ) : null}
                         </td>
