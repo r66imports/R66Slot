@@ -63,6 +63,9 @@ function ProductGridLive({
   }, [settings.assignedCategories])
 
   const handleAddToCart = (p: any) => {
+    const stockQty = Number(p.quantity ?? 0)
+    if (stockQty <= 0) return
+    // stockQty/trackQty must be passed or the cart cap resolves to Infinity.
     addItem({
       id: p.id,
       sku: p.sku || '',
@@ -71,7 +74,10 @@ function ProductGridLive({
       price: p.price || 0,
       imageUrl: p.imageUrl || '',
       pageUrl: p.pageUrl || '',
-    }, getQty(p.id))
+      stockQty,
+      trackQty: true,
+      isPreOrder: p.isPreOrder ?? false,
+    }, Math.min(getQty(p.id), stockQty))
     setQty(p.id, 1)
     setAddedId(p.id)
     setTimeout(() => setAddedId(null), 1500)
@@ -190,14 +196,23 @@ function ProductGridLive({
                       {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
                     </p>
                   )}
-                  {showStockQty && !p.isPreOrder && (
+                  {showStockQty && (!p.isPreOrder || p.quantity <= 0) && (
                     <p className={`text-xs font-medium mb-2 ${p.quantity > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                      {p.quantity > 0 ? `${p.quantity} in stock` : 'Out of stock'}
+                      {p.quantity > 0 ? `${p.quantity} in stock` : 'Sold Out'}
                     </p>
                   )}
                   {settings.showAddToCart && (
                     <div className="mt-auto">
-                      {p.isPreOrder ? (
+                      {/* Sold Out wins over Pre Order — a 0-qty product is never purchasable,
+                          whatever its pre-order flag. */}
+                      {p.quantity <= 0 ? (
+                        <button
+                          disabled
+                          className="block w-full text-center font-semibold py-2 px-3 rounded text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
+                        >
+                          Sold Out
+                        </button>
+                      ) : p.isPreOrder ? (
                         <a
                           href={productUrl}
                           target="_blank"
@@ -206,13 +221,6 @@ function ProductGridLive({
                         >
                           Book for Next Shipment
                         </a>
-                      ) : p.quantity === 0 ? (
-                        <button
-                          disabled
-                          className="block w-full text-center font-semibold py-2 px-3 rounded text-sm bg-gray-300 text-gray-500 cursor-not-allowed"
-                        >
-                          Out of Stock
-                        </button>
                       ) : (
                         <>
                           <div className="flex items-center justify-center gap-2 mb-2">

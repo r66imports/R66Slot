@@ -1,5 +1,4 @@
 import { db } from '@/lib/db'
-import { isRuleActive } from '@/lib/site-rules'
 
 export interface LineItem {
   id: string
@@ -57,34 +56,26 @@ export async function autoCreateMissingProducts(items: LineItem[]): Promise<numb
 
 /** Adjust product stock by sku. direction='subtract' deducts (floor 0), 'add' restores. */
 export async function adjustStock(items: LineItem[], direction: 'subtract' | 'add'): Promise<void> {
-  const autoPreOrder = await isRuleActive('auto_preorder_on_oos', true)
   const now = new Date().toISOString()
   for (const li of items) {
     const sku = extractSku(li.description)
     if (!sku || li.qty <= 0) continue
     try {
       if (direction === 'subtract') {
-        const res = await db.query(
+        await db.query(
           `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $1, 0), updated_at = $2 WHERE LOWER(sku) = LOWER($3) RETURNING quantity`,
           [li.qty, now, sku]
         )
-        if (autoPreOrder && res.rows[0]?.quantity === 0) {
-          await db.query(
-            `UPDATE products SET is_pre_order = true, updated_at = $1 WHERE LOWER(sku) = LOWER($2) AND NOT COALESCE(is_pre_order, false)`,
-            [now, sku]
-          )
-        }
+        // Rule 30: selling out no longer flips the product to Pre-Order. A sold-out
+        // item reads Sold Out — Pre Order / Book Now is for products deliberately
+        // flagged as pre-order items.
       } else {
-        const res = await db.query(
+        await db.query(
           `UPDATE products SET quantity = COALESCE(quantity, 0) + $1, updated_at = $2 WHERE LOWER(sku) = LOWER($3) RETURNING quantity`,
           [li.qty, now, sku]
         )
-        if (autoPreOrder && (res.rows[0]?.quantity ?? 0) > 0) {
-          await db.query(
-            `UPDATE products SET is_pre_order = false, updated_at = $1 WHERE LOWER(sku) = LOWER($2) AND COALESCE(is_pre_order, false)`,
-            [now, sku]
-          )
-        }
+        // Restoring stock must not clear a deliberately-set pre-order flag either —
+        // the flag is owned by the product, not by the stock level.
       }
     } catch {
       // best-effort

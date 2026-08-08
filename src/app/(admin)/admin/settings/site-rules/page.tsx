@@ -305,8 +305,8 @@ function SortableRuleRow({
 
           {rule.id === 'auto_preorder_on_oos' && (
             <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-xl">
-              <p className="text-xs font-semibold text-orange-700 mb-1">Apply to existing products</p>
-              <p className="text-xs text-orange-600 mb-2">Click below to immediately apply to all current products.</p>
+              <p className="text-xs font-semibold text-orange-700 mb-1">Clear Pre-Order on in-stock products</p>
+              <p className="text-xs text-orange-600 mb-2">Removes the Pre-Order flag from any product that has stock on hand. Zero-stock products are left untouched so genuine pre-orders are not wiped.</p>
               <div className="flex items-center gap-3">
                 <button
                   onClick={syncPreorder}
@@ -317,7 +317,7 @@ function SortableRuleRow({
                 </button>
                 {syncPreorderResult && (
                   <span className="text-xs text-green-700 font-semibold">
-                    ✓ {syncPreorderResult.set} set · {syncPreorderResult.cleared} cleared
+                    ✓ {syncPreorderResult.cleared} cleared
                   </span>
                 )}
               </div>

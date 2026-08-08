@@ -10,18 +10,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const [activeImg, setActiveImg] = useState(0)
   const [qty, setQty] = useState(1)
   const [added, setAdded] = useState(false)
-  const [stockRuleActive, setStockRuleActive] = useState(true)
   const { addItem } = useLocalCart()
-
-  useEffect(() => {
-    fetch('/api/admin/site-rules')
-      .then((r) => r.ok ? r.json() : [])
-      .then((rules: any[]) => {
-        const rule = rules.find((r: any) => r.id === 'enforce_stock_limit')
-        setStockRuleActive(rule ? rule.active !== false : true)
-      })
-      .catch(() => {})
-  }, [])
 
   useEffect(() => {
     fetch(`/api/admin/products/${id}`)
@@ -52,10 +41,13 @@ export default function ProductDetailClient({ id }: { id: string }) {
     ...((product.images as string[]) || []).filter((img: string) => img && img !== product.imageUrl),
   ]
 
-  const trackStock = stockRuleActive || product.trackQuantity === true
-  const stockLimit = trackStock && product.quantity > 0 ? product.quantity : Infinity
+  // Stock is always tracked on the storefront — the Rule 1 toggle governs admin
+  // invoicing/POS, not what a customer is allowed to put in their cart.
+  const availableQty = Number(product.quantity ?? 0)
+  const stockLimit = availableQty
 
   const handleAddToCart = () => {
+    if (availableQty <= 0) return
     addItem({
       id: product.id,
       sku: product.sku || '',
@@ -64,15 +56,16 @@ export default function ProductDetailClient({ id }: { id: string }) {
       price: product.price || 0,
       imageUrl: product.imageUrl || '',
       pageUrl: `/product/${product.id}`,
-      stockQty: trackStock ? (product.quantity ?? undefined) : undefined,
-      trackQty: trackStock,
+      stockQty: availableQty,
+      trackQty: true,
       isPreOrder: product.isPreOrder ?? false,
-    }, Math.min(qty, isFinite(stockLimit) ? stockLimit : qty))
+    }, Math.min(qty, stockLimit))
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }
 
-  const outOfStock = trackStock ? (product.quantity <= 0 && !product.isPreOrder) : (product.quantity === 0 && !product.isPreOrder)
+  // Sold Out wins over Pre Order — a 0-qty product is never purchasable.
+  const outOfStock = availableQty <= 0
   const isPreOrder = product.isPreOrder
 
   return (
@@ -151,11 +144,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
                       disabled={isFinite(stockLimit) && qty >= stockLimit}
                       className="w-9 h-9 flex items-center justify-center text-lg font-bold text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">+</button>
                   </div>
-                  {trackStock && isFinite(stockLimit) && (
-                    <span className="text-xs font-medium text-gray-500">
-                      {qty >= stockLimit ? '⚠ Max available: ' + stockLimit + ' in stock' : stockLimit + ' in stock'}
-                    </span>
-                  )}
+                  <span className="text-xs font-medium text-gray-500">
+                    {qty >= stockLimit ? '⚠ Max available: ' + stockLimit + ' in stock' : stockLimit + ' in stock'}
+                  </span>
                 </div>
               )}
               {isPreOrder ? (
@@ -172,7 +163,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           ) : (
             <button disabled className="w-full font-bold py-3 px-6 rounded-lg text-base bg-gray-200 text-gray-500 cursor-not-allowed">
-              Out of Stock
+              Sold Out
             </button>
           )}
 

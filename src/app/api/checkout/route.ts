@@ -50,6 +50,38 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
+    const items = (body.items || []) as CheckoutOrder['items']
+
+    // Server-side stock guard. The cart caps quantity client-side, but that is a
+    // convenience only — a stale cart, a second tab, or a direct POST can all ask
+    // for more than exists. Reject before anything is written.
+    const shortfalls: Array<{ id: string; title: string; requested: number; available: number }> = []
+    for (const item of items) {
+      if (!item.id || !item.quantity) continue
+      const res = await db.query(
+        `SELECT title, COALESCE(quantity, 0) AS quantity FROM products WHERE id = $1`,
+        [item.id]
+      )
+      const available = Number(res.rows[0]?.quantity ?? 0)
+      if (!res.rows.length || item.quantity > available) {
+        shortfalls.push({
+          id: item.id,
+          title: res.rows[0]?.title || item.title || item.id,
+          requested: item.quantity,
+          available: res.rows.length ? available : 0,
+        })
+      }
+    }
+    if (shortfalls.length) {
+      return NextResponse.json(
+        {
+          error: 'Some items are no longer available in the quantity requested.',
+          shortfalls,
+        },
+        { status: 409 }
+      )
+    }
+
     const orders = await blobRead<CheckoutOrder[]>(KEY, [])
 
     const orderNumber = `R66-${Date.now().toString().slice(-6)}`
@@ -60,21 +92,31 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
       customer: body.customer,
       shipping: body.shipping,
-      items: body.items,
+      items,
       subtotal: body.subtotal,
       total: body.total,
     }
 
     await blobWrite(KEY, [newOrder, ...orders])
 
-    // Deduct stock for each item immediately — floor at 0
+    // Deduct stock for each item immediately — floor at 0.
+    // Failures are logged rather than swallowed; a deduction that matches no product
+    // used to fail silently and leave the item purchasable forever.
     const now = new Date().toISOString()
-    for (const item of (body.items as CheckoutOrder['items'])) {
+    for (const item of items) {
       if (!item.id || !item.quantity) continue
-      await db.query(
-        `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3 WHERE id = $1`,
-        [item.id, item.quantity, now]
-      ).catch(() => {})
+      try {
+        const res = await db.query(
+          `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3
+           WHERE id = $1 RETURNING id`,
+          [item.id, item.quantity, now]
+        )
+        if (!res.rows.length) {
+          console.error('[checkout] stock deduction matched no product', { id: item.id, orderNumber })
+        }
+      } catch (err: any) {
+        console.error('[checkout] stock deduction failed', { id: item.id, orderNumber, err: err?.message })
+      }
     }
 
     return NextResponse.json({ success: true, orderNumber, id: newOrder.id })
