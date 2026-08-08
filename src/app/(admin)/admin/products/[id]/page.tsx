@@ -224,6 +224,8 @@ export default function EditProductPage({
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const isLoaded = useRef(false)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Guards against two saves uploading the same pending image at once
+  const uploadingRef = useRef(false)
 
   // Dropdown refs for click-outside
   const brandRef = useRef<HTMLDivElement>(null)
@@ -481,13 +483,16 @@ export default function EditProductPage({
     } catch { /* non-critical */ }
   }
 
-  // Autosave — saves current fields without uploading pending images or redirecting
+  // Autosave — saves current fields without redirecting
   const doAutosave = async () => {
     if (!title.trim()) return
     setAutosaveStatus('saving')
     const cleanFloat = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
     const cleanInt = (v: string) => { const n = parseInt(v); return isNaN(n) ? 0 : n }
     try {
+      // Upload pasted images first — the API COALESCEs, so sending the filtered
+      // list before they upload would wipe images off the record instead.
+      const imageUrls = savedImageUrls(await uploadPendingImages())
       await fetch(`/api/admin/products/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -513,8 +518,8 @@ export default function EditProductPage({
             height: dimHeight ? cleanFloat(dimHeight) : null,
           },
           eta,
-          images: mediaFiles.filter(f => !f.url.startsWith('data:')).map(f => f.url),
-          imageUrl: mediaFiles.find(f => !f.url.startsWith('data:'))?.url || '',
+          images: imageUrls,
+          imageUrl: imageUrls[0] || '',
           pageIds, pageId: pageIds[0] || '', pageUrl,
           seo: { metaTitle: seoTitle, metaDescription: seoDescription, metaKeywords: seoKeywords, ogImage: seoImage },
         }),
@@ -560,7 +565,7 @@ export default function EditProductPage({
       selectedCarClasses, selectedRevoParts, selectedSidewaysParts, selectedSidewaysCarClasses,
       customOrgData,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
-      seoTitle, seoDescription, seoKeywords, seoImage, salesAccount, purchaseAccount])
+      seoTitle, seoDescription, seoKeywords, seoImage, salesAccount, purchaseAccount, mediaFiles])
 
   // Click-outside — close all custom dropdowns (registered once; no state deps needed)
   useEffect(() => {
@@ -610,11 +615,20 @@ export default function EditProductPage({
     return () => document.removeEventListener('paste', handler)
   }, [])
 
-  // Upload base64 images to server and return real URLs
-  const uploadPendingImages = async (): Promise<string[]> => {
-    const uploadedUrls: string[] = []
-    for (const file of mediaFiles) {
-      if (file.url.startsWith('data:')) {
+  // Upload base64 images to the server and return the media files with real URLs.
+  // A failed upload keeps its data: URL so the next save retries instead of dropping it.
+  const uploadPendingImages = async (): Promise<{ name: string; url: string; type: string }[]> => {
+    const current = mediaFiles
+    if (!current.some(f => f.url.startsWith('data:'))) return current
+    if (uploadingRef.current) return current
+    uploadingRef.current = true
+    try {
+      const resolved: { name: string; url: string; type: string }[] = []
+      for (const file of current) {
+        if (!file.url.startsWith('data:')) {
+          resolved.push(file)
+          continue
+        }
         try {
           const res = await fetch(file.url)
           const blob = await res.blob()
@@ -623,17 +637,25 @@ export default function EditProductPage({
           const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
           if (uploadRes.ok) {
             const data = await uploadRes.json()
-            uploadedUrls.push(data.url)
+            resolved.push({ ...file, url: data.url })
+          } else {
+            resolved.push(file)
           }
         } catch (err) {
           console.error('Image upload failed:', err)
+          resolved.push(file)
         }
-      } else {
-        uploadedUrls.push(file.url)
       }
+      setMediaFiles(resolved)
+      return resolved
+    } finally {
+      uploadingRef.current = false
     }
-    return uploadedUrls
   }
+
+  // Saved image URLs only — never persist a data: URL to the product record
+  const savedImageUrls = (files: { url: string }[]) =>
+    files.map(f => f.url).filter(u => !u.startsWith('data:'))
 
   const handleSave = async (shouldRedirect = true) => {
     setSaving(true)
@@ -650,7 +672,7 @@ export default function EditProductPage({
 
     try {
       setUploadingImages(true)
-      const imageUrls = await uploadPendingImages()
+      const imageUrls = savedImageUrls(await uploadPendingImages())
       setUploadingImages(false)
 
       const productData = {
