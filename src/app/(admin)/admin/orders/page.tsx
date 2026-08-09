@@ -3677,6 +3677,30 @@ function OrdersPageInner() {
       return s + sub - disc + ship
     }, 0)
 
+  // Pre Order Deposit roll-up for the visible rows — deposit already banked vs still outstanding.
+  // % based deposits are recomputed off the live total (the stored depositPaid figure goes stale
+  // when line items change), matching how the doc itself renders the deposit.
+  const depositTotals = docRows.reduce(
+    (acc, d) => {
+      if (!(d as any).preOrderDeposit) return acc
+      const sub = d.lineItems.reduce((ls, li) => ls + lineAmt(li), 0)
+      const disc = sub * ((d as any).discountPct || 0) / 100
+      const ship = (d as any).shippingCost || 0
+      const dTotal = sub - disc + ship
+      const required = (d as any).depositPct
+        ? Math.round(dTotal * (d as any).depositPct / 100 * 100) / 100
+        : ((d as any).depositPaid || 0)
+      if (required <= 0.005) return acc
+      const received = (d as any).depositReceived
+        ? required
+        : Math.min((d as any).amountPaid || 0, required)
+      acc.paid += received
+      acc.due += Math.max(0, required - received)
+      return acc
+    },
+    { paid: 0, due: 0 }
+  )
+
   // Group all active backorders by client — use email (lowercase) as key for reliable deduplication
   const backordersByClient: Record<string, { displayName: string; email: string; phone: string; items: Backorder[] }> = {}
   for (const b of backorders) {
@@ -4468,7 +4492,17 @@ function OrdersPageInner() {
                 </button>
               )}
             </div>
-            {!showArchive && <p className="text-sm font-semibold text-gray-700">Total (excl. VAT): {fmtPrice(grandTotal)}</p>}
+            {!showArchive && (
+              <div className="flex items-center gap-4 text-sm font-semibold">
+                {(depositTotals.paid > 0.005 || depositTotals.due > 0.005) && (
+                  <>
+                    <span className="text-green-600">Deposits Paid: {fmtPrice(depositTotals.paid)}</span>
+                    <span className="text-amber-600">Deposits Due: {fmtPrice(depositTotals.due)}</span>
+                  </>
+                )}
+                <span className="text-gray-700">Total (excl. VAT): {fmtPrice(grandTotal)}</span>
+              </div>
+            )}
           </div>
 
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
