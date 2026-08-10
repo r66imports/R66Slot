@@ -3677,25 +3677,24 @@ function OrdersPageInner() {
       return s + sub - disc + ship
     }, 0)
 
-  // Pre Order Deposit roll-up for the visible rows — deposit already banked vs still outstanding.
-  // % based deposits are recomputed off the live total (the stored depositPaid figure goes stale
-  // when line items change), matching how the doc itself renders the deposit.
+  // Deposit roll-up. Sums exactly the two per-row figures so the header always reconciles
+  // against the rows below it: the green "Paid" amount (a recorded payment) and the amber
+  // "Deposit" amount still to be paid. The conditions below mirror the row rendering — keep
+  // them in step if that changes. docRows has already dropped archived docs, and the header
+  // only renders when !showArchive, so this covers the Active side only.
   const depositTotals = docRows.reduce(
     (acc, d) => {
-      if (!(d as any).preOrderDeposit) return acc
       const sub = d.lineItems.reduce((ls, li) => ls + lineAmt(li), 0)
       const disc = sub * ((d as any).discountPct || 0) / 100
-      const ship = (d as any).shippingCost || 0
-      const dTotal = sub - disc + ship
-      const required = (d as any).depositPct
-        ? Math.round(dTotal * (d as any).depositPct / 100 * 100) / 100
-        : ((d as any).depositPaid || 0)
-      if (required <= 0.005) return acc
-      const received = (d as any).depositReceived
-        ? required
-        : Math.min((d as any).amountPaid || 0, required)
-      acc.paid += received
-      acc.due += Math.max(0, required - received)
+      const dTotal = sub - disc + ((d as any).shippingCost || 0)
+      const paid = (d as any).amountPaid || 0
+      const bal = Math.max(0, dTotal - paid - ((d as any).creditApplied || 0))
+      const partiallyPaid = d.type === 'invoice' && paid > 0 && bal > 0.005 && d.status !== 'paid'
+      if (paid > 0 && !partiallyPaid && d.status !== 'paid') {
+        acc.paid += paid
+      } else if (paid === 0 && (d as any).preOrderDeposit && ((d as any).depositPaid || 0) > 0.005) {
+        acc.due += (d as any).depositPaid
+      }
       return acc
     },
     { paid: 0, due: 0 }
