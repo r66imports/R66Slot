@@ -1163,7 +1163,9 @@ function CreateDocumentModal({
     const sub = (editDoc.lineItems || []).reduce((s: number, li: any) => s + lineAmt(li), 0)
     const disc = sub * ((editDoc as any).discountPct || 0) / 100
     const invTotal = sub - disc + ((editDoc as any).shippingCost || 0)
-    const depositPaid = (editDoc as any).depositPaid || 0
+    // In deposit mode depositPaid is the deposit DUE, not money received — folding it in
+    // understates the outstanding balance and mints a phantom overpayment credit.
+    const depositPaid = (editDoc as any).depositMode ? 0 : ((editDoc as any).depositPaid || 0)
     const newOverpaymentCredit = Math.max(0, newAmountPaid + newCreditApplied - Math.max(0, invTotal - depositPaid))
     const nowUnpaid = newAmountPaid + newCreditApplied + depositPaid < invTotal - 0.005
     const patchBody: Record<string, any> = { payments: newPayments, amountPaid: newAmountPaid, creditApplied: newCreditApplied, overpaymentCredit: newOverpaymentCredit }
@@ -2665,7 +2667,11 @@ function PaymentModal({
   const existingCreditApplied = (doc as any).creditApplied || 0
   // depositPaid is often already folded into amountPaid once a deposit has been recorded
   // as a payment — take whichever is larger so the deposit isn't counted twice.
-  const existingSettled = Math.max(existingAmountPaid, (doc as any).depositPaid || 0) + existingCreditApplied
+  // In deposit mode depositPaid is the deposit DUE rather than money received, so it must
+  // not count as settled: doing so collapses balanceDue to the balance-on-delivery and
+  // books the difference as a phantom overpayment credit.
+  const settledDeposit = (doc as any).depositMode ? 0 : ((doc as any).depositPaid || 0)
+  const existingSettled = Math.max(existingAmountPaid, settledDeposit) + existingCreditApplied
   const creditApplied = paymentForm.useCredit
     ? Math.min(clientCreditBalance, parseFloat(paymentForm.creditApplied) || clientCreditBalance)
     : 0
@@ -3365,8 +3371,10 @@ function OrdersPageInner() {
     const newAmountPaid = ((paymentModal as any).amountPaid || 0) + result.amountPaid
     const newCreditApplied = ((paymentModal as any).creditApplied || 0) + result.creditApplied
     const newOverpaymentCredit = ((paymentModal as any).overpaymentCredit || 0) + result.overpaymentCredit
-    // depositPaid is the expected deposit, not a separate prior payment — use Max so it isn't counted twice
-    const fullySettled = Math.max(newAmountPaid, (paymentModal as any).depositPaid || 0) + newCreditApplied >= invoiceTotal - 0.005
+    // depositPaid is the expected deposit, not a separate prior payment — use Max so it isn't counted twice.
+    // In deposit mode it is money still owed, so it never counts toward settlement.
+    const settledDeposit = (paymentModal as any).depositMode ? 0 : ((paymentModal as any).depositPaid || 0)
+    const fullySettled = Math.max(newAmountPaid, settledDeposit) + newCreditApplied >= invoiceTotal - 0.005
     const payments = [
       ...((paymentModal as any).payments || []),
       { date: new Date().toISOString(), amountPaid: result.amountPaid, creditApplied: result.creditApplied, paymentMethod: result.paymentMethod, notes: result.notes },
@@ -3407,7 +3415,8 @@ function OrdersPageInner() {
     const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
     const prevAmountPaid = (doc as any).amountPaid || 0
     const prevCredit = (doc as any).creditApplied || 0
-    const prevDeposit = (doc as any).depositPaid || 0
+    // In deposit mode depositPaid is the deposit DUE, not money received
+    const prevDeposit = (doc as any).depositMode ? 0 : ((doc as any).depositPaid || 0)
     const newAmountPaid = prevAmountPaid + amountPaid
     const effectivePaid = Math.max(newAmountPaid, prevDeposit)
     const newOverpayment = Math.max(0, effectivePaid + prevCredit - invoiceTotal)
