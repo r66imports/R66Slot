@@ -3064,6 +3064,16 @@ function OrdersPageInner() {
         const newTotal = newSubtotal - newDiscAmt + ((target as any).shippingCost || 0)
         patchBody.depositPaid = Math.round(newTotal * targetDepositPct / 100 * 100) / 100
       }
+      // Payments taken on the quote must survive the merge, or money the customer has already
+      // paid vanishes and they are billed for it again. amountPaid and creditApplied add up;
+      // the two payment histories concatenate so every line still shows on the invoice.
+      const quotePaid = (quote as any).amountPaid || 0
+      const quoteCredit = (quote as any).creditApplied || 0
+      if (quotePaid > 0.005 || quoteCredit > 0.005) {
+        patchBody.amountPaid = ((target as any).amountPaid || 0) + quotePaid
+        patchBody.creditApplied = ((target as any).creditApplied || 0) + quoteCredit
+        patchBody.payments = [...((target as any).payments || []), ...((quote as any).payments || [])]
+      }
       const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -3134,6 +3144,16 @@ function OrdersPageInner() {
           shippingCost: (doc as any).shippingCost || 0,
           trackingNumber: (doc as any).trackingNumber || '',
           sourceQuoteNumber: doc.docNumber,
+          // Rule 45(1): payments already taken on the quote carry onto the new document, or the
+          // customer gets re-billed for money they have paid.
+          amountPaid: (doc as any).amountPaid || 0,
+          creditApplied: (doc as any).creditApplied || 0,
+          overpaymentCredit: (doc as any).overpaymentCredit || 0,
+          showCreditOnInvoice: (doc as any).showCreditOnInvoice || false,
+          payments: (doc as any).payments || [],
+          // A deposit-mode quote's depositPaid is the deposit DUE, not money received, and the
+          // new document is never in deposit mode — copying it would make it read as settled.
+          depositPaid: (doc as any).depositMode ? 0 : ((doc as any).depositPaid || 0),
         }),
       })
       if (res.ok) {
