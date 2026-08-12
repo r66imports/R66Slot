@@ -24,7 +24,7 @@ function rulesSentence(...keys: (keyof typeof RULES)[]): string {
 
 const FIELDS: { field: string; meaning: React.ReactNode; writer: string }[] = [
   { field: 'amountPaid', meaning: 'Total money received against the document, cumulative', writer: 'Record Payment · inline panel' },
-  { field: 'payments[]', meaning: 'Payment history — date, amount, method, notes. The source of truth', writer: 'Record Payment · inline panel' },
+  { field: 'payments[]', meaning: 'Payment history — date, amount, method, notes. The source of truth, and what the customer sees itemised when more than one payment was taken', writer: 'Record Payment · inline panel' },
   { field: 'creditApplied', meaning: 'Existing customer credit used to offset this document', writer: 'Record Payment' },
   { field: 'depositPaid', meaning: <><strong className="font-semibold text-red-600">Deposit due</strong> when depositMode is on; <strong className="font-semibold">deposit received</strong> when it is off</>, writer: 'Edit modal, from Deposit %' },
   { field: 'depositMode', meaning: 'Switches the meaning of depositPaid. Quotes only', writer: 'Edit modal' },
@@ -354,6 +354,49 @@ export default function PaymentMappingPage() {
             <text x="819" y="214" fontSize="11" fill="#6b7280" textAnchor="middle">ledger + document</text>
           </svg>
         </Figure>
+      </section>
+
+      {/* ─── What the customer sees ───────────────────────────────────────── */}
+      <section className="mb-12">
+        <SectionHeading eyebrow="Output" title="What the customer sees" />
+        <p className="text-gray-600 max-w-3xl leading-relaxed">
+          A quote or invoice can collect several payments — a deposit, then a balance, or two EFTs on the same
+          day. When more than one has been recorded, each is itemised on its own line above the Amount Paid
+          total, so the customer can reconcile the document against their bank statement instead of seeing one
+          lump sum they cannot account for.
+        </p>
+
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 my-6 max-w-xl">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-3">
+            R66INV6696 — two payments recorded
+          </p>
+          <div className="text-sm">
+            <div className="flex justify-between px-3 py-2 bg-gray-800 text-white rounded-lg font-bold">
+              <span>TOTAL</span><span className="tabular-nums">R 8 959.45</span>
+            </div>
+            <div className="flex justify-between py-0.5 mt-1 text-xs text-blue-500">
+              <span className="pl-3">10 Aug 26 · EFT</span><span className="tabular-nums">-R 3 735.03</span>
+            </div>
+            <div className="flex justify-between py-0.5 text-xs text-blue-500">
+              <span className="pl-3">10 Aug 26 · EFT</span><span className="tabular-nums">-R 2 801.27</span>
+            </div>
+            <div className="flex justify-between py-1 mt-1 border-b border-blue-100 text-blue-600 font-medium">
+              <span>Amount Paid</span><span className="tabular-nums">-R 6 536.30</span>
+            </div>
+            <div className="flex justify-between px-3 py-2 mt-1 bg-orange-600 text-white rounded-lg font-bold">
+              <span>BALANCE DUE</span><span className="tabular-nums">R 2 423.15</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-l-4 border-blue-500 bg-blue-50 rounded-r-lg px-5 py-4 max-w-3xl">
+          <p className="text-[11px] font-mono uppercase tracking-widest text-blue-600 mb-2">All four outputs</p>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            {rulesSentence('carryOver', 'totalsBlock')} require the totals block to be identical everywhere, so
+            the itemised lines render in the View modal, Print, Email and the downloaded PDF — not just one of
+            them. A single payment is never itemised, because it only repeats the Amount Paid row.
+          </p>
+        </div>
       </section>
 
       {/* ─── Field reference ──────────────────────────────────────────────── */}

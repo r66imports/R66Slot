@@ -149,6 +149,16 @@ interface DocViewData {
   overpaymentCredit: number
   showCreditOnInvoice: boolean
   bankAccountId?: string
+  /** Payment history, itemised under Amount Paid when more than one payment was taken. */
+  payments?: DocPaymentEntry[]
+}
+
+export interface DocPaymentEntry {
+  date?: string
+  amountPaid?: number
+  creditApplied?: number
+  paymentMethod?: string
+  notes?: string
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -225,6 +235,25 @@ function fmtDate(iso: string) {
     .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })
     .toUpperCase()
 }
+/**
+ * Individual payments to itemise beneath the Amount Paid row.
+ *
+ * Only returned when more than one payment was taken — a single payment tells the customer
+ * nothing the Amount Paid row does not already say. Per Rule 45(3) every output path
+ * (React preview, View/Print HTML, Email, PDF) must render this same list.
+ */
+function itemisedPayments(data: { payments?: DocPaymentEntry[] }): { label: string; amount: number }[] {
+  const paid = (data.payments || []).filter((p) => (p.amountPaid || 0) > 0.005)
+  if (paid.length < 2) return []
+  return paid.map((p) => ({
+    label: [
+      p.date ? fmtDate(p.date) : '',
+      p.paymentMethod || '',
+    ].filter(Boolean).join(' · '),
+    amount: p.amountPaid || 0,
+  }))
+}
+
 function fmtDateLong(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
 }
@@ -488,6 +517,12 @@ function DocumentBody({
               <span className="font-medium text-amber-600">{fmtPrice(data.overpaymentCredit)}</span>
             </div>
           )}
+          {itemisedPayments(data).map((p, i) => (
+            <div key={i} className="flex justify-between py-0.5 text-xs mt-1 text-blue-500">
+              <span className="pl-3">{p.label}</span>
+              <span>-{fmtPrice(p.amount)}</span>
+            </div>
+          ))}
           {(data.amountPaid || 0) > 0 && (
             <div className="flex justify-between py-1 border-b border-blue-100 text-sm mt-1">
               <span className="text-blue-600 font-medium">Amount Paid</span>
@@ -2173,6 +2208,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       <div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#dc2626;color:white;border-radius:8px;font-weight:700"><span>${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}</span><span>${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositHTML)}</span></div>
       ` : ''}
       ${creditAppliedHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #d1fae5"><span style="color:#16a34a;font-weight:600">Credit Applied</span><span style="color:#16a34a;font-weight:600">-${fmtPrice(creditAppliedHTML)}</span></div>` : ''}
+      ${itemisedPayments(data).map(p => `<div style="display:flex;justify-content:space-between;padding:2px 0;margin-top:2px;font-size:11px;color:#60a5fa"><span style="padding-left:12px">${p.label}</span><span>-${fmtPrice(p.amount)}</span></div>`).join('')}
       ${amountPaidHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #dbeafe"><span style="color:#2563eb;font-weight:600">Amount Paid</span><span style="color:#2563eb;font-weight:600">-${fmtPrice(amountPaidHTML)}</span></div>` : ''}
       ${remainingHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}</span><span>${fmtPrice(remainingHTML)}</span></div>` : ''}
     </div>
@@ -2247,6 +2283,7 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
     `TOTAL:  ${fmtPrice(total)}`,
     ...(liveDepositEmail > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  ${data.docType === 'quote' ? '' : '-'}${fmtPrice(liveDepositEmail)}`] : []),
     ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
+    ...itemisedPayments(data).map(p => `   ${p.label}:  -${fmtPrice(p.amount)}`),
     ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
     ...((total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0))}`] : []),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
@@ -2441,6 +2478,11 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   footRows.push(mkFoot('TOTAL', fmtPrice(total))); totalIdx = footRows.length - 1
   if (depositPDF > 0) { footRows.push(mkFoot(data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid', `${data.docType === 'quote' ? '' : '-'}${fmtPrice(depositPDF)}`)); depositNoteIdx = footRows.length - 1 }
   if (creditAppliedPDF > 0) { footRows.push(mkFoot('Credit Applied', `-${fmtPrice(creditAppliedPDF)}`)); creditIdx = footRows.length - 1 }
+  const paymentRowIdx: number[] = []
+  for (const p of itemisedPayments(data)) {
+    footRows.push(mkFoot(`    ${p.label}`, `-${fmtPrice(p.amount)}`))
+    paymentRowIdx.push(footRows.length - 1)
+  }
   if (amountPaidPDF > 0) { footRows.push(mkFoot('Amount Paid', `-${fmtPrice(amountPaidPDF)}`)); amountPaidIdx = footRows.length - 1 }
   if (remainingPDF > 0.005) { footRows.push(mkFoot(data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE', fmtPrice(remainingPDF))); balanceDueIdx = footRows.length - 1 }
 
@@ -2497,6 +2539,11 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
       if (creditIdx >= 0 && hookData.row.index === creditIdx) {
         hookData.cell.styles.textColor = [22, 163, 74]
         hookData.cell.styles.fontStyle = 'bold'
+      }
+      // Individual payments sit under Amount Paid as lighter, non-bold detail lines.
+      if (paymentRowIdx.includes(hookData.row.index)) {
+        hookData.cell.styles.textColor = [96, 165, 250]
+        hookData.cell.styles.fontSize = 8
       }
       if (amountPaidIdx >= 0 && hookData.row.index === amountPaidIdx) {
         hookData.cell.styles.textColor = [37, 99, 235]
@@ -3850,6 +3897,8 @@ function OrdersPageInner() {
     overpaymentCredit: (doc as any).overpaymentCredit || 0,
     showCreditOnInvoice: (doc as any).showCreditOnInvoice ?? false,
     bankAccountId: (doc as any).bankAccountId || '',
+    // Carried so View, Print, Email and Download can itemise each payment taken.
+    payments: (doc as any).payments || [],
   })
 
   const viewBackorder = (b: Backorder) => setViewData(boToViewData(b))
