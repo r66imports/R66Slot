@@ -5,6 +5,10 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { Backorder } from '@/types/backorder'
 import { useColumnResize } from '@/hooks/use-column-resize'
+import {
+  settledAmount, balanceDue as calcBalanceDue, overpaymentFor,
+  isFullySettled, depositAsSettled, paymentWarnings,
+} from '@/lib/payment-math'
 
 // ─── Service types ────────────────────────────────────────────────────────────
 const SERVICE_TYPES = [
@@ -237,10 +241,9 @@ function docTotal(doc: OrderDocument) {
   return sub - disc + ship
 }
 function docBalanceDue(doc: OrderDocument) {
-  const total = docTotal(doc)
-  // depositPaid is often already folded into amountPaid once recorded as a payment — take whichever is larger so it isn't counted twice
-  const settled = Math.max((doc as any).amountPaid || 0, (doc as any).depositPaid || 0) + ((doc as any).creditApplied || 0)
-  return Math.max(0, total - settled)
+  // Arithmetic lives in @/lib/payment-math so the meaning of depositPaid is resolved in one
+  // place — in deposit mode it is the deposit DUE, not money received.
+  return calcBalanceDue(doc as any)
 }
 // Payment methods actually recorded against a doc. The payments[] history is the source of
 // truth (Rule 44) — the flat paymentMethod/paymentMethod2 fields are only a fallback for
@@ -1163,9 +1166,7 @@ function CreateDocumentModal({
     const sub = (editDoc.lineItems || []).reduce((s: number, li: any) => s + lineAmt(li), 0)
     const disc = sub * ((editDoc as any).discountPct || 0) / 100
     const invTotal = sub - disc + ((editDoc as any).shippingCost || 0)
-    // In deposit mode depositPaid is the deposit DUE, not money received — folding it in
-    // understates the outstanding balance and mints a phantom overpayment credit.
-    const depositPaid = (editDoc as any).depositMode ? 0 : ((editDoc as any).depositPaid || 0)
+    const depositPaid = depositAsSettled(editDoc as any)
     const newOverpaymentCredit = Math.max(0, newAmountPaid + newCreditApplied - Math.max(0, invTotal - depositPaid))
     const nowUnpaid = newAmountPaid + newCreditApplied + depositPaid < invTotal - 0.005
     const patchBody: Record<string, any> = { payments: newPayments, amountPaid: newAmountPaid, creditApplied: newCreditApplied, overpaymentCredit: newOverpaymentCredit }
@@ -2647,6 +2648,8 @@ function PushToSageBtn() {
 type PaymentFormState = {
   amountReceived: string; creditApplied: string; useCredit: boolean
   showCreditOnInvoice: boolean; paymentMethod: string; notes: string
+  // Explicit acknowledgement before a payment is allowed to create customer credit.
+  confirmCredit: boolean
 }
 
 function PaymentModal({
@@ -2663,22 +2666,19 @@ function PaymentModal({
   const subtotal = (doc.lineItems || []).reduce((s, li) => s + lineAmt(li), 0)
   const discountAmt = subtotal * ((doc as any).discountPct || 0) / 100
   const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
-  const existingAmountPaid = (doc as any).amountPaid || 0
-  const existingCreditApplied = (doc as any).creditApplied || 0
-  // depositPaid is often already folded into amountPaid once a deposit has been recorded
-  // as a payment — take whichever is larger so the deposit isn't counted twice.
-  // In deposit mode depositPaid is the deposit DUE rather than money received, so it must
-  // not count as settled: doing so collapses balanceDue to the balance-on-delivery and
-  // books the difference as a phantom overpayment credit.
-  const settledDeposit = (doc as any).depositMode ? 0 : ((doc as any).depositPaid || 0)
-  const existingSettled = Math.max(existingAmountPaid, settledDeposit) + existingCreditApplied
+  const existingSettled = settledAmount(doc as any)
   const creditApplied = paymentForm.useCredit
     ? Math.min(clientCreditBalance, parseFloat(paymentForm.creditApplied) || clientCreditBalance)
     : 0
   const balanceDue = Math.max(0, invoiceTotal - existingSettled - creditApplied)
   const amountReceived = parseFloat(paymentForm.amountReceived) || 0
-  const overpayment = Math.max(0, amountReceived - balanceDue)
+  // Cumulative, so a legacy deposit folded into amountPaid is never counted twice.
+  const overpayment = overpaymentFor(doc as any, amountReceived, creditApplied)
   const shortfall = Math.max(0, balanceDue - amountReceived)
+  const warnings = paymentWarnings(doc as any, amountReceived)
+  // A payment may only mint customer credit once it has been explicitly acknowledged.
+  const creditNeedsConfirm = overpayment > 0.005
+  const blocked = (creditNeedsConfirm && !paymentForm.confirmCredit) || (warnings.length > 0 && !paymentForm.confirmCredit)
   const set = (k: keyof PaymentFormState, v: string | boolean) => setPaymentForm(f => ({ ...f, [k]: v }))
 
   const handleSave = async () => {
@@ -2718,7 +2718,7 @@ function PaymentModal({
           )}
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Amount Received (R)</label>
-            <input type="number" min={0} step="0.01" value={paymentForm.amountReceived} onChange={e => set('amountReceived', e.target.value)} placeholder="0.00" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            <input type="number" min={0} step="0.01" autoComplete="off" value={paymentForm.amountReceived} onChange={e => set('amountReceived', e.target.value)} placeholder="0.00" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1.5">
             <div className="flex justify-between"><span className="text-gray-500">{doc.type === 'invoice' ? 'Invoice Total' : doc.type === 'salesorder' ? 'Sales Order Total' : 'Quote Total'}</span><span className="font-medium">{fmtPrice(invoiceTotal)}</span></div>
@@ -2727,6 +2727,14 @@ function PaymentModal({
             <div className="flex justify-between border-t border-gray-200 pt-1.5"><span className="text-gray-500">Balance Due</span><span className="font-semibold">{fmtPrice(balanceDue)}</span></div>
             <div className="flex justify-between"><span className="text-gray-500">Amount Received</span><span className="font-medium">{fmtPrice(amountReceived)}</span></div>
           </div>
+          {warnings.length > 0 && (
+            <div className="p-3 bg-red-50 rounded-lg border-2 border-red-300 text-sm text-red-700">
+              <p className="font-bold mb-1">⚠ Check this amount</p>
+              <ul className="list-disc pl-4 space-y-0.5 text-xs">
+                {warnings.map(w => <li key={w.kind}>{w.message}</li>)}
+              </ul>
+            </div>
+          )}
           {overpayment > 0.005 && (
             <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-sm text-amber-700">
               <p>R{overpayment.toFixed(2)} will be added to <strong>{doc.clientName}</strong>'s credit balance.</p>
@@ -2735,6 +2743,17 @@ function PaymentModal({
                 Show credit detail on invoice to customer
               </label>
             </div>
+          )}
+          {/* Credit is real money owed back to a customer — never mint it silently. */}
+          {(creditNeedsConfirm || warnings.length > 0) && (
+            <label className="flex items-start gap-2 p-3 bg-gray-50 rounded-lg border border-gray-300 cursor-pointer text-sm">
+              <input type="checkbox" checked={paymentForm.confirmCredit} onChange={e => set('confirmCredit', e.target.checked)} className="w-4 h-4 mt-0.5 accent-blue-600" />
+              <span className="font-medium text-gray-700">
+                {creditNeedsConfirm
+                  ? <>I confirm <strong>{doc.clientName}</strong> really paid R{amountReceived.toFixed(2)} and that R{overpayment.toFixed(2)} should become credit on their account.</>
+                  : <>I confirm R{amountReceived.toFixed(2)} is the correct amount received.</>}
+              </span>
+            </label>
           )}
           {shortfall > 0.005 && amountReceived > 0 && (
             <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-sm text-red-600">
@@ -2754,7 +2773,7 @@ function PaymentModal({
         </div>
         <div className="px-6 py-4 border-t flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 font-semibold">{saving ? 'Saving…' : 'Save Payment'}</button>
+          <button onClick={handleSave} disabled={saving || blocked} title={blocked ? 'Tick the confirmation above to continue' : undefined} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed font-semibold">{saving ? 'Saving…' : 'Save Payment'}</button>
         </div>
       </div>
     </div>
@@ -2983,10 +3002,7 @@ function OrdersPageInner() {
   const [paymentModal, setPaymentModal] = useState<OrderDocument | null>(null)
   const [clientCreditBalance, setClientCreditBalance] = useState(0)
   const [creditBalances, setCreditBalances] = useState<Record<string, number>>({})
-  const [paymentForm, setPaymentForm] = useState<{
-    amountReceived: string; creditApplied: string; useCredit: boolean
-    showCreditOnInvoice: boolean; paymentMethod: string; notes: string
-  }>({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '' })
+  const [paymentForm, setPaymentForm] = useState<PaymentFormState>({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '', confirmCredit: false })
   const [sendToInvoiceQuote, setSendToInvoiceQuote] = useState<OrderDocument | null>(null)
   const [appendingToInvoice, setAppendingToInvoice] = useState(false)
 
@@ -3342,7 +3358,7 @@ function OrdersPageInner() {
     const balance = data.balance ?? 0
 
     setClientCreditBalance(balance)
-    setPaymentForm({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '' })
+    setPaymentForm({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '', confirmCredit: false })
     setPaymentModal(doc)
   }
 
@@ -3371,10 +3387,7 @@ function OrdersPageInner() {
     const newAmountPaid = ((paymentModal as any).amountPaid || 0) + result.amountPaid
     const newCreditApplied = ((paymentModal as any).creditApplied || 0) + result.creditApplied
     const newOverpaymentCredit = ((paymentModal as any).overpaymentCredit || 0) + result.overpaymentCredit
-    // depositPaid is the expected deposit, not a separate prior payment — use Max so it isn't counted twice.
-    // In deposit mode it is money still owed, so it never counts toward settlement.
-    const settledDeposit = (paymentModal as any).depositMode ? 0 : ((paymentModal as any).depositPaid || 0)
-    const fullySettled = Math.max(newAmountPaid, settledDeposit) + newCreditApplied >= invoiceTotal - 0.005
+    const fullySettled = isFullySettled(paymentModal as any, { amountPaid: newAmountPaid, creditApplied: newCreditApplied })
     const payments = [
       ...((paymentModal as any).payments || []),
       { date: new Date().toISOString(), amountPaid: result.amountPaid, creditApplied: result.creditApplied, paymentMethod: result.paymentMethod, notes: result.notes },
@@ -3415,8 +3428,7 @@ function OrdersPageInner() {
     const invoiceTotal = subtotal - discountAmt + ((doc as any).shippingCost || 0)
     const prevAmountPaid = (doc as any).amountPaid || 0
     const prevCredit = (doc as any).creditApplied || 0
-    // In deposit mode depositPaid is the deposit DUE, not money received
-    const prevDeposit = (doc as any).depositMode ? 0 : ((doc as any).depositPaid || 0)
+    const prevDeposit = depositAsSettled(doc as any)
     const newAmountPaid = prevAmountPaid + amountPaid
     const effectivePaid = Math.max(newAmountPaid, prevDeposit)
     const newOverpayment = Math.max(0, effectivePaid + prevCredit - invoiceTotal)
