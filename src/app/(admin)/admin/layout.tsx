@@ -172,6 +172,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Events', href: '/admin/events' },
         { name: 'Payments', href: '/admin/payments' },
         { name: 'Customer Payments', href: '/admin/customer-payments' },
+        { name: 'Payment Mapping', href: '/admin/payment-mapping' },
         { name: 'Accounting', href: '/admin/accounting' },
         { name: 'Sage Accounting', href: '/admin/sage' },
         { name: 'Costing Calculator', isModal: true },

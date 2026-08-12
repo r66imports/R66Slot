@@ -32,6 +32,7 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Business & Store', name: 'Suppliers', href: '/admin/supplier-contacts' },
   { group: 'Business & Store', name: 'Events', href: '/admin/events' },
   { group: 'Business & Store', name: 'Payments', href: '/admin/payments' },
+  { group: 'Business & Store', name: 'Payment Mapping', href: '/admin/payment-mapping' },
   { group: 'Business & Store', name: 'Sage Accounting', href: '/admin/sage' },
   // Shipping
   { group: 'Shipping', name: 'Shipping Network', href: '/admin/shipping-network' },
