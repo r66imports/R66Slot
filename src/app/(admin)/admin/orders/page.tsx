@@ -1390,7 +1390,7 @@ function CreateDocumentModal({
   const [networkCouriers, setNetworkCouriers] = useState<{ id: string; name: string }[]>([])
   const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
-  const [nonDepositPct, setNonDepositPct] = useState<number>(
+  const [nonDepositPct] = useState<number>(
     isQuote && !(editDoc as any)?.depositMode && (editDoc as any)?.depositPct > 0
       ? ((editDoc as any)?.depositPct as number) : 0
   )
@@ -1846,23 +1846,19 @@ function CreateDocumentModal({
                       <td />
                     </tr>
                   )}
-                  {!depositMode && (
+                  {/* Rule 45(2): Deposit Paid is read-only, sourced from Record Payment. The
+                      editable input this replaces let a document be marked settled with no
+                      payment record, no date, no method and no ledger entry, hiding a real
+                      balance due. The row only appears for documents that already carry a
+                      legacy value. */}
+                  {!depositMode && depositPaid > 0 && (
                     <tr className="bg-gray-50">
-                      <td colSpan={4} className="px-3 py-1.5 text-right text-gray-500 text-xs">Deposit Paid</td>
-                      <td className="px-2 py-1">
-                        <input type="number" min={0} step={0.01}
-                          className="w-full px-2 py-1 text-sm text-right rounded border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
-                          value={depositPaid}
-                          onChange={(e) => {
-                            const val = Math.max(0, Number(e.target.value))
-                            setDepositPaid(val)
-                            if (isQuote && total > 0) setNonDepositPct(val / total * 100)
-                          }}
-                        />
+                      <td colSpan={4} className="px-3 py-1.5 text-right text-gray-500 text-xs">
+                        Deposit Paid
+                        <span className="ml-1.5 text-[10px] text-gray-400 font-normal">legacy — record deposits via Record Payment</span>
                       </td>
-                      <td className="px-3 py-1.5 text-right text-green-600 font-medium">
-                        {depositPaid > 0 ? `-${fmtPrice(depositPaid)}` : '—'}
-                      </td>
+                      <td className="px-2 py-1 text-right text-sm text-gray-500 tabular-nums">{fmtPrice(depositPaid)}</td>
+                      <td className="px-3 py-1.5 text-right text-green-600 font-medium">-{fmtPrice(depositPaid)}</td>
                       <td />
                     </tr>
                   )}
