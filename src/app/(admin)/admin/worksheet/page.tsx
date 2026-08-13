@@ -836,6 +836,11 @@ function WorksheetEditor({
   function calcFinalLanded(w: number) {
     return effectiveFinalW(w) * finalExRate * (1 + (shippingPctCalc + customsPctCalc + handlingPctCalc) / 100)
   }
+  // Supplier's own wholesale price per unit, in the supplier's currency — what the supplier actually
+  // invoices (SCS/CUT adjustments applied, but no shipping/customs/handling and no ZAR conversion)
+  function supplierWholesaleFC(w: number) {
+    return effectiveFinalW(w)
+  }
   function calcEntityFinalLanded(w: number, entity?: 'R66' | 'JDM' | '') {
     const base = calcFinalLanded(w)
     return entity === 'R66' ? base * 1.15 : base
@@ -2525,18 +2530,21 @@ function WorksheetEditor({
         />
       )}
 
-      {/* ── Create Invoice Modal (all items, no VAT) ── */}
+      {/* ── Create Invoice Modal (supplier invoice: supplier's wholesale price in the supplier's currency, no VAT) ──
+           unitCost is held in ZAR by the modal; the supplier currency rate divides it back to the exact wholesale. */}
       {showInvoiceModal && (
         <WorksheetInvoiceModal
           supplierName={supplier}
           supplierContact={suppliers.find(s => s.name === supplier)}
           companyInfo={companyInfo}
           invoiceDate={worksheetDate}
-          rates={fxRates}
+          rates={{ ...fxRates, [currency]: finalExRate }}
+          defaultCurrency={currency}
+          costBasisLabel="Wholesale cost"
           hideExchangeRate
           items={items.filter((it) => it.sku && it.wholesalePrice > 0).map((it) => ({
             sku: it.sku, description: it.description, qty: it.qty,
-            unitCost: Math.round(calcFinalLanded(it.wholesalePrice) * 100) / 100,
+            unitCost: Math.round(supplierWholesaleFC(it.wholesalePrice) * finalExRate * 100) / 100,
           }))}
           onClose={() => setShowInvoiceModal(false)}
         />
@@ -3652,6 +3660,7 @@ const INV_CURRENCIES = ['ZAR', 'USD', 'EUR', 'GBP', 'SGD', 'CNY', 'HKD']
 
 function WorksheetInvoiceModal({
   supplierName, supplierContact, companyInfo, invoiceDate, items, onClose, title, vatPct, rates, hideExchangeRate,
+  defaultCurrency, costBasisLabel,
 }: {
   supplierName: string
   supplierContact?: SupplierContact
@@ -3663,14 +3672,19 @@ function WorksheetInvoiceModal({
   vatPct?: number  // 15 for R66, 0 or undefined for no VAT
   rates?: Record<string, number>
   hideExchangeRate?: boolean
+  defaultCurrency?: string       // currency the invoice opens in (supplier currency for supplier invoices)
+  costBasisLabel?: string        // 'Landed cost' (default) or 'Wholesale cost'
 }) {
   const [invoiceNo, setInvoiceNo] = useState('')
   const [poRef, setPoRef] = useState('')
   const [date, setDate] = useState(invoiceDate || new Date().toISOString().slice(0, 10))
-  const [invCurrency, setInvCurrency] = useState('ZAR')
+  const [invCurrency, setInvCurrency] = useState(
+    defaultCurrency && INV_CURRENCIES.includes(defaultCurrency) ? defaultCurrency : 'ZAR')
+  const basisLabel = costBasisLabel ?? 'Landed cost'
   const [rows, setRows] = useState(items.map(it => ({ ...it })))
   const sym = invCurrency === 'ZAR' ? 'R' : invCurrency
-  const rate = invCurrency === 'ZAR' ? 1 : ((rates ?? {})[invCurrency] ?? CURRENCY_DEFAULTS[invCurrency] ?? 1)
+  const rateRaw = invCurrency === 'ZAR' ? 1 : ((rates ?? {})[invCurrency] ?? CURRENCY_DEFAULTS[invCurrency] ?? 1)
+  const rate = rateRaw > 0 ? rateRaw : 1   // a blank/zero worksheet rate must not divide to Infinity
   const fmt = (zarAmt: number) => (zarAmt / rate).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
   const subtotal = rows.reduce((s, r) => s + r.qty * r.unitCost, 0)
@@ -3744,7 +3758,7 @@ function WorksheetInvoiceModal({
         <p style="font-size:13px;color:#374151;">VAT (${vatPct}%): ${sym} ${fmt(vatAmt)}</p>` : ''}
         <p style="font-size:22px;font-weight:800;color:#111827;margin-top:4px;">${sym} ${fmt(grandTotal)}</p>
         ${invCurrency !== 'ZAR' && !hideExchangeRate ? `<p style="font-size:11px;color:#374151;margin-top:2px;">1 ${invCurrency} = R ${rate.toFixed(2)} (from ZAR)</p>` : ''}
-        <p style="font-size:11px;color:#374151;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ' · landed cost'}</p>
+        <p style="font-size:11px;color:#374151;margin-top:4px;">${rows.filter(r => r.sku).reduce((s, r) => s + r.qty, 0)} items${vatPct ? ` · incl. ${vatPct}% VAT` : ` · ${basisLabel.toLowerCase()}`}</p>
       </div>
     </div>
     <table>
@@ -3774,7 +3788,7 @@ function WorksheetInvoiceModal({
             <h2 className="text-base font-semibold text-gray-900">{title ?? 'Create Invoice'}</h2>
             <p className="text-xs text-gray-500 mt-0.5">
               {supplierName && <span className="font-medium">{supplierName}</span>}
-              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : 'Landed cost'} · {sym} {fmt(grandTotal)} total{invCurrency !== 'ZAR' && !hideExchangeRate ? ` · 1 ${invCurrency} = R ${rate.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : ''}
+              {supplierName && ' · '}{vatPct ? `Landed + ${vatPct}% VAT` : basisLabel} · {sym} {fmt(grandTotal)} total{invCurrency !== 'ZAR' && !hideExchangeRate ? ` · 1 ${invCurrency} = R ${rate.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : ''}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -3838,7 +3852,9 @@ function WorksheetInvoiceModal({
                         className="w-14 border-0 bg-transparent text-xs text-center font-semibold text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
                     </td>
                     <td className="px-3 py-1.5 text-right">
-                      <input type="number" min={0} step={0.01} value={row.unitCost} onChange={e => updateRow(idx, 'unitCost', parseFloat(e.target.value) || 0)}
+                      {/* Rows hold unitCost in ZAR — show and edit it in the selected invoice currency */}
+                      <input type="number" min={0} step={0.01} value={Math.round((row.unitCost / rate) * 100) / 100}
+                        onChange={e => updateRow(idx, 'unitCost', (parseFloat(e.target.value) || 0) * rate)}
                         className="w-24 border-0 bg-transparent text-xs text-right text-gray-700 focus:outline-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
                     </td>
                     <td className="px-3 py-1.5 text-right text-xs font-semibold text-gray-900">
