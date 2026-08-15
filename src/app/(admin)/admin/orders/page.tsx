@@ -513,7 +513,7 @@ function DocumentBody({
           )}
           {(data.overpaymentCredit || 0) > 0 && data.showCreditOnInvoice && (
             <div className="flex justify-between py-1 border-b border-amber-100 text-sm mt-1">
-              <span className="text-amber-600 font-medium">Overpayment Credit <span className="text-[10px] font-normal">(carried to your account)</span></span>
+              <span className="text-amber-600 font-medium">Overpayment Credit <span className="text-xs font-normal">(carried to your account)</span></span>
               <span className="font-medium text-amber-600">{fmtPrice(data.overpaymentCredit)}</span>
             </div>
           )}
@@ -1088,9 +1088,9 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
                 <span className="font-mono text-xs text-indigo-500 mr-2">{p.sku}</span>
                 <span className="text-gray-800">{p.title}</span>
                 {isPre
-                  ? <span className="float-right text-[10px] font-semibold px-1.5 py-0.5 rounded text-amber-600 bg-amber-50">NEXT SHIPMENT</span>
+                  ? <span className="float-right text-xs font-semibold px-1.5 py-0.5 rounded text-amber-600 bg-amber-50">NEXT SHIPMENT</span>
                   : oos
-                    ? <span className="float-right text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
+                    ? <span className="float-right text-xs font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">OUT OF STOCK</span>
                     : <span className="float-right text-gray-400 text-xs">R {p.price.toFixed(2)}</span>
                 }
               </button>
@@ -1638,7 +1638,7 @@ function CreateDocumentModal({
                       {li._service ? (
                         <>
                           <td className="px-2 py-1.5 align-top pt-2">
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-orange-200 text-orange-800">SVC</span>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-200 text-orange-800">SVC</span>
                           </td>
                           <td className="px-2 py-1.5">
                             <div className="flex flex-col gap-1">
@@ -1678,9 +1678,9 @@ function CreateDocumentModal({
                             <SkuLineInput value={li.description} onChange={(v) => updateLine(li.id, 'description', v)} products={modalProducts} isQuote={isQuote} onSelectProduct={(sku, title, price, costPerItem, preOrderPrice, stockQty) => { updateLine(li.id, 'description', sku ? `${sku} – ${title}` : title); const autoPrice = priceMode === 'cost' ? (costPerItem || price) : priceMode === 'preorder' ? (preOrderPrice > 0 ? preOrderPrice : price) : price; updateLine(li.id, 'unitPrice', autoPrice); if (preOrderPrice > 0) updateLine(li.id, '_preOrderPrice', preOrderPrice); updateLine(li.id, '_retailPrice', price); updateLine(li.id, '_costPrice', costPerItem); if (sku) updateLine(li.id, '_stockQty', stockQty) }} />
                             {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
                               <div className="flex gap-1 mt-1 flex-wrap">
-                                {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
-                                {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Book Now R{li._preOrderPrice.toFixed(2)}</button> : null}
-                                {li._costPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-[10px] px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
+                                {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
+                                {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Book Now R{li._preOrderPrice.toFixed(2)}</button> : null}
+                                {li._costPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
                               </div>
                             )}
                           </td>
@@ -1698,7 +1698,7 @@ function CreateDocumentModal({
                               }}
                             />
                             {!isQuote && enforceStockLimit && li._stockQty !== undefined && li.qty >= li._stockQty && (
-                              <div className="text-[10px] text-red-500 font-medium mt-0.5 text-right">{li._stockQty} in stock</div>
+                              <div className="text-xs text-red-500 font-medium mt-0.5 text-right">{li._stockQty} in stock</div>
                             )}
                           </td>
                           <td className="px-2 py-1"><input type="number" min={0} step={0.01} className="w-full px-2 py-1.5 text-sm text-right rounded focus:outline-none focus:bg-blue-50" value={li.unitPrice} onChange={(e) => updateLine(li.id, 'unitPrice', Number(e.target.value))} /></td>
@@ -1855,7 +1855,7 @@ function CreateDocumentModal({
                     <tr className="bg-gray-50">
                       <td colSpan={4} className="px-3 py-1.5 text-right text-gray-500 text-xs">
                         Deposit Paid
-                        <span className="ml-1.5 text-[10px] text-gray-400 font-normal">legacy — record deposits via Record Payment</span>
+                        <span className="ml-1.5 text-xs text-gray-400 font-normal">legacy — record deposits via Record Payment</span>
                       </td>
                       <td className="px-2 py-1 text-right text-sm text-gray-500 tabular-nums">{fmtPrice(depositPaid)}</td>
                       <td className="px-3 py-1.5 text-right text-green-600 font-medium">-{fmtPrice(depositPaid)}</td>
@@ -4572,7 +4572,7 @@ function OrdersPageInner() {
                   <IconTrash />
                   {showBin ? 'Back to Active' : 'Bin'}
                   {binDocs.length > 0 && (
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${showBin ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{binDocs.length}</span>
+                    <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${showBin ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{binDocs.length}</span>
                   )}
                 </button>
               )}
@@ -4643,7 +4643,7 @@ function OrdersPageInner() {
                           <PlainTh col="source" label="Source" />
                           <th className="text-center py-3 px-4 text-gray-500 flex items-center justify-end gap-1.5">
                             <span>Actions</span>
-                            <button onClick={autoFitDocCols} title="Auto-fit columns to page" className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 font-medium leading-none">Fit</button>
+                            <button onClick={autoFitDocCols} title="Auto-fit columns to page" className="text-xs px-1.5 py-0.5 rounded border border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 font-medium leading-none">Fit</button>
                           </th>
                         </>
                       )
@@ -4657,14 +4657,14 @@ function OrdersPageInner() {
                       <td className="py-3 px-4 font-mono font-semibold text-blue-700">{cfg.boDocNum(b)}</td>
                       <td className="py-3 px-4 text-gray-500">{fmtDate(cfg.boDate(b) ?? b.createdAt)}</td>
                       <td className="py-3 px-4 font-medium">{b.clientName}</td>
-                      <td className={`py-3 px-4 text-gray-600 break-words ${docColW.description < 120 ? 'text-[10px]' : docColW.description < 155 ? 'text-[11px]' : 'text-xs'}`}>{b.description}</td>
+                      <td className="py-3 px-4 text-gray-600 break-words text-xs font-bold">{b.description}</td>
                       <td className="py-3 px-4 text-right font-semibold">{fmtPrice(b.price * b.qty)}</td>
                       <td className="py-3 px-4 text-center">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
+                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold capitalize ${BO_STATUS_COLORS[b.status] ?? 'bg-gray-100 text-gray-600'}`}>{b.status}</span>
                       </td>
                       <td className="py-3 px-4 text-center"></td>
                       <td className="py-3 px-4 text-center">
-                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Back Order</span>
+                        <span className="text-xs font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Back Order</span>
                       </td>
                       <td className="py-3 px-4 text-center">
                         <ActionsDropdown items={[
@@ -4707,26 +4707,26 @@ function OrdersPageInner() {
                     return (
                       <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : (doc as any).depositReceived ? 'bg-yellow-50 hover:bg-yellow-100' : (doc as any).shippingAdded ? 'bg-blue-50 hover:bg-blue-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 text-xs">
-                          <div className="font-mono font-semibold text-blue-700">{doc.docNumber}</div>
+                          <div className="font-mono font-bold text-blue-700">{doc.docNumber}</div>
                           {(doc as any).sourceQuoteNumber && (
-                            <div className="text-[10px] text-gray-400 mt-0.5">Q: {(doc as any).sourceQuoteNumber}</div>
+                            <div className="text-xs font-bold text-gray-400 mt-0.5">Q: {(doc as any).sourceQuoteNumber}</div>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-xs text-gray-500">{fmtDate(doc.date)}</td>
-                        <td className="py-3 px-4 text-xs font-medium">{doc.clientName}</td>
-                        <td className="py-3 px-4 text-xs text-gray-600 break-words">{firstDesc}</td>
+                        <td className="py-3 px-4 text-xs font-bold text-gray-500">{fmtDate(doc.date)}</td>
+                        <td className="py-3 px-4 text-xs font-bold">{doc.clientName}</td>
+                        <td className="py-3 px-4 text-xs font-bold text-gray-600 break-words">{firstDesc}</td>
                         <td className="py-3 px-4 text-xs text-right">
-                          <div className="font-semibold">{fmtPrice(docTotal)}</div>
-                          {isPartiallyPaid && <div className="text-[10px] text-red-600 font-semibold mt-0.5">Due {fmtPrice(docBalance)}</div>}
-                          {amtPaid > 0 && !isPartiallyPaid && doc.status !== 'paid' && doc.status !== 'archived' && <div className="text-[10px] text-green-600 mt-0.5">Paid {fmtPrice(amtPaid)}</div>}
+                          <div className="font-bold">{fmtPrice(docTotal)}</div>
+                          {isPartiallyPaid && <div className="text-xs text-red-600 font-bold mt-0.5">Due {fmtPrice(docBalance)}</div>}
+                          {amtPaid > 0 && !isPartiallyPaid && doc.status !== 'paid' && doc.status !== 'archived' && <div className="text-xs font-bold text-green-600 mt-0.5">Paid {fmtPrice(amtPaid)}</div>}
                           {/* Pre Order Deposit quotes: show the deposit due/received even before a formal Record Payment */}
                           {(doc as any).preOrderDeposit && amtPaid === 0 && ((doc as any).depositPaid || 0) > 0.005 && doc.status !== 'archived' && (
-                            <div className="text-[10px] text-amber-600 font-semibold mt-0.5">Deposit {fmtPrice((doc as any).depositPaid)}</div>
+                            <div className="text-xs text-amber-600 font-bold mt-0.5">Deposit {fmtPrice((doc as any).depositPaid)}</div>
                           )}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">
-                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-bold capitalize ${DOC_STATUS_COLORS[doc.status] ?? 'bg-gray-100 text-gray-600'}`}>{doc.status}</span>
                             {(doc as any).sentToPackingList && (
                               <span title="Sent to Packing List">
                                 <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10" /></svg>
@@ -4738,19 +4738,19 @@ function OrdersPageInner() {
                           {payMethods.length > 0 ? (
                             <div className="flex flex-col items-center gap-0.5">
                               {payMethods.map((m, i) => (
-                                <span key={m} title={`Payment method: ${m}`} className={`text-xs px-2 py-0.5 rounded-full bg-gray-100 ${i === 0 ? 'text-gray-700' : 'text-gray-500'}`}>{m}</span>
+                                <span key={m} title={`Payment method: ${m}`} className={`text-xs font-bold px-2 py-0.5 rounded-full bg-gray-100 ${i === 0 ? 'text-gray-700' : 'text-gray-500'}`}>{m}</span>
                               ))}
                             </div>
                           ) : null}
                         </td>
                         <td className="py-3 px-4 text-center">
                           <div className="flex flex-col items-center gap-1">
-                            <span className="text-xs bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full">Standalone</span>
+                            <span className="text-xs font-bold bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full">Standalone</span>
                             {(doc as any).preOrderDeposit && (
-                              <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pre Order Deposit</span>
+                              <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Pre Order Deposit</span>
                             )}
                             {isPartiallyPaid && (
-                              <span className="text-[10px] font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+                              <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                                 Partial · Due {fmtPrice(docBalance)}
                               </span>
                             )}
@@ -4758,7 +4758,7 @@ function OrdersPageInner() {
                               const key = doc.clientName.toLowerCase().replace(/\s+/g, '_')
                               const bal = creditBalances[key]
                               return bal && bal > 0 ? (
-                                <span className="text-[10px] font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full" title={`Credit balance: R${bal.toFixed(2)}`}>
+                                <span className="text-xs font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full" title={`Credit balance: R${bal.toFixed(2)}`}>
                                   Credit R{bal.toFixed(2)}
                                 </span>
                               ) : null
