@@ -76,7 +76,100 @@ interface OrderDoc {
   creditApplied?: number
   amountPaid?: number
   bankAccountId?: string
+  paymentMethod?: string
+  paymentMethod2?: string
+  paymentMethod1Amount?: number
+  paymentMethod2Amount?: number
+  /** Payment history — the source of truth for how a document was paid (Rule 44). The flat
+   *  paymentMethod fields above are only a fallback for docs written before it existed. */
+  payments?: { date?: string; amountPaid?: number; creditApplied?: number; paymentMethod?: string; notes?: string }[]
   createdAt: string
+}
+
+interface PettyCashEntry {
+  id: string
+  date: string
+  type: 'in' | 'out'
+  description: string
+  category: string
+  reference?: string
+  amount: number
+  sourceId?: string
+  createdAt: string
+}
+
+interface InvoiceCashPayment {
+  /** Stable key for the import guard — `${docId}:${index}`, or `${docId}:m1|m2` for legacy docs. */
+  sourceId: string
+  docId: string
+  docNumber: string
+  clientName: string
+  date: string
+  method: string
+  amount: number
+  archived: boolean
+  notes?: string
+}
+
+const PETTY_CATEGORIES = [
+  'Float Top-Up', 'Fuel & Travel', 'Postage & Courier', 'Refreshments',
+  'Stationery', 'Parking & Tolls', 'Repairs & Maintenance', 'Staff', 'Banking', 'Other',
+]
+
+const EMPTY_PETTY_FORM = () => ({
+  date: new Date().toISOString().slice(0, 10),
+  type: 'out' as 'in' | 'out',
+  description: '',
+  category: '',
+  reference: '',
+  amount: 0,
+})
+
+/** Matches "Cash", "Cash Deposit", "cash payment" — but not "Cashback". */
+const isCashMethod = (m?: string) => /^cash\b/i.test(String(m || '').trim())
+
+/** Every cash payment recorded against a document. payments[] is authoritative; the flat
+ *  paymentMethod/paymentMethod2 pair is only read when a doc has no payment history. */
+function cashPaymentsOf(doc: OrderDoc): InvoiceCashPayment[] {
+  const base = {
+    docId: doc.id,
+    docNumber: doc.docNumber,
+    clientName: doc.clientName || '',
+    archived: doc.status === 'archived',
+  }
+  const docDate = (doc.date || doc.createdAt || '').slice(0, 10)
+
+  const fromHistory = (doc.payments || [])
+    .map((p, i) => ({ p, i }))
+    .filter(({ p }) => isCashMethod(p.paymentMethod) && (Number(p.amountPaid) || 0) > 0.005)
+    .map(({ p, i }) => ({
+      ...base,
+      sourceId: `${doc.id}:${i}`,
+      date: (p.date || docDate || '').slice(0, 10),
+      method: (p.paymentMethod || 'Cash').trim(),
+      amount: Number(p.amountPaid) || 0,
+      notes: p.notes,
+    }))
+  if (fromHistory.length) return fromHistory
+
+  // ── Legacy docs (no payments[]) ──
+  const out: InvoiceCashPayment[] = []
+  const m1 = String(doc.paymentMethod || '').trim()
+  const m2 = String(doc.paymentMethod2 || '').trim()
+  const a1 = Number(doc.paymentMethod1Amount) || 0
+  const a2 = Number(doc.paymentMethod2Amount) || 0
+  const paid = Number(doc.amountPaid) || 0
+
+  if (isCashMethod(m1)) {
+    // Split amounts are only populated on multi-method docs. Falling back to the full
+    // amountPaid when a second method exists would book the other method's money as cash.
+    const amt = a1 > 0.005 ? a1 : (m2 ? 0 : paid)
+    if (amt > 0.005) out.push({ ...base, sourceId: `${doc.id}:m1`, date: docDate, method: m1, amount: amt })
+  }
+  if (isCashMethod(m2) && a2 > 0.005) {
+    out.push({ ...base, sourceId: `${doc.id}:m2`, date: docDate, method: m2, amount: a2 })
+  }
+  return out
 }
 
 const EMPTY_ACCOUNT = (): Omit<BankAccount, 'id'> => ({
@@ -105,8 +198,24 @@ export default function AccountingPage() {
   const [form, setForm] = useState(EMPTY_ACCOUNT())
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'stats' | 'banks' | 'services'>('stats')
+  const [activeTab, setActiveTab] = useState<'stats' | 'banks' | 'petty' | 'services'>('stats')
   const [statPeriod, setStatPeriod] = useState<'all' | '30' | '90' | 'year'>('all')
+
+  // Petty Cash tab state
+  const [petty, setPetty] = useState<PettyCashEntry[]>([])
+  const [pettyLoaded, setPettyLoaded] = useState(false)
+  const [showPettyForm, setShowPettyForm] = useState(false)
+  const [pettyForm, setPettyForm] = useState(EMPTY_PETTY_FORM())
+  const [savingPetty, setSavingPetty] = useState(false)
+  const [pettyEditId, setPettyEditId] = useState<string | null>(null)
+  const [pettyFilter, setPettyFilter] = useState<'all' | 'in' | 'out'>('all')
+  const [pettyCatFilter, setPettyCatFilter] = useState('all')
+  const [pettyView, setPettyView] = useState<'book' | 'invoices'>('book')
+  const [cashFrom, setCashFrom] = useState('')
+  const [cashTo, setCashTo] = useState('')
+  const [cashSearch, setCashSearch] = useState('')
+  const [importingCash, setImportingCash] = useState(false)
+  const [importResult, setImportResult] = useState<string | null>(null)
 
   // Services tab state
   const [svcStore, setSvcStore] = useState<ServiceStore>({ entries: [], paid: {} })
@@ -127,6 +236,15 @@ export default function AccountingPage() {
       setLoading(false)
     })
   }, [])
+
+  // Load petty cash the first time the tab is opened
+  useEffect(() => {
+    if (activeTab !== 'petty' || pettyLoaded) return
+    fetch('/api/admin/petty-cash').then(r => r.ok ? r.json() : []).then(data => {
+      setPetty(Array.isArray(data) ? data : [])
+      setPettyLoaded(true)
+    }).catch(() => setPettyLoaded(true))
+  }, [activeTab, pettyLoaded])
 
   // Load services data the first time the services tab is opened
   useEffect(() => {
@@ -320,6 +438,146 @@ export default function AccountingPage() {
     return acc
   }, {})
 
+  // ── Petty Cash helpers ─────────────────────────────────────────────────────
+
+  // Running balance is always computed over EVERY entry in chronological order,
+  // so a filtered view still shows the true balance after each movement.
+  const pettyChronological = [...petty].sort((a, b) =>
+    (a.date || '').localeCompare(b.date || '') || (a.createdAt || '').localeCompare(b.createdAt || '')
+  )
+  const pettyBalanceAfter: Record<string, number> = {}
+  let pettyRunning = 0
+  for (const e of pettyChronological) {
+    pettyRunning += e.type === 'in' ? e.amount : -e.amount
+    pettyBalanceAfter[e.id] = pettyRunning
+  }
+
+  const pettyIn      = petty.filter(e => e.type === 'in').reduce((s, e) => s + e.amount, 0)
+  const pettyOut     = petty.filter(e => e.type === 'out').reduce((s, e) => s + e.amount, 0)
+  const pettyBalance = pettyIn - pettyOut
+
+  const thisMonth = new Date().toISOString().slice(0, 7)
+  const pettyMonthOut = petty
+    .filter(e => e.type === 'out' && (e.date || '').slice(0, 7) === thisMonth)
+    .reduce((s, e) => s + e.amount, 0)
+
+  const pettyCategories = Array.from(new Set([
+    ...PETTY_CATEGORIES,
+    ...petty.map(e => e.category).filter(Boolean),
+  ]))
+
+  const filteredPetty = petty
+    .filter(e => pettyFilter === 'all' || e.type === pettyFilter)
+    .filter(e => pettyCatFilter === 'all' || e.category === pettyCatFilter)
+
+  const filteredPettyNet = filteredPetty.reduce((s, e) => s + (e.type === 'in' ? e.amount : -e.amount), 0)
+
+  const startPettyEdit = (e: PettyCashEntry) => {
+    setPettyEditId(e.id)
+    setPettyForm({
+      date: e.date, type: e.type, description: e.description,
+      category: e.category || '', reference: e.reference || '', amount: e.amount,
+    })
+    setShowPettyForm(true)
+  }
+
+  const closePettyForm = () => {
+    setShowPettyForm(false); setPettyEditId(null); setPettyForm(EMPTY_PETTY_FORM())
+  }
+
+  const savePetty = async () => {
+    if (!pettyForm.description.trim() || pettyForm.amount <= 0) return
+    setSavingPetty(true)
+    try {
+      const res = await fetch('/api/admin/petty-cash', {
+        method: pettyEditId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pettyEditId ? { id: pettyEditId, ...pettyForm } : pettyForm),
+      })
+      if (res.ok) {
+        const entry: PettyCashEntry = await res.json()
+        setPetty(prev => {
+          const next = pettyEditId ? prev.map(e => e.id === entry.id ? entry : e) : [entry, ...prev]
+          return next.sort((a, b) =>
+            (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || '')
+          )
+        })
+        closePettyForm()
+      }
+    } finally { setSavingPetty(false) }
+  }
+
+  const deletePetty = async (id: string) => {
+    await fetch(`/api/admin/petty-cash?id=${id}`, { method: 'DELETE' })
+    setPetty(prev => prev.filter(e => e.id !== id))
+    if (pettyEditId === id) closePettyForm()
+  }
+
+  // ── Invoice cash payments ──────────────────────────────────────────────────
+
+  // Archived invoices are DELIBERATELY included here, unlike the statistics tab. Archiving is
+  // a filing action — it does not un-receive the money — so excluding them would hide cash
+  // that was genuinely taken in.
+  const cashSourceInvoices = docs.filter(d => d.type === 'invoice' && d.status !== 'cancelled')
+
+  const invoiceCash = cashSourceInvoices
+    .flatMap(cashPaymentsOf)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.docNumber.localeCompare(b.docNumber))
+
+  const filteredCash = invoiceCash
+    .filter(p => !cashFrom || (p.date && p.date >= cashFrom))
+    .filter(p => !cashTo || (p.date && p.date <= cashTo))
+    .filter(p => {
+      const q = cashSearch.trim().toLowerCase()
+      if (!q) return true
+      return p.docNumber.toLowerCase().includes(q) || p.clientName.toLowerCase().includes(q)
+    })
+
+  const cashTotal = filteredCash.reduce((s, p) => s + p.amount, 0)
+  const cashInvoiceNumbers = Array.from(new Set(filteredCash.map(p => p.docNumber)))
+
+  const bookedSourceIds = new Set(petty.map(e => e.sourceId).filter(Boolean) as string[])
+  const unbookedCash = filteredCash.filter(p => !bookedSourceIds.has(p.sourceId))
+  const unbookedTotal = unbookedCash.reduce((s, p) => s + p.amount, 0)
+
+  const cashDateRangeActive = Boolean(cashFrom || cashTo || cashSearch.trim())
+
+  const importCash = async (rows: InvoiceCashPayment[]) => {
+    if (rows.length === 0) return
+    setImportingCash(true)
+    setImportResult(null)
+    try {
+      const res = await fetch('/api/admin/petty-cash', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'import',
+          entries: rows.map(p => ({
+            date: p.date,
+            description: `Cash received — ${p.docNumber}${p.clientName ? ` · ${p.clientName}` : ''}`,
+            category: 'Invoice Cash',
+            reference: p.docNumber,
+            amount: p.amount,
+            sourceId: p.sourceId,
+          })),
+        }),
+      })
+      if (res.ok) {
+        const { created, imported, skipped } = await res.json()
+        if (Array.isArray(created) && created.length > 0) {
+          setPetty(prev => [...created, ...prev].sort((a, b) =>
+            (b.date || '').localeCompare(a.date || '') || (b.createdAt || '').localeCompare(a.createdAt || '')
+          ))
+        }
+        setImportResult(
+          `${imported} payment${imported !== 1 ? 's' : ''} booked to the cash book` +
+          (skipped ? ` · ${skipped} already booked` : '')
+        )
+      } else {
+        setImportResult('Import failed')
+      }
+    } finally { setImportingCash(false) }
+  }
+
   const fmt = (n: number) => `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 
   if (loading) return <div className="text-center py-20 text-gray-400">Loading…</div>
@@ -340,6 +598,10 @@ export default function AccountingPage() {
           <button onClick={() => setActiveTab('banks')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'banks' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             🏦 Bank Accounts
+          </button>
+          <button onClick={() => setActiveTab('petty')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'petty' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            💵 Petty Cash
           </button>
           <button onClick={() => setActiveTab('services')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'services' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
@@ -650,6 +912,392 @@ export default function AccountingPage() {
           )}
         </div>
       )}
+
+      {/* ── PETTY CASH TAB ── */}
+      {activeTab === 'petty' && (
+        <div className="space-y-4">
+          {!pettyLoaded ? (
+            <div className="text-center py-20 text-gray-400 text-sm">Loading petty cash…</div>
+          ) : (
+            <>
+              {/* Summary cards */}
+              {pettyView === 'book' && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white rounded-2xl border border-green-200 p-5">
+                  <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">Cash In</p>
+                  <p className="text-2xl font-bold text-green-700">{fmt(pettyIn)}</p>
+                  <p className="text-xs text-gray-400 mt-1">{petty.filter(e => e.type === 'in').length} top-up{petty.filter(e => e.type === 'in').length !== 1 ? 's' : ''}</p>
+                </div>
+                <div className="bg-white rounded-2xl border border-red-200 p-5">
+                  <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-1">Cash Out</p>
+                  <p className="text-2xl font-bold text-red-600">{fmt(pettyOut)}</p>
+                  <p className="text-xs text-gray-400 mt-1">{petty.filter(e => e.type === 'out').length} payment{petty.filter(e => e.type === 'out').length !== 1 ? 's' : ''}</p>
+                </div>
+                <div className={`bg-white rounded-2xl border p-5 ${pettyBalance < 0 ? 'border-red-200' : 'border-blue-200'}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${pettyBalance < 0 ? 'text-red-500' : 'text-blue-500'}`}>Balance on Hand</p>
+                  <p className={`text-2xl font-bold ${pettyBalance < 0 ? 'text-red-600' : 'text-blue-600'}`}>{fmt(pettyBalance)}</p>
+                  <p className="text-xs text-gray-400 mt-1">{pettyBalance < 0 ? 'Overdrawn — float needs a top-up' : 'Cash in the tin'}</p>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Spent This Month</p>
+                  <p className="text-2xl font-bold text-gray-800">{fmt(pettyMonthOut)}</p>
+                  <p className="text-xs text-gray-400 mt-1">{new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' })}</p>
+                </div>
+              </div>
+              )}
+
+              {/* Invoice cash summary cards */}
+              {pettyView === 'invoices' && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="bg-white rounded-2xl border border-green-200 p-5">
+                    <p className="text-xs font-semibold text-green-600 uppercase tracking-wide mb-1">Total Cash Received</p>
+                    <p className="text-2xl font-bold text-green-700">{fmt(cashTotal)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{cashDateRangeActive ? 'filtered view' : 'all invoices'}</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cash Payments</p>
+                    <p className="text-2xl font-bold text-gray-800">{filteredCash.length}</p>
+                    <p className="text-xs text-gray-400 mt-1">of {invoiceCash.length} on record</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-blue-200 p-5">
+                    <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">Invoices</p>
+                    <p className="text-2xl font-bold text-blue-600">{cashInvoiceNumbers.length}</p>
+                    <p className="text-xs text-gray-400 mt-1">paid with cash</p>
+                  </div>
+                  <div className={`bg-white rounded-2xl border p-5 ${unbookedCash.length > 0 ? 'border-amber-200' : 'border-gray-200'}`}>
+                    <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${unbookedCash.length > 0 ? 'text-amber-600' : 'text-gray-400'}`}>Not Yet in Cash Book</p>
+                    <p className={`text-2xl font-bold ${unbookedCash.length > 0 ? 'text-amber-600' : 'text-gray-800'}`}>{fmt(unbookedTotal)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{unbookedCash.length} payment{unbookedCash.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Toolbar */}
+              <div className="flex flex-wrap items-center gap-2 justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  {pettyView === 'book' ? (
+                    <>
+                      {(['all', 'in', 'out'] as const).map(v => (
+                        <button key={v} onClick={() => setPettyFilter(v)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${pettyFilter === v ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                          {v === 'all' ? 'All' : v === 'in' ? 'Cash In' : 'Cash Out'}
+                        </button>
+                      ))}
+                      <span className="w-px h-5 bg-gray-200 mx-1" />
+                      <select value={pettyCatFilter} onChange={e => setPettyCatFilter(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40">
+                        <option value="all">All Categories</option>
+                        {pettyCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <span className="w-px h-5 bg-gray-200 mx-1" />
+                    </>
+                  ) : (
+                    <>
+                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">From</label>
+                      <input type="date" value={cashFrom} onChange={e => setCashFrom(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wide">To</label>
+                      <input type="date" value={cashTo} onChange={e => setCashTo(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                      <input value={cashSearch} onChange={e => setCashSearch(e.target.value)}
+                        placeholder="Invoice # or client…"
+                        className="border border-gray-300 rounded-lg px-3 py-1.5 text-xs w-44 focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                      {cashDateRangeActive && (
+                        <button onClick={() => { setCashFrom(''); setCashTo(''); setCashSearch('') }}
+                          className="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 hover:bg-gray-200">Clear</button>
+                      )}
+                      <span className="w-px h-5 bg-gray-200 mx-1" />
+                    </>
+                  )}
+                  <button onClick={() => { setPettyView('book'); setImportResult(null) }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${pettyView === 'book' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    📒 Cash Book
+                  </button>
+                  <button onClick={() => { setPettyView('invoices'); setImportResult(null) }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${pettyView === 'invoices' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    🧾 Invoice Cash{invoiceCash.length > 0 ? ` (${invoiceCash.length})` : ''}
+                  </button>
+                </div>
+                {pettyView === 'book' ? (
+                  <button onClick={() => showPettyForm ? closePettyForm() : setShowPettyForm(true)}
+                    className="flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark">
+                    + Add Entry
+                  </button>
+                ) : (
+                  <button onClick={() => importCash(unbookedCash)}
+                    disabled={importingCash || unbookedCash.length === 0}
+                    title={unbookedCash.length === 0 ? 'Every cash payment in this view is already in the cash book' : 'Book these payments as Cash In entries'}
+                    className="flex items-center gap-1.5 bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-green-700 disabled:opacity-40">
+                    {importingCash ? 'Booking…' : `↓ Book ${unbookedCash.length} to Cash Book`}
+                  </button>
+                )}
+              </div>
+
+              {importResult && (
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-xl px-4 py-2.5 text-sm flex items-center justify-between">
+                  <span>{importResult}</span>
+                  <button onClick={() => setImportResult(null)} className="text-blue-400 hover:text-blue-700 text-xs">✕</button>
+                </div>
+              )}
+
+              {/* Add / Edit form */}
+              {pettyView === 'book' && showPettyForm && (
+                <div className="bg-white rounded-2xl border border-primary/30 p-5 shadow-sm">
+                  <h3 className="font-semibold text-gray-800 mb-4">{pettyEditId ? 'Edit Petty Cash Entry' : 'New Petty Cash Entry'}</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Date *</label>
+                      <input
+                        type="date"
+                        value={pettyForm.date}
+                        onChange={e => setPettyForm(f => ({ ...f, date: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Type *</label>
+                      <div className="flex gap-2">
+                        {([['in', 'Cash In'], ['out', 'Cash Out']] as const).map(([v, l]) => (
+                          <button key={v} type="button" onClick={() => setPettyForm(f => ({ ...f, type: v }))}
+                            className={`flex-1 px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                              pettyForm.type === v
+                                ? v === 'in' ? 'bg-green-600 text-white border-green-600' : 'bg-red-600 text-white border-red-600'
+                                : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}>
+                            {l}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Amount (R) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={pettyForm.amount || ''}
+                        onChange={e => setPettyForm(f => ({ ...f, amount: Number(e.target.value) }))}
+                        placeholder="0.00"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description *</label>
+                      <input
+                        type="text"
+                        value={pettyForm.description}
+                        onChange={e => setPettyForm(f => ({ ...f, description: e.target.value }))}
+                        placeholder={pettyForm.type === 'in' ? 'e.g. Float top-up from FNB' : 'e.g. Fuel — courier run to PostNet'}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Category</label>
+                      <select
+                        value={pettyForm.category}
+                        onChange={e => setPettyForm(f => ({ ...f, category: e.target.value }))}
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+                        <option value="">— None —</option>
+                        {pettyCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="md:col-span-3">
+                      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Reference / Received By</label>
+                      <input
+                        type="text"
+                        value={pettyForm.reference}
+                        onChange={e => setPettyForm(f => ({ ...f, reference: e.target.value }))}
+                        placeholder="Optional — slip number, staff member…"
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button onClick={closePettyForm}
+                      className="px-4 py-2 border border-gray-300 rounded-xl text-sm font-semibold hover:bg-gray-50">Cancel</button>
+                    <button
+                      onClick={savePetty}
+                      disabled={savingPetty || !pettyForm.description.trim() || pettyForm.amount <= 0}
+                      className="px-6 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50">
+                      {savingPetty ? 'Saving…' : pettyEditId ? 'Update Entry' : 'Add Entry'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Cash book */}
+              {pettyView === 'book' && (filteredPetty.length === 0 ? (
+                <div className="text-center py-16 text-gray-400">
+                  <div className="text-4xl mb-3">💵</div>
+                  <p className="font-medium">No petty cash entries found</p>
+                  <p className="text-sm mt-1">Record a float top-up as Cash In, then log each cash payment as Cash Out.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        <th className="pl-5 pr-3 py-3 text-left">Date</th>
+                        <th className="px-4 py-3 text-left">Description</th>
+                        <th className="px-4 py-3 text-left">Category</th>
+                        <th className="px-4 py-3 text-left">Reference</th>
+                        <th className="px-4 py-3 text-right">Cash In</th>
+                        <th className="px-4 py-3 text-right">Cash Out</th>
+                        <th className="px-4 py-3 text-right">Balance</th>
+                        <th className="px-4 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredPetty.map(e => {
+                        const bal = pettyBalanceAfter[e.id] ?? 0
+                        return (
+                          <tr key={e.id} className={`transition-colors ${pettyEditId === e.id ? 'bg-primary/5' : e.type === 'in' ? 'bg-green-50/40' : ''}`}>
+                            <td className="pl-5 pr-3 py-3 text-gray-600 whitespace-nowrap text-xs">
+                              {e.date ? new Date(e.date + 'T00:00:00').toLocaleDateString('en-ZA') : '—'}
+                            </td>
+                            <td className="px-4 py-3 text-gray-800">{e.description || '—'}</td>
+                            <td className="px-4 py-3">
+                              {e.category
+                                ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{e.category}</span>
+                                : <span className="text-xs text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-gray-500 text-xs">{e.reference || '—'}</td>
+                            <td className="px-4 py-3 text-right font-mono font-semibold text-green-700">
+                              {e.type === 'in' ? fmt(e.amount) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-semibold text-red-600">
+                              {e.type === 'out' ? fmt(e.amount) : <span className="text-gray-300">—</span>}
+                            </td>
+                            <td className={`px-4 py-3 text-right font-mono font-semibold ${bal < 0 ? 'text-red-600' : 'text-gray-800'}`}>
+                              {fmt(bal)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5 justify-end">
+                                <button
+                                  onClick={() => startPettyEdit(e)}
+                                  className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">✏ Edit</button>
+                                <button
+                                  onClick={() => deletePetty(e.id)}
+                                  className="text-xs px-2 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">✕</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  <div className="border-t border-gray-100 px-5 py-3 bg-gray-50 flex justify-between items-center text-xs text-gray-500">
+                    <span>{filteredPetty.length} entr{filteredPetty.length !== 1 ? 'ies' : 'y'}{(pettyFilter !== 'all' || pettyCatFilter !== 'all') ? ' (filtered)' : ''}</span>
+                    <span className="flex items-center gap-4">
+                      <span>Net for view: <span className={`font-semibold ${filteredPettyNet < 0 ? 'text-red-600' : 'text-gray-700'}`}>{fmt(filteredPettyNet)}</span></span>
+                      <span className="font-semibold text-gray-700">Balance on hand: {fmt(pettyBalance)}</span>
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              {/* ── INVOICE CASH PAYMENTS VIEW ── */}
+              {pettyView === 'invoices' && (
+                filteredCash.length === 0 ? (
+                  <div className="text-center py-16 text-gray-400">
+                    <div className="text-4xl mb-3">🧾</div>
+                    <p className="font-medium">No cash payments found</p>
+                    {invoiceCash.length > 0 ? (
+                      <p className="text-sm mt-1">No cash payments in this date range — clear the filters to see them all.</p>
+                    ) : (
+                      <>
+                        <p className="text-sm mt-1">
+                          Nothing on record was paid with cash — all {cashSourceInvoices.length} invoices were settled by another method.
+                        </p>
+                        <p className="text-sm mt-1">
+                          Payments land here when Orders → Invoices → Record Payment is set to <strong>Cash</strong> (it defaults to EFT).
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    {/* Invoice numbers paid with cash */}
+                    <div className="bg-white rounded-2xl border border-gray-200 px-5 py-4">
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                        Invoice Numbers — Cash ({cashInvoiceNumbers.length})
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {cashInvoiceNumbers.map(n => (
+                          <span key={n} className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-mono font-semibold bg-blue-50 text-blue-700 border border-blue-100">
+                            {n}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            <th className="pl-5 pr-3 py-3 text-left">Date</th>
+                            <th className="px-4 py-3 text-left">Invoice #</th>
+                            <th className="px-4 py-3 text-left">Client</th>
+                            <th className="px-4 py-3 text-left">Payment Type</th>
+                            <th className="px-4 py-3 text-right">Amount</th>
+                            <th className="px-4 py-3 text-center">Cash Book</th>
+                            <th className="px-4 py-3"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {filteredCash.map(p => {
+                            const booked = bookedSourceIds.has(p.sourceId)
+                            return (
+                              <tr key={p.sourceId} className={`transition-colors ${booked ? 'bg-green-50/40' : ''}`}>
+                                <td className="pl-5 pr-3 py-3 text-gray-600 whitespace-nowrap text-xs">
+                                  {p.date ? new Date(p.date + 'T00:00:00').toLocaleDateString('en-ZA') : '—'}
+                                </td>
+                                <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-700">
+                                  {p.docNumber}
+                                  {p.archived && (
+                                    <span title="Invoice is archived — the cash was still received" className="ml-1.5 font-sans text-[10px] font-medium text-gray-400">archived</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-gray-800">{p.clientName || '—'}</td>
+                                <td className="px-4 py-3">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">{p.method}</span>
+                                </td>
+                                <td className="px-4 py-3 text-right font-mono font-semibold text-green-700">{fmt(p.amount)}</td>
+                                <td className="px-4 py-3 text-center">
+                                  {booked
+                                    ? <span className="text-xs text-green-700 font-semibold">✓ Booked</span>
+                                    : <span className="text-xs text-amber-600 font-semibold">Not booked</span>}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {!booked && (
+                                    <button
+                                      onClick={() => importCash([p])}
+                                      disabled={importingCash}
+                                      className="text-xs px-2.5 py-1 rounded-lg border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-50">
+                                      ↓ Book
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                      <div className="border-t border-gray-100 px-5 py-3 bg-gray-50 flex justify-between items-center text-xs text-gray-500">
+                        <span>
+                          {filteredCash.length} cash payment{filteredCash.length !== 1 ? 's' : ''} across {cashInvoiceNumbers.length} invoice{cashInvoiceNumbers.length !== 1 ? 's' : ''}
+                          {cashDateRangeActive ? ' (filtered)' : ''}
+                        </span>
+                        <span className="font-semibold text-green-700">Total cash: {fmt(cashTotal)}</span>
+                      </div>
+                    </div>
+                  </>
+                )
+              )}
+            </>
+          )}
+        </div>
+      )}
+
 
       {/* ── SERVICES TAB ── */}
       {activeTab === 'services' && (
