@@ -12,7 +12,9 @@ export async function POST(request: Request) {
     // Build transporter from env vars (user configures their SMTP in .env)
     const smtpHost = process.env.SMTP_HOST
     const smtpPort = parseInt(process.env.SMTP_PORT || '587')
-    const smtpUser = process.env.SMTP_USER
+    // SMTP_FROM carries the login on deployments that never set SMTP_USER — insisting on
+    // SMTP_USER alone left a perfectly good mailer reported as "not configured".
+    const smtpUser = process.env.SMTP_USER || process.env.SMTP_FROM
     const smtpPass = process.env.SMTP_PASS
     const smtpFrom = process.env.SMTP_FROM || smtpUser || 'noreply@r66slot.co.za'
 
@@ -31,6 +33,11 @@ export async function POST(request: Request) {
       port: smtpPort,
       secure: smtpPort === 465,
       auth: { user: smtpUser, pass: smtpPass },
+      // A mail server that never answers must not hold the request open until the proxy
+      // times out and replaces our response with its own error page.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     })
 
     await transporter.sendMail({

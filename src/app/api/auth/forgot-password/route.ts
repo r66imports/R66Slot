@@ -20,6 +20,11 @@ function createTransport() {
       user: process.env.SMTP_FROM || process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    // A mail server that never answers must not hold the customer's request open until the
+    // proxy times out and shows them an error page instead of our message.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   })
 }
 
@@ -94,9 +99,11 @@ export async function POST(request: NextRequest) {
     // sendMail throws on a rejected send — say so rather than letting the customer
     // wait on mail that was never accepted.
     console.error('[forgot-password] error:', err?.message || err)
+    // 503, not 502: the CDN in front of this app replaces a 502 body with its own
+    // "error code: 502" page, so the customer never sees why nothing arrived.
     return NextResponse.json(
       { error: 'We could not send the reset email. Please contact us and we will reset it for you.' },
-      { status: 502 }
+      { status: 503 }
     )
   }
 }
