@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobAppendArrayItem, blobReplaceArrayItem, blobRemoveArrayItem } from '@/lib/blob-storage'
 import type { OrderDocument } from '../route'
-import { adjustStock } from '@/lib/order-helpers'
+import { adjustStock, findStockShortfalls, shortfallMessage } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
 
 const KEY = 'data/order-documents.json'
@@ -42,6 +42,20 @@ export async function PATCH(
     // Only run stock logic if something stock-relevant actually changed
     const stockRelevantChange = body.status !== undefined || body.type !== undefined || body.lineItems !== undefined
 
+    // Rule 1 — an invoice may never carry more than the shelf holds. Adding lines to an
+    // existing invoice (Send to Invoice → Add to Existing) lands here rather than on POST,
+    // so it needs the same guard. Quantities already deducted for this document are
+    // restored before the new ones are taken, so they count as available.
+    // stockAlreadyReserved: the caller already took the stock elsewhere (Rule 31 — a site
+    // order deducts at checkout), so there is nothing left to check.
+    if (body.lineItems !== undefined && newType === 'invoice' && !isCancelled && !body.stockAlreadyReserved) {
+      const alreadyDeducted = prev.stockDeducted !== false && wasStockable ? prev.lineItems : []
+      const shortfalls = await findStockShortfalls(newItems, { creditFrom: alreadyDeducted })
+      if (shortfalls.length > 0) {
+        return NextResponse.json({ error: shortfallMessage(shortfalls), shortfalls }, { status: 422 })
+      }
+    }
+
     // Rule 3 — Stock Deduction: only adjust stock if the rule is active
     if (stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
       if (prev.stockDeducted !== false && wasStockable && isCancelled && !wasCancelled) {
@@ -77,6 +91,8 @@ export async function PATCH(
       // If type changes from salesorder→invoice and stockDeducted is already true: no action needed
     }
 
+    // stockAlreadyReserved is a request-only hint — it must not be persisted onto the document.
+    delete body.stockAlreadyReserved
     docs[idx] = { ...prev, ...body, updatedAt: new Date().toISOString() }
     await blobReplaceArrayItem(KEY, id, docs[idx])
     return NextResponse.json(docs[idx])

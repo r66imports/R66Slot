@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobAppendArrayItem } from '@/lib/blob-storage'
 import { isRuleActive } from '@/lib/site-rules'
-import { type LineItem, extractSku, autoCreateMissingProducts, adjustStock } from '@/lib/order-helpers'
-import { db } from '@/lib/db'
+import { type LineItem, autoCreateMissingProducts, adjustStock, findStockShortfalls, shortfallMessage } from '@/lib/order-helpers'
 
 export type { LineItem }
 
@@ -79,6 +78,17 @@ export async function POST(request: Request) {
     // stockAlreadyReserved = true when converting a Sales Order (stockDeducted:true) to Invoice.
     // The SO already deducted stock — skip re-deduction to avoid double-deduct.
     const stockAlreadyReserved = !!body.stockAlreadyReserved
+
+    // Rule 1 — Enforce Stock Limits: invoices only (SOs may be created for items not yet in stock).
+    // Always enforced, regardless of the toggle: an invoice raised against an empty product was
+    // flagged as stock-deducted while inventory never moved, so the sale silently vanished.
+    // Nothing that is not in stock may be invoiced.
+    if (!stockAlreadyReserved && body.type === 'invoice') {
+      const shortfalls = await findStockShortfalls(lineItems)
+      if (shortfalls.length > 0) {
+        return NextResponse.json({ error: shortfallMessage(shortfalls), shortfalls }, { status: 422 })
+      }
+    }
 
     // Rule 3 — Stock Deduction: deduct inventory when creating Sales Orders or Invoices
     const deductStock = !stockAlreadyReserved && stockable && await isRuleActive('invoice_stock_deduction', true)

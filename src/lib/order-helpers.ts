@@ -54,7 +54,74 @@ export async function autoCreateMissingProducts(items: LineItem[]): Promise<numb
   return created
 }
 
-/** Adjust product stock by sku. direction='subtract' deducts (floor 0), 'add' restores. */
+export interface StockShortfall {
+  sku: string
+  requested: number
+  available: number
+}
+
+/**
+ * Line items that ask for more stock than the product actually has.
+ *
+ * An invoice raised against an empty product used to deduct nothing at all — the old
+ * `GREATEST(qty - n, 0)` floor silently swallowed it, so the sale was flagged as
+ * stock-deducted while inventory never moved. Blocking up front is the only way that
+ * cannot happen; see `adjustStock` for the matching arithmetic fix.
+ *
+ * `creditFrom` is the set of line items already deducted for this same document (an
+ * invoice being edited): those quantities are restored before the new ones are taken,
+ * so they count as available.
+ */
+export async function findStockShortfalls(
+  items: LineItem[],
+  opts?: { creditFrom?: LineItem[] }
+): Promise<StockShortfall[]> {
+  const tally = (list: LineItem[], sign: 1 | -1, into: Map<string, number>) => {
+    for (const li of list) {
+      const sku = extractSku(li.description)
+      if (!sku || li.qty <= 0) continue
+      const k = sku.toUpperCase()
+      into.set(k, (into.get(k) ?? 0) + sign * li.qty)
+    }
+    return into
+  }
+
+  const wanted = tally(items, 1, new Map<string, number>())
+  if (opts?.creditFrom) tally(opts.creditFrom, -1, wanted)
+
+  const shortfalls: StockShortfall[] = []
+  for (const [sku, requested] of wanted) {
+    if (requested <= 0) continue
+    const res = await db.query(
+      `SELECT COALESCE(quantity, 0) AS q, track_quantity FROM products WHERE UPPER(sku) = $1 LIMIT 1`,
+      [sku]
+    )
+    const row = res.rows[0]
+    // Unknown SKU — Rule 2 auto-creates it as a draft product, there is no stock to check.
+    // track_quantity = false means the product deliberately opts out of stock control.
+    if (!row || row.track_quantity === false) continue
+    const available = Number(row.q) || 0
+    if (requested > available) shortfalls.push({ sku, requested, available })
+  }
+  return shortfalls
+}
+
+/** Human-readable 422 message for a set of shortfalls. */
+export function shortfallMessage(shortfalls: StockShortfall[]): string {
+  return `Not in stock — invoice not created:\n${shortfalls
+    .map((s) => `• ${s.sku}: ${s.available} in stock, ${s.requested} requested`)
+    .join('\n')}`
+}
+
+/**
+ * Adjust product stock by sku. direction='subtract' deducts, 'add' restores.
+ *
+ * Deductions are no longer floored at zero: a shortfall shows up as a negative quantity
+ * that is visible and self-corrects when stock arrives, rather than disappearing. That
+ * floor also broke restores — reversing a deduction that never moved anything handed back
+ * stock the shelf never had. Invoices are blocked before they get here (see
+ * `findStockShortfalls`); Sales Orders may legitimately reserve stock that has not landed.
+ */
 export async function adjustStock(items: LineItem[], direction: 'subtract' | 'add'): Promise<void> {
   const now = new Date().toISOString()
   for (const li of items) {
@@ -63,7 +130,7 @@ export async function adjustStock(items: LineItem[], direction: 'subtract' | 'ad
     try {
       if (direction === 'subtract') {
         await db.query(
-          `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $1, 0), updated_at = $2 WHERE LOWER(sku) = LOWER($3) RETURNING quantity`,
+          `UPDATE products SET quantity = COALESCE(quantity, 0) - $1, updated_at = $2 WHERE LOWER(sku) = LOWER($3) RETURNING quantity`,
           [li.qty, now, sku]
         )
         // Rule 30: selling out no longer flips the product to Pre-Order. A sold-out

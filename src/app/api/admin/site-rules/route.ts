@@ -28,8 +28,8 @@ const DEFAULT_RULES: SiteRule[] = [
   {
     id: 'enforce_stock_limit',
     name: 'Rule 1 \u2014 Enforce Stock Limits',
-    description: 'Prevent selling more items than what is available in stock. Quantity is capped at the current stock level. If stock is 0, the item cannot be added to an invoice or sold at POS.',
-    active: false,
+    description: 'Prevent selling more items than what is available in stock. Invoices are ALWAYS hard-blocked — this part is not toggleable. If a line item asks for more than the product holds (including stock 0), the invoice is refused and the offending SKUs are named. That applies everywhere an invoice is raised: Create Invoice, Quote → Send to Invoice (both Create New and Add to Existing), and Pre-Order Dashboard → Send to Invoice. Exceptions: converting a Sales Order that already reserved the stock, and site orders that already deducted at checkout (Rule 31) — those stock movements have happened already. Sales Orders are NOT blocked — an SO legitimately reserves stock that has not landed yet. The toggle controls the softer limits: capping quantity at stock level in the invoice line-item picker and blocking POS sales at 0.',
+    active: true,
     appliesTo: ['Admin Invoices', 'POS / Scanner', 'Online Store'],
     category: 'Inventory',
   },

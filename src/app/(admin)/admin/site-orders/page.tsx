@@ -168,7 +168,9 @@ export default function SiteOrdersPage() {
       const res = await fetch(`/api/admin/orders/documents/${invoiceDoc.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineItems: merged }),
+        // Rule 31 — the site order already deducted this stock at checkout, so the
+        // insufficient-stock guard does not apply to these lines.
+        body: JSON.stringify({ lineItems: merged, stockAlreadyReserved: true }),
       })
       if (!res.ok) throw new Error('Failed to update invoice')
 

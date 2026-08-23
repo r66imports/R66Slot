@@ -189,9 +189,44 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     return `Deposit R${deposit.toFixed(2)} allocated from Quote ${quoteDoc.docNumber} (${dateStr})`
   }
 
+  // Nothing that is not on the shelf may be invoiced — an invoice against an empty product
+  // used to deduct nothing at all, so the sale never came off inventory. The server enforces
+  // this too; checking here names the offending SKU instead of showing a bare error. A failed
+  // lookup blocks rather than waving the invoice through — guessing costs stock accuracy.
+  const stockBlockReasons=async(items:any[]):Promise<string[]>=>{
+    try{
+      const [reservedMap,products]:[Record<string,number>,any[]]=await Promise.all([
+        fetch('/api/admin/inventory-reserved').then(r=>r.json()),
+        fetch('/api/admin/products?fields=sku,quantity').then(r=>r.json()),
+      ])
+      const stockMap:Record<string,number>={}
+      for(const p of products){if(p.sku) stockMap[p.sku.toString().toUpperCase()]=p.quantity??0}
+      const reasons:string[]=[]
+      for(const item of items){
+        const rawSku=item.sku?item.sku.toString():(()=>{const em=(item.description||'').indexOf('–');return em>-1?item.description.slice(0,em).trim():''})()
+        const sku=rawSku.toUpperCase()
+        if(!sku||!(sku in stockMap)) continue
+        const totalStock=stockMap[sku]||0; const requested=Number(item.qty)||0
+        if(totalStock<=0){reasons.push(`• ${sku}: not in stock — Worksheet Qty not updated`)}
+        else{const available=Math.max(0,totalStock-(reservedMap[sku]||0));if(requested>available) reasons.push(`• ${sku}: Qty not available in Inventory (${available} available, ${requested} requested)`)}
+      }
+      return reasons
+    }catch{
+      return ['• Could not verify stock levels — please try again']
+    }
+  }
+  const blockedByStock=async(items:any[]):Promise<boolean>=>{
+    const reasons=await stockBlockReasons(items)
+    if(reasons.length===0) return false
+    window.alert(`Cannot create invoice:\n\n${reasons.join('\n')}`)
+    setSending(false)
+    return true
+  }
+
   const appendQuoteToInvoice=async(quoteDoc:any,invoiceDoc:any)=>{
     setSending(true);setOpen(false);setPendingConvertQuote(null)
     try{
+      if(await blockedByStock(quoteDoc.lineItems||[])) return
       const merged=[...(invoiceDoc.lineItems||[]),...(quoteDoc.lineItems||[])]
       const depositNote=depositNoteFor(quoteDoc)
       const mergedNotes=[invoiceDoc.notes,depositNote].filter(Boolean).join('\n')
@@ -225,8 +260,10 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         lineItems:[lineItem()],notes:`Pre-order: ${form.supplier||''} — ${form.description}`,terms:'',status:'draft',
       }
       if(bankAccountId) body.bankAccountId=bankAccountId
+      if(type==='invoice'&&await blockedByStock(body.lineItems)) return
       const res=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       if(res.ok){const doc=await res.json();if(doc.id) notify(doc.docNumber,doc.id)}
+      else{const e=await res.json().catch(()=>({}));window.alert(e.error||'Could not create document')}
     }catch{}
     finally{setSending(false)}
   }
@@ -236,24 +273,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     setSending(true);setOpen(false);setPendingConvertQuote(null)
     try{
       const invoiceItems:any[]=quoteDoc.lineItems||[]
-      try{
-        const [reservedMap,products]:[Record<string,number>,any[]]=await Promise.all([
-          fetch('/api/admin/inventory-reserved').then(r=>r.json()),
-          fetch('/api/admin/products?fields=sku,quantity').then(r=>r.json()),
-        ])
-        const stockMap:Record<string,number>={}
-        for(const p of products){if(p.sku) stockMap[p.sku.toString().toUpperCase()]=p.quantity??0}
-        const blockReasons:string[]=[]
-        for(const item of invoiceItems){
-          const rawSku=item.sku?item.sku.toString():(()=>{const em=(item.description||'').indexOf('–');return em>-1?item.description.slice(0,em).trim():''})()
-          const sku=rawSku.toUpperCase()
-          if(!sku||!(sku in stockMap)) continue
-          const totalStock=stockMap[sku]||0; const requested=Number(item.qty)||0
-          if(totalStock===0){blockReasons.push(`• ${sku}: Worksheet Qty not updated`)}
-          else{const available=Math.max(0,totalStock-(reservedMap[sku]||0));if(requested>available) blockReasons.push(`• ${sku}: Qty not available in Inventory (${available} available, ${requested} requested)`)}
-        }
-        if(blockReasons.length>0){window.alert(`Cannot create invoice:\n\n${blockReasons.join('\n')}`);setSending(false);return}
-      }catch{}
+      if(await blockedByStock(invoiceItems)) return
       const allDocs:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json())
       const invDocNumber=nextDocNumber(allDocs,'invoice')
       const depositNote=depositNoteFor(quoteDoc)
@@ -278,12 +298,16 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     try{
       const skuPrefix=form.sku?`${form.sku} –`:null
       const existingItems:any[]=target.lineItems||[]
+      // Only the newly added quantity is checked — what the invoice already holds was
+      // deducted when it was raised.
+      if(target.type==='invoice'&&await blockedByStock([lineItem()])) return
       const existingIdx=skuPrefix?existingItems.findIndex((i:any)=>i.description?.startsWith(skuPrefix)):-1
       const updatedItems=existingIdx>=0
         ?existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)
         :[...existingItems,lineItem()]
       const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lineItems:updatedItems})})
       if(res.ok) notify(target.docNumber,target.id)
+      else{const e=await res.json().catch(()=>({}));window.alert(e.error||`Could not update ${target.docNumber}`)}
     }catch{}
     finally{setSending(false)}
   }
