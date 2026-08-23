@@ -732,6 +732,38 @@ function WorksheetEditor({
 
   useEffect(() => { refreshSheets() }, [refreshSheets])
 
+  // ── Import Checklist ticks (read-only mirror) ──
+  // A checklist is a "did all the stock arrive?" sheet only — it never touches
+  // stock qty or products. Ticked items just highlight the worksheet line green.
+  // All qty/product updates stay on the worksheet (Update Qty's / Update Products).
+  const [checklistTicks, setChecklistTicks] = useState<Set<string>>(new Set())
+
+  const refreshChecklistTicks = useCallback(async () => {
+    if (!worksheetId) return
+    try {
+      const res = await fetch('/api/admin/checklists')
+      if (!res.ok) return
+      const lists: Array<{ worksheetId?: string; items?: Array<{ sku?: string; checked?: boolean }> }> = await res.json()
+      const ticked = new Set<string>()
+      lists
+        .filter((cl) => cl.worksheetId && cl.worksheetId === worksheetId)
+        .forEach((cl) => (cl.items || []).forEach((it) => {
+          if (it.checked && it.sku) ticked.add(it.sku.trim().toUpperCase())
+        }))
+      setChecklistTicks(ticked)
+    } catch { /* checklist highlight is cosmetic — ignore failures */ }
+  }, [worksheetId])
+
+  useEffect(() => { refreshChecklistTicks() }, [refreshChecklistTicks])
+
+  // Re-check when the tab regains focus — items are usually ticked on another device/tab
+  useEffect(() => {
+    window.addEventListener('focus', refreshChecklistTicks)
+    return () => window.removeEventListener('focus', refreshChecklistTicks)
+  }, [refreshChecklistTicks])
+
+  const isChecklistTicked = (it: WsItem) => !!it.sku && checklistTicks.has(it.sku.trim().toUpperCase())
+
   // Load entity map once on mount
   useEffect(() => {
     fetch('/api/admin/sku-entity-map')
@@ -2161,7 +2193,11 @@ function WorksheetEditor({
                 const skuMatches = filteredProducts(it.skuSearch || it.sku)
                 const hasFinal = it.wholesalePrice > 0
                 return (
-                  <tr key={it.id} className="border-b border-gray-50">
+                  <tr
+                    key={it.id}
+                    className={`border-b border-gray-50 ${isChecklistTicked(it) ? 'bg-green-50' : ''}`}
+                    title={isChecklistTicked(it) ? 'Stock received — ticked on the Import Checklist' : undefined}
+                  >
                     <td className="py-2 text-xs text-gray-400">{i + 1}</td>
 
                     {/* Costing Entity */}
@@ -2596,7 +2632,7 @@ function WorksheetEditor({
               if (!alreadySent.length) return null
               return (
                 <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 mb-4">
-                  <p className="text-xs font-bold text-amber-800 mb-2">⚠️ {alreadySent.length} item{alreadySent.length !== 1 ? 's' : ''} already received via checklist — will be SKIPPED to prevent duplication:</p>
+                  <p className="text-xs font-bold text-amber-800 mb-2">⚠️ {alreadySent.length} item{alreadySent.length !== 1 ? 's' : ''} already sent to inventory — will be SKIPPED to prevent duplication:</p>
                   <div className="space-y-1 max-h-28 overflow-y-auto">
                     {alreadySent.map(it => (
                       <div key={it.id} className="flex items-center gap-2 text-xs px-2 py-1 bg-amber-100 rounded">
