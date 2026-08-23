@@ -195,6 +195,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Site Settings', href: '/admin/settings' },
         { name: 'Site Rules', href: '/admin/settings/site-rules' },
         { name: 'Stock Mapping', href: '/admin/settings/stock-mapping' },
+        { name: 'Pre-Orders Mapping', href: '/admin/settings/preorders-mapping' },
         { name: 'Prompts', href: '/admin/settings/prompts' },
         { name: 'User Accounts', href: '/admin/settings/users', adminOnly: true },
         { name: 'My Account', href: '/admin/account' },

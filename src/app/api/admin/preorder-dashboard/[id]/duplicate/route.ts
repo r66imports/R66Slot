@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
-import { invalidateCache } from '../../route'
-import type { PreOrderDashboardItem } from '../../route'
+import { invalidateCache } from '@/lib/preorder-helpers'
+import type { PreOrderDashboardItem } from '@/lib/preorder-helpers'
 
 const KEY = 'data/preorder-dashboard.json'
 

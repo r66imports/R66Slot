@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
-import { uploadBase64Image, invalidateCache, syncImageToProduct } from '../route'
-import type { PreOrderDashboardItem } from '../route'
+import { uploadBase64Image, invalidateCache, syncImageToProduct } from '@/lib/preorder-helpers'
+import type { PreOrderDashboardItem } from '@/lib/preorder-helpers'
 
 const KEY = 'data/preorder-dashboard.json'
 
