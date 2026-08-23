@@ -44,6 +44,10 @@ export interface Backorder {
   // Supplier
   supplierId?: string
   supplierName?: string
+  // Supplier Order grouping — lines sharing a ref form one supplier order on /admin/suppliers.
+  // Legacy lines have no ref and fall into that supplier's default (unnamed) order.
+  supplierOrderRef?: string
+  supplierOrderName?: string
   // Meta
   notes?: string
   source?: string

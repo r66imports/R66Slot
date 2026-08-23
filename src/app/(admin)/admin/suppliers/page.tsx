@@ -55,6 +55,8 @@ interface Backorder {
   price: number
   supplierName?: string
   supplierId?: string
+  supplierOrderRef?: string
+  supplierOrderName?: string
   status: 'active' | 'complete' | 'cancelled'
   orderStatus?: string
   notes?: string
@@ -275,16 +277,25 @@ export default function SuppliersNetworkPage() {
     return b.supplierName === selectedSupplierFilter
   })
 
-  // Group backorders by supplier name for the order sheet
-  const groupedBackorders: Record<string, Backorder[]> =
-    selectedSupplierFilter === 'all'
-      ? filteredBackorders.reduce<Record<string, Backorder[]>>((acc, b) => {
-          const key = b.supplierName || 'Unassigned'
-          if (!acc[key]) acc[key] = []
-          acc[key].push(b)
-          return acc
-        }, {})
-      : { [selectedSupplierFilter === 'unassigned' ? 'Unassigned' : selectedSupplierFilter]: filteredBackorders }
+  // Group backorders into supplier orders. Lines that carry a supplierOrderRef form their own
+  // discrete order; legacy lines with no ref fall into that supplier's default (unnamed) order.
+  const groupedBackorders: { key: string; label: string; supplierName: string; items: Backorder[] }[] =
+    Object.values(
+      filteredBackorders.reduce<Record<string, { key: string; label: string; supplierName: string; items: Backorder[] }>>((acc, b) => {
+        const supplier = b.supplierName || 'Unassigned'
+        const key = `${supplier}::${b.supplierOrderRef || ''}`
+        if (!acc[key]) {
+          acc[key] = {
+            key,
+            label: b.supplierOrderRef ? (b.supplierOrderName || supplier) : supplier,
+            supplierName: supplier,
+            items: [],
+          }
+        }
+        acc[key].items.push(b)
+        return acc
+      }, {})
+    )
 
   const totalQty = filteredBackorders.reduce((sum, b) => sum + b.qty, 0)
   const totalValue = filteredBackorders.reduce((sum, b) => sum + b.qty * b.price, 0)
@@ -842,16 +853,16 @@ export default function SuppliersNetworkPage() {
                   </div>
 
                   {/* Supplier groups — collapsible accordion */}
-                  {Object.entries(groupedBackorders).map(([supplierName, items]) => {
-                    const isOpen = !closedGroups.has(supplierName)
+                  {groupedBackorders.map(({ key, label, supplierName, items }) => {
+                    const isOpen = !closedGroups.has(key)
                     const subtotalQty = items.reduce((s, b) => s + b.qty, 0)
                     return (
-                      <div key={supplierName} className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div key={key} className="border border-gray-200 rounded-xl overflow-hidden">
                         {/* Accordion header */}
                         <div className="flex items-center justify-between px-5 py-3 bg-gray-50 border-b border-gray-200">
                           <button
                             type="button"
-                            onClick={() => toggleGroup(supplierName)}
+                            onClick={() => toggleGroup(key)}
                             className="flex items-center gap-3 flex-1 text-left"
                           >
                             <svg
@@ -860,7 +871,7 @@ export default function SuppliersNetworkPage() {
                             >
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                             </svg>
-                            <span className="font-semibold text-gray-900 text-sm">{supplierName}</span>
+                            <span className="font-semibold text-gray-900 text-sm">{label}</span>
                             <span className="text-xs text-gray-400">{items.length} line{items.length !== 1 ? 's' : ''} · {subtotalQty} items</span>
                           </button>
                           <div className="flex items-center gap-2 flex-shrink-0">
@@ -877,7 +888,7 @@ export default function SuppliersNetworkPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => downloadSupplierOrder(supplierName, items)}
+                              onClick={() => downloadSupplierOrder(label, items)}
                               className="flex items-center gap-1.5 bg-gray-900 text-white text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-gray-700 transition-colors"
                               title="Download order sheet as PDF"
                             >

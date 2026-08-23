@@ -28,12 +28,21 @@ export interface OrderDocument {
   shippingMethod?: string
   trackingNumber?: string
   depositPaid?: number
+  // Pre Order Deposit (Quotes only) — must survive creation, not just later edits
+  preOrderDeposit?: boolean
+  depositMode?: boolean
+  depositPct?: number
   paymentMethod?: string
   bankAccountId?: string
   createdAt: string
   updatedAt: string
   backorderId?: string
   stockDeducted?: boolean
+  // Quotes only — set once the quote's lines have been pushed to a supplier order
+  supplierOrderSent?: boolean
+  supplierOrderRef?: string
+  supplierOrderName?: string
+  supplierOrderSupplier?: string
 }
 
 async function getDocs(): Promise<OrderDocument[]> {
@@ -96,12 +105,19 @@ export async function POST(request: Request) {
       shippingMethod: body.shippingMethod || '',
       trackingNumber: body.trackingNumber || '',
       depositPaid: body.depositPaid || 0,
+      preOrderDeposit: body.preOrderDeposit || false,
+      depositMode: body.depositMode || false,
+      depositPct: body.depositPct || 0,
       paymentMethod: body.paymentMethod || '',
       bankAccountId: body.bankAccountId || '',
       createdAt: now,
       updatedAt: now,
       backorderId: body.backorderId,
       stockDeducted: deductStock,
+      supplierOrderSent: body.supplierOrderSent || false,
+      supplierOrderRef: body.supplierOrderRef,
+      supplierOrderName: body.supplierOrderName,
+      supplierOrderSupplier: body.supplierOrderSupplier,
     }
     await blobAppendArrayItem(KEY, doc)
     // Rule 2 — Auto-Create Product: create draft products for unknown SKUs (best-effort)

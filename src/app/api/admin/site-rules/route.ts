@@ -432,6 +432,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Accounting', 'Petty Cash', 'Admin Invoices'],
     category: 'Payments & Credits',
   },
+  {
+    id: 'quote_to_supplier_order',
+    name: 'Rule 49 — Quote → Supplier Order',
+    description: `Quotes (and Pre Order Deposit quotes, which are Quotes) carry an "Add to Supplier Order" tick box directly beneath the Pre Order Deposit tick box. It exists ONLY on Quotes — Sales Orders and Invoices never show it, because a supplier order is raised to BUY stock, which happens before the customer document is committed. Ticking it reveals a Supplier dropdown (from data/supplier-network.json) and a choice of target: "Create New Supplier Order", which takes an editable name defaulting to "Supplier – DD/MM/YYYY", or "Add to Existing Supplier Order", which lists only that supplier's currently open orders with their line counts and is disabled when the supplier has none. Nothing is sent while the box is being configured — the push happens on Save, and Save is blocked with an error if no supplier is chosen or the quote has no line items. ON SAVE every line on the quote is POSTed to /api/admin/backorders carrying supplierId, supplierName, supplierOrderRef, supplierOrderName, the quote number and source 'quote-supplier-order'. PRICE: the line's cost price is used where it has one, falling back to the unit price — a supplier order is a purchasing document, so it must never carry retail. WHAT MAKES AN ORDER DISCRETE: backorder lines are grouped on /admin/suppliers by supplierName PLUS supplierOrderRef, so two orders raised for the same supplier stay separate accordions with their own names, Send to Worksheet and Download Order buttons. Legacy lines that carry no ref fall into that supplier's default unnamed order exactly as before, so nothing already in the system moves. NO DOUBLE SENDING: the quote is stamped supplierOrderSent once the lines land, the tick box locks and reads "✓ Sent to Supplier Orders", and re-saving or re-opening the quote will not push the lines again. If any line fails to post, the stamp is rolled back and the modal reports the failure instead of closing, so the send can be retried cleanly.`,
+    active: true,
+    appliesTo: ['Admin Quotes', 'Supplier Orders', 'Back Orders'],
+    category: 'Orders',
+  },
 ]
 
 export async function GET() {

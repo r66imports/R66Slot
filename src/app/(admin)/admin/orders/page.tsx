@@ -932,7 +932,18 @@ function ClientAutofill({
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const [dropUp, setDropUp] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // Flip the list above the input when it would otherwise run off the bottom of the viewport
+  function openList() {
+    const r = wrapperRef.current?.getBoundingClientRect()
+    if (r) {
+      const spaceBelow = window.innerHeight - r.bottom - 8
+      setDropUp(spaceBelow < DROPDOWN_MAX_H && r.top - 8 > spaceBelow)
+    }
+    setOpen(true)
+  }
 
   const filtered = query.trim()
     ? clients.filter((c) => {
@@ -966,15 +977,15 @@ function ClientAutofill({
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm">🔍</span>
         <input
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
+          onChange={(e) => { setQuery(e.target.value); openList() }}
+          onFocus={openList}
           placeholder="Search saved clients to autofill…"
           className="w-full border-2 border-blue-200 focus:border-blue-400 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none bg-blue-50 focus:bg-white transition-colors"
           autoComplete="off"
         />
       </div>
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto">
+        <ul className={`absolute z-50 w-full bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto ${dropUp ? 'bottom-full mb-1' : 'mt-1'}`}>
           {filtered.map((c) => (
             <li
               key={c.id}
@@ -1002,6 +1013,9 @@ function ClientAutofill({
 
 // ─── SKU Line Input ────────────────────────────────────────────────────────────
 
+// Tallest a line-item / autofill dropdown may grow before it scrolls internally
+const DROPDOWN_MAX_H = 192
+
 function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = false }: {
   value: string
   onChange: (v: string) => void
@@ -1012,7 +1026,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
   const [open, setOpen] = useState(false)
   const [blockMsg, setBlockMsg] = useState<{ text: string; type: 'oos' | 'preorder' } | null>(null)
   const [searchQ, setSearchQ] = useState('')
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; bottom: number; left: number; width: number; dropUp: boolean; maxHeight: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const q = searchQ.toLowerCase()
   const filtered = q.length >= 1
@@ -1024,7 +1038,19 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
   function openDropdown() {
     if (inputRef.current) {
       const r = inputRef.current.getBoundingClientRect()
-      setDropdownPos({ top: r.bottom + 2, left: r.left, width: Math.max(r.width, 320) })
+      // Flip upward when the list won't fit below the input — line item rows sit low in the
+      // modal, so a fixed-position list anchored to r.bottom would run off the viewport.
+      const spaceBelow = window.innerHeight - r.bottom - 8
+      const spaceAbove = r.top - 8
+      const dropUp = spaceBelow < DROPDOWN_MAX_H && spaceAbove > spaceBelow
+      setDropdownPos({
+        top: r.bottom + 2,
+        bottom: window.innerHeight - r.top + 2,
+        left: r.left,
+        width: Math.max(r.width, 320),
+        dropUp,
+        maxHeight: Math.min(DROPDOWN_MAX_H, Math.max(dropUp ? spaceAbove : spaceBelow, 120)),
+      })
     }
     setOpen(true)
   }
@@ -1063,7 +1089,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
         onBlur={() => setTimeout(() => { setOpen(false); setSearchQ('') }, 150)}
       />
       {blockMsg && dropdownPos && (
-        <div style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, zIndex: 9999 }} className={`text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
+        <div style={{ position: 'fixed', ...(dropdownPos.dropUp ? { bottom: dropdownPos.bottom } : { top: dropdownPos.top }), left: dropdownPos.left, zIndex: 9999 }} className={`text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
           ⚠ {blockMsg.text}
           {blockMsg.type === 'preorder' && (
             <a href="/admin/backorders" className="underline font-semibold hover:text-amber-200 ml-1">Open Back Orders →</a>
@@ -1071,7 +1097,17 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
         </div>
       )}
       {showDropdown && (
-        <div style={{ position: 'fixed', top: dropdownPos!.top, left: dropdownPos!.left, width: dropdownPos!.width, zIndex: 9999 }} className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div
+          style={{
+            position: 'fixed',
+            ...(dropdownPos!.dropUp ? { bottom: dropdownPos!.bottom } : { top: dropdownPos!.top }),
+            left: dropdownPos!.left,
+            width: dropdownPos!.width,
+            maxHeight: dropdownPos!.maxHeight,
+            zIndex: 9999,
+          }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto"
+        >
           {filtered.map((p) => {
             const oos = p.quantity <= 0
             const isPre = p.isPreOrder
@@ -1398,6 +1434,49 @@ function CreateDocumentModal({
   useEffect(() => { nonDepositPctRef.current = nonDepositPct }, [nonDepositPct])
   const [depositMode, setDepositMode] = useState<boolean>((editDoc as any)?.depositMode || !!(editDoc as any)?.preOrderDeposit || false)
   const [preOrderDeposit, setPreOrderDeposit] = useState<boolean>((editDoc as any)?.preOrderDeposit || false)
+  // ── Add to Supplier Order (Quotes only) ──────────────────────────────────
+  // Ticking this pushes every line on the quote to /admin/suppliers as backorder lines,
+  // either onto an existing supplier order (shared supplierOrderRef) or a brand new one.
+  const [addToSupplierOrder, setAddToSupplierOrder] = useState<boolean>(!!(editDoc as any)?.supplierOrderSent)
+  const [soSent, setSoSent] = useState<boolean>(!!(editDoc as any)?.supplierOrderSent)
+  const [soSuppliers, setSoSuppliers] = useState<{ id: string; name: string }[]>([])
+  const [soOpenOrders, setSoOpenOrders] = useState<{ ref: string; name: string; supplierName: string; lines: number }[]>([])
+  const [soSupplierId, setSoSupplierId] = useState<string>('')
+  const [soTargetRef, setSoTargetRef] = useState<string>('new')
+  const [soNewName, setSoNewName] = useState<string>('')
+  const soSupplierName = soSuppliers.find((s) => s.id === soSupplierId)?.name || ''
+  const soExistingForSupplier = soOpenOrders.filter((o) => o.supplierName === soSupplierName)
+
+  // Load suppliers + the currently open supplier orders the first time the tick box is used
+  useEffect(() => {
+    if (!isQuote || !addToSupplierOrder || soSuppliers.length > 0) return
+    fetch('/api/admin/supplier-network')
+      .then((r) => r.ok ? r.json() : [])
+      .then((list: any[]) => setSoSuppliers(
+        list.filter((s) => s.isActive !== false).map((s) => ({ id: s.id, name: s.name }))
+      ))
+      .catch(() => {})
+    fetch('/api/admin/backorders?all=true')
+      .then((r) => r.ok ? r.json() : [])
+      .then((bos: any[]) => {
+        const open = new Map<string, { ref: string; name: string; supplierName: string; lines: number }>()
+        bos.filter((b) => b.status === 'active' && b.supplierOrderRef && b.supplierName).forEach((b) => {
+          const existing = open.get(b.supplierOrderRef)
+          if (existing) existing.lines += 1
+          else open.set(b.supplierOrderRef, { ref: b.supplierOrderRef, name: b.supplierOrderName || b.supplierName, supplierName: b.supplierName, lines: 1 })
+        })
+        setSoOpenOrders(Array.from(open.values()))
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addToSupplierOrder])
+
+  // Reset the target order and seed a default name whenever the supplier changes
+  useEffect(() => {
+    if (!soSupplierName) return
+    setSoTargetRef('new')
+    setSoNewName(`${soSupplierName} – ${new Date().toLocaleDateString('en-ZA')}`)
+  }, [soSupplierName])
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>((editDoc as any)?.bankAccountId || '')
   const [showBankManager, setShowBankManager] = useState(false)
@@ -1425,9 +1504,18 @@ function CreateDocumentModal({
   const handleSave = async () => {
     if (!form.clientName.trim()) { setError('Client name is required'); return }
     if (!form.docNumber.trim()) { setError('Document number is required'); return }
+    const sendingToSO = isQuote && addToSupplierOrder && !soSent
+    if (sendingToSO && !soSupplierName) { setError('Select a supplier for the supplier order'); return }
+    if (sendingToSO && lineItems.length === 0) { setError('Add at least one line item before sending to a supplier order'); return }
     setSaving(true)
     setError('')
     try {
+      // Resolve the target supplier order up-front so its ref can be stamped on the document
+      const targetSO = sendingToSO
+        ? (soTargetRef === 'new'
+            ? { ref: `so_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, name: soNewName.trim() || `${soSupplierName} – ${new Date().toLocaleDateString('en-ZA')}` }
+            : { ref: soTargetRef, name: soExistingForSupplier.find((o) => o.ref === soTargetRef)?.name || soSupplierName })
+        : null
       const toSendBO = isQuote ? lineItems.filter(li => li._backorder && !li._backorderSent) : []
       const savedLineItems = isQuote
         ? lineItems.map(li => (li._backorder && !li._backorderSent) ? { ...li, _backorderSent: true } : li)
@@ -1439,10 +1527,48 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, preOrderDeposit }),
+        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, preOrderDeposit, ...(targetSO ? { supplierOrderSent: true, supplierOrderRef: targetSO.ref, supplierOrderName: targetSO.name, supplierOrderSupplier: soSupplierName } : {}) }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
+        // Push every quote line onto the chosen supplier order. Uses cost price where the line
+        // carries one — supplier orders are purchasing documents, not retail.
+        if (targetSO) {
+          const soResults = await Promise.allSettled(lineItems.map(li => {
+            const { sku } = splitSkuTitle(li.description || '')
+            return fetch('/api/admin/backorders', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clientName: form.clientName,
+                clientEmail: form.clientEmail,
+                clientPhone: form.clientPhone,
+                sku: sku || '',
+                description: li.description,
+                qty: li.qty,
+                price: li._costPrice || li.unitPrice,
+                supplierId: soSupplierId,
+                supplierName: soSupplierName,
+                supplierOrderRef: targetSO.ref,
+                supplierOrderName: targetSO.name,
+                quoteNumber: form.docNumber,
+                source: 'quote-supplier-order',
+              }),
+            })
+          }))
+          const failed = soResults.some(r => r.status === 'rejected' || !r.value.ok)
+          if (failed) {
+            // Roll the marker back so the quote can be re-sent once the failure is resolved
+            fetch(`/api/admin/orders/documents/${savedDoc.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ supplierOrderSent: false }),
+            }).catch(() => {})
+            setError('Document saved, but sending to the supplier order failed — try again')
+            return
+          }
+          setSoSent(true)
+        }
         if (toSendBO.length > 0) {
           Promise.allSettled(toSendBO.map(li => {
             const { sku } = splitSkuTitle(li.description || '')
@@ -1475,8 +1601,8 @@ function CreateDocumentModal({
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/40 ${fullScreen ? '' : 'p-4'}`}>
-      <div className={`bg-white flex flex-col relative ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-6xl'}`}
-        style={fullScreen ? undefined : { aspectRatio: '16 / 9', maxHeight: '92vh' }}>
+      {/* Default size matches the Costing Calculator modal (max-w-4xl / max-h-90vh) */}
+      <div className={`bg-white flex flex-col relative ${fullScreen ? 'w-full h-full' : 'rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh]'}`}>
         <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
           <h2 className="text-lg font-bold">
             {editDoc
@@ -1533,6 +1659,94 @@ function CreateDocumentModal({
                 <span className="text-xs text-gray-500 ml-2">Renames this Quote to "Pre Order Deposit" and switches Discount → Deposit %</span>
               </div>
             </label>
+          )}
+
+          {/* Add to Supplier Order — Quotes only. Sends every line to /admin/suppliers. */}
+          {docType === 'quote' && (
+            <div className={`rounded-xl border-2 transition-colors ${addToSupplierOrder ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200 hover:border-indigo-300'}`}>
+              <label className="flex items-center gap-3 cursor-pointer select-none px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={addToSupplierOrder}
+                  disabled={soSent}
+                  onChange={(e) => setAddToSupplierOrder(e.target.checked)}
+                  className={`w-4 h-4 rounded accent-indigo-600 ${soSent ? 'cursor-not-allowed opacity-70' : ''}`}
+                />
+                <div>
+                  <span className="text-sm font-semibold text-indigo-700">Add to Supplier Order</span>
+                  {soSent
+                    ? <span className="text-xs text-green-600 font-semibold ml-2">✓ Sent to Supplier Orders</span>
+                    : <span className="text-xs text-gray-500 ml-2">Sends every line on this Quote to Supplier Orders on save</span>}
+                </div>
+              </label>
+
+              {addToSupplierOrder && !soSent && (
+                <div className="px-4 pb-4 space-y-3 border-t border-indigo-200 pt-3">
+                  <div>
+                    <label className="text-xs font-semibold text-gray-500 mb-1 block">Supplier *</label>
+                    <select
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                      value={soSupplierId}
+                      onChange={(e) => setSoSupplierId(e.target.value)}
+                    >
+                      <option value="">— Select supplier —</option>
+                      {soSuppliers.map((s) => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {soSupplierName && (
+                    <div className="space-y-2">
+                      <label className={`flex items-center gap-3 cursor-pointer select-none px-3 py-2 rounded-lg border ${soTargetRef === 'new' ? 'border-indigo-400 bg-white' : 'border-gray-200'}`}>
+                        <input
+                          type="radio"
+                          name="so-target"
+                          checked={soTargetRef === 'new'}
+                          onChange={() => setSoTargetRef('new')}
+                          className="w-4 h-4 accent-indigo-600"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Create New Supplier Order</span>
+                      </label>
+                      {soTargetRef === 'new' && (
+                        <input
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                          placeholder="Supplier order name"
+                          value={soNewName}
+                          onChange={(e) => setSoNewName(e.target.value)}
+                        />
+                      )}
+
+                      <label className={`flex items-center gap-3 select-none px-3 py-2 rounded-lg border ${soTargetRef !== 'new' ? 'border-indigo-400 bg-white' : 'border-gray-200'} ${soExistingForSupplier.length === 0 ? 'opacity-50' : 'cursor-pointer'}`}>
+                        <input
+                          type="radio"
+                          name="so-target"
+                          disabled={soExistingForSupplier.length === 0}
+                          checked={soTargetRef !== 'new'}
+                          onChange={() => setSoTargetRef(soExistingForSupplier[0]?.ref || 'new')}
+                          className="w-4 h-4 accent-indigo-600"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Add to Existing Supplier Order
+                          {soExistingForSupplier.length === 0 && <span className="text-xs text-gray-400 ml-2">none open for {soSupplierName}</span>}
+                        </span>
+                      </label>
+                      {soTargetRef !== 'new' && soExistingForSupplier.length > 0 && (
+                        <select
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                          value={soTargetRef}
+                          onChange={(e) => setSoTargetRef(e.target.value)}
+                        >
+                          {soExistingForSupplier.map((o) => (
+                            <option key={o.ref} value={o.ref}>{o.name} · {o.lines} line{o.lines !== 1 ? 's' : ''}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <section>
