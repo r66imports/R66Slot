@@ -55,7 +55,23 @@ export default function SupplierContactsPage() {
   const [form, setForm] = useState<Omit<SupplierContact, 'id'>>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
+  const [dropUp, setDropUp] = useState(false)
   const actionsRef = useRef<HTMLTableSectionElement>(null)
+
+  // Open the actions menu upwards when there isn't room below (last rows on the page)
+  function toggleActions(e: React.MouseEvent<HTMLButtonElement>, id: string) {
+    if (openActionId === id) {
+      setOpenActionId(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const MENU_HEIGHT = 90
+    // The table card clips overflow, so the menu is bounded by the viewport AND the table bottom
+    const tableBottom = actionsRef.current?.getBoundingClientRect().bottom ?? window.innerHeight
+    const spaceBelow = Math.min(window.innerHeight, tableBottom) - rect.bottom
+    setDropUp(spaceBelow < MENU_HEIGHT + 16)
+    setOpenActionId(id)
+  }
 
   // Close action dropdown on outside click
   useEffect(() => {
@@ -233,7 +249,7 @@ export default function SupplierContactsPage() {
                   <td className="py-3 px-4 text-center sticky right-0 bg-white shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)]" style={{ zIndex: openActionId === s.id ? 9999 : undefined }}>
                     <div className="relative inline-block">
                       <button
-                        onClick={() => setOpenActionId(openActionId === s.id ? null : s.id)}
+                        onClick={(e) => toggleActions(e, s.id)}
                         className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1"
                       >
                         Actions
@@ -242,7 +258,7 @@ export default function SupplierContactsPage() {
                         </svg>
                       </button>
                       {openActionId === s.id && (
-                        <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1">
+                        <div className={`absolute right-0 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'} w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1`}>
                           <button
                             onClick={() => openEdit(s)}
                             className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 w-full text-left"
