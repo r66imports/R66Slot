@@ -55,14 +55,8 @@ export default function ChecklistsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: cl.id, items: newItems }),
     })
-    // Sync to linked worksheet
-    if (cl.worksheetId && item?.sku) {
-      fetch('/api/admin/worksheets', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ worksheetId: cl.worksheetId, sku: item.sku, sentToInventory: newChecked }),
-      }).catch(() => {})
-    }
+    // Ticks stay on the checklist — the linked worksheet reads them and highlights
+    // the matching line green. No stock or product updates happen from here.
   }
 
   const updateItemNotes = async (cl: Checklist, itemId: string, notes: string) => {
@@ -85,16 +79,6 @@ export default function ChecklistsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: cl.id, items: newItems }),
     })
-    // Sync all items to unchecked in linked worksheet
-    if (cl.worksheetId) {
-      cl.items.filter(it => it.sku && it.checked).forEach(it => {
-        fetch('/api/admin/worksheets', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ worksheetId: cl.worksheetId, sku: it.sku, sentToInventory: false }),
-        }).catch(() => {})
-      })
-    }
   }
 
   const toggleArchive = async (cl: Checklist) => {
@@ -156,6 +140,7 @@ export default function ChecklistsPage() {
         {visible.map(cl => {
           const checkedCount = cl.items.filter(it => it.checked).length
           const total = cl.items.length
+          const totalQty = cl.items.reduce((sum, it) => sum + (Number(it.qty) || 0), 0)
           const pct = total > 0 ? Math.round(checkedCount / total * 100) : 0
           const isOpen = openId === cl.id
           const allDone = checkedCount === total && total > 0
@@ -174,6 +159,7 @@ export default function ChecklistsPage() {
                       {cl.supplier && <span className="text-blue-600 font-medium">{cl.supplier}</span>}
                       <span>{fmtDate(cl.date)}</span>
                       <span>· {total} items</span>
+                      <span>· {totalQty} qty</span>
                     </div>
                   </div>
                 </div>
