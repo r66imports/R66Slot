@@ -132,6 +132,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Products', href: '/admin/products' },
         { name: 'Product Archive', href: '/admin/products/archive' },
         { name: 'Task List', href: '/admin/task-list' },
+        { name: 'SKU Photo Task List', href: '/admin/sku-photo-task-list' },
         { name: 'Inventory', href: '/admin/inventory' },
         { name: 'Categories', href: '/admin/categories' },
         { name: 'POS / Scanner', href: '/admin/pos' },

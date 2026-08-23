@@ -5,8 +5,13 @@ const KEY = 'data/task-list.json'
 
 export type TaskPriority = 'high' | 'medium' | 'low'
 
+// 'tasks' = the general Task List. 'sku-photo' = the SKU Photo Task List,
+// fed by the automated "product has no image" scan.
+export type TaskListName = 'tasks' | 'sku-photo'
+
 export interface Task {
   id: string
+  list: TaskListName
   title: string
   date: string // YYYY-MM-DD — the task line this item belongs to
   priority: TaskPriority
@@ -30,15 +35,23 @@ function toDateKey(iso: string): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-// Backfill fields added after the original task-list shipped
+function coercePriority(value: unknown): TaskPriority {
+  return value === 'high' || value === 'low' || value === 'medium' ? value : 'medium'
+}
+
+function coerceList(value: unknown): TaskListName | null {
+  return value === 'tasks' || value === 'sku-photo' ? value : null
+}
+
+// Backfill fields added after the original task-list shipped. Tasks created by the
+// no-image scan belong to the SKU Photo Task List; everything else is a general task.
 function normalize(t: any): Task {
-  const priority: TaskPriority =
-    t.priority === 'high' || t.priority === 'low' || t.priority === 'medium' ? t.priority : 'medium'
   return {
     ...t,
-    title: t.title || t.productTitle || '',
-    date: t.date || toDateKey(t.createdAt),
-    priority,
+    list: coerceList(t?.list) ?? (t?.source === 'auto-no-image' ? 'sku-photo' : 'tasks'),
+    title: t?.title || t?.productTitle || '',
+    date: t?.date || toDateKey(t?.createdAt),
+    priority: coercePriority(t?.priority),
   }
 }
 
@@ -73,14 +86,16 @@ function sortTasks(tasks: Task[]): Task[] {
   })
 }
 
-// GET /api/admin/task-list
-export async function GET() {
+// GET /api/admin/task-list?list=tasks|sku-photo  (omit list for every task)
+export async function GET(request: Request) {
   try {
+    const listFilter = coerceList(new URL(request.url).searchParams.get('list'))
     const raw = await getTasks()
     const tasks = pruneTasks(raw)
     // Save pruned list back if any were removed
     if (tasks.length !== raw.length) await saveTasks(tasks)
-    return NextResponse.json(sortTasks(tasks))
+    const visible = listFilter ? tasks.filter((t) => t.list === listFilter) : tasks
+    return NextResponse.json(sortTasks(visible))
   } catch (error) {
     console.error('Error fetching task list:', error)
     return NextResponse.json([], { status: 200 })
@@ -98,25 +113,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'title or productId is required' }, { status: 400 })
     }
 
+    const source = body.source === 'auto-no-image' ? 'auto-no-image' : 'manual'
+    const list = coerceList(body.list) ?? (source === 'auto-no-image' ? 'sku-photo' : 'tasks')
     const tasks = await getTasks()
 
-    // Product-linked tasks are deduped — a product can only be pending once
+    // Product-linked tasks are deduped per list — a product can only be pending once
     if (productId) {
-      const existing = tasks.find((t) => t.productId === productId && !t.completedAt)
+      const existing = tasks.find((t) => t.productId === productId && t.list === list && !t.completedAt)
       if (existing) {
         return NextResponse.json({ task: existing, alreadyExists: true })
       }
     }
 
     const now = new Date()
-    const priority: TaskPriority =
-      body.priority === 'high' || body.priority === 'low' ? body.priority : 'medium'
-
     const task: Task = {
       id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      list,
       title,
       date: typeof body.date === 'string' && body.date ? body.date : toDateKey(now.toISOString()),
-      priority,
+      priority: coercePriority(body.priority),
       sku: sku || '',
       productId: productId || '',
       productTitle: productTitle || '',
@@ -124,7 +139,7 @@ export async function POST(request: Request) {
       supplier: body.supplier || '',
       imageUrl: imageUrl || '',
       note: body.note || '',
-      source: body.source || 'manual',
+      source,
       createdAt: now.toISOString(),
       completedAt: null,
     }

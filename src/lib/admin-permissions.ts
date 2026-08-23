@@ -9,6 +9,7 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Content', name: 'Homepage', href: '/admin/homepage' },
   { group: 'Content', name: 'Products', href: '/admin/products' },
   { group: 'Content', name: 'Task List', href: '/admin/task-list' },
+  { group: 'Content', name: 'SKU Photo Task List', href: '/admin/sku-photo-task-list' },
   { group: 'Content', name: 'Inventory', href: '/admin/inventory' },
   { group: 'Content', name: 'Categories', href: '/admin/categories' },
   { group: 'Content', name: 'POS / Scanner', href: '/admin/pos' },

@@ -3,7 +3,7 @@ import { blobRead, blobWrite } from '@/lib/blob-storage'
 
 const KEY = 'data/task-list.json'
 
-// PATCH /api/admin/task-list/[id] — toggle complete, edit title/note/date/priority
+// PATCH /api/admin/task-list/[id] — toggle complete, edit title/note/date/priority/list
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -28,6 +28,9 @@ export async function PATCH(
     }
     if (body.priority === 'high' || body.priority === 'medium' || body.priority === 'low') {
       tasks[idx].priority = body.priority
+    }
+    if (body.list === 'tasks' || body.list === 'sku-photo') {
+      tasks[idx].list = body.list
     }
     await blobWrite(KEY, tasks)
     return NextResponse.json(tasks[idx])
