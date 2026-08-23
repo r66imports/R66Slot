@@ -5,7 +5,9 @@ import { blobRead, blobWrite } from '@/lib/blob-storage'
 
 const CUSTOMERS_KEY = 'data/customers.json'
 const RESET_TOKENS_KEY = 'data/password-reset-tokens.json'
-const TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
+// A reset link that dies in an hour is no use to someone who reads mail once a day —
+// they come back to a dead link and are locked out all over again.
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 function createTransport() {
   return nodemailer.createTransport({
@@ -13,7 +15,9 @@ function createTransport() {
     port: Number(process.env.SMTP_PORT || 587),
     secure: Number(process.env.SMTP_PORT) === 465,
     auth: {
-      user: process.env.SMTP_FROM,
+      // Every other route in the app authenticates with SMTP_USER; this one only ever
+      // read SMTP_FROM, so it fails alone when only SMTP_USER is set.
+      user: process.env.SMTP_FROM || process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
   })
@@ -25,6 +29,18 @@ export async function POST(request: NextRequest) {
     if (!email) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
 
     const normalised = email.toLowerCase().trim()
+
+    // Checked BEFORE the customer lookup on purpose: a misconfigured mailer is the same
+    // answer for every address, so failing here leaks nothing about who has an account.
+    // Reporting success with no mailer configured tells customers to check an inbox that
+    // will never receive anything, and leaves them locked out with no way to recover.
+    if (!process.env.SMTP_HOST || !process.env.SMTP_PASS) {
+      console.error('[forgot-password] SMTP not configured — cannot send reset email')
+      return NextResponse.json(
+        { error: 'Password reset email is temporarily unavailable. Please contact us and we will reset it for you.' },
+        { status: 503 }
+      )
+    }
 
     const customers = await blobRead<any[]>(CUSTOMERS_KEY, [])
     const customer = customers.find((c: any) => c.email?.toLowerCase() === normalised)
@@ -48,7 +64,7 @@ export async function POST(request: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.r66slot.co.za'
     const resetLink = `${siteUrl}/account/reset-password?token=${token}`
 
-    if (process.env.SMTP_HOST && process.env.SMTP_PASS) {
+    {
       const transporter = createTransport()
       await transporter.sendMail({
         from: `"R66 Slot" <${process.env.SMTP_FROM}>`,
@@ -65,20 +81,22 @@ export async function POST(request: NextRequest) {
                 Reset Password
               </a>
             </p>
-            <p style="color:#666;font-size:13px">This link expires in 1 hour. If you didn&rsquo;t request a reset, you can safely ignore this email.</p>
+            <p style="color:#666;font-size:13px">This link expires in 24 hours. If you didn&rsquo;t request a reset, you can safely ignore this email.</p>
             <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
             <p style="color:#999;font-size:12px">R66 Slot &mdash; r66slot.co.za</p>
           </div>
         `,
       })
-    } else {
-      // Dev fallback: log the link
-      console.log('[forgot-password] Reset link:', resetLink)
     }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
+    // sendMail throws on a rejected send — say so rather than letting the customer
+    // wait on mail that was never accepted.
     console.error('[forgot-password] error:', err?.message || err)
-    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'We could not send the reset email. Please contact us and we will reset it for you.' },
+      { status: 502 }
+    )
   }
 }
