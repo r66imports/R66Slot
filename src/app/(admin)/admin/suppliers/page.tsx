@@ -134,6 +134,11 @@ export default function SuppliersNetworkPage() {
   const [wsSentResult, setWsSentResult] = useState('')
   const [wsCreatedId, setWsCreatedId] = useState('')
 
+  // Delete Supplier Order
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState<{ ref: string; supplierName: string; label: string; lines: number } | null>(null)
+  const [deletingOrder, setDeletingOrder] = useState(false)
+  const [deleteOrderError, setDeleteOrderError] = useState('')
+
   // ─── Data Loading ──────────────────────────────────────────────────────
 
   const loadSuppliers = useCallback(async () => {
@@ -279,14 +284,15 @@ export default function SuppliersNetworkPage() {
 
   // Group backorders into supplier orders. Lines that carry a supplierOrderRef form their own
   // discrete order; legacy lines with no ref fall into that supplier's default (unnamed) order.
-  const groupedBackorders: { key: string; label: string; supplierName: string; items: Backorder[] }[] =
+  const groupedBackorders: { key: string; ref: string; label: string; supplierName: string; items: Backorder[] }[] =
     Object.values(
-      filteredBackorders.reduce<Record<string, { key: string; label: string; supplierName: string; items: Backorder[] }>>((acc, b) => {
+      filteredBackorders.reduce<Record<string, { key: string; ref: string; label: string; supplierName: string; items: Backorder[] }>>((acc, b) => {
         const supplier = b.supplierName || 'Unassigned'
         const key = `${supplier}::${b.supplierOrderRef || ''}`
         if (!acc[key]) {
           acc[key] = {
             key,
+            ref: b.supplierOrderRef || '',
             label: b.supplierOrderRef ? (b.supplierOrderName || supplier) : supplier,
             supplierName: supplier,
             items: [],
@@ -397,6 +403,32 @@ export default function SuppliersNetworkPage() {
       else next.add(name)
       return next
     })
+  }
+
+  // Delete an entire supplier order - removes every backorder line in the group and
+  // un-stamps the source quote so it can be sent to a supplier order again.
+  async function confirmDeleteSupplierOrder() {
+    if (!deleteOrderTarget) return
+    setDeletingOrder(true)
+    setDeleteOrderError('')
+    try {
+      const qs = new URLSearchParams()
+      if (deleteOrderTarget.ref) qs.set('ref', deleteOrderTarget.ref)
+      qs.set('supplier', deleteOrderTarget.supplierName)
+      const res = await fetch(`/api/admin/suppliers/orders?${qs.toString()}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setDeleteOrderError(data.error || 'Failed to delete supplier order')
+        return
+      }
+      setDeleteOrderTarget(null)
+      await loadBackorders()
+    } catch (e) {
+      console.error('Failed to delete supplier order', e)
+      setDeleteOrderError('Failed to delete supplier order')
+    } finally {
+      setDeletingOrder(false)
+    }
   }
 
   function downloadSupplierOrder(supplierName: string, items: Backorder[]) {
@@ -853,7 +885,7 @@ export default function SuppliersNetworkPage() {
                   </div>
 
                   {/* Supplier groups — collapsible accordion */}
-                  {groupedBackorders.map(({ key, label, supplierName, items }) => {
+                  {groupedBackorders.map(({ key, ref, label, supplierName, items }) => {
                     const isOpen = !closedGroups.has(key)
                     const subtotalQty = items.reduce((s, b) => s + b.qty, 0)
                     return (
@@ -897,6 +929,21 @@ export default function SuppliersNetworkPage() {
                               </svg>
                               Download Order
                             </button>
+                            {/* Only discrete supplier orders can be deleted. Legacy lines with no ref
+                                sit in the default group for that supplier alongside plain backorders. */}
+                            {ref && (
+                            <button
+                              type="button"
+                              onClick={() => { setDeleteOrderError(''); setDeleteOrderTarget({ ref, supplierName, label, lines: items.length }) }}
+                              className="flex items-center gap-1.5 border border-red-200 text-red-600 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Delete this supplier order"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </button>
+                            )}
                           </div>
                         </div>
                         {/* Collapsible table */}
@@ -933,6 +980,55 @@ export default function SuppliersNetworkPage() {
           companyInfo={companyInfo}
           onClose={() => setShowCreateOrder(false)}
         />
+      )}
+
+      {/* ── Delete Supplier Order Modal ──────────────────────── */}
+      {deleteOrderTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-semibold text-gray-900">Delete Supplier Order</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{deleteOrderTarget.label}</p>
+              </div>
+              <button onClick={() => setDeleteOrderTarget(null)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600">
+                This removes all <span className="font-semibold text-gray-900">{deleteOrderTarget.lines}</span> line
+                {deleteOrderTarget.lines !== 1 ? 's' : ''} on this supplier order. The quote they came from is unlocked
+                so it can be sent to a supplier order again. Stock and customer documents are not affected.
+              </p>
+              <p className="text-xs text-gray-400">This cannot be undone.</p>
+
+              {deleteOrderError && (
+                <div className="bg-red-50 border border-red-100 text-red-600 text-xs rounded-lg px-3 py-2">{deleteOrderError}</div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setDeleteOrderTarget(null)}
+                disabled={deletingOrder}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteSupplierOrder}
+                disabled={deletingOrder}
+                className="bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deletingOrder ? 'Deleting…' : 'Delete Order'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Send to Worksheet Modal ────────────────────────────────────── */}
