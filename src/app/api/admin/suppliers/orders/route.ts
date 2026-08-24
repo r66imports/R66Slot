@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { blobRead, blobRemoveArrayItem, blobReplaceArrayItem } from '@/lib/blob-storage'
 import type { Backorder } from '@/types/backorder'
 
 const BACKORDERS_KEY = 'data/backorders.json'
@@ -8,6 +8,7 @@ const DOCS_KEY = 'data/order-documents.json'
 // Only the supplier-order stamp fields matter here — kept local so this route does not
 // import from another route file.
 interface StampedDoc {
+  id: string
   supplierOrderSent?: boolean
   supplierOrderRef?: string
   supplierOrderName?: string
@@ -21,6 +22,9 @@ interface StampedDoc {
 // A deployed page may still send ?ref=&supplier= instead, so that form keeps working: the
 // group is supplierName + supplierOrderRef, and legacy lines carry no ref at all.
 // When the order carries a ref, any quote stamped with it is un-stamped so it can be sent again.
+//
+// Rows are removed one at a time through the atomic helpers rather than rewriting the whole
+// array — a send running at the same time would otherwise be wiped out by the write-back.
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -44,37 +48,35 @@ export async function DELETE(request: Request) {
     }
 
     const backorders = await blobRead<Backorder[]>(BACKORDERS_KEY, [])
-    const remaining = backorders.filter((b) => !inGroup(b))
-    const deleted = backorders.length - remaining.length
+    const targets = backorders.filter(inGroup)
 
-    if (deleted === 0) {
+    if (targets.length === 0) {
       return NextResponse.json({ error: 'Supplier order not found' }, { status: 404 })
     }
 
-    await blobWrite(BACKORDERS_KEY, remaining)
+    for (const b of targets) {
+      await blobRemoveArrayItem(BACKORDERS_KEY, b.id)
+    }
 
     // Un-stamp the source quote(s) so the lines can be re-sent
     let unstamped = 0
     if (ref) {
       const docs = await blobRead<StampedDoc[]>(DOCS_KEY, [])
-      let changed = false
-      const updated = docs.map((d) => {
-        if (d.supplierOrderRef !== ref) return d
-        changed = true
-        unstamped++
-        return {
+      for (const d of docs) {
+        if (d.supplierOrderRef !== ref) continue
+        await blobReplaceArrayItem(DOCS_KEY, d.id, {
           ...d,
           supplierOrderSent: false,
           supplierOrderRef: undefined,
           supplierOrderName: undefined,
           supplierOrderSupplier: undefined,
           updatedAt: new Date().toISOString(),
-        }
-      })
-      if (changed) await blobWrite(DOCS_KEY, updated)
+        })
+        unstamped++
+      }
     }
 
-    return NextResponse.json({ success: true, deleted, unstamped })
+    return NextResponse.json({ success: true, deleted: targets.length, unstamped })
   } catch (error) {
     console.error('Error deleting supplier order:', error)
     return NextResponse.json({ error: 'Failed to delete supplier order' }, { status: 500 })

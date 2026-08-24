@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { blobRead, blobWrite, blobAppendArrayItem } from '@/lib/blob-storage'
 import type { Backorder } from '@/types/backorder'
 
 export type { Backorder }
@@ -84,9 +84,10 @@ export async function POST(request: Request) {
       updatedAt: now,
     }
 
-    const backorders = await getBackorders()
-    backorders.unshift(newBackorder)
-    await saveBackorders(backorders)
+    // Atomic append. Callers such as Send to Supplier Order fire one POST per line in
+    // parallel, and a read-modify-write here loses every line but the last writer.
+    // GET sorts by createdAt desc, so appending rather than unshifting changes nothing.
+    await blobAppendArrayItem(BACKORDERS_KEY, newBackorder)
 
     return NextResponse.json(newBackorder, { status: 201 })
   } catch (error) {
