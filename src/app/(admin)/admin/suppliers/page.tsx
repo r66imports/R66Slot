@@ -135,7 +135,7 @@ export default function SuppliersNetworkPage() {
   const [wsCreatedId, setWsCreatedId] = useState('')
 
   // Delete Supplier Order
-  const [deleteOrderTarget, setDeleteOrderTarget] = useState<{ ref: string; supplierName: string; label: string; lines: number } | null>(null)
+  const [deleteOrderTarget, setDeleteOrderTarget] = useState<{ ref: string; supplierName: string; label: string; ids: string[] } | null>(null)
   const [deletingOrder, setDeletingOrder] = useState(false)
   const [deleteOrderError, setDeleteOrderError] = useState('')
 
@@ -412,10 +412,11 @@ export default function SuppliersNetworkPage() {
     setDeletingOrder(true)
     setDeleteOrderError('')
     try {
-      const qs = new URLSearchParams()
-      if (deleteOrderTarget.ref) qs.set('ref', deleteOrderTarget.ref)
-      qs.set('supplier', deleteOrderTarget.supplierName)
-      const res = await fetch(`/api/admin/suppliers/orders?${qs.toString()}`, { method: 'DELETE' })
+      const res = await fetch('/api/admin/suppliers/orders', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: deleteOrderTarget.ids, ref: deleteOrderTarget.ref }),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         setDeleteOrderError(data.error || 'Failed to delete supplier order')
@@ -929,12 +930,9 @@ export default function SuppliersNetworkPage() {
                               </svg>
                               Download Order
                             </button>
-                            {/* Only discrete supplier orders can be deleted. Legacy lines with no ref
-                                sit in the default group for that supplier alongside plain backorders. */}
-                            {ref && (
                             <button
                               type="button"
-                              onClick={() => { setDeleteOrderError(''); setDeleteOrderTarget({ ref, supplierName, label, lines: items.length }) }}
+                              onClick={() => { setDeleteOrderError(''); setDeleteOrderTarget({ ref, supplierName, label, ids: items.map((b) => b.id) }) }}
                               className="flex items-center gap-1.5 border border-red-200 text-red-600 text-xs font-medium px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
                               title="Delete this supplier order"
                             >
@@ -943,7 +941,6 @@ export default function SuppliersNetworkPage() {
                               </svg>
                               Delete
                             </button>
-                            )}
                           </div>
                         </div>
                         {/* Collapsible table */}
@@ -998,9 +995,10 @@ export default function SuppliersNetworkPage() {
 
             <div className="p-6 space-y-4">
               <p className="text-sm text-gray-600">
-                This removes all <span className="font-semibold text-gray-900">{deleteOrderTarget.lines}</span> line
-                {deleteOrderTarget.lines !== 1 ? 's' : ''} on this supplier order. The quote they came from is unlocked
-                so it can be sent to a supplier order again. Stock and customer documents are not affected.
+                This removes all <span className="font-semibold text-gray-900">{deleteOrderTarget.ids.length}</span> line
+                {deleteOrderTarget.ids.length !== 1 ? 's' : ''} on this supplier order. Any quote they came from is
+                unlocked so it can be sent to a supplier order again. Stock, pre-orders and customer documents are
+                not affected.
               </p>
               <p className="text-xs text-gray-400">This cannot be undone.</p>
 

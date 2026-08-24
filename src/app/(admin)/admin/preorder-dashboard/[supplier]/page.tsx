@@ -996,6 +996,10 @@ export default function SupplierPreOrderPage() {
     setSendingToSO(true)
     setSoResult(null)
     try {
+      // Every send raises its own discrete supplier order, so it groups separately on
+      // /admin/suppliers and can be deleted on its own.
+      const soRef = `so_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const soName = `${supplierName} – ${new Date().toLocaleDateString('en-ZA')}`
       const results = await Promise.all(targetItems.map(item => {
         const customerQty = item.customers.reduce((sum, c) => sum + c.qty, 0) + (item.extraQty || 0)
         const moq = item.minOrderQty ?? 0
@@ -1016,6 +1020,8 @@ export default function SupplierPreOrderPage() {
             qty: totalQty || 1,
             price: rawPrice,
             supplierName,
+            supplierOrderRef: soRef,
+            supplierOrderName: soName,
             notes: `${currency} ${rawPrice.toFixed(2)} – Pre-Order Dashboard`,
             source: 'preorder-dashboard',
           }),
