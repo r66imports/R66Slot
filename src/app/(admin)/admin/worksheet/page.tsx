@@ -2958,6 +2958,8 @@ function ProductInfoModal({
   const [newPurchaseInput, setNewPurchaseInput] = useState('')
   const [showManageBrands, setShowManageBrands] = useState(false)
   const [showManageCategories, setShowManageCategories] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [lastClickedIdx, setLastClickedIdx] = useState<number | null>(null)
 
   useEffect(() => {
     fetch('/api/admin/product-options').then(r => r.json()).then((o: any) => {
@@ -3028,6 +3030,54 @@ function ProductInfoModal({
 
   function updateRow(idx: number, patch: Partial<ProdInfoRow>) {
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
+  }
+
+  // ── Batch edit: tick rows to apply Brand / Item Category to all of them ──
+  function toggleSelect(idx: number, shiftKey: boolean) {
+    const id = rows[idx]?.wsId
+    if (!id) return
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      const turnOn = !prev.has(id)
+      if (shiftKey && lastClickedIdx !== null) {
+        const [from, to] = lastClickedIdx < idx ? [lastClickedIdx, idx] : [idx, lastClickedIdx]
+        for (let i = from; i <= to; i++) {
+          const rid = rows[i]?.wsId
+          if (!rid) continue
+          if (turnOn) next.add(rid); else next.delete(rid)
+        }
+      } else {
+        if (turnOn) next.add(id); else next.delete(id)
+      }
+      return next
+    })
+    setLastClickedIdx(idx)
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds(prev => prev.size === rows.length ? new Set() : new Set(rows.map(r => r.wsId)))
+    setLastClickedIdx(null)
+  }
+
+  // Batch-set the brand on every ticked row, auto-filling Sage accounts the same
+  // way a single-row brand pick does.
+  function batchSetBrand(brand: string) {
+    const map = opts.brandAccountMap
+    setRows(prev => prev.map(r => {
+      if (!selectedIds.has(r.wsId)) return r
+      if (!brand) return { ...r, categoryBrands: [], salesAccount: [], purchaseAccount: [] }
+      const entry = map[brand]
+      return {
+        ...r,
+        categoryBrands: [brand],
+        salesAccount: entry?.salesAccount?.length > 0 ? entry.salesAccount : [brand],
+        purchaseAccount: entry?.purchaseAccount?.length > 0 ? entry.purchaseAccount : [brand],
+      }
+    }))
+  }
+
+  function batchSetItemCategory(cat: string) {
+    setRows(prev => prev.map(r => selectedIds.has(r.wsId) ? { ...r, itemCategories: cat ? [cat] : [] } : r))
   }
 
   function toggleBrand(idx: number, brand: string) {
@@ -3455,10 +3505,49 @@ function ProductInfoModal({
           </div>
         )}
 
+        {/* Batch edit bar — appears as soon as a row is ticked */}
+        {selectedIds.size > 0 && (
+          <div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-purple-700 whitespace-nowrap">
+              {selectedIds.size} selected — apply to all:
+            </span>
+            <select
+              value=""
+              onChange={e => { const v = e.target.value; if (v) batchSetBrand(v === '__clear__' ? '' : v) }}
+              className="px-2 py-1.5 border border-purple-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
+            >
+              <option value="">Set Category (Brand)…</option>
+              {localBrands.map(b => <option key={b} value={b}>{b}</option>)}
+              <option value="__clear__">— Clear —</option>
+            </select>
+            <select
+              value=""
+              onChange={e => { const v = e.target.value; if (v) batchSetItemCategory(v === '__clear__' ? '' : v) }}
+              className="px-2 py-1.5 border border-purple-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
+            >
+              <option value="">Set Item Category (Unit)…</option>
+              {opts.categories.map(c => <option key={c} value={c}>{c}</option>)}
+              <option value="__clear__">— Clear —</option>
+            </select>
+            <button type="button" onClick={() => { setSelectedIds(new Set()); setLastClickedIdx(null) }}
+              className="ml-auto text-xs text-purple-600 hover:text-purple-800 underline">Clear selection</button>
+          </div>
+        )}
+
         <div className="overflow-auto flex-1 px-6 py-4">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left border-b border-gray-100">
+                <th className="pb-2 pr-3 w-8">
+                  <input
+                    type="checkbox"
+                    checked={rows.length > 0 && selectedIds.size === rows.length}
+                    ref={el => { if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < rows.length }}
+                    onChange={toggleSelectAll}
+                    title="Select all"
+                    className="rounded cursor-pointer accent-purple-600"
+                  />
+                </th>
                 <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">SKU</th>
                 <th className="pb-2 pr-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
                 <th className="pb-2 pr-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
@@ -3483,7 +3572,16 @@ function ProductInfoModal({
                 const brand = row.categoryBrands[0]
                 const brandMap = brand ? opts.brandAccountMap[brand] : null
                 return (
-                  <tr key={row.wsId} className="border-b border-gray-50">
+                  <tr key={row.wsId} className={`border-b border-gray-50 ${selectedIds.has(row.wsId) ? 'bg-purple-50/70' : ''}`}>
+                    <td className="py-2 pr-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(row.wsId)}
+                        onChange={e => toggleSelect(idx, (e.nativeEvent as MouseEvent).shiftKey === true)}
+                        title="Tick to batch edit (shift-click for a range)"
+                        className="rounded cursor-pointer accent-purple-600"
+                      />
+                    </td>
                     <td className="py-2 pr-4">
                       <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{row.sku}</span>
                       {!row.prodId && <span className="block text-[10px] text-teal-500 mt-0.5">· new</span>}
