@@ -46,6 +46,8 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Supplier Network', name: 'Stock Sheets', href: '/admin/supplier-stock-sheets' },
   // Blog
   { group: 'Blog', name: 'Blog', href: '/admin/blog' },
+  // Settings
+  { group: 'Settings', name: 'Email Settings', href: '/admin/settings/email' },
 ]
 
 /** Default permissions granted to new staff users */

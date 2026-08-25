@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
+import { loadMailConfig, sendMail } from '@/lib/mailer'
 
 export async function POST(request: Request) {
   try {
@@ -9,43 +9,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Build transporter from env vars (user configures their SMTP in .env)
-    const smtpHost = process.env.SMTP_HOST
-    const smtpPort = parseInt(process.env.SMTP_PORT || '587')
-    // SMTP_FROM carries the login on deployments that never set SMTP_USER — insisting on
-    // SMTP_USER alone left a perfectly good mailer reported as "not configured".
-    const smtpUser = process.env.SMTP_USER || process.env.SMTP_FROM
-    const smtpPass = process.env.SMTP_PASS
-    const smtpFrom = process.env.SMTP_FROM || smtpUser || 'noreply@r66slot.co.za'
-
-    if (!smtpHost || !smtpUser || !smtpPass) {
-      // Return a mailto fallback if SMTP not configured
+    const cfg = await loadMailConfig()
+    if (!cfg.ready) {
+      // Return a mailto fallback if no mailer is configured
       const mailtoLink = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent('Please find your document attached.')}`
       return NextResponse.json({
         success: false,
         mailto: mailtoLink,
-        message: 'SMTP not configured. Use mailto link to send manually.',
+        message: 'Email is not configured. Use the mailto link, or set it up under Settings → Email.',
       })
     }
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpPort === 465,
-      auth: { user: smtpUser, pass: smtpPass },
-      // A mail server that never answers must not hold the request open until the proxy
-      // times out and replaces our response with its own error page.
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000,
-    })
-
-    await transporter.sendMail({
-      from: `"R66SLOT Admin" <${smtpFrom}>`,
-      to,
-      subject,
-      html,
-    })
+    const sent = await sendMail({ to, subject, html, fromName: 'R66SLOT Admin' })
+    if (!sent.ok) {
+      return NextResponse.json({ success: false, error: sent.error }, { status: 503 })
+    }
 
     return NextResponse.json({ success: true, message: `${documentType} sent to ${to}` })
   } catch (error: any) {
