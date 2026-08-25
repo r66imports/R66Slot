@@ -3068,27 +3068,6 @@ function ProductInfoModal({
     setLastClickedIdx(null)
   }
 
-  // Batch-set the brand on every ticked row, auto-filling Sage accounts the same
-  // way a single-row brand pick does.
-  function batchSetBrand(brand: string) {
-    const map = opts.brandAccountMap
-    setRows(prev => prev.map(r => {
-      if (!selectedIds.has(r.wsId)) return r
-      if (!brand) return { ...r, categoryBrands: [], salesAccount: [], purchaseAccount: [] }
-      const entry = map[brand]
-      return {
-        ...r,
-        categoryBrands: [brand],
-        salesAccount: entry?.salesAccount?.length > 0 ? entry.salesAccount : [brand],
-        purchaseAccount: entry?.purchaseAccount?.length > 0 ? entry.purchaseAccount : [brand],
-      }
-    }))
-  }
-
-  function batchSetItemCategory(cat: string) {
-    setRows(prev => prev.map(r => selectedIds.has(r.wsId) ? { ...r, itemCategories: cat ? [cat] : [] } : r))
-  }
-
   function toggleBrand(idx: number, brand: string) {
     const current = rows[idx]?.categoryBrands || []
     const next = current.includes(brand) ? current.filter(v => v !== brand) : [...current, brand]
@@ -3516,29 +3495,11 @@ function ProductInfoModal({
 
         {/* Batch edit bar — appears as soon as a row is ticked */}
         {selectedIds.size > 0 && (
-          <div className="px-6 py-3 bg-purple-50 border-b border-purple-100 flex flex-wrap items-center gap-2">
+          <div className="px-6 py-2.5 bg-purple-50 border-b border-purple-100 flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-purple-700 whitespace-nowrap">
-              {selectedIds.size} selected — apply to all:
+              {selectedIds.size} selected
             </span>
-            <select
-              value=""
-              onChange={e => { const v = e.target.value; if (v) batchSetBrand(v === '__clear__' ? '' : v) }}
-              className="px-2 py-1.5 border border-purple-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
-            >
-              <option value="">Set Category (Brand)…</option>
-              {localBrands.map(b => <option key={b} value={b}>{b}</option>)}
-              <option value="__clear__">— Clear —</option>
-            </select>
-            <select
-              value=""
-              onChange={e => { const v = e.target.value; if (v) batchSetItemCategory(v === '__clear__' ? '' : v) }}
-              className="px-2 py-1.5 border border-purple-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-purple-400 cursor-pointer"
-            >
-              <option value="">Set Item Category (Unit)…</option>
-              {opts.categories.map(c => <option key={c} value={c}>{c}</option>)}
-              <option value="__clear__">— Clear —</option>
-            </select>
-            <span className="text-[11px] text-purple-400 italic">or change any ticked row&rsquo;s dropdown — it applies to all ticked rows</span>
+            <span className="text-[11px] text-purple-400 italic">— change any ticked row&rsquo;s dropdown and it applies to all ticked rows</span>
             <button type="button" onClick={() => { setSelectedIds(new Set()); setLastClickedIdx(null) }}
               className="ml-auto text-xs text-purple-600 hover:text-purple-800 underline">Clear selection</button>
           </div>
