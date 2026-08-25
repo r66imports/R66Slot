@@ -3011,7 +3011,9 @@ function ProductInfoModal({
     const entry = map[brand]
     const salesAccount = entry?.salesAccount?.length > 0 ? entry.salesAccount : [brand]
     const purchaseAccount = entry?.purchaseAccount?.length > 0 ? entry.purchaseAccount : [brand]
-    setRows(prev => prev.map((r, i) => i === idx ? {
+    const id = rows[idx]?.wsId
+    const batch = !!id && selectedIds.has(id) && selectedIds.size > 1
+    setRows(prev => prev.map((r, i) => (batch ? selectedIds.has(r.wsId) : i === idx) ? {
       ...r,
       categoryBrands: brands,
       salesAccount,
@@ -3028,7 +3030,14 @@ function ProductInfoModal({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Editing a cell on a ticked row applies the change to every ticked row.
+  // Untouched (unticked) rows always edit on their own.
   function updateRow(idx: number, patch: Partial<ProdInfoRow>) {
+    const id = rows[idx]?.wsId
+    if (id && selectedIds.has(id) && selectedIds.size > 1) {
+      setRows(prev => prev.map(r => selectedIds.has(r.wsId) ? { ...r, ...patch } : r))
+      return
+    }
     setRows(prev => prev.map((r, i) => i === idx ? { ...r, ...patch } : r))
   }
 
@@ -3529,6 +3538,7 @@ function ProductInfoModal({
               {opts.categories.map(c => <option key={c} value={c}>{c}</option>)}
               <option value="__clear__">— Clear —</option>
             </select>
+            <span className="text-[11px] text-purple-400 italic">or change any ticked row&rsquo;s dropdown — it applies to all ticked rows</span>
             <button type="button" onClick={() => { setSelectedIds(new Set()); setLastClickedIdx(null) }}
               className="ml-auto text-xs text-purple-600 hover:text-purple-800 underline">Clear selection</button>
           </div>
