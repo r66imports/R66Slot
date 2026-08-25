@@ -193,12 +193,15 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   // used to deduct nothing at all, so the sale never came off inventory. The server enforces
   // this too; checking here names the offending SKU instead of showing a bare error. A failed
   // lookup blocks rather than waving the invoice through — guessing costs stock accuracy.
+  // products.quantity is ALREADY net of every Sales Order reservation — an SO deducts stock the
+  // moment it is created (Rule 3), so the shelf figure IS the available figure. Subtracting
+  // /api/admin/inventory-reserved on top counted the same SO a second time, which zeroed out
+  // every SKU covered by a supplier SO and blocked its pre-order customers from being invoiced.
+  // This now matches the server guard (findStockShortfalls) and the Inventory page, which shows
+  // Total Inventory as quantity + reserved rather than quantity − reserved.
   const stockBlockReasons=async(items:any[]):Promise<string[]>=>{
     try{
-      const [reservedMap,products]:[Record<string,number>,any[]]=await Promise.all([
-        fetch('/api/admin/inventory-reserved').then(r=>r.json()),
-        fetch('/api/admin/products?fields=sku,quantity').then(r=>r.json()),
-      ])
+      const products:any[]=await fetch('/api/admin/products?fields=sku,quantity').then(r=>r.json())
       const stockMap:Record<string,number>={}
       for(const p of products){if(p.sku) stockMap[p.sku.toString().toUpperCase()]=p.quantity??0}
       const reasons:string[]=[]
@@ -206,9 +209,9 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         const rawSku=item.sku?item.sku.toString():(()=>{const em=(item.description||'').indexOf('–');return em>-1?item.description.slice(0,em).trim():''})()
         const sku=rawSku.toUpperCase()
         if(!sku||!(sku in stockMap)) continue
-        const totalStock=stockMap[sku]||0; const requested=Number(item.qty)||0
-        if(totalStock<=0){reasons.push(`• ${sku}: not in stock — Worksheet Qty not updated`)}
-        else{const available=Math.max(0,totalStock-(reservedMap[sku]||0));if(requested>available) reasons.push(`• ${sku}: Qty not available in Inventory (${available} available, ${requested} requested)`)}
+        const available=stockMap[sku]||0; const requested=Number(item.qty)||0
+        if(available<=0){reasons.push(`• ${sku}: not in stock — Worksheet Qty not updated`)}
+        else if(requested>available) reasons.push(`• ${sku}: Qty not available in Inventory (${available} available, ${requested} requested)`)
       }
       return reasons
     }catch{
