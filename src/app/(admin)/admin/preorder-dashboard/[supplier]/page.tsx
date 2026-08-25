@@ -111,18 +111,28 @@ function ContactSearch({ contacts, onSelect, onAddManual }: {
 }
 
 async function generatePoster(form: FormState, itemId: string): Promise<void> {
-  const res = await fetch('/api/admin/preorder-poster', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title: form.description, sku: form.sku, imageUrl: form.imageUrl, brand: form.brand, eta: form.eta,
-      estimatedRetailPrice: form.estimatedRetailPrice, retailPrice: form.retailPrice, cutoffDate: form.cutoffDate, notes: form.notes,
-    }),
-  })
-  if (!res.ok) return
-  const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href=url; a.download=`preorder-${form.sku||itemId}.png`; a.click()
-  setTimeout(()=>URL.revokeObjectURL(url),5000)
+  try {
+    const res = await fetch('/api/admin/preorder-poster', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: form.description, sku: form.sku, imageUrl: form.imageUrl, brand: form.brand, eta: form.eta,
+        estimatedRetailPrice: form.estimatedRetailPrice, retailPrice: form.retailPrice, cutoffDate: form.cutoffDate, notes: form.notes,
+      }),
+    })
+    if (!res.ok) {
+      const msg = await res.text().catch(()=>'')
+      alert(`Poster could not be generated (${res.status}). ${msg.slice(0,200)}`)
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href=url; a.download=`preorder-${form.sku||itemId}.png`
+    document.body.appendChild(a); a.click(); a.remove()
+    setTimeout(()=>URL.revokeObjectURL(url),5000)
+  } catch (err:any) {
+    alert(`Poster could not be generated: ${err?.message||'network error'}`)
+  }
 }
 
 function SendToDropdown({ customer, form, unitPrice, onLinked }: {
