@@ -899,7 +899,11 @@ export default function SupplierPreOrderPage() {
         i.description.toLowerCase().includes(search.toLowerCase()) ||
         i.sku.toLowerCase().includes(search.toLowerCase()) ||
         (i.brand || '').toLowerCase().includes(search.toLowerCase()) ||
-        i.customers.some(c => c.linkedDocNumber?.toLowerCase().includes(search.toLowerCase()))
+        i.customers.some(c =>
+          c.linkedDocNumber?.toLowerCase().includes(search.toLowerCase()) ||
+          c.name.toLowerCase().includes(search.toLowerCase()) ||
+          (c.email || '').toLowerCase().includes(search.toLowerCase())
+        )
       )
     : newFiltered
 
@@ -1046,7 +1050,11 @@ export default function SupplierPreOrderPage() {
     ? sorted.filter(i => !viewAllSearch ||
         i.description.toLowerCase().includes(viewAllSearch.toLowerCase()) ||
         i.sku.toLowerCase().includes(viewAllSearch.toLowerCase()) ||
-        i.customers.some(c => c.linkedDocNumber?.toLowerCase().includes(viewAllSearch.toLowerCase())))
+        i.customers.some(c =>
+          c.linkedDocNumber?.toLowerCase().includes(viewAllSearch.toLowerCase()) ||
+          c.name.toLowerCase().includes(viewAllSearch.toLowerCase()) ||
+          (c.email || '').toLowerCase().includes(viewAllSearch.toLowerCase())
+        ))
     : []
 
   return (
@@ -1104,7 +1112,7 @@ export default function SupplierPreOrderPage() {
               type="text"
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Search SKU, description, brand…"
+              placeholder="Search SKU, description, brand, client…"
               className="w-full pl-7 pr-7 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
             />
             {search && (
@@ -1176,7 +1184,7 @@ export default function SupplierPreOrderPage() {
               <button onClick={() => setShowViewAll(false)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
             </div>
             <div className="px-4 pt-3 pb-2">
-              <input type="text" value={viewAllSearch} onChange={e => setViewAllSearch(e.target.value)} placeholder="Search SKU or description…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" autoFocus/>
+              <input type="text" value={viewAllSearch} onChange={e => setViewAllSearch(e.target.value)} placeholder="Search SKU, description or client…" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" autoFocus/>
             </div>
             <div className="overflow-y-auto flex-1 px-4 pb-4">
               <table className="w-full text-sm">
