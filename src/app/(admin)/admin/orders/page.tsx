@@ -9,6 +9,7 @@ import {
   settledAmount, balanceDue as calcBalanceDue, overpaymentFor,
   isFullySettled, depositAsSettled, paymentWarnings,
 } from '@/lib/payment-math'
+import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
 
 // ─── Service types ────────────────────────────────────────────────────────────
 const SERVICE_TYPES = [
@@ -3286,8 +3287,13 @@ function OrdersPageInner() {
       if (quotePaid > 0.005 || quoteCredit > 0.005) {
         patchBody.amountPaid = ((target as any).amountPaid || 0) + quotePaid
         patchBody.creditApplied = ((target as any).creditApplied || 0) + quoteCredit
-        patchBody.payments = [...((target as any).payments || []), ...((quote as any).payments || [])]
+        // Stamped with the Quote they came off, or the invoice shows unexplained deposits
+        // once several Quotes have been consolidated onto it.
+        patchBody.payments = [...((target as any).payments || []), ...tagPaymentsFromQuote((quote as any).payments, quote.docNumber)]
       }
+      // Rule 28 — the audit trail must name EVERY source Quote, not just the one that
+      // created the invoice, so "Quote Ref:" grows with each merge.
+      patchBody.sourceQuoteNumber = mergeQuoteRefs((target as any).sourceQuoteNumber, quote.docNumber)
       const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -3364,7 +3370,7 @@ function OrdersPageInner() {
           creditApplied: (doc as any).creditApplied || 0,
           overpaymentCredit: (doc as any).overpaymentCredit || 0,
           showCreditOnInvoice: (doc as any).showCreditOnInvoice || false,
-          payments: (doc as any).payments || [],
+          payments: tagPaymentsFromQuote((doc as any).payments, doc.docNumber),
           // A deposit-mode quote's depositPaid is the deposit DUE, not money received, and the
           // new document is never in deposit mode — copying it would make it read as settled.
           depositPaid: (doc as any).depositMode ? 0 : ((doc as any).depositPaid || 0),

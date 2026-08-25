@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
+import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
 
 interface Contact { id: string; firstName: string; lastName: string; email?: string; phone?: string }
 interface SupplierContact { id: string; name: string; preferredCurrency?: string }
@@ -233,16 +234,16 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       const merged=[...(invoiceDoc.lineItems||[]),...(quoteDoc.lineItems||[])]
       const depositNote=depositNoteFor(quoteDoc)
       const mergedNotes=[invoiceDoc.notes,depositNote].filter(Boolean).join('\n')
-      const mergedPayments=[
-        ...(invoiceDoc.payments||[]),
-        ...(quoteDoc.payments||[]).map((p:any)=>({...p,notes:[p.notes,`From Quote ${quoteDoc.docNumber}`].filter(Boolean).join(' — ')})),
-      ]
+      const mergedPayments=[...(invoiceDoc.payments||[]),...tagPaymentsFromQuote(quoteDoc.payments,quoteDoc.docNumber)]
       const res=await fetch(`/api/admin/orders/documents/${invoiceDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({
         lineItems:merged,
         notes:mergedNotes,
         amountPaid:Number(invoiceDoc.amountPaid||0)+Number(quoteDoc.amountPaid||0),
         creditApplied:Number(invoiceDoc.creditApplied||0)+Number(quoteDoc.creditApplied||0),
         payments:mergedPayments,
+        // Rule 28 — every Quote merged in stays named in "Quote Ref:", not just the one
+        // that created the invoice.
+        sourceQuoteNumber:mergeQuoteRefs(invoiceDoc.sourceQuoteNumber,quoteDoc.docNumber),
       })})
       if(res.ok){
         await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
@@ -285,7 +286,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         clientName:quoteDoc.clientName,clientEmail:quoteDoc.clientEmail||'',clientPhone:quoteDoc.clientPhone||'',clientAddress:quoteDoc.clientAddress||'',
         lineItems:invoiceItems,notes:[quoteDoc.notes,depositNote].filter(Boolean).join('\n'),terms:quoteDoc.terms||'',status:'draft',
         discountPct:quoteDoc.discountPct||0,sourceQuoteNumber:quoteDoc.docNumber,
-        amountPaid:quoteDoc.amountPaid||0,creditApplied:quoteDoc.creditApplied||0,payments:quoteDoc.payments||[],
+        amountPaid:quoteDoc.amountPaid||0,creditApplied:quoteDoc.creditApplied||0,payments:tagPaymentsFromQuote(quoteDoc.payments,quoteDoc.docNumber),
       })})
       if(newInvRes.ok){
         const newInv=await newInvRes.json()
