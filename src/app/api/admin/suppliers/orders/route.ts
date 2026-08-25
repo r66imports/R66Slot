@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobRemoveArrayItem, blobReplaceArrayItem } from '@/lib/blob-storage'
 import type { Backorder } from '@/types/backorder'
+import type { SupplierOrderLine } from '@/types/supplier-order'
 
 const BACKORDERS_KEY = 'data/backorders.json'
+const SUPPLIER_ORDERS_KEY = 'data/supplier-orders.json'
 const DOCS_KEY = 'data/order-documents.json'
 
 // Only the supplier-order stamp fields matter here — kept local so this route does not
@@ -47,13 +49,26 @@ export async function DELETE(request: Request) {
       return (b.supplierName || 'Unassigned') === supplier
     }
 
+    // Supplier orders live in their own store; legacy rows still sit in backorders, so both
+    // are swept. A group can straddle the two while old rows are being cleared out.
+    const orderLines = await blobRead<SupplierOrderLine[]>(SUPPLIER_ORDERS_KEY, [])
+    const solTargets = orderLines.filter((l) => {
+      if (idSet.size > 0) return idSet.has(l.id)
+      if (l.status !== 'active') return false
+      if (ref) return l.supplierOrderRef === ref
+      return l.supplierName === supplier
+    })
+
     const backorders = await blobRead<Backorder[]>(BACKORDERS_KEY, [])
     const targets = backorders.filter(inGroup)
 
-    if (targets.length === 0) {
+    if (targets.length === 0 && solTargets.length === 0) {
       return NextResponse.json({ error: 'Supplier order not found' }, { status: 404 })
     }
 
+    for (const l of solTargets) {
+      await blobRemoveArrayItem(SUPPLIER_ORDERS_KEY, l.id)
+    }
     for (const b of targets) {
       await blobRemoveArrayItem(BACKORDERS_KEY, b.id)
     }
@@ -76,7 +91,7 @@ export async function DELETE(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true, deleted: targets.length, unstamped })
+    return NextResponse.json({ success: true, deleted: targets.length + solTargets.length, unstamped })
   } catch (error) {
     console.error('Error deleting supplier order:', error)
     return NextResponse.json({ error: 'Failed to delete supplier order' }, { status: 500 })

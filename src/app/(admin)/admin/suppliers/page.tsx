@@ -60,7 +60,48 @@ interface Backorder {
   status: 'active' | 'complete' | 'cancelled'
   orderStatus?: string
   notes?: string
+  quoteNumber?: string
+  source?: string
   createdAt: string
+  updatedAt?: string
+}
+
+// A line on a supplier order — its own store, no longer a backorder row.
+interface SupplierOrderLine {
+  id: string
+  supplierId?: string
+  supplierName: string
+  supplierOrderRef: string
+  supplierOrderName: string
+  sku: string
+  description: string
+  brand?: string
+  qty: number
+  price: number
+  clientName?: string
+  clientEmail?: string
+  clientPhone?: string
+  quoteNumber?: string
+  notes?: string
+  source?: string
+  status: 'active' | 'complete' | 'cancelled'
+  createdAt: string
+  updatedAt: string
+}
+
+// Blank row used to render a supplier order line through the shared table shape.
+const EMPTY_ROW: Backorder = {
+  id: '',
+  clientName: '',
+  clientEmail: '',
+  clientPhone: '',
+  sku: '',
+  description: '',
+  brand: '',
+  qty: 0,
+  price: 0,
+  status: 'active',
+  createdAt: '',
 }
 
 const EMPTY_SUPPLIER: Omit<Supplier, 'id' | 'isActive' | 'createdAt'> = {
@@ -117,6 +158,9 @@ export default function SuppliersNetworkPage() {
 
   // Backorders
   const [backorders, setBackorders] = useState<Backorder[]>([])
+  // Supplier order lines live in their own store now. Legacy backorder rows are still merged in
+  // below so nothing already on this page disappears before they are cleared out.
+  const [supplierOrderLines, setSupplierOrderLines] = useState<SupplierOrderLine[]>([])
   const [backordersLoading, setBackordersLoading] = useState(false)
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all')
   const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false)
@@ -168,10 +212,14 @@ export default function SuppliersNetworkPage() {
   const loadBackorders = useCallback(async () => {
     setBackordersLoading(true)
     try {
-      const res = await fetch('/api/admin/backorders?all=true')
-      if (res.ok) setBackorders(await res.json())
+      const [boRes, solRes] = await Promise.all([
+        fetch('/api/admin/backorders?all=true'),
+        fetch('/api/admin/supplier-orders'),
+      ])
+      if (boRes.ok) setBackorders(await boRes.json())
+      if (solRes.ok) setSupplierOrderLines(await solRes.json())
     } catch (e) {
-      console.error('Failed to load backorders', e)
+      console.error('Failed to load supplier orders', e)
     } finally {
       setBackordersLoading(false)
     }
@@ -266,16 +314,41 @@ export default function SuppliersNetworkPage() {
 
   // ─── Order Sheet Helpers ───────────────────────────────────────────────
 
-  // All unique supplier names from active backorders
+  // Supplier order lines rendered through the same row shape as legacy backorder rows.
+  const orderLines: Backorder[] = supplierOrderLines.map((l) => ({
+    ...EMPTY_ROW,
+    id: l.id,
+    clientName: l.clientName || '',
+    clientEmail: l.clientEmail || '',
+    clientPhone: l.clientPhone || '',
+    sku: l.sku,
+    description: l.description,
+    brand: l.brand || '',
+    qty: l.qty,
+    price: l.price,
+    supplierId: l.supplierId,
+    supplierName: l.supplierName,
+    supplierOrderRef: l.supplierOrderRef,
+    supplierOrderName: l.supplierOrderName,
+    quoteNumber: l.quoteNumber,
+    notes: l.notes || '',
+    source: l.source,
+    status: l.status,
+    createdAt: l.createdAt,
+    updatedAt: l.updatedAt,
+  }))
+  const allLines: Backorder[] = [...orderLines, ...backorders]
+
+  // All unique supplier names from active lines
   const backorderSuppliers = Array.from(
     new Set(
-      backorders
+      allLines
         .filter((b) => b.status === 'active' && b.supplierName)
         .map((b) => b.supplierName as string)
     )
   ).sort()
 
-  const filteredBackorders = backorders.filter((b) => {
+  const filteredBackorders = allLines.filter((b) => {
     if (b.status !== 'active') return false
     if (selectedSupplierFilter === 'all') return true
     if (selectedSupplierFilter === 'unassigned') return !b.supplierName
@@ -851,15 +924,15 @@ export default function SuppliersNetworkPage() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
-                  Loading backorders...
+                  Loading supplier orders...
                 </div>
               ) : filteredBackorders.length === 0 ? (
                 <div className="text-center py-16 text-gray-400">
                   <svg className="w-12 h-12 mx-auto mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                   </svg>
-                  <p className="text-sm font-medium">No active backorders</p>
-                  <p className="text-xs mt-1">Active backorders from /admin/backorders will appear here</p>
+                  <p className="text-sm font-medium">No supplier orders</p>
+                  <p className="text-xs mt-1">Send a Quote to a supplier order and it will appear here</p>
                 </div>
               ) : (
                 <div className="space-y-6">

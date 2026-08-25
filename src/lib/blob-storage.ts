@@ -95,6 +95,20 @@ export async function blobAppendArrayItem(key: string, item: unknown): Promise<v
   )
 }
 
+// Append several items in one write. Callers that would otherwise fire N parallel
+// single-item appends (e.g. sending a whole quote to a supplier order) use this instead.
+export async function blobAppendArrayItems(key: string, items: unknown[]): Promise<void> {
+  if (!Array.isArray(items) || items.length === 0) return
+  await db.query(
+    `INSERT INTO json_store (key, value, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (key) DO UPDATE
+       SET value = COALESCE(json_store.value, '[]'::jsonb) || $2::jsonb,
+           updated_at = NOW()`,
+    [key, JSON.stringify(items)]
+  )
+}
+
 export async function blobReplaceArrayItem(key: string, id: string, item: unknown): Promise<void> {
   await db.query(
     `UPDATE json_store

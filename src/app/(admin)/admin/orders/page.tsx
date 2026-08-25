@@ -1451,20 +1451,31 @@ function CreateDocumentModal({
   // Load suppliers + the currently open supplier orders the first time the tick box is used
   useEffect(() => {
     if (!isQuote || !addToSupplierOrder || soSuppliers.length > 0) return
-    fetch('/api/admin/supplier-network')
-      .then((r) => r.ok ? r.json() : [])
-      .then((list: any[]) => setSoSuppliers(
-        list.filter((s) => s.isActive !== false).map((s) => ({ id: s.id, name: s.name }))
-      ))
+    // Suppliers live in two stores: the Supplier Network cards and the Supplier Contacts book.
+    // Contacts is the populated master list, so both are merged and de-duped by name.
+    Promise.all([
+      fetch('/api/admin/supplier-contacts').then((r) => r.ok ? r.json() : []).catch(() => []),
+      fetch('/api/admin/supplier-network').then((r) => r.ok ? r.json() : []).catch(() => []),
+    ])
+      .then(([contacts, network]: [any[], any[]]) => {
+        const byName = new Map<string, { id: string; name: string }>()
+        for (const s of [...(contacts || []), ...(network || [])]) {
+          const name = (s?.name || '').trim()
+          if (!name || s.isActive === false) continue
+          const key = name.toLowerCase()
+          if (!byName.has(key)) byName.set(key, { id: s.id, name })
+        }
+        setSoSuppliers(Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name)))
+      })
       .catch(() => {})
-    fetch('/api/admin/backorders?all=true')
+    fetch('/api/admin/supplier-orders')
       .then((r) => r.ok ? r.json() : [])
-      .then((bos: any[]) => {
+      .then((sol: any[]) => {
         const open = new Map<string, { ref: string; name: string; supplierName: string; lines: number }>()
-        bos.filter((b) => b.status === 'active' && b.supplierOrderRef && b.supplierName).forEach((b) => {
-          const existing = open.get(b.supplierOrderRef)
+        sol.filter((l) => l.status === 'active' && l.supplierOrderRef && l.supplierName).forEach((l) => {
+          const existing = open.get(l.supplierOrderRef)
           if (existing) existing.lines += 1
-          else open.set(b.supplierOrderRef, { ref: b.supplierOrderRef, name: b.supplierOrderName || b.supplierName, supplierName: b.supplierName, lines: 1 })
+          else open.set(l.supplierOrderRef, { ref: l.supplierOrderRef, name: l.supplierOrderName || l.supplierName, supplierName: l.supplierName, lines: 1 })
         })
         setSoOpenOrders(Array.from(open.values()))
       })
@@ -1535,30 +1546,32 @@ function CreateDocumentModal({
         // Push every quote line onto the chosen supplier order. Uses cost price where the line
         // carries one — supplier orders are purchasing documents, not retail.
         if (targetSO) {
-          const soResults = await Promise.allSettled(lineItems.map(li => {
-            const { sku } = splitSkuTitle(li.description || '')
-            return fetch('/api/admin/backorders', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                clientName: form.clientName,
-                clientEmail: form.clientEmail,
-                clientPhone: form.clientPhone,
-                sku: sku || '',
-                description: li.description,
-                qty: li.qty,
-                price: li._costPrice || li.unitPrice,
-                supplierId: soSupplierId,
-                supplierName: soSupplierName,
-                supplierOrderRef: targetSO.ref,
-                supplierOrderName: targetSO.name,
-                quoteNumber: form.docNumber,
-                source: 'quote-supplier-order',
+          // One call, one write — every line lands on the chosen supplier order together.
+          const soRes = await fetch('/api/admin/supplier-orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              supplierId: soSupplierId,
+              supplierName: soSupplierName,
+              supplierOrderRef: targetSO.ref,
+              supplierOrderName: targetSO.name,
+              clientName: form.clientName,
+              clientEmail: form.clientEmail,
+              clientPhone: form.clientPhone,
+              quoteNumber: form.docNumber,
+              source: 'quote-supplier-order',
+              lines: lineItems.map(li => {
+                const { sku } = splitSkuTitle(li.description || '')
+                return {
+                  sku: sku || '',
+                  description: li.description,
+                  qty: li.qty,
+                  price: li._costPrice || li.unitPrice,
+                }
               }),
-            })
-          }))
-          const failed = soResults.some(r => r.status === 'rejected' || !r.value.ok)
-          if (failed) {
+            }),
+          }).catch(() => null)
+          if (!soRes || !soRes.ok) {
             // Roll the marker back so the quote can be re-sent once the failure is resolved
             fetch(`/api/admin/orders/documents/${savedDoc.id}`, {
               method: 'PATCH',
