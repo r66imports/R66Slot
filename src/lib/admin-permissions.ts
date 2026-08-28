@@ -33,7 +33,9 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Business & Store', name: 'Suppliers', href: '/admin/supplier-contacts' },
   { group: 'Business & Store', name: 'Events', href: '/admin/events' },
   { group: 'Business & Store', name: 'Payments', href: '/admin/payments' },
+  { group: 'Business & Store', name: 'Customer Payments', href: '/admin/customer-payments' },
   { group: 'Business & Store', name: 'Payment Mapping', href: '/admin/payment-mapping' },
+  { group: 'Business & Store', name: 'Accounting', href: '/admin/accounting' },
   { group: 'Business & Store', name: 'Sage Accounting', href: '/admin/sage' },
   // Shipping
   { group: 'Shipping', name: 'Shipping Network', href: '/admin/shipping-network' },
@@ -47,7 +49,12 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   // Blog
   { group: 'Blog', name: 'Blog', href: '/admin/blog' },
   // Settings
+  { group: 'Settings', name: 'Site Settings', href: '/admin/settings' },
   { group: 'Settings', name: 'Email Settings', href: '/admin/settings/email' },
+  { group: 'Settings', name: 'Site Rules', href: '/admin/settings/site-rules' },
+  { group: 'Settings', name: 'Stock Mapping', href: '/admin/settings/stock-mapping' },
+  { group: 'Settings', name: 'Pre-Orders Mapping', href: '/admin/settings/preorders-mapping' },
+  { group: 'Settings', name: 'Prompts', href: '/admin/settings/prompts' },
 ]
 
 /** Default permissions granted to new staff users */
@@ -55,3 +62,31 @@ export const DEFAULT_PERMISSIONS = ['/admin/inventory', '/admin/orders']
 
 /** Routes always accessible regardless of permissions */
 export const ALWAYS_ALLOWED = ['/admin', '/admin/account', '/admin/login']
+
+/**
+ * Reserved for the main Admin account. Nothing else may live here: staff must get
+ * identical functionality to Admin on every feature they have been granted, so
+ * permissions decide *whether* a feature is visible, never how much of it works.
+ * Managing other people's accounts is the one exception.
+ */
+export const ADMIN_ONLY = ['/admin/settings/users']
+
+/**
+ * Single source of truth for "may this role open this link?" — used by the nav
+ * filter and by the page guards so they can never drift apart.
+ *
+ * Query strings and hashes are stripped first. Nav entries like
+ * /admin/orders?tab=quotes must resolve against the /admin/orders permission;
+ * without this, staff granted Orders lose every Orders sub-item in the menu.
+ */
+export function canAccessPath(
+  role: string | null,
+  permissions: string[],
+  href: string
+): boolean {
+  const path = href.split('?')[0].split('#')[0]
+  if (role !== 'staff') return true
+  if (ADMIN_ONLY.some((a) => path === a || path.startsWith(a + '/'))) return false
+  if (ALWAYS_ALLOWED.includes(path)) return true
+  return permissions.includes(path) || permissions.some((p) => p !== '/admin' && path.startsWith(p + '/'))
+}

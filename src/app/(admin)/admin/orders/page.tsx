@@ -1445,6 +1445,9 @@ function CreateDocumentModal({
   const [soSupplierId, setSoSupplierId] = useState<string>('')
   const [soTargetRef, setSoTargetRef] = useState<string>('new')
   const [soNewName, setSoNewName] = useState<string>('')
+  const [soLoading, setSoLoading] = useState(false)
+  const [soLoadError, setSoLoadError] = useState('')
+  const [soReloadKey, setSoReloadKey] = useState(0)
   const soSupplierName = soSuppliers.find((s) => s.id === soSupplierId)?.name || ''
   const soExistingForSupplier = soOpenOrders.filter((o) => o.supplierName === soSupplierName)
 
@@ -1453,21 +1456,42 @@ function CreateDocumentModal({
     if (!isQuote || !addToSupplierOrder || soSuppliers.length > 0) return
     // Suppliers live in two stores: the Supplier Network cards and the Supplier Contacts book.
     // Contacts is the populated master list, so both are merged and de-duped by name.
-    Promise.all([
-      fetch('/api/admin/supplier-contacts').then((r) => r.ok ? r.json() : []).catch(() => []),
-      fetch('/api/admin/supplier-network').then((r) => r.ok ? r.json() : []).catch(() => []),
-    ])
-      .then(([contacts, network]: [any[], any[]]) => {
+    // Never swallow a failure here — an empty dropdown with no explanation reads as
+    // "I am not allowed to pick a supplier", which is not what an auth or network
+    // failure actually means.
+    const loadList = async (url: string): Promise<any[]> => {
+      const r = await fetch(url, { credentials: 'same-origin' })
+      if (r.status === 401 || r.status === 403) throw new Error('Your session no longer has access to the supplier list — sign out and back in.')
+      if (!r.ok) throw new Error(`${url} returned ${r.status}`)
+      const data = await r.json().catch(() => null)
+      if (!Array.isArray(data)) throw new Error(`${url} did not return a supplier list`)
+      return data
+    }
+    setSoLoading(true)
+    setSoLoadError('')
+    // allSettled, not all — Supplier Network is often empty or unreachable, and that
+    // must never take the populated Supplier Contacts list down with it.
+    Promise.allSettled([loadList('/api/admin/supplier-contacts'), loadList('/api/admin/supplier-network')])
+      .then((settled) => {
+        const rows = settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []))
         const byName = new Map<string, { id: string; name: string }>()
-        for (const s of [...(contacts || []), ...(network || [])]) {
+        for (const s of rows) {
           const name = (s?.name || '').trim()
           if (!name || s.isActive === false) continue
           const key = name.toLowerCase()
           if (!byName.has(key)) byName.set(key, { id: s.id, name })
         }
-        setSoSuppliers(Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name)))
+        const merged = Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name))
+        setSoSuppliers(merged)
+        if (merged.length > 0) return
+        // Nothing to pick from — say why rather than showing an empty dropdown.
+        const failure = settled.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined
+        setSoLoadError(
+          failure?.reason?.message ||
+            'No suppliers found. Add one under Suppliers or Supplier Network first.'
+        )
       })
-      .catch(() => {})
+      .finally(() => setSoLoading(false))
     fetch('/api/admin/supplier-orders')
       .then((r) => r.ok ? r.json() : [])
       .then((sol: any[]) => {
@@ -1481,7 +1505,7 @@ function CreateDocumentModal({
       })
       .catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addToSupplierOrder])
+  }, [addToSupplierOrder, soReloadKey])
 
   // Reset the target order and seed a default name whenever the supplier changes
   useEffect(() => {
@@ -1702,12 +1726,25 @@ function CreateDocumentModal({
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-200"
                       value={soSupplierId}
                       onChange={(e) => setSoSupplierId(e.target.value)}
+                      disabled={soLoading}
                     >
-                      <option value="">— Select supplier —</option>
+                      <option value="">{soLoading ? 'Loading suppliers…' : '— Select supplier —'}</option>
                       {soSuppliers.map((s) => (
                         <option key={s.id} value={s.id}>{s.name}</option>
                       ))}
                     </select>
+                    {soLoadError && (
+                      <div className="flex items-center gap-2 mt-1.5 text-xs text-red-600">
+                        <span>{soLoadError}</span>
+                        <button
+                          type="button"
+                          onClick={() => { setSoSuppliers([]); setSoReloadKey((k) => k + 1) }}
+                          className="underline font-semibold hover:text-red-800"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {soSupplierName && (

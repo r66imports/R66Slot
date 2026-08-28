@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils/cn'
 import { useState, useEffect } from 'react'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
 import { AdminAuthContext, type AdminAuthData } from '@/lib/admin-auth-context'
-import { ALWAYS_ALLOWED } from '@/lib/admin-permissions'
+import { ALWAYS_ALLOWED, canAccessPath } from '@/lib/admin-permissions'
 
 type DropItem = { name: string; href?: string; isModal?: boolean; adminOnly?: boolean }
 type NavGroup = { label: string; href?: string; items?: DropItem[]; badge?: number }
@@ -20,11 +20,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [isLoading, setIsLoading] = useState(!isLoginPage)
   const { role, permissions } = authData
 
-  const canAccess = (href: string) => {
-    if (role !== 'staff') return true
-    if (ALWAYS_ALLOWED.includes(href)) return true
-    return permissions.includes(href) || permissions.some((p) => p !== '/admin' && href.startsWith(p + '/'))
-  }
+  const canAccess = (href: string) => canAccessPath(role, permissions, href)
 
   useEffect(() => {
     if (isLoginPage) return
@@ -43,11 +39,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           const p: string[] = data.permissions ?? []
           setAuthData({ role: r, permissions: p, username: data.username ?? 'Admin' })
           setIsAuthenticated(true)
-          if (r === 'staff') {
-            const ok = ALWAYS_ALLOWED.includes(pathname) ||
-              p.includes(pathname) ||
-              p.some((x) => x !== '/admin' && pathname.startsWith(x + '/'))
-            if (!ok) router.push(p.find((x) => !ALWAYS_ALLOWED.includes(x)) ?? '/admin')
+          if (r === 'staff' && !canAccessPath(r, p, pathname)) {
+            router.push(p.find((x) => !ALWAYS_ALLOWED.includes(x)) ?? '/admin')
           }
         } else {
           router.push('/admin/login')

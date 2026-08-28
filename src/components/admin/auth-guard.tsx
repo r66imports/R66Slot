@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { AdminAuthContext, type AdminAuthData } from '@/lib/admin-auth-context'
-import { ALWAYS_ALLOWED } from '@/lib/admin-permissions'
+import { ALWAYS_ALLOWED, canAccessPath } from '@/lib/admin-permissions'
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -43,18 +43,10 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(true)
 
           // Redirect staff away from pages they can't access
-          if (role === 'staff') {
-            const allowed = permissions
-            const canAccess =
-              ALWAYS_ALLOWED.includes(pathname) ||
-              allowed.includes(pathname) ||
-              allowed.some((p) => p !== '/admin' && pathname.startsWith(p + '/'))
-
-            if (!canAccess) {
-              // Redirect to first permitted page
-              const firstPage = allowed.find((p) => !ALWAYS_ALLOWED.includes(p))
-              router.push(firstPage ?? '/admin')
-            }
+          if (role === 'staff' && !canAccessPath(role, permissions, pathname)) {
+            // Redirect to first permitted page
+            const firstPage = permissions.find((p) => !ALWAYS_ALLOWED.includes(p))
+            router.push(firstPage ?? '/admin')
           }
         } else {
           router.push('/admin/login')
