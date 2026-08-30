@@ -224,6 +224,13 @@ export default function EditProductPage({
   const [autosaveStatus, setAutosaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const isLoaded = useRef(false)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Stock and visibility are owned by Inventory, the Worksheet and invoicing — not by this
+  // form. A tab opened before a Worksheet import still holds the pre-import figures, and
+  // because autosave fires on ANY field change it stamped them back over real stock
+  // movements. The API COALESCEs nulls, so quantity and status are now sent ONLY when this
+  // form actually changed them. These hold what was loaded.
+  const loadedQuantity = useRef<string | null>(null)
+  const loadedStatus = useRef<string | null>(null)
   // Guards against two saves uploading the same pending image at once
   const uploadingRef = useRef(false)
 
@@ -334,6 +341,7 @@ export default function EditProductPage({
           setBarcode(found.barcode || '')
           setTrackQuantity(found.trackQuantity ?? true)
           setQuantity(found.quantity?.toString() || '0')
+          loadedQuantity.current = found.quantity?.toString() || '0'
           setWeight(found.weight?.toString() || '')
           setWeightUnit(found.weightUnit || 'kg')
           setBrand(found.brand || '')
@@ -349,6 +357,7 @@ export default function EditProductPage({
           setTags(Array.isArray(found.tags) ? found.tags.join(', ') : '')
           setEta(found.eta || '')
           setStatus(found.status || 'draft')
+          loadedStatus.current = found.status || 'draft'
           setBoxSize(found.boxSize || '')
           setDimLength(found.dimensions?.length?.toString() || '')
           setDimWidth(found.dimensions?.width?.toString() || '')
@@ -484,11 +493,29 @@ export default function EditProductPage({
   }
 
   // Autosave — saves current fields without redirecting
+  // quantity and status go in a save ONLY when this form changed them — see loadedQuantity.
+  // Both handleSave and doAutosave build their body from this one helper so the two stay
+  // identical, and both call commitStockBaseline() on success so a saved edit becomes the
+  // new baseline rather than being re-sent on every later keystroke.
+  const changedStockFields = () => {
+    const n = parseInt(quantity)
+    const qty = isNaN(n) ? 0 : n
+    const out: Record<string, any> = {}
+    const base = loadedQuantity.current === null ? null : (parseInt(loadedQuantity.current) || 0)
+    if (base === null || qty !== base) out.quantity = qty
+    if (loadedStatus.current === null || status !== loadedStatus.current) out.status = status
+    return out
+  }
+  const commitStockBaseline = () => {
+    const n = parseInt(quantity)
+    loadedQuantity.current = String(isNaN(n) ? 0 : n)
+    loadedStatus.current = status
+  }
+
   const doAutosave = async () => {
     if (!title.trim()) return
     setAutosaveStatus('saving')
     const cleanFloat = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
-    const cleanInt = (v: string) => { const n = parseInt(v); return isNaN(n) ? 0 : n }
     try {
       // Upload pasted images first — the API COALESCEs, so sending the filtered
       // list before they upload would wipe images off the record instead.
@@ -503,7 +530,7 @@ export default function EditProductPage({
           costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
           preOrderPrice: preOrderPrice ? cleanFloat(preOrderPrice) : null,
           auctionReservePrice: auctionReservePrice ? cleanFloat(auctionReservePrice) : null,
-          sku, barcode, trackQuantity, quantity: cleanInt(quantity),
+          sku, barcode, trackQuantity, ...changedStockFields(),
           weight: weight ? cleanFloat(weight) : null, weightUnit,
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
           carBrands, sidewaysBrands, isPreOrder, units, salesAccount, purchaseAccount,
@@ -511,7 +538,7 @@ export default function EditProductPage({
           sidewaysCarClasses: selectedSidewaysCarClasses, customOrgs: customOrgData,
           carType: carTypes[0] || carType, carTypes, sidewaysCarTypes, partType, scale, supplier, collections,
           tags: tags.split(',').map((t: string) => t.trim()).filter(Boolean),
-          status, boxSize,
+          boxSize,
           dimensions: {
             length: dimLength ? cleanFloat(dimLength) : null,
             width: dimWidth ? cleanFloat(dimWidth) : null,
@@ -524,6 +551,7 @@ export default function EditProductPage({
           seo: { metaTitle: seoTitle, metaDescription: seoDescription, metaKeywords: seoKeywords, ogImage: seoImage },
         }),
       })
+      commitStockBaseline()
       setAutosaveStatus('saved')
       setTimeout(() => setAutosaveStatus('idle'), 2000)
     } catch {
@@ -668,7 +696,6 @@ export default function EditProductPage({
     }
 
     const cleanFloat = (v: string) => { const n = parseFloat(v); return isNaN(n) ? 0 : n }
-    const cleanInt = (v: string) => { const n = parseInt(v); return isNaN(n) ? 0 : n }
 
     try {
       setUploadingImages(true)
@@ -684,7 +711,7 @@ export default function EditProductPage({
         sku,
         barcode,
         trackQuantity,
-        quantity: cleanInt(quantity),
+        ...changedStockFields(),
         weight: weight ? cleanFloat(weight) : null,
         weightUnit,
         brand: categoryBrands[0] || brand,
@@ -706,7 +733,6 @@ export default function EditProductPage({
         supplier,
         collections,
         tags: tags.split(',').map(t => t.trim()).filter(Boolean),
-        status,
         boxSize,
         dimensions: {
           length: dimLength ? cleanFloat(dimLength) : null,
@@ -736,6 +762,7 @@ export default function EditProductPage({
       })
 
       if (res.ok) {
+        commitStockBaseline()
         // Sync categories — add/remove product from each category's productIds
         fetch('/api/admin/categories/sync-product', {
           method: 'POST',
