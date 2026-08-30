@@ -152,6 +152,17 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h)
   },[])
   useEffect(()=>{setLinkedDocNumber(customer.linkedDocNumber||'')},[customer.linkedDocNumber])
+  // Rule 60 — another card's Send-to converted the Quote this entry belongs to. A Quote
+  // covers every SKU the customer reserved, so all of its cards move to the Invoice together.
+  useEffect(()=>{
+    const h=(e:Event)=>{
+      const d=(e as CustomEvent).detail; if(!d) return
+      const mine=customer.linkedDocId?customer.linkedDocId===d.fromDocId:customer.linkedDocNumber===d.fromDocNumber
+      if(mine&&d.toDocNumber!==customer.linkedDocNumber){setLinkedDocNumber(d.toDocNumber);onLinked(d.toDocNumber,d.toDocId)}
+    }
+    window.addEventListener('preorder-doc-relinked',h)
+    return ()=>window.removeEventListener('preorder-doc-relinked',h)
+  })
 
   const openStatuses=['draft','sent','accepted','pending','processing','active']
   const isOpenDoc=(d:any)=>d.type==='invoice'?d.status!=='archived':openStatuses.includes(d.status)
@@ -190,6 +201,17 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
 
   const lineItem=()=>({id:`li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,description:`${form.sku} – ${form.description}`,qty:customer.qty,unitPrice})
   const notify=(docNumber:string,docId:string)=>{setLinkedDocNumber(docNumber);onLinked(docNumber,docId)}
+  // Rule 60 — converting a Quote moves the whole document, so every dashboard entry it
+  // covers has to follow it, not just the card whose dropdown was used. The server sweeps
+  // the entire blob because one Quote can span suppliers; the event keeps the cards already
+  // on screen in step without forcing a reload that would discard unsaved edits.
+  const relinkQuoteEntries=async(quoteDoc:any,toDocNumber:string,toDocId:string)=>{
+    const detail={fromDocId:quoteDoc.id,fromDocNumber:quoteDoc.docNumber,toDocId,toDocNumber}
+    try{
+      await fetch('/api/admin/preorder-dashboard/relink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(detail)})
+      window.dispatchEvent(new CustomEvent('preorder-doc-relinked',{detail}))
+    }catch{}
+  }
 
   // A visible line for the invoice's Notes so the customer can see each deposit that was allocated
   // when several Quotes get consolidated onto one Invoice.
@@ -257,6 +279,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       })})
       if(res.ok){
         await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
+        await relinkQuoteEntries(quoteDoc,invoiceDoc.docNumber,invoiceDoc.id)
         notify(invoiceDoc.docNumber,invoiceDoc.id)
       }
     }catch{}
@@ -301,6 +324,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       if(newInvRes.ok){
         const newInv=await newInvRes.json()
         await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
+        await relinkQuoteEntries(quoteDoc,newInv.docNumber,newInv.id)
         notify(newInv.docNumber,newInv.id)
       }
     }catch{}

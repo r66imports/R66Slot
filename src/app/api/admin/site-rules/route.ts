@@ -440,6 +440,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Admin Quotes', 'Supplier Orders', 'Back Orders'],
     category: 'Orders',
   },
+  {
+    id: 'preorder_dashboard_doc_relink',
+    name: 'Rule 51 — Pre-Order Dashboard: Cards Follow the Document',
+    description: `A Quote covers every SKU the customer reserved, but on the Pre-Order Dashboard that is one customer entry per card, each carrying its own linkedDocId / linkedDocNumber and showing it as the chip beside Send to. WHEN A QUOTE IS CONVERTED, ALL OF ITS CARDS MOVE TOGETHER: sending a Quote to an Invoice from any card — "Add to Existing Invoice" or "Create New Invoice" — re-points every dashboard entry on that Quote to the resulting Invoice, not only the card whose dropdown was used. Otherwise the customer's other cards keep showing a Quote number for a Quote that has already been archived into the Invoice, while its lines sit on that Invoice. The relink runs server-side via /api/admin/preorder-dashboard/relink over the WHOLE blob, not just the supplier page on screen, because one Quote can span suppliers; entries are matched on linkedDocId and fall back to linkedDocNumber for entries saved before the id was stored. Cards already rendered are updated through a window event rather than a reload, so unsaved edits on other cards are not discarded. WHAT DOES NOT RELINK: adding a single card's line to an existing document is not a conversion — only that entry links. A Quote that is still open keeps its own number on every card; only an archived (converted) Quote resolves forward. RESOLVING HISTORIC LINKS: the forward pointer from a Quote to the Invoice that absorbed it is the Invoice's sourceQuoteNumber, which under Rule 28 names every Quote merged in, so a consolidated Invoice resolves all of its Quotes. Where one Quote number somehow appears on more than one Invoice the entry is left alone and reported rather than guessed at.`,
+    active: true,
+    appliesTo: ['Pre-Order Dashboard', 'Admin Quotes', 'Invoices'],
+    category: 'Orders',
+  },
 ]
 
 export async function GET() {
