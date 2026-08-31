@@ -26,9 +26,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'fromDocId or fromDocNumber is required' }, { status: 400 })
     }
 
+    // Either identifier is enough to say the entry belongs to this Quote. Trusting the
+    // number only when no id was stored left behind any entry whose id had drifted from the
+    // Quote it names, and those cards kept showing a Quote that was already converted.
     const matches = (c: any) => (
       (fromDocId && c.linkedDocId === fromDocId) ||
-      (!c.linkedDocId && fromDocNumber && c.linkedDocNumber === fromDocNumber)
+      (fromDocNumber && c.linkedDocNumber === fromDocNumber)
     )
 
     const items = await getItems()

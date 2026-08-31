@@ -456,14 +456,6 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Online Store', 'Admin Invoices'],
     category: 'Orders',
   },
-  {
-    id: 'preorder_send_all_reserved',
-    name: 'Rule 53 — Pre-Order Dashboard: Send All Reserved Items',
-    description: `The Pre-Order Dashboard holds one card per SKU, so a customer's reservations are scattered across every supplier page. Sending a document only ever moves what THAT document holds — a Quote carries the lines it was raised with, so anything the customer reserved before or after it stays behind, unchipped. "📦 Send ALL reserved items →" in a card's Send-to dropdown closes that gap: it sweeps every entry the customer holds across the WHOLE blob and puts them on one document, either a new Invoice or any of that client's open documents. WHAT IS SWEPT: entries carrying no document, and entries whose document has been archived. AN ENTRY SITTING ON ANOTHER OPEN DOCUMENT IS LEFT ALONE and named in the confirmation — it is already spoken for, and sweeping it up would put the same reservation on two documents. NO DOUBLE-BOOKING: a SKU the target document already carries is never re-added and its quantity is never touched — that card is simply linked to the document. Running the sweep twice therefore adds nothing the second time. Two cards reserving the same SKU for one customer become a single line with the quantity summed. The customer is matched on email where both sides carry one, falling back to name. Every swept card is re-pointed through /api/admin/preorder-dashboard/link-entries, which names each entry explicitly by itemId + customerId (unlike Rule 31's relink sweep, these entries have no single source document in common). Cards already on screen follow through a window event rather than a reload, so unsaved edits survive. A confirmation states the counts before anything is written, and invoices remain subject to the usual stock guard.`,
-    active: true,
-    appliesTo: ['Pre-Order Dashboard', 'Invoices', 'Quotes'],
-    category: 'Orders',
-  },
 ]
 
 export async function GET() {
