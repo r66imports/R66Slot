@@ -3318,15 +3318,20 @@ function OrdersPageInner() {
     setAppendingToInvoice(true)
     try {
       const newItems = quote.lineItems.map((li, i) => ({ ...li, id: `li_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}` }))
-      const mergedItems = [...target.lineItems, ...newItems]
-      const patchBody: Record<string, any> = { lineItems: mergedItems }
+      // Re-read the invoice. The copy in the page's list may be minutes old, and writing a
+      // whole array built from it silently drops anything added since — the lines are
+      // appended server-side so nothing can land between the read and the write.
+      const freshList: any[] = await fetch('/api/admin/orders/documents').then((r) => r.json()).catch(() => [])
+      const fresh: any = (Array.isArray(freshList) ? freshList : []).find((d: any) => d.id === target.id) || target
+      const mergedItems = [...(fresh.lineItems || []), ...newItems]
+      const patchBody: Record<string, any> = { appendLineItems: newItems }
       // Merging line items changes the subtotal — recompute the stored deposit so it doesn't go
       // stale relative to the new total (View/Print/Email/PDF read this field directly).
-      const targetDepositPct = (target as any).depositPct || 0
-      if ((target as any).preOrderDeposit && targetDepositPct > 0) {
+      const targetDepositPct = fresh.depositPct || 0
+      if (fresh.preOrderDeposit && targetDepositPct > 0) {
         const newSubtotal = mergedItems.reduce((s, li) => s + lineAmt(li), 0)
-        const newDiscAmt = newSubtotal * ((target as any).discountPct || 0) / 100
-        const newTotal = newSubtotal - newDiscAmt + ((target as any).shippingCost || 0)
+        const newDiscAmt = newSubtotal * (fresh.discountPct || 0) / 100
+        const newTotal = newSubtotal - newDiscAmt + (fresh.shippingCost || 0)
         patchBody.depositPaid = Math.round(newTotal * targetDepositPct / 100 * 100) / 100
       }
       // Payments taken on the quote must survive the merge, or money the customer has already
@@ -3335,15 +3340,15 @@ function OrdersPageInner() {
       const quotePaid = (quote as any).amountPaid || 0
       const quoteCredit = (quote as any).creditApplied || 0
       if (quotePaid > 0.005 || quoteCredit > 0.005) {
-        patchBody.amountPaid = ((target as any).amountPaid || 0) + quotePaid
-        patchBody.creditApplied = ((target as any).creditApplied || 0) + quoteCredit
+        patchBody.amountPaid = (fresh.amountPaid || 0) + quotePaid
+        patchBody.creditApplied = (fresh.creditApplied || 0) + quoteCredit
         // Stamped with the Quote they came off, or the invoice shows unexplained deposits
         // once several Quotes have been consolidated onto it.
-        patchBody.payments = [...((target as any).payments || []), ...tagPaymentsFromQuote((quote as any).payments, quote.docNumber)]
+        patchBody.payments = [...(fresh.payments || []), ...tagPaymentsFromQuote((quote as any).payments, quote.docNumber)]
       }
       // Rule 28 — the audit trail must name EVERY source Quote, not just the one that
       // created the invoice, so "Quote Ref:" grows with each merge.
-      patchBody.sourceQuoteNumber = mergeQuoteRefs((target as any).sourceQuoteNumber, quote.docNumber)
+      patchBody.sourceQuoteNumber = mergeQuoteRefs(fresh.sourceQuoteNumber, quote.docNumber)
       const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -3358,6 +3363,14 @@ function OrdersPageInner() {
           body: JSON.stringify({ status: 'archived' }),
         })
         if (archiveRes.ok) setDocuments((prev) => prev.map((d) => d.id === quote.id ? { ...d, status: 'archived' } : d))
+        // Rule 60 — the Quote has been absorbed, so every Pre-Order Dashboard entry it
+        // covers follows it to the Invoice. Without this the cards keep naming a Quote that
+        // has been archived, and the items look unsent.
+        await fetch('/api/admin/preorder-dashboard/relink', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fromDocId: quote.id, fromDocNumber: quote.docNumber, toDocId: target.id, toDocNumber: target.docNumber }),
+        }).catch(() => {})
         setSoToInvoiceResult(`✓ ${quote.docNumber} → added to ${target.docNumber}`)
       } else {
         const errData = await res.json().catch(() => ({}))

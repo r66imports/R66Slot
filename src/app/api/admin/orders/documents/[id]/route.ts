@@ -30,6 +30,16 @@ export async function PATCH(
     if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const prev = docs[idx]
+
+    // appendLineItems — merge against the document as it stands RIGHT NOW. Callers used to
+    // build the whole array from a copy fetched when their dropdown opened; two sends racing
+    // each other, or one made from a page loaded minutes earlier, then wrote whole arrays
+    // over one another and quietly dropped the other's lines.
+    if (Array.isArray(body.appendLineItems)) {
+      body.lineItems = [...(prev.lineItems || []), ...body.appendLineItems]
+      delete body.appendLineItems
+    }
+
     const newStatus = body.status ?? prev.status
     const newType = body.type ?? prev.type
     const newItems = body.lineItems ?? prev.lineItems

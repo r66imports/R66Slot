@@ -336,7 +336,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       if(newLines.length>0){
         if((target?target.type:'invoice')==='invoice'&&await blockedByStock(newLines)) return
         if(target){
-          const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lineItems:[...existing,...newLines]})})
+          const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({appendLineItems:newLines})})
           if(!res.ok){const e=await res.json().catch(()=>({}));alert(e.error||`Could not update ${target.docNumber}`);return}
         }else{
           const allDocuments:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json())
@@ -362,24 +362,28 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     setSending(true);setOpen(false);setPendingConvertQuote(null)
     try{
       if(await blockedByStock(quoteDoc.lineItems||[])) return
-      const merged=[...(invoiceDoc.lineItems||[]),...(quoteDoc.lineItems||[])]
+      // Re-read the invoice: this dropdown's copy was fetched when it opened, so its notes
+      // and payment totals must not be written back from a stale snapshot either. The lines
+      // are appended server-side, where nothing can land between the read and the write.
+      const freshList:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json()).catch(()=>[])
+      const inv=(Array.isArray(freshList)?freshList:[]).find((d:any)=>d.id===invoiceDoc.id)||invoiceDoc
       const depositNote=depositNoteFor(quoteDoc)
-      const mergedNotes=[invoiceDoc.notes,depositNote].filter(Boolean).join('\n')
-      const mergedPayments=[...(invoiceDoc.payments||[]),...tagPaymentsFromQuote(quoteDoc.payments,quoteDoc.docNumber)]
-      const res=await fetch(`/api/admin/orders/documents/${invoiceDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-        lineItems:merged,
+      const mergedNotes=[inv.notes,depositNote].filter(Boolean).join('\n')
+      const mergedPayments=[...(inv.payments||[]),...tagPaymentsFromQuote(quoteDoc.payments,quoteDoc.docNumber)]
+      const res=await fetch(`/api/admin/orders/documents/${inv.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+        appendLineItems:quoteDoc.lineItems||[],
         notes:mergedNotes,
-        amountPaid:Number(invoiceDoc.amountPaid||0)+Number(quoteDoc.amountPaid||0),
-        creditApplied:Number(invoiceDoc.creditApplied||0)+Number(quoteDoc.creditApplied||0),
+        amountPaid:Number(inv.amountPaid||0)+Number(quoteDoc.amountPaid||0),
+        creditApplied:Number(inv.creditApplied||0)+Number(quoteDoc.creditApplied||0),
         payments:mergedPayments,
         // Rule 28 — every Quote merged in stays named in "Quote Ref:", not just the one
         // that created the invoice.
-        sourceQuoteNumber:mergeQuoteRefs(invoiceDoc.sourceQuoteNumber,quoteDoc.docNumber),
+        sourceQuoteNumber:mergeQuoteRefs(inv.sourceQuoteNumber,quoteDoc.docNumber),
       })})
       if(res.ok){
         await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
-        await relinkQuoteEntries(quoteDoc,invoiceDoc.docNumber,invoiceDoc.id)
-        notify(invoiceDoc.docNumber,invoiceDoc.id)
+        await relinkQuoteEntries(quoteDoc,inv.docNumber,inv.id)
+        notify(inv.docNumber,inv.id)
       }
     }catch{}
     setSending(false)
@@ -434,15 +438,21 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     setSending(true);setOpen(false)
     try{
       const skuPrefix=form.sku?`${form.sku} –`:null
-      const existingItems:any[]=target.lineItems||[]
       // Only the newly added quantity is checked — what the invoice already holds was
       // deducted when it was raised.
       if(target.type==='invoice'&&await blockedByStock([lineItem()])) return
+      // Re-read the target: the copy this dropdown holds was fetched when it opened, and a
+      // send made from another card since would be wiped out by a whole-array write.
+      const freshList:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json()).catch(()=>[])
+      const fresh=(Array.isArray(freshList)?freshList:[]).find((d:any)=>d.id===target.id)||target
+      const existingItems:any[]=fresh.lineItems||[]
       const existingIdx=skuPrefix?existingItems.findIndex((i:any)=>i.description?.startsWith(skuPrefix)):-1
-      const updatedItems=existingIdx>=0
-        ?existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)
-        :[...existingItems,lineItem()]
-      const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lineItems:updatedItems})})
+      // A line for this SKU already there gets topped up; anything new is appended
+      // server-side, where nothing can slip in between the read and the write.
+      const patchBody=existingIdx>=0
+        ?{lineItems:existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)}
+        :{appendLineItems:[lineItem()]}
+      const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patchBody)})
       if(res.ok) notify(target.docNumber,target.id)
       else{const e=await res.json().catch(()=>({}));window.alert(e.error||`Could not update ${target.docNumber}`)}
     }catch{}

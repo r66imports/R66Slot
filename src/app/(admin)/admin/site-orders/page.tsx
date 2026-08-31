@@ -257,13 +257,12 @@ export default function SiteOrdersPage() {
       const target = freshDocs.find((d: any) => d.id === invoiceDoc.id) || invoiceDoc
 
       const newItems = orderLineItems(order)
-      const merged = [...(target.lineItems || []), ...newItems]
       const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         // Rule 31 — the site order's stock was deducted at checkout and is held by the
         // order, not by the invoice: no guard to run, and nothing here for it to move.
-        body: JSON.stringify({ lineItems: merged, stockAlreadyReserved: true, skipStockAdjust: true }),
+        body: JSON.stringify({ appendLineItems: newItems, stockAlreadyReserved: true, skipStockAdjust: true }),
       })
       if (!res.ok) throw new Error('Failed to update invoice')
 
