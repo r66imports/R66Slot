@@ -155,14 +155,19 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   // Rule 60 — another card's Send-to converted the Quote this entry belongs to. A Quote
   // covers every SKU the customer reserved, so all of its cards move to the Invoice together.
   useEffect(()=>{
-    const h=(e:Event)=>{
-      const d=(e as CustomEvent).detail; if(!d) return
+    const apply=(d:any)=>{
+      if(!d) return
       // Either identifier is enough — same rule as the server sweep.
       const mine=(!!d.fromDocId&&customer.linkedDocId===d.fromDocId)||(!!d.fromDocNumber&&customer.linkedDocNumber===d.fromDocNumber)
       if(mine&&d.toDocNumber!==customer.linkedDocNumber){setLinkedDocNumber(d.toDocNumber);onLinked(d.toDocNumber,d.toDocId)}
     }
+    const h=(e:Event)=>apply((e as CustomEvent).detail)
+    // A conversion made in another tab — the Orders page, or a second dashboard window —
+    // arrives through localStorage, which fires `storage` in every tab but the writer's.
+    const s=(e:StorageEvent)=>{if(e.key==='preorder-doc-relinked'&&e.newValue){try{apply(JSON.parse(e.newValue))}catch{}}}
     window.addEventListener('preorder-doc-relinked',h)
-    return ()=>window.removeEventListener('preorder-doc-relinked',h)
+    window.addEventListener('storage',s)
+    return ()=>{window.removeEventListener('preorder-doc-relinked',h);window.removeEventListener('storage',s)}
   })
 
 
@@ -213,6 +218,12 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     try{
       await fetch('/api/admin/preorder-dashboard/relink',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(detail)})
       window.dispatchEvent(new CustomEvent('preorder-doc-relinked',{detail}))
+      // …and to every OTHER tab. A dashboard left open in a second window would otherwise
+      // keep showing the Quote until it was reloaded, which reads as the send having failed.
+      try{localStorage.setItem('preorder-doc-relinked',JSON.stringify({...detail,t:Date.now()}))}catch{}
+      // …and to every OTHER tab. A dashboard left open in a second window would otherwise
+      // keep showing the Quote until it was reloaded, which reads as the send having failed.
+      try{localStorage.setItem('preorder-doc-relinked',JSON.stringify({...detail,t:Date.now()}))}catch{}
     }catch{}
   }
 

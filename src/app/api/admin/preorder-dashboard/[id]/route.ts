@@ -110,6 +110,33 @@ export async function PATCH(
       'onSalesPage', 'salesTier1Discount', 'salesTier2Discount',
       'notes',
     ]
+    // A card saved from a page that was loaded before its Quote was converted carries the
+    // OLD link in its customers array, and writing it back put the entry straight back onto
+    // a Quote that no longer exists — undoing the relink every time the card was saved.
+    // The stored link wins whenever the incoming one names a document that is archived or
+    // gone while the server already holds a live one. Deliberately clearing a link, or
+    // moving a card to another live document, still goes through.
+    if (Array.isArray(body.customers)) {
+      const docs = await blobRead<any[]>('data/order-documents.json', [])
+      const byId: Record<string, any> = {}, byNum: Record<string, any> = {}
+      for (const d of docs) { byId[d.id] = d; byNum[d.docNumber] = d }
+      const lookup = (c: any) => (c?.linkedDocId && byId[c.linkedDocId]) || (c?.linkedDocNumber && byNum[c.linkedDocNumber]) || null
+      const stored: Record<string, any> = {}
+      for (const c of ((current as any).customers || [])) stored[c.id] = c
+      body.customers = body.customers.map((c: any) => {
+        const prev = stored[c.id]
+        if (!prev?.linkedDocNumber) return c
+        const sameLink = c.linkedDocId === prev.linkedDocId && c.linkedDocNumber === prev.linkedDocNumber
+        if (sameLink || !c.linkedDocNumber) return c
+        const incoming = lookup(c), held = lookup(prev)
+        if (held && held.status !== 'archived' && (!incoming || incoming.status === 'archived')) {
+          console.warn('[preorder] stale link ignored on save', { sku: (current as any).sku, customer: c.name, tried: c.linkedDocNumber, kept: prev.linkedDocNumber })
+          return { ...c, linkedDocId: prev.linkedDocId, linkedDocNumber: prev.linkedDocNumber }
+        }
+        return c
+      })
+    }
+
     const updated: PreOrderDashboardItem = { ...current, updatedAt: new Date().toISOString() }
     for (const field of allowedFields) {
       if (field in body) (updated as any)[field] = body[field]

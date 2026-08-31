@@ -3371,6 +3371,11 @@ function OrdersPageInner() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fromDocId: quote.id, fromDocNumber: quote.docNumber, toDocId: target.id, toDocNumber: target.docNumber }),
         }).catch(() => {})
+        // Tell any Pre-Order Dashboard open in another tab, so its cards flip to the
+        // Invoice there and then instead of sitting on a Quote that no longer exists.
+        try {
+          localStorage.setItem('preorder-doc-relinked', JSON.stringify({ fromDocId: quote.id, fromDocNumber: quote.docNumber, toDocId: target.id, toDocNumber: target.docNumber, t: Date.now() }))
+        } catch {}
         setSoToInvoiceResult(`✓ ${quote.docNumber} → added to ${target.docNumber}`)
       } else {
         const errData = await res.json().catch(() => ({}))
