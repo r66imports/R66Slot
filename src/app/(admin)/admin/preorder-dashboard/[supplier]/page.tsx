@@ -145,6 +145,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   const [bankAccounts,setBankAccounts]=useState<any[]>([])
   const [pendingQuoteBank,setPendingQuoteBank]=useState(false)
   const [pendingConvertQuote,setPendingConvertQuote]=useState<any>(null)
+  const [pendingSendAll,setPendingSendAll]=useState(false)
   const [linkedDocNumber,setLinkedDocNumber]=useState(customer.linkedDocNumber||'')
   const [sending,setSending]=useState(false); const ref=useRef<HTMLDivElement>(null)
   useEffect(()=>{
@@ -164,11 +165,24 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     return ()=>window.removeEventListener('preorder-doc-relinked',h)
   })
 
+  // "Send all reserved items" swept this customer's entries onto one document — the cards
+  // already on screen follow it without a reload that would discard unsaved edits.
+  useEffect(()=>{
+    const h=(e:Event)=>{
+      const d=(e as CustomEvent).detail; if(!d?.entries) return
+      if(!d.entries.some((x:any)=>x.customerId===customer.id)) return
+      if(d.toDocNumber!==customer.linkedDocNumber){setLinkedDocNumber(d.toDocNumber);onLinked(d.toDocNumber,d.toDocId)}
+    }
+    window.addEventListener('preorder-entries-linked',h)
+    return ()=>window.removeEventListener('preorder-entries-linked',h)
+  })
+
+
   const openStatuses=['draft','sent','accepted','pending','processing','active']
   const isOpenDoc=(d:any)=>d.type==='invoice'?d.status!=='archived':openStatuses.includes(d.status)
 
   const loadDocs = async () => {
-    setLoading(true); setDocSearch(''); setMode('new')
+    setLoading(true); setDocSearch(''); setMode('new'); setPendingSendAll(false)
     try{
       const [all,banks]=await Promise.all([
         fetch('/api/admin/orders/documents').then(r=>r.ok?r.json():[]),
@@ -257,6 +271,91 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     window.alert(`Cannot create invoice:\n\n${reasons.join('\n')}`)
     setSending(false)
     return true
+  }
+
+  // Everything this customer has reserved, across every supplier. The dashboard is one card
+  // per SKU, so a customer's reservations are scattered over the whole blob — a document-level
+  // send can only ever move what that document already holds, which is why items reserved
+  // before or after the quote was raised stay behind.
+  const gatherCustomerEntries=async(targetDocId?:string)=>{
+    const [items,allDocuments]:[any[],any[]]=await Promise.all([
+      fetch('/api/admin/preorder-dashboard').then(r=>r.json()),
+      fetch('/api/admin/orders/documents').then(r=>r.json()),
+    ])
+    const docById:Record<string,any>={},docByNum:Record<string,any>={}
+    for(const d of (Array.isArray(allDocuments)?allDocuments:[])){docById[d.id]=d;docByNum[d.docNumber]=d}
+    const email=(customer.email||'').toLowerCase()
+    const name=(customer.name||'').toLowerCase()
+    const isMine=(c:any)=>{
+      const ce=(c.email||'').toLowerCase()
+      if(email&&ce) return ce===email
+      return (c.name||'').toLowerCase()===name
+    }
+    const free:any[]=[],held:string[]=[]
+    for(const it of (Array.isArray(items)?items:[])){
+      for(const c of (it.customers||[])){
+        if(!isMine(c)) continue
+        const doc=(c.linkedDocId&&docById[c.linkedDocId])||(c.linkedDocNumber&&docByNum[c.linkedDocNumber])||null
+        const onTarget=!!targetDocId&&c.linkedDocId===targetDocId
+        // An entry sitting on another OPEN document is already spoken for — sweeping it up
+        // would put the same reservation on two documents. Left alone, and reported.
+        if(doc&&doc.status!=='archived'&&!onTarget){held.push(doc.docNumber);continue}
+        free.push({itemId:it.id,customerId:c.id,sku:(it.sku||'').trim(),description:it.description||'',qty:Number(c.qty)||1,unitPrice:parsePrice(it.estimatedRetailPrice||'')})
+      }
+    }
+    return {free,held}
+  }
+  // Sends every unallocated reservation this customer holds to one document. A SKU the
+  // document already carries is never re-added or re-quantified — the card is simply linked
+  // to it, so running this twice cannot double-book anything.
+  const sendAllToDoc=async(target:any|null)=>{
+    setSending(true);setOpen(false);setPendingSendAll(false)
+    try{
+      const {free,held}=await gatherCustomerEntries(target?.id)
+      if(free.length===0){alert(`Nothing to send — ${customer.name} has no unallocated pre-order items.`);return}
+      const existing:any[]=target?.lineItems||[]
+      const skuOf=(s:string)=>(s||'').split(/\s*–\s*|\s+-\s+/)[0].trim().toUpperCase()
+      const onDoc=new Set(existing.map((li:any)=>skuOf(li.description)))
+      const lines:Record<string,any>={}
+      const covered=new Set<string>()
+      for(const e of free){
+        const key=e.sku.toUpperCase()
+        if(onDoc.has(key)){covered.add(e.sku);continue}
+        // The same SKU reserved on two cards is one line with the quantity summed.
+        if(lines[key]) lines[key].qty+=e.qty
+        else lines[key]={id:`li_${Date.now()}_${Object.keys(lines).length}`,description:`${e.sku} – ${e.description}`,qty:e.qty,unitPrice:e.unitPrice}
+      }
+      const newLines=Object.values(lines)
+      const heldRefs=[...new Set(held)]
+      const parts=[`Send ${free.length} reserved item${free.length===1?'':'s'} for ${customer.name} to ${target?target.docNumber:'a new Invoice'}?`]
+      parts.push(newLines.length>0?`${newLines.length} new line${newLines.length===1?'':'s'} will be added.`:'No new lines will be added.')
+      if(covered.size>0) parts.push(`${covered.size} SKU${covered.size===1?'':'s'} already on it — those cards are just linked, quantities untouched.`)
+      if(heldRefs.length>0) parts.push(`Items on other open documents (${heldRefs.join(', ')}) are left alone.`)
+      if(!confirm(parts.join('\n\n'))) return
+      let doc=target
+      if(newLines.length>0){
+        if((target?target.type:'invoice')==='invoice'&&await blockedByStock(newLines)) return
+        if(target){
+          const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({lineItems:[...existing,...newLines]})})
+          if(!res.ok){const e=await res.json().catch(()=>({}));alert(e.error||`Could not update ${target.docNumber}`);return}
+        }else{
+          const allDocuments:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json())
+          const docNumber=nextDocNumber(allDocuments,'invoice')
+          const res=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',docNumber,date:new Date().toISOString().slice(0,10),clientName:customer.name,clientEmail:customer.email||'',clientPhone:(customer as any).phone||'',clientAddress:'',lineItems:newLines,notes:`Pre-order items for ${customer.name}`,terms:'',status:'draft'})})
+          if(!res.ok){const e=await res.json().catch(()=>({}));alert(e.error||'Could not create the invoice');return}
+          doc=await res.json()
+        }
+      }
+      if(!doc) return
+      const entries=free.map(e=>({itemId:e.itemId,customerId:e.customerId}))
+      await fetch('/api/admin/preorder-dashboard/link-entries',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entries,toDocId:doc.id,toDocNumber:doc.docNumber})})
+      window.dispatchEvent(new CustomEvent('preorder-entries-linked',{detail:{entries,toDocId:doc.id,toDocNumber:doc.docNumber}}))
+      notify(doc.docNumber,doc.id)
+      alert(`${doc.docNumber}: ${newLines.length} line${newLines.length===1?'':'s'} added, ${free.length} card${free.length===1?'':'s'} linked.`)
+    }catch{
+      alert('Could not send the items. Please try again.')
+    }
+    setSending(false)
   }
 
   const appendQuoteToInvoice=async(quoteDoc:any,invoiceDoc:any)=>{
@@ -361,7 +460,24 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       )}
       {open&&(
         <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-56 overflow-hidden">
-          {pendingConvertQuote?(
+          {pendingSendAll?(
+            <div className="py-1.5">
+              <div className="flex items-center gap-2 px-3 py-1 border-b border-gray-100 mb-1">
+                <button onClick={()=>setPendingSendAll(false)} className="text-[10px] text-gray-400 hover:text-gray-600">← Back</button>
+                <p className="text-[10px] font-bold text-gray-500 truncate">All reserved items — {customer.name}</p>
+              </div>
+              <button onClick={()=>sendAllToDoc(null)} className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium text-green-700">+ 🧾 New Invoice</button>
+              <div className="border-t my-1"/>
+              <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Add to Existing</p>
+              {docs.length===0&&<p className="px-3 py-2 text-xs text-gray-400">No open documents for this customer</p>}
+              {docs.map((d:any)=>(
+                <button key={d.id} onClick={()=>sendAllToDoc(d)} className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 font-medium">
+                  <span className="font-semibold text-indigo-700">{d.docNumber}</span>
+                  <span className="text-gray-400 ml-1 capitalize text-[10px]">({d.type} · {d.status})</span>
+                </button>
+              ))}
+            </div>
+          ):pendingConvertQuote?(
             <div className="py-1.5">
               <div className="flex items-center gap-2 px-3 py-1 border-b border-gray-100 mb-1">
                 <button onClick={()=>setPendingConvertQuote(null)} className="text-[10px] text-gray-400 hover:text-gray-600">← Back</button>
@@ -394,6 +510,10 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
             </div>
           ):(
             <>
+              <button onClick={()=>setPendingSendAll(true)}
+                className="w-full text-left px-3 py-2 text-[11px] hover:bg-amber-50 font-semibold text-amber-800 border-b border-gray-100 whitespace-nowrap">
+                📦 Send ALL reserved items →
+              </button>
               <div className="flex border-b border-gray-100">
                 <button onClick={()=>{setMode('new')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='new'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Create New</button>
                 <button onClick={()=>{setMode('existing')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='existing'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Add to Existing</button>
