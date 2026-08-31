@@ -76,12 +76,16 @@ export default function SiteOrdersPage() {
     const clientEmail = order.customer.email.toLowerCase()
     const clientName = `${order.customer.firstName} ${order.customer.lastName}`.trim().toLowerCase()
     const clientInvoices = allInvoices.filter((d: any) =>
-      d.status !== 'archived' && (
+      d.status !== 'archived' &&
+      // The invoice the order already sits on is not a move target.
+      d.docNumber !== order.invoiceRef && (
         (d.clientEmail?.toLowerCase() === clientEmail) ||
         d.clientName?.toLowerCase() === clientName
       )
     )
-    if (clientInvoices.length > 0) {
+    // An order that is already on an invoice always asks first — its line items leave
+    // that invoice, so this must never happen on one stray click.
+    if (clientInvoices.length > 0 || order.invoiceRef) {
       setExistingClientInvoices(clientInvoices)
       setPendingConvertOrder(order)
     } else {
@@ -89,11 +93,93 @@ export default function SiteOrdersPage() {
     }
   }
 
+  function orderLineItems(order: CheckoutOrder) {
+    return order.items.map((item, i) => ({
+      id: `li_${Date.now()}_${i}`,
+      description: item.sku ? `${item.sku} \u2013 ${item.title}` : item.title,
+      qty: item.quantity,
+      unitPrice: item.price,
+      // Stamped so these lines can be found again when the order moves to another invoice.
+      sourceOrderId: order.id,
+    }))
+  }
+
+  // The invoice lines belonging to an order — stamped ones when present, otherwise matched
+  // by description for invoices raised before the stamp existed (one line per ordered item).
+  function stripOrderLines(lines: any[], order: CheckoutOrder) {
+    if (lines.some((li) => li.sourceOrderId === order.id)) {
+      return lines.filter((li) => li.sourceOrderId !== order.id)
+    }
+    const remaining = [...lines]
+    for (const item of order.items) {
+      const desc = item.sku ? `${item.sku} \u2013 ${item.title}` : item.title
+      const i = remaining.findIndex((li) => !li.sourceOrderId && li.description === desc)
+      if (i !== -1) remaining.splice(i, 1)
+    }
+    return remaining
+  }
+
+  // Pull the order's line items off the invoice it currently sits on. Stock does not move:
+  // Rule 31 — a site order's stock is deducted at checkout and held by the order itself,
+  // so its lines travel between invoices without touching inventory.
+  async function detachFromInvoice(order: CheckoutOrder) {
+    if (!order.invoiceRef) return
+    const res = await fetch('/api/admin/orders/documents?type=invoice')
+    const docs: any[] = res.ok ? await res.json() : []
+    const doc = docs.find((d: any) => d.docNumber === order.invoiceRef)
+    if (!doc) return
+    const lines: any[] = doc.lineItems || []
+    const remaining = stripOrderLines(lines, order)
+    if (remaining.length === lines.length) return
+    await fetch(`/api/admin/orders/documents/${doc.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lineItems: remaining, stockAlreadyReserved: true, skipStockAdjust: true }),
+    })
+    // Nothing left on an invoice that never took money — send it to the Bin rather than
+    // leave a blank document behind. It can be restored from there.
+    const paid = (doc.amountPaid || 0) + (doc.creditApplied || 0) + (doc.depositPaid || 0)
+    if (remaining.length === 0 && paid <= 0 && (doc.payments || []).length === 0) {
+      await fetch(`/api/admin/orders/documents/${doc.id}`, { method: 'DELETE' })
+    }
+  }
+
+  // A cancelled order whose stock was restored gave those units back to the shelf.
+  // Invoicing it again has to take them out a second time — and fail loudly if they
+  // are no longer there.
+  async function reclaimStock(order: CheckoutOrder): Promise<boolean> {
+    if (!order.stockRestored) return true
+    const res = await fetch('/api/checkout', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id, deductStock: true }),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(err.error || 'Not enough stock to invoice this order again.')
+      return false
+    }
+    return true
+  }
+
+  // Hand back stock taken by reclaimStock when the invoice it was taken for never landed.
+  async function releaseReclaimedStock(order: CheckoutOrder) {
+    await fetch('/api/checkout', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id, restoreStock: true }),
+    }).catch(() => {})
+  }
+
   async function doCreateNewInvoice(order: CheckoutOrder) {
     setConverting(order.id)
     setPendingConvertOrder(null)
     setExistingClientInvoices([])
+    let reclaimed = false
     try {
+      if (!(await reclaimStock(order))) return
+      reclaimed = !!order.stockRestored
+
       const docsRes = await fetch('/api/admin/orders/documents?type=invoice')
       const docs = docsRes.ok ? await docsRes.json() : []
       const nums = docs
@@ -102,12 +188,11 @@ export default function SiteOrdersPage() {
       const next = (nums.length > 0 ? Math.max(...nums) : 0) + 1
       const docNumber = `INV${String(next).padStart(4, '0')}`
 
-      const lineItems = order.items.map((item, i) => ({
-        id: `li_${Date.now()}_${i}`,
-        description: item.sku ? `${item.sku} \u2013 ${item.title}` : item.title,
-        qty: item.quantity,
-        unitPrice: item.price,
-      }))
+      // Detach only now that the next number is settled — the old invoice may be binned
+      // by this, and it must still count when the new document is numbered.
+      await detachFromInvoice(order)
+
+      const lineItems = orderLineItems(order)
 
       const clientName = `${order.customer.firstName} ${order.customer.lastName}`.trim()
       const clientAddress = [
@@ -147,6 +232,8 @@ export default function SiteOrdersPage() {
 
       await load()
     } catch {
+      // Stock was taken back out for an invoice that never landed — hand it back.
+      if (reclaimed) await releaseReclaimedStock(order)
       alert('Failed to create invoice. Please try again.')
     } finally {
       setConverting(null)
@@ -157,31 +244,39 @@ export default function SiteOrdersPage() {
     setConverting(order.id)
     setPendingConvertOrder(null)
     setExistingClientInvoices([])
+    let reclaimed = false
     try {
-      const newItems = order.items.map((item, i) => ({
-        id: `li_${Date.now()}_${i}`,
-        description: item.sku ? `${item.sku} \u2013 ${item.title}` : item.title,
-        qty: item.quantity,
-        unitPrice: item.price,
-      }))
-      const merged = [...(invoiceDoc.lineItems || []), ...newItems]
-      const res = await fetch(`/api/admin/orders/documents/${invoiceDoc.id}`, {
+      if (!(await reclaimStock(order))) return
+      reclaimed = !!order.stockRestored
+      await detachFromInvoice(order)
+
+      // Re-read the target: detaching the order from its previous invoice may have
+      // rewritten it, and the copy handed to this function would then be stale.
+      const freshRes = await fetch('/api/admin/orders/documents?type=invoice')
+      const freshDocs: any[] = freshRes.ok ? await freshRes.json() : []
+      const target = freshDocs.find((d: any) => d.id === invoiceDoc.id) || invoiceDoc
+
+      const newItems = orderLineItems(order)
+      const merged = [...(target.lineItems || []), ...newItems]
+      const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        // Rule 31 — the site order already deducted this stock at checkout, so the
-        // insufficient-stock guard does not apply to these lines.
-        body: JSON.stringify({ lineItems: merged, stockAlreadyReserved: true }),
+        // Rule 31 — the site order's stock was deducted at checkout and is held by the
+        // order, not by the invoice: no guard to run, and nothing here for it to move.
+        body: JSON.stringify({ lineItems: merged, stockAlreadyReserved: true, skipStockAdjust: true }),
       })
       if (!res.ok) throw new Error('Failed to update invoice')
 
       await fetch('/api/checkout', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: order.id, status: 'invoiced', invoiceRef: invoiceDoc.docNumber }),
+        body: JSON.stringify({ id: order.id, status: 'invoiced', invoiceRef: target.docNumber }),
       })
 
       await load()
     } catch {
+      // Stock was taken back out for an invoice that never landed — hand it back.
+      if (reclaimed) await releaseReclaimedStock(order)
       alert('Failed to add to invoice. Please try again.')
     } finally {
       setConverting(null)
@@ -368,13 +463,15 @@ export default function SiteOrdersPage() {
                     </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-2">
-                        {order.status !== 'invoiced' && order.status !== 'cancelled' && (
+                        {order.status !== 'archived' && (
                           <button
                             onClick={() => sendToInvoice(order)}
                             disabled={converting === order.id}
                             className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                           >
-                            {converting === order.id ? 'Creating…' : 'Send to Invoice'}
+                            {converting === order.id
+                              ? (order.invoiceRef ? 'Moving…' : 'Creating…')
+                              : (order.invoiceRef ? 'Change Invoice' : 'Send to Invoice')}
                           </button>
                         )}
                         {order.status === 'pending' && (
@@ -476,10 +573,22 @@ export default function SiteOrdersPage() {
       {pendingConvertOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
-            <h3 className="text-lg font-bold text-gray-900 mb-1">Send to Invoice</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">
+              {pendingConvertOrder.invoiceRef ? 'Change Invoice' : 'Send to Invoice'}
+            </h3>
             <p className="text-sm text-gray-500 mb-4">
               Order <span className="font-semibold text-gray-800">{pendingConvertOrder.orderNumber}</span> — {pendingConvertOrder.customer.firstName} {pendingConvertOrder.customer.lastName}
             </p>
+            {pendingConvertOrder.invoiceRef && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 font-medium">
+                Currently on <span className="font-semibold">{pendingConvertOrder.invoiceRef}</span> — these items are removed from that invoice and placed on the one you pick.
+              </div>
+            )}
+            {pendingConvertOrder.stockRestored && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 font-medium">
+                Stock for this order was restored — invoicing it again deducts it from inventory a second time.
+              </div>
+            )}
             <div className="space-y-2 mb-4">
               <button
                 onClick={() => doCreateNewInvoice(pendingConvertOrder)}
@@ -487,7 +596,11 @@ export default function SiteOrdersPage() {
               >
                 + Create New Invoice
               </button>
-              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide pt-1">Add to Existing</p>
+              {existingClientInvoices.length > 0 && (
+                <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide pt-1">
+                  {pendingConvertOrder.invoiceRef ? 'Move to Existing' : 'Add to Existing'}
+                </p>
+              )}
               {existingClientInvoices.map((inv: any) => (
                 <button
                   key={inv.id}

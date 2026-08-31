@@ -128,7 +128,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, status, invoiceRef, restoreStock } = body
+    const { id, status, invoiceRef, restoreStock, deductStock } = body
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
     const orders = await blobRead<CheckoutOrder[]>(KEY, [])
     const idx = orders.findIndex((o) => o.id === id)
@@ -156,6 +156,54 @@ export async function PATCH(request: Request) {
         }
       }
       orders[idx].stockRestored = allOk
+    }
+
+    // Re-take stock for an order that handed it back (cancelled → stock restored) and is
+    // now being invoiced again. Refuse outright if the shelf can no longer cover it — the
+    // items may well have been sold in the meantime.
+    if (deductStock === true && order.stockRestored) {
+      const shortfalls: Array<{ id: string; title: string; requested: number; available: number }> = []
+      for (const item of order.items) {
+        if (!item.id || !item.quantity) continue
+        const res = await db.query(
+          `SELECT title, COALESCE(quantity, 0) AS quantity FROM products WHERE id = $1`,
+          [item.id]
+        )
+        const available = Number(res.rows[0]?.quantity ?? 0)
+        if (!res.rows.length || item.quantity > available) {
+          shortfalls.push({
+            id: item.id,
+            title: res.rows[0]?.title || item.title || item.id,
+            requested: item.quantity,
+            available: res.rows.length ? available : 0,
+          })
+        }
+      }
+      if (shortfalls.length) {
+        return NextResponse.json(
+          {
+            error: `Not enough stock to invoice this order again: ${shortfalls
+              .map((s) => `${s.title} (${s.requested} requested, ${s.available} available)`)
+              .join(', ')}`,
+            shortfalls,
+          },
+          { status: 409 }
+        )
+      }
+      const deductedAt = new Date().toISOString()
+      for (const item of order.items) {
+        if (!item.id || !item.quantity) continue
+        try {
+          await db.query(
+            `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3
+             WHERE id = $1 RETURNING id`,
+            [item.id, item.quantity, deductedAt]
+          )
+        } catch (err: any) {
+          console.error('[checkout] re-deduction failed', { id: item.id, orderNumber: order.orderNumber, err: err?.message })
+        }
+      }
+      orders[idx].stockRestored = false
     }
 
     if (status) orders[idx].status = status

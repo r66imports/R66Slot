@@ -56,8 +56,13 @@ export async function PATCH(
       }
     }
 
+    // skipStockAdjust: the caller owns this document's stock movement. Rule 31 — a site
+    // order's stock is deducted at checkout and held by the order itself, so moving its
+    // lines onto or off an invoice must neither credit nor deduct anything here.
+    const skipStockAdjust = !!body.skipStockAdjust
+
     // Rule 3 — Stock Deduction: only adjust stock if the rule is active
-    if (stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
+    if (!skipStockAdjust && stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
       if (prev.stockDeducted !== false && wasStockable && isCancelled && !wasCancelled) {
         // Being cancelled/archived — restore stock UNLESS it's a fully-paid invoice being archived.
         // A paid invoice means the sale completed; stock is legitimately gone and must stay deducted.
@@ -91,8 +96,9 @@ export async function PATCH(
       // If type changes from salesorder→invoice and stockDeducted is already true: no action needed
     }
 
-    // stockAlreadyReserved is a request-only hint — it must not be persisted onto the document.
+    // Request-only hints — they must not be persisted onto the document.
     delete body.stockAlreadyReserved
+    delete body.skipStockAdjust
     docs[idx] = { ...prev, ...body, updatedAt: new Date().toISOString() }
     await blobReplaceArrayItem(KEY, id, docs[idx])
     return NextResponse.json(docs[idx])
