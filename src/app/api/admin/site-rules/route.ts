@@ -448,6 +448,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Pre-Order Dashboard', 'Admin Quotes', 'Invoices'],
     category: 'Orders',
   },
+  {
+    id: 'site_order_invoice_reallocation',
+    name: 'Rule 52 — Site Orders: Re-Allocate to a Different Invoice',
+    description: `A Site Order stays re-pointable after it has been invoiced. The Send to Invoice button remains on the row once the order is Invoiced, where it reads "Change Invoice", and once it is Cancelled; only Archived orders lose it. The picker offers Create New Invoice or any of that client's open invoices EXCEPT the one the order already sits on. CHOOSING A TARGET MOVES THE ORDER: its line items are pulled off the invoice they were on and placed on the chosen one, and the order's invoiceRef is re-pointed. Lines raised from a Site Order are stamped with sourceOrderId so they can be found again; invoices raised before the stamp existed are matched on line description instead, one line per ordered item. A move always asks first — the picker opens even when the client has no other invoices — and names the invoice the lines are leaving. AN EMPTIED INVOICE IS BINNED: if the move leaves the old invoice with no lines and it has taken no money (no amountPaid, creditApplied, depositPaid or payment history) it is deleted to the Invoice Bin, where it can be restored. An invoice that HAS taken money is left in place, empty, to be dealt with by hand. The new invoice number is worked out before the detach, so a binned number is never reused. STOCK DOES NOT MOVE. Under Rule 31 a site order's stock is deducted at checkout and held by the ORDER, not by the invoice it happens to be attached to, so shuffling lines between invoices touches no inventory: these PATCHes carry skipStockAdjust (a request-only hint, never persisted) so the document layer leaves stock alone, and new invoices carry stockAlreadyReserved as before. This is also why "Add to Existing" no longer deducts on top of the checkout deduction. THE ONE EXCEPTION is an order that was Cancelled AND had its stock restored: invoicing it again has to take that stock back out. /api/checkout is PATCHed with deductStock, which re-checks availability first and refuses with a 409 naming the shortfall when the items have since been sold elsewhere, and the stock is handed straight back if the invoice then fails to create. The picker warns with a blue banner before this happens.`,
+    active: true,
+    appliesTo: ['Online Store', 'Admin Invoices'],
+    category: 'Orders',
+  },
 ]
 
 export async function GET() {
