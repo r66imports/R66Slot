@@ -27,7 +27,7 @@ interface DashboardItem {
 type FormState = Omit<DashboardItem, 'id' | 'createdAt'>
 interface DashboardOptions { brands: string[]; units: string[]; etas: string[] }
 interface CostingSettings { shippingMarkup: number; markup: number; includeVAT: boolean }
-type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff' | 'new'
+type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff' | 'new' | 'clients' | 'alert'
 
 const CURRENCIES = ['ZAR','USD','CNY','EUR','GBP','HKD','SGD','JPY','AUD','CAD']
 const PAGE_SIZE = 10
@@ -43,6 +43,17 @@ function cutoffAlert(date?: string): { active: boolean; days: number } {
   if (!date) return { active: false, days: 999 }
   const days = daysUntilCutoff(date)
   return { active: days >= 0 && days <= 2, days }
+}
+
+// Colour band a card carries: 0 = red (cut-off today), 1 = orange, 2 = yellow, Infinity = none.
+// Mirrors the card header colours so the Cut-off Alerts sort finds exactly what the eye is hunting for.
+function alertRank(i: DashboardItem): number {
+  if (i.orderPlaced) return Infinity
+  const a = cutoffAlert(i.cutoffDate)
+  return a.active ? a.days : Infinity
+}
+function clientQty(i: DashboardItem): number {
+  return (i.customers || []).reduce((s, c) => s + (c.qty || 0), 0)
 }
 
 function calcRetailPrice(wholesalePrice:string,currency:string,rates:Record<string,number>,settings:CostingSettings,supplier?:string): string {
@@ -1025,6 +1036,9 @@ export default function SupplierPreOrderPage() {
     else if (sortBy === 'price') v = parsePrice(a.estimatedRetailPrice) - parsePrice(b.estimatedRetailPrice)
     else if (sortBy === 'date') v = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
     else if (sortBy === 'new') v = latestNewReservedAt(a) - latestNewReservedAt(b)
+    else if (sortBy === 'clients') v = clientQty(a) - clientQty(b) || a.customers.length - b.customers.length
+    // Reversed so the default Desc puts red first, then orange, then yellow; Asc flips it
+    else if (sortBy === 'alert') v = alertRank(b) - alertRank(a)
     else if (sortBy === 'cutoff') {
       const da = a.cutoffDate ? new Date(a.cutoffDate).getTime() : Infinity
       const db2 = b.cutoffDate ? new Date(b.cutoffDate).getTime() : Infinity
@@ -1033,8 +1047,12 @@ export default function SupplierPreOrderPage() {
     return sortAsc ? v : -v
   })
 
-  // "New Orders" filters the list down to items with at least one not-yet-seen reservation
-  const newFiltered = sortBy === 'new' ? sorted.filter(i => i.customers.some(c => (c as any).isNew)) : sorted
+  // These three sorts double as filters — the list narrows to just what the mode is about
+  const newFiltered =
+    sortBy === 'new' ? sorted.filter(i => i.customers.some(c => (c as any).isNew))
+    : sortBy === 'clients' ? sorted.filter(i => i.customers.length > 0)
+    : sortBy === 'alert' ? sorted.filter(i => alertRank(i) !== Infinity)
+    : sorted
 
   const filtered = search.trim()
     ? newFiltered.filter(i =>
@@ -1053,6 +1071,13 @@ export default function SupplierPreOrderPage() {
   const safePage = Math.min(page, totalPages)
   const pagedItems = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
   const newOrders = items.reduce((s, i) => s + i.customers.filter(c => (c as any).isNew).length, 0)
+  const clientOrderItems = items.filter(i => i.customers.length > 0).length
+  const alertCounts = items.reduce((c, i) => {
+    const r = alertRank(i)
+    if (r === 0) c.red++; else if (r === 1) c.orange++; else if (r === 2) c.yellow++
+    return c
+  }, { red: 0, orange: 0, yellow: 0 })
+  const alertTotal = alertCounts.red + alertCounts.orange + alertCounts.yellow
 
   // Fall back to Date Added if the New Orders filter is active but everything's since been marked seen
   useEffect(() => {
@@ -1185,6 +1210,8 @@ export default function SupplierPreOrderPage() {
     ...(newOrders > 0 ? [{ value: 'new' as SortBy, label: `🆕 New Orders (${newOrders})` }] : []),
     { value: 'date', label: 'Date Added' }, { value: 'az', label: 'A–Z' }, { value: 'sku', label: 'SKU' },
     { value: 'brand', label: 'Brand' }, { value: 'price', label: 'Price' }, { value: 'cutoff', label: 'Cut-off Date' },
+    { value: 'clients', label: `👥 Client Orders (${clientOrderItems})` },
+    { value: 'alert', label: `🚨 Cut-off Alerts (${alertTotal})` },
   ]
 
   const fxPairs = Object.entries(exchangeRates).filter(([cur]) => cur !== 'ZAR' && items.some(i => i.wholesaleCurrency === cur))
@@ -1247,6 +1274,13 @@ export default function SupplierPreOrderPage() {
           <button onClick={() => setSortAsc(a => !a)} className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 font-medium transition-colors">
             {sortAsc ? '↑ Asc' : '↓ Desc'}
           </button>
+          {sortBy === 'alert' && (
+            <div className="flex items-center gap-1.5 text-[11px] font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-red-600 text-white">Today {alertCounts.red}</span>
+              <span className="px-2 py-0.5 rounded-full bg-orange-500 text-white">1 day {alertCounts.orange}</span>
+              <span className="px-2 py-0.5 rounded-full bg-yellow-400 text-black">2 days {alertCounts.yellow}</span>
+            </div>
+          )}
           <div className="h-4 w-px bg-gray-200"/>
           <div className="relative flex-1 min-w-[180px]">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">🔍</span>
@@ -1293,8 +1327,8 @@ export default function SupplierPreOrderPage() {
           {pagedItems.length === 0 && !newItem ? (
             <div className="text-center py-20 text-gray-400">
               <div className="text-4xl mb-3">📦</div>
-              <p className="font-medium">No items for {supplierName}</p>
-              <p className="text-sm mt-1">Click &quot;+ New Item&quot; to add the first one.</p>
+              <p className="font-medium">{sortBy === 'alert' ? 'No cut-off alerts right now' : sortBy === 'clients' ? 'No items with client orders' : `No items for ${supplierName}`}</p>
+              <p className="text-sm mt-1">{sortBy === 'alert' || sortBy === 'clients' ? 'Switch Sort back to Date Added to see every item.' : <>Click &quot;+ New Item&quot; to add the first one.</>}</p>
             </div>
           ) : pagedItems.map(item => (
             <ItemCard key={item.id} item={item} contacts={contacts} suppliers={suppliers} options={options}

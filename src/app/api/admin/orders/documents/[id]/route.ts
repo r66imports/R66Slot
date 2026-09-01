@@ -112,9 +112,17 @@ export async function PATCH(
     docs[idx] = { ...prev, ...body, updatedAt: new Date().toISOString() }
     await blobReplaceArrayItem(KEY, id, docs[idx])
     return NextResponse.json(docs[idx])
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating document:', error)
-    return NextResponse.json({ error: 'Failed to update document' }, { status: 500 })
+    // The real cause is surfaced here, not just logged: every document PATCH on this site
+    // was failing with a bare "Failed to update document", which says nothing about why and
+    // left invoices, quotes and sales orders uneditable with no way to diagnose it.
+    return NextResponse.json({
+      error: 'Failed to update document',
+      detail: error?.message || String(error),
+      code: error?.code,
+      where: error?.routine || error?.severity ? 'database' : undefined,
+    }, { status: 500 })
   }
 }
 
