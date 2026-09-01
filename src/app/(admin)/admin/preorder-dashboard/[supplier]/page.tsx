@@ -276,31 +276,60 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   const appendQuoteToInvoice=async(quoteDoc:any,invoiceDoc:any)=>{
     setSending(true);setOpen(false);setPendingConvertQuote(null)
     try{
-      if(await blockedByStock(quoteDoc.lineItems||[])) return
-      // Re-read the invoice: this dropdown's copy was fetched when it opened, so its notes
-      // and payment totals must not be written back from a stale snapshot either. The lines
-      // are appended server-side, where nothing can land between the read and the write.
+      // Re-read BOTH documents. This dropdown's copies were fetched when it opened, so the
+      // invoice's notes and payment totals must not be written back from a stale snapshot —
+      // and the Quote's lineItems must come from the server, never from the list copy. A
+      // Quote whose lines were missing from that copy used to append an EMPTY array: the
+      // deposits, payments and Quote Ref all merged, the Quote was archived and every
+      // dashboard card was re-badged to the Invoice, while the goods themselves never
+      // arrived on it. Nothing then deducted that stock, so Inventory read high for ever.
       const freshList:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json()).catch(()=>[])
-      const inv=(Array.isArray(freshList)?freshList:[]).find((d:any)=>d.id===invoiceDoc.id)||invoiceDoc
-      const depositNote=depositNoteFor(quoteDoc)
+      const list=Array.isArray(freshList)?freshList:[]
+      const inv=list.find((d:any)=>d.id===invoiceDoc.id)||invoiceDoc
+      const quote=list.find((d:any)=>d.id===quoteDoc.id)||quoteDoc
+      const quoteLines:any[]=quote.lineItems||[]
+      // A Quote with no lines has nothing to merge. Bail BEFORE any money moves — merging
+      // the payments and archiving it would strand the goods with no way back.
+      if(quoteLines.length===0){
+        alert(`Cannot merge ${quote.docNumber||'this Quote'} into ${inv.docNumber}: it has no line items.\n\nNothing has been changed.`)
+        setSending(false);return
+      }
+      if(await blockedByStock(quoteLines)) return
+      const before=(inv.lineItems||[]).length
+      const depositNote=depositNoteFor(quote)
       const mergedNotes=[inv.notes,depositNote].filter(Boolean).join('\n')
-      const mergedPayments=[...(inv.payments||[]),...tagPaymentsFromQuote(quoteDoc.payments,quoteDoc.docNumber)]
+      const mergedPayments=[...(inv.payments||[]),...tagPaymentsFromQuote(quote.payments,quote.docNumber)]
       const res=await fetch(`/api/admin/orders/documents/${inv.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-        appendLineItems:quoteDoc.lineItems||[],
+        appendLineItems:quoteLines,
         notes:mergedNotes,
-        amountPaid:Number(inv.amountPaid||0)+Number(quoteDoc.amountPaid||0),
-        creditApplied:Number(inv.creditApplied||0)+Number(quoteDoc.creditApplied||0),
+        amountPaid:Number(inv.amountPaid||0)+Number(quote.amountPaid||0),
+        creditApplied:Number(inv.creditApplied||0)+Number(quote.creditApplied||0),
         payments:mergedPayments,
         // Rule 28 — every Quote merged in stays named in "Quote Ref:", not just the one
         // that created the invoice.
-        sourceQuoteNumber:mergeQuoteRefs(inv.sourceQuoteNumber,quoteDoc.docNumber),
+        sourceQuoteNumber:mergeQuoteRefs(inv.sourceQuoteNumber,quote.docNumber),
       })})
-      if(res.ok){
-        await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
-        await relinkQuoteEntries(quoteDoc,inv.docNumber,inv.id)
-        notify(inv.docNumber,inv.id)
+      if(!res.ok){
+        const e=await res.json().catch(()=>({}))
+        alert(e.error||`Could not merge into ${inv.docNumber}. Nothing has been changed.`)
+        setSending(false);return
       }
-    }catch{}
+      // A 200 is not proof the lines landed. Confirm against what the server actually saved
+      // before archiving the Quote or re-badging any card — those two steps are what make a
+      // dropped append permanent and invisible.
+      const saved=await res.json().catch(()=>null)
+      if((saved?.lineItems||[]).length<before+quoteLines.length){
+        alert(`${inv.docNumber} did not accept the ${quoteLines.length} line item(s) from ${quote.docNumber}.\n\nThe Quote has NOT been archived and no card has been re-linked, so nothing is lost — please try again.`)
+        setSending(false);return
+      }
+      await fetch(`/api/admin/orders/documents/${quote.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
+      await relinkQuoteEntries(quote,inv.docNumber,inv.id)
+      notify(inv.docNumber,inv.id)
+    }catch(err:any){
+      // This used to swallow everything, which is how a half-finished merge looked like a
+      // clean one to the person clicking the button.
+      alert(`Merge failed: ${err?.message||'unknown error'}. Nothing has been changed.`)
+    }
     setSending(false)
   }
 
@@ -317,8 +346,18 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       if(bankAccountId) body.bankAccountId=bankAccountId
       if(type==='invoice'&&await blockedByStock(body.lineItems)) return
       const res=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      if(res.ok){const doc=await res.json();if(doc.id) notify(doc.docNumber,doc.id)}
-      else{const e=await res.json().catch(()=>({}));window.alert(e.error||'Could not create document')}
+      if(!res.ok){const e=await res.json().catch(()=>({}));window.alert(e.error||'Could not create document');return}
+      const doc=await res.json()
+      if(!doc.id){window.alert(doc.error||'Could not create document');return}
+      // A document that came back without the line is not something to badge the card
+      // against — an unlinked card can be retried, a wrongly-linked one strands the stock.
+      if((doc.lineItems||[]).length===0){
+        window.alert(`${doc.docNumber} was created without ${form.sku||'the item'}.
+
+The card has NOT been linked — please check the document.`)
+        return
+      }
+      notify(doc.docNumber,doc.id)
     }catch{}
     finally{setSending(false)}
   }
@@ -368,8 +407,22 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         ?{lineItems:existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)}
         :{appendLineItems:[lineItem()]}
       const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patchBody)})
-      if(res.ok) notify(target.docNumber,target.id)
-      else{const e=await res.json().catch(()=>({}));window.alert(e.error||`Could not update ${target.docNumber}`)}
+      if(!res.ok){const e=await res.json().catch(()=>({}));window.alert(e.error||`Could not update ${target.docNumber}`);return}
+      // Only badge the card once the line is provably on the document. Badging on res.ok
+      // alone is how a card ends up naming an Invoice that has no line for its SKU — and
+      // once a Quote it points at is later merged, the relink sweep carries that empty
+      // badge onto the Invoice, where nothing will ever deduct its stock.
+      const savedDoc=await res.json().catch(()=>null)
+      const landed=skuPrefix
+        ?(savedDoc?.lineItems||[]).some((i:any)=>i.description?.startsWith(skuPrefix))
+        :(savedDoc?.lineItems||[]).length>existingItems.length
+      if(!landed){
+        window.alert(`${target.docNumber} did not accept ${form.sku||'this item'}.
+
+The card has NOT been linked, so nothing is lost — please try again.`)
+        return
+      }
+      notify(target.docNumber,target.id)
     }catch{}
     finally{setSending(false)}
   }

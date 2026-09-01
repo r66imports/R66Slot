@@ -3354,8 +3354,27 @@ function OrdersPageInner() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patchBody),
       })
-      if (res.ok) {
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}))
+        setSoToInvoiceResult(`Error: ${e.error || res.status} — nothing has been changed.`)
+        setTimeout(() => setSoToInvoiceResult(null), 8000)
+        setAppendingToInvoice(false)
+        return
+      }
+      {
         const updated = await res.json()
+        // A 200 does not prove the goods landed. An append that arrives empty is a valid
+        // no-op the server reports as success — and archiving the Quote and re-linking its
+        // dashboard cards on the strength of that is what strands the items: the deposits
+        // merge, the Quote disappears, every card reads as invoiced, and nothing ever
+        // deducts the stock. Verify against what was actually saved before going further.
+        if ((updated?.lineItems || []).length < (fresh.lineItems || []).length + newItems.length) {
+          setSoToInvoiceResult(`Error: ${target.docNumber} did not accept the ${newItems.length} line item(s) from ${quote.docNumber} — ${quote.docNumber} has NOT been archived and no card re-linked, so nothing is lost. Please try again.`)
+          setTimeout(() => setSoToInvoiceResult(null), 12000)
+          setDocuments((prev) => prev.map((d) => d.id === updated.id ? updated : d))
+          setAppendingToInvoice(false)
+          return
+        }
         setDocuments((prev) => prev.map((d) => d.id === updated.id ? updated : d))
         const archiveRes = await fetch(`/api/admin/orders/documents/${quote.id}`, {
           method: 'PATCH',
@@ -3377,9 +3396,6 @@ function OrdersPageInner() {
           localStorage.setItem('preorder-doc-relinked', JSON.stringify({ fromDocId: quote.id, fromDocNumber: quote.docNumber, toDocId: target.id, toDocNumber: target.docNumber, t: Date.now() }))
         } catch {}
         setSoToInvoiceResult(`✓ ${quote.docNumber} → added to ${target.docNumber}`)
-      } else {
-        const errData = await res.json().catch(() => ({}))
-        setSoToInvoiceResult(`Error: ${errData.error || res.status}`)
       }
       setTimeout(() => setSoToInvoiceResult(null), 5000)
     } catch (e: any) {
