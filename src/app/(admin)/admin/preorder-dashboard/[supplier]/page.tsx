@@ -968,6 +968,33 @@ export default function SupplierPreOrderPage() {
     }
   }
 
+  // Rule 60 — a relink lands in the blob for every entry the Quote covers, but this page
+  // holds all of its items in memory and only renders ten of them at a time. The cards on
+  // screen update themselves; everything on the other pages has to be patched here, or
+  // paging forward shows the Quote number the browser loaded hours ago until the whole page
+  // is reloaded. The storage event carries relinks made in another tab.
+  useEffect(() => {
+    const apply = (d: any) => {
+      if (!d?.toDocNumber) return
+      setItems((prev) => prev.map((it) => {
+        const customers = (it.customers || []) as any[]
+        let changed = false
+        const next = customers.map((c: any) => {
+          const mine = (!!d.fromDocId && c.linkedDocId === d.fromDocId) || (!!d.fromDocNumber && c.linkedDocNumber === d.fromDocNumber)
+          if (!mine) return c
+          changed = true
+          return { ...c, linkedDocId: d.toDocId, linkedDocNumber: d.toDocNumber }
+        })
+        return changed ? { ...it, customers: next } : it
+      }))
+    }
+    const h = (e: Event) => apply((e as CustomEvent).detail)
+    const s = (e: StorageEvent) => { if (e.key === 'preorder-doc-relinked' && e.newValue) { try { apply(JSON.parse(e.newValue)) } catch {} } }
+    window.addEventListener('preorder-doc-relinked', h)
+    window.addEventListener('storage', s)
+    return () => { window.removeEventListener('preorder-doc-relinked', h); window.removeEventListener('storage', s) }
+  }, [])
+
   useEffect(() => {
     Promise.all([
       loadItems(),
