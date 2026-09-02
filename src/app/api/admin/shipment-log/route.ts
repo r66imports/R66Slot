@@ -35,7 +35,15 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const month = searchParams.get('month') // YYYY-MM
     let rows = await getRows()
-    if (month) rows = rows.filter((r) => r.createdAt.startsWith(month))
+    if (month) {
+      // Selected month, plus anything from an earlier month that is still open.
+      // Only an instruction of "Shipped" closes a packing task — everything else rolls over.
+      rows = rows.filter((r) => {
+        const rowMonth = (r.createdAt || '').slice(0, 7)
+        if (rowMonth === month) return true
+        return rowMonth < month && (r.instruction || '').trim().toLowerCase() !== 'shipped'
+      })
+    }
     return NextResponse.json(rows)
   } catch {
     return NextResponse.json([])

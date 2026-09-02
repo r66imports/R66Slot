@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
 interface DropdownOption { value: string; label: string; color: string }
@@ -143,6 +143,16 @@ const COLOR_DOT: Record<string, string> = {
 const COLORS = ['yellow','green','red','blue','orange','indigo','teal','pink','dark','gray']
 
 function pill(color: string) { return COLOR_PILL[color] ?? COLOR_PILL.gray }
+function shortMonth(iso: string) {
+  const m = (iso || '').slice(0, 7)
+  if (!m) return ''
+  return new Date(m + '-02').toLocaleString('en-ZA', { month: 'short' })
+}
+function longMonth(iso: string) {
+  const m = (iso || '').slice(0, 7)
+  if (!m) return ''
+  return new Date(m + '-02').toLocaleString('en-ZA', { month: 'long', year: 'numeric' })
+}
 function dot(color: string) { return COLOR_DOT[color] ?? COLOR_DOT.gray }
 
 /* ─── Configurable Dropdown ──────────────────────────────────────────────── */
@@ -381,6 +391,9 @@ export default function ShipmentLogPage() {
   const [loading, setLoading] = useState(true)
   const [boxFreeMode, setBoxFreeMode] = useState<Record<string, boolean>>({})
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7))
+  const [search, setSearch] = useState('')
+  const [allRows, setAllRows] = useState<ShipmentRow[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const optSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -402,6 +415,21 @@ export default function ShipmentLogPage() {
       if (optData && !optData.error) setOptions(optData)
     }).catch(() => {}).finally(() => setLoading(false))
   }, [month])
+
+  /* Search spans every month, so pull the full log the first time a query is typed */
+  const query = search.trim().toLowerCase()
+  const searching = query.length > 0
+  useEffect(() => {
+    if (!searching) return
+    let cancelled = false
+    setSearchLoading(true)
+    fetch('/api/admin/shipment-log')
+      .then((r) => r.json())
+      .then((data) => { if (!cancelled) setAllRows(Array.isArray(data) ? data : []) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setSearchLoading(false) })
+    return () => { cancelled = true }
+  }, [searching])
 
   const openClientPopup = (name: string) => {
     if (!name.trim()) return
@@ -438,12 +466,12 @@ export default function ShipmentLogPage() {
   }, [])
 
   const updateRow = (id: string, field: keyof ShipmentRow, value: string) => {
-    setRows((prev) => {
-      const next = prev.map((r) => r.id === id ? { ...r, [field]: value } : r)
-      const updated = next.find((r) => r.id === id)!
-      saveRow(updated)
-      return next
-    })
+    const src = rows.find((r) => r.id === id) || allRows.find((r) => r.id === id)
+    if (!src) return
+    const updated = { ...src, [field]: value }
+    setRows((prev) => prev.map((r) => r.id === id ? updated : r))
+    setAllRows((prev) => prev.map((r) => r.id === id ? updated : r))
+    saveRow(updated)
   }
 
   const updateOptions = (key: keyof ShipmentOptions, opts: DropdownOption[]) => {
@@ -463,12 +491,14 @@ export default function ShipmentLogPage() {
     if (res.ok) {
       const row = await res.json()
       setRows((prev) => [row, ...prev])
+      setAllRows((prev) => prev.length ? [row, ...prev] : prev)
     }
   }
 
   const deleteRow = async (id: string) => {
     if (!confirm('Delete this shipment row?')) return
     setRows((prev) => prev.filter((r) => r.id !== id))
+    setAllRows((prev) => prev.filter((r) => r.id !== id))
     await fetch(`/api/admin/shipment-log/${id}`, { method: 'DELETE' })
   }
 
@@ -480,12 +510,41 @@ export default function ShipmentLogPage() {
   }
   const monthLabel = new Date(month + '-02').toLocaleString('en-ZA', { month: 'long', year: 'numeric' })
 
+  /* A packing task is only closed when its instruction is "Shipped" —
+     every other instruction means the order is still open */
+  const isShipped = useCallback((row: ShipmentRow) => {
+    const opt = options.instructions.find((o) => o.value === row.instruction)
+    return (opt?.label || row.instruction || '').trim().toLowerCase() === 'shipped'
+  }, [options.instructions])
+
+  /* Rows to render. Searching looks across every month; otherwise the selected
+     month is shown with any still-open rows from earlier months rolled over on top. */
+  const displayRows = useMemo(() => {
+    if (searching) {
+      return [...allRows]
+        .filter((r) =>
+          (r.name || '').toLowerCase().includes(query) ||
+          (r.invoiceNumber || '').toLowerCase().includes(query))
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+        .map((row, i, arr) => ({ row, carried: false, num: arr.length - i }))
+    }
+    const carried = rows
+      .filter((r) => (r.createdAt || '').slice(0, 7) < month && !isShipped(r))
+      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+    const current = rows.filter((r) => (r.createdAt || '').slice(0, 7) === month)
+    return [
+      ...carried.map((row) => ({ row, carried: true, num: 0 })),
+      ...current.map((row, i) => ({ row, carried: false, num: current.length - i })),
+    ]
+  }, [rows, allRows, searching, query, month, isShipped])
+
   /* Summary counts */
   const counts = {
-    total: rows.length,
-    sent: rows.filter((r) => r.status === 'sent' || r.instruction === 'shipped').length,
-    hold: rows.filter((r) => r.instruction === 'hold').length,
-    ready: rows.filter((r) => r.instruction === 'ready').length,
+    total: displayRows.length,
+    sent: displayRows.filter(({ row }) => row.status === 'sent' || isShipped(row)).length,
+    hold: displayRows.filter(({ row }) => row.instruction === 'hold').length,
+    ready: displayRows.filter(({ row }) => row.instruction === 'ready').length,
+    carried: displayRows.filter((d) => d.carried).length,
   }
 
   return (
@@ -496,6 +555,28 @@ export default function ShipmentLogPage() {
           <div>
             <h1 className="text-xl font-bold text-gray-900">Shipment Log</h1>
             <p className="text-xs text-gray-500 mt-0.5">Local shipping — track packing, dispatch, and couriers</p>
+          </div>
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
+            <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+            </svg>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search invoice # or client name…"
+              className="w-full text-sm border border-gray-200 rounded-xl pl-9 pr-8 py-2 focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-300"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                title="Clear search"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            )}
           </div>
 
           {/* Month nav */}
@@ -525,6 +606,7 @@ export default function ShipmentLogPage() {
             { label: 'Ready to Ship', value: counts.ready, cls: 'text-green-600' },
             { label: 'On Hold', value: counts.hold, cls: 'text-red-600' },
             { label: 'Sent', value: counts.sent, cls: 'text-blue-600' },
+            ...(counts.carried ? [{ label: 'Rolled Over', value: counts.carried, cls: 'text-amber-600' }] : []),
           ].map((s) => (
             <div key={s.label} className="text-center">
               <p className={`text-lg font-bold ${s.cls}`}>{s.value}</p>
@@ -532,6 +614,12 @@ export default function ShipmentLogPage() {
             </div>
           ))}
         </div>
+
+        {searching && (
+          <p className="inline-block text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mt-3">
+            Searching all months for &ldquo;{search.trim()}&rdquo; &mdash; {displayRows.length} result{displayRows.length === 1 ? '' : 's'}{searchLoading ? ' (loading…)' : ''}
+          </p>
+        )}
       </div>
 
       {/* Table */}
@@ -541,7 +629,7 @@ export default function ShipmentLogPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-900 text-white text-xs uppercase tracking-wider">
-                  <th className="py-3 px-3 text-center w-10">#</th>
+                  <th className="py-3 px-3 text-center w-16">#</th>
                   <th className="py-3 px-3 text-left min-w-[100px]">Name</th>
                   <th className="py-3 px-3 text-left min-w-[110px]">Invoice</th>
                   <th className="py-3 px-3 text-left min-w-[110px]">Status</th>
@@ -557,19 +645,36 @@ export default function ShipmentLogPage() {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {loading || (searching && searchLoading && displayRows.length === 0) ? (
                   <tr><td colSpan={13} className="py-16 text-center text-gray-400 text-sm">Loading&hellip;</td></tr>
-                ) : rows.length === 0 ? (
+                ) : displayRows.length === 0 ? (
                   <tr>
                     <td colSpan={13} className="py-16 text-center">
-                      <p className="text-gray-400 text-sm mb-3">No shipments for {monthLabel}</p>
-                      <button onClick={addRow} className="text-indigo-600 text-sm font-semibold hover:underline">+ Add first shipment</button>
+                      {searching ? (
+                        <p className="text-gray-400 text-sm">No shipments match &ldquo;{search.trim()}&rdquo;</p>
+                      ) : (
+                        <>
+                          <p className="text-gray-400 text-sm mb-3">No shipments for {monthLabel}</p>
+                          <button onClick={addRow} className="text-indigo-600 text-sm font-semibold hover:underline">+ Add first shipment</button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ) : (
-                  rows.map((row, idx) => (
-                    <tr key={row.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${idx % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
-                      <td className="py-2 px-3 text-center text-xs text-gray-400 font-mono">{rows.length - idx}</td>
+                  displayRows.map(({ row, carried, num }, idx) => (
+                    <tr key={row.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${carried ? 'bg-amber-50/60' : idx % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                      <td className="py-2 px-3 text-center">
+                        {carried ? (
+                          <span
+                            className="text-[9px] font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1 py-0.5 whitespace-nowrap"
+                            title={`Still open — rolled over from ${longMonth(row.createdAt)}`}
+                          >
+                            {shortMonth(row.createdAt)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 font-mono">{num}</span>
+                        )}
+                      </td>
 
                       <td className="py-2 px-2">
                         <button
