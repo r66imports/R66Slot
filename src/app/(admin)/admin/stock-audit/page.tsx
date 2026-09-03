@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 
 interface InvoiceLine {
   docNumber: string
-  type: 'invoice' | 'salesorder'
+  type: 'invoice' | 'salesorder' | 'siteorder'
   date: string
   clientName: string
   qty: number
@@ -17,11 +17,13 @@ interface SkuAuditRow {
   supplier: string
   currentQty: number
   impliedStarting: number
+  startingSource: 'log' | 'derived'
   totalSoldQty: number
   syncedSoldQty: number
   totalReservedQty: number
   unsyncedDocs: string[]
   invoices: InvoiceLine[]
+  variance: number
   status: 'ok' | 'unsynced' | 'oversold'
 }
 
@@ -195,7 +197,7 @@ export default function StockAuditPage() {
                   <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
                   <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
                   <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Supplier</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" title="Estimated starting stock = Current + Sold + Reserved">Est. Starting</th>
+                  <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" title="Stock booked into the system — the worksheet import / inventory save that logged it in. Marked est. where there is no log history and it had to be worked back from sales.">Logged In</th>
                   <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Sold</th>
                   <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Synced</th>
                   <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reserved (SO)</th>
@@ -223,7 +225,12 @@ export default function StockAuditPage() {
                       <td className="px-3 py-3 font-mono text-xs text-indigo-700 font-semibold">{row.sku.toUpperCase()}</td>
                       <td className="px-3 py-3 text-gray-900 max-w-[200px] truncate">{row.title}</td>
                       <td className="px-3 py-3 text-gray-500 text-xs">{row.supplier || '—'}</td>
-                      <td className="px-3 py-3 text-right font-medium text-gray-700">{row.impliedStarting}</td>
+                      <td className="px-3 py-3 text-right font-medium text-gray-700">
+                        {row.impliedStarting}
+                        {row.startingSource === 'derived' && (
+                          <span className="ml-1 text-[10px] font-normal text-gray-400" title="No stock log for this SKU — worked back from sales">est.</span>
+                        )}
+                      </td>
                       <td className="px-3 py-3 text-right font-bold text-gray-900">
                         {row.totalSoldQty || '—'}
                         {unsynced > 0 && (
@@ -246,8 +253,9 @@ export default function StockAuditPage() {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-xs text-gray-400">
-        <span><strong>Est. Starting</strong> = Current stock + All sold + All reserved</span>
-        <span><strong>Total Sold</strong> = Every invoice line item (synced or not)</span>
+        <span><strong>Logged In</strong> = Stock booked into the system (worksheet import / inventory save)</span>
+        <span><strong>est.</strong> = No stock log for that SKU, so worked back from sales</span>
+        <span><strong>Total Sold</strong> = Every invoice line item (synced or not), plus site orders not yet invoiced</span>
         <span><strong>Synced</strong> = Stock actually deducted in system</span>
         <span>Click any row for full invoice breakdown</span>
       </div>
@@ -276,8 +284,9 @@ export default function StockAuditPage() {
               {/* SKU stats */}
               <div className="grid grid-cols-4 gap-3 mt-4">
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
-                  <p className="text-xs text-gray-500">Est. Starting</p>
+                  <p className="text-xs text-gray-500">Logged In</p>
                   <p className="text-xl font-bold text-gray-900">{detail.impliedStarting}</p>
+                  <p className="text-xs text-gray-400">{detail.startingSource === 'log' ? 'from stock log' : 'estimated'}</p>
                 </div>
                 <div className="bg-red-50 rounded-lg p-3 text-center">
                   <p className="text-xs text-red-600">Total Sold</p>
@@ -293,6 +302,24 @@ export default function StockAuditPage() {
                   <p className={`text-xl font-bold ${detail.currentQty === 0 ? 'text-red-700' : 'text-green-700'}`}>{detail.currentQty}</p>
                 </div>
               </div>
+
+              {/* Does it add up? Logged in, less everything sold and reserved, should be what is on the shelf. */}
+              {detail.variance === 0 ? (
+                <p className="mt-3 text-xs text-gray-500">
+                  Balances: {detail.impliedStarting} logged in &minus; {detail.totalSoldQty} sold
+                  {detail.totalReservedQty ? ` − ${detail.totalReservedQty} reserved` : ''}
+                  {' '}= {detail.currentQty} in stock
+                </p>
+              ) : (
+                <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <strong>{Math.abs(detail.variance)} unit{Math.abs(detail.variance) === 1 ? '' : 's'} unaccounted for.</strong>{' '}
+                  {detail.impliedStarting} was logged in, but stock on hand plus everything sold and
+                  reserved comes to {detail.impliedStarting - detail.variance}.
+                  {detail.variance > 0
+                    ? ' Stock left without a document behind it.'
+                    : ' More went out than was ever booked in.'}
+                </p>
+              )}
             </div>
 
             {/* Invoice list */}
@@ -314,9 +341,11 @@ export default function StockAuditPage() {
                       <td className="px-4 py-2.5 font-mono text-xs text-indigo-700 font-semibold">{inv.docNumber}</td>
                       <td className="px-4 py-2.5">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                          inv.type === 'invoice' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-700'
+                          inv.type === 'invoice' ? 'bg-gray-100 text-gray-700'
+                          : inv.type === 'siteorder' ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
                         }`}>
-                          {inv.type === 'invoice' ? 'Invoice' : 'Sales Order'}
+                          {inv.type === 'invoice' ? 'Invoice' : inv.type === 'siteorder' ? 'Site Order' : 'Sales Order'}
                         </span>
                       </td>
                       <td className="px-4 py-2.5 text-gray-600 text-xs">{fmt(inv.date)}</td>
