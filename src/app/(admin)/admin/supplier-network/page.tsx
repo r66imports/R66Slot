@@ -28,6 +28,7 @@ interface DashItem {
 interface WsItem {
   qty: number
   wholesalePrice: number
+  gcdRetailCny?: number
   sku: string
   description: string
   sentToInventory?: boolean
@@ -40,7 +41,15 @@ interface WsSheet {
   date: string
   archived: boolean
   currency: string
+  exchangeRate?: number
   supplierInvNumber?: string
+  cutMode?: boolean
+  cutDiscountPct?: number
+  gcdMode?: boolean
+  finalExRate?: number
+  finalShippingCost?: number
+  finalCustomsCost?: number
+  finalHandlingCharge?: number
   items: WsItem[]
 }
 
@@ -69,8 +78,17 @@ type Tab = 'overview' | 'pipeline' | 'worksheets' | 'by-supplier'
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
+function fmtNum(n: number) {
+  return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
 function fmt(n: number) {
-  return 'R ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  return 'R ' + fmtNum(n)
+}
+
+// The sheet's own currency, e.g. "USD 3 623.10" — never summed across sheets.
+function fmtFC(sheet: WsSheet, n: number) {
+  return `${sheet.currency || 'ZAR'} ${fmtNum(n)}`
 }
 
 function fmtShort(n: number) {
@@ -79,8 +97,43 @@ function fmtShort(n: number) {
   return `R${Math.round(n)}`
 }
 
-function wsValue(sheet: WsSheet) {
-  return (sheet.items || []).reduce((s, i) => s + (i.wholesalePrice || 0) * (i.qty || 0), 0)
+// ─── Worksheet totals ──────────────────────────────────────────────────────────
+// Every supplier buys in their own currency. Each worksheet stores that currency
+// plus the exchange rate it was costed at, so a sheet is converted at its OWN
+// stored rate — never a live rate, and never left unconverted. Only the ZAR
+// amounts may be added together.
+
+function wsCut(sheet: WsSheet, w: number) {
+  return sheet.cutMode ? w * (1 - (sheet.cutDiscountPct || 0) / 100) : w
+}
+
+function wsFilledItems(sheet: WsSheet) {
+  return (sheet.items || []).filter((i) =>
+    sheet.gcdMode ? (i.gcdRetailCny || 0) > 0 : (i.wholesalePrice || 0) > 0
+  )
+}
+
+// Total in the supplier's own currency — what the supplier actually invoices.
+function wsValueFC(sheet: WsSheet) {
+  return wsFilledItems(sheet).reduce(
+    (s, i) => s + (i.qty || 0) * (sheet.gcdMode ? (i.gcdRetailCny || 0) : (i.wholesalePrice || 0)),
+    0
+  )
+}
+
+// The same total in ZAR, mirroring the worksheet page's totals footer.
+// GCD sheets are landed cost (base + shipping + customs + handling) at the final
+// rate; every other sheet is qty x wholesale x the sheet's own exchange rate.
+function wsValueZAR(sheet: WsSheet) {
+  const items = wsFilledItems(sheet)
+  if (sheet.gcdMode) {
+    const finalRate = sheet.finalExRate ?? sheet.exchangeRate ?? 1
+    const baseZAR = items.reduce((s, i) => s + (i.qty || 0) * wsCut(sheet, i.gcdRetailCny || 0) * finalRate, 0)
+    if (baseZAR <= 0) return 0
+    return baseZAR + (sheet.finalShippingCost || 0) + (sheet.finalCustomsCost || 0) + (sheet.finalHandlingCharge || 0) * finalRate
+  }
+  const rate = sheet.exchangeRate ?? 1
+  return items.reduce((s, i) => s + (i.qty || 0) * wsCut(sheet, i.wholesalePrice || 0) * rate, 0)
 }
 
 function matchSup(name: string, sup: SupplierContact) {
@@ -255,27 +308,31 @@ export default function SupplierNetworkPage() {
     const sheets = worksheets.filter(ws => matchSup(ws.supplier, sup))
     const active = sheets.filter(w => !w.archived)
     const archived = sheets.filter(w => w.archived)
-    const totalCost = sheets.reduce((s, w) => s + wsValue(w), 0)
+    const totalCost = sheets.reduce((s, w) => s + wsValueZAR(w), 0)
     return {
       supplier: sup,
       sheetCount: sheets.length,
       activeCount: active.length,
       archivedCount: archived.length,
       totalCost,
-      activeCost: active.reduce((s, w) => s + wsValue(w), 0),
+      activeCost: active.reduce((s, w) => s + wsValueZAR(w), 0),
       totalItems: sheets.reduce((s, w) => s + (w.items?.length || 0), 0),
       latestDate: sheets.map(w => w.date).filter(Boolean).sort().at(-1) || '',
     }
   }).filter(s => s.sheetCount > 0)
 
   // Totals
-  const totalPipelineValue = pipelineStats.reduce((s, x) => s + x.totalValue, 0)
-  const totalPipelineQty = pipelineStats.reduce((s, x) => s + x.totalQty, 0)
-  const totalPipelineItems = pipelineStats.reduce((s, x) => s + x.itemCount, 0)
-  const unmatchedWsValue = worksheets
-    .filter(ws => !suppliers.some(s => matchSup(ws.supplier, s)))
-    .reduce((s, w) => s + wsValue(w), 0)
-  const totalWsCost = wsStats.reduce((s, x) => s + x.totalCost, 0) + unmatchedWsValue
+  // Summed over the dashboard items themselves, not over pipelineStats — two
+  // supplier contacts can share a name/code and would count the same item twice.
+  const pipelineItems = dashItems.filter(i => suppliers.some(s => matchSup(i.supplier, s)))
+  const totalPipelineValue = pipelineItems.reduce((s, it) =>
+    s + parseFloat(it.retailPrice || it.estimatedRetailPrice || '0') * (it.customers ?? []).reduce((a, c) => a + c.qty, 0), 0)
+  const totalPipelineQty = pipelineItems.reduce((s, it) =>
+    s + (it.customers ?? []).reduce((a, c) => a + c.qty, 0), 0)
+  const totalPipelineItems = pipelineItems.length
+  // Summed over the worksheets themselves, not over wsStats — two supplier
+  // contacts can match the same sheet name/code, which would count it twice.
+  const totalWsCost = worksheets.reduce((s, w) => s + wsValueZAR(w), 0)
   const totalActiveWs = worksheets.filter(w => !w.archived).length
   const totalArchivedWs = worksheets.filter(w => w.archived).length
 
@@ -301,7 +358,7 @@ export default function SupplierNetworkPage() {
   const monthlyMap = worksheets.reduce((acc, ws) => {
     if (!ws.date) return acc
     const m = ws.date.substring(0, 7)
-    acc[m] = (acc[m] || 0) + wsValue(ws)
+    acc[m] = (acc[m] || 0) + wsValueZAR(ws)
     return acc
   }, {} as Record<string, number>)
   const monthlySeries = Object.entries(monthlyMap)
@@ -454,7 +511,8 @@ export default function SupplierNetworkPage() {
                       <th className="px-4 py-1.5 text-left text-[11px] text-gray-300 font-semibold">Supplier</th>
                       <th className="px-4 py-1.5 text-left text-[11px] text-gray-300 font-semibold">Name</th>
                       <th className="px-4 py-1.5 text-right text-[11px] text-gray-300 font-semibold">Items</th>
-                      <th className="px-4 py-1.5 text-right text-[11px] text-gray-300 font-semibold">Cost</th>
+                      <th className="px-4 py-1.5 text-right text-[11px] text-gray-300 font-semibold">Supplier Cost</th>
+                      <th className="px-4 py-1.5 text-right text-[11px] text-gray-300 font-semibold">Cost (ZAR)</th>
                       <th className="px-4 py-1.5 text-center text-[11px] text-gray-300 font-semibold">Status</th>
                     </tr>
                   </thead>
@@ -465,7 +523,8 @@ export default function SupplierNetworkPage() {
                         <td className="px-4 py-1.5 text-xs font-medium text-blue-600">{ws.supplier || '—'}</td>
                         <td className="px-4 py-1.5 text-xs text-gray-600">{ws.name || '—'}</td>
                         <td className="px-4 py-1.5 text-xs text-right text-gray-600">{ws.items?.length || 0}</td>
-                        <td className="px-4 py-1.5 text-xs text-right tabular-nums font-semibold text-gray-800">{fmt(wsValue(ws))}</td>
+                        <td className="px-4 py-1.5 text-xs text-right tabular-nums text-gray-500">{fmtFC(ws, wsValueFC(ws))}</td>
+                        <td className="px-4 py-1.5 text-xs text-right tabular-nums font-semibold text-gray-800">{fmt(wsValueZAR(ws))}</td>
                         <td className="px-4 py-1.5 text-center">
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${ws.archived ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
                             {ws.archived ? 'Archived' : 'Active'}
@@ -639,7 +698,8 @@ export default function SupplierNetworkPage() {
                       <th className="px-4 py-2 text-left text-[11px] text-gray-300 font-semibold">Name</th>
                       <th className="px-4 py-2 text-left text-[11px] text-gray-300 font-semibold">Inv #</th>
                       <th className="px-4 py-2 text-right text-[11px] text-gray-300 font-semibold">Items</th>
-                      <th className="px-4 py-2 text-right text-[11px] text-gray-300 font-semibold">Total Cost</th>
+                      <th className="px-4 py-2 text-right text-[11px] text-gray-300 font-semibold">Supplier Cost</th>
+                      <th className="px-4 py-2 text-right text-[11px] text-gray-300 font-semibold">Total Cost (ZAR)</th>
                       <th className="px-4 py-2 text-center text-[11px] text-gray-300 font-semibold">Status</th>
                       <th className="px-4 py-2" />
                     </tr>
@@ -652,7 +712,10 @@ export default function SupplierNetworkPage() {
                         <td className="px-4 py-2 text-xs text-gray-700 max-w-[160px] truncate">{ws.name || '—'}</td>
                         <td className="px-4 py-2 text-xs text-gray-500 font-mono">{ws.supplierInvNumber || '—'}</td>
                         <td className="px-4 py-2 text-xs text-right text-gray-600">{ws.items?.length || 0}</td>
-                        <td className="px-4 py-2 text-xs text-right tabular-nums font-semibold text-gray-800">{fmt(wsValue(ws))}</td>
+                        <td className="px-4 py-2 text-xs text-right tabular-nums text-gray-500" title={`1 ${ws.currency || 'ZAR'} = R ${(ws.exchangeRate ?? 1).toFixed(4)}`}>
+                          {fmtFC(ws, wsValueFC(ws))}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-right tabular-nums font-semibold text-gray-800">{fmt(wsValueZAR(ws))}</td>
                         <td className="px-4 py-2 text-center">
                           <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${ws.archived ? 'bg-gray-100 text-gray-500' : 'bg-green-100 text-green-700'}`}>
                             {ws.archived ? 'Archived' : 'Active'}
@@ -669,6 +732,18 @@ export default function SupplierNetworkPage() {
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-100 border-t-2 border-gray-300">
+                      <td colSpan={5} className="px-4 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wider text-right">
+                        Worksheet Purchases (ZAR)
+                      </td>
+                      <td className="px-4 py-2 text-[10px] text-right text-gray-400 italic">mixed currencies</td>
+                      <td className="px-4 py-2 text-xs text-right tabular-nums font-bold text-gray-900">
+                        {fmt(filteredWs.reduce((s, w) => s + wsValueZAR(w), 0))}
+                      </td>
+                      <td colSpan={2} />
+                    </tr>
+                  </tfoot>
                 </table>
               )}
             </div>
