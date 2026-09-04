@@ -29,6 +29,14 @@ interface Supplier {
   name: string
 }
 
+/** Lean product record from /api/admin/products?inventory=1 — used to match typed item codes */
+interface ProductLite {
+  id: string
+  sku: string
+  title: string
+  imageUrl: string
+}
+
 const PRIORITY_OPTIONS: { value: TaskPriority; label: string }[] = [
   { value: 'high', label: 'High' },
   { value: 'medium', label: 'Medium' },
@@ -92,6 +100,23 @@ function normalize(t: any): Task {
   }
 }
 
+// A typed task title can BE an item code ("LCD64037-CH") or contain one
+// ("LCD64037-CH check qty") — match the whole title first, then each token.
+function findProductForText(text: string, index: Map<string, ProductLite>) {
+  if (index.size === 0) return null
+  const raw = (text || '').trim()
+  if (!raw) return null
+  const direct = index.get(raw.toUpperCase())
+  if (direct) return direct
+  for (const token of raw.split(/[ ,;|]+/)) {
+    const key = token.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '').toUpperCase()
+    if (key.length < 3 || !/[0-9]/.test(key)) continue
+    const hit = index.get(key)
+    if (hit) return hit
+  }
+  return null
+}
+
 function sortTasks(list: Task[]) {
   return [...list].sort((a, b) => {
     if (!!a.completedAt !== !!b.completedAt) return a.completedAt ? 1 : -1
@@ -124,6 +149,7 @@ export default function TaskListView({
   const [search, setSearch] = useState('')
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [productIndex, setProductIndex] = useState<Map<string, ProductLite>>(new Map())
   const [selectedSupplier, setSelectedSupplier] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'' | TaskPriority>('')
 
@@ -148,10 +174,20 @@ export default function TaskListView({
     Promise.all([
       fetch(`/api/admin/task-list?list=${list}`).then(r => r.json()).catch(() => []),
       fetch('/api/admin/supplier-contacts').then(r => r.json()).catch(() => []),
-    ]).then(([taskData, supplierData]) => {
+      fetch('/api/admin/products?inventory=1').then(r => r.json()).catch(() => []),
+    ]).then(([taskData, supplierData, productData]) => {
       const loaded = Array.isArray(taskData) ? taskData.map(normalize) : []
       setTasks(loaded)
       setSuppliers(Array.isArray(supplierData) ? supplierData : [])
+      if (Array.isArray(productData)) {
+        const index = new Map<string, ProductLite>()
+        for (const p of productData as any[]) {
+          const sku = (p?.sku || '').trim().toUpperCase()
+          if (!sku || index.has(sku)) continue
+          index.set(sku, { id: p.id, sku: p.sku || '', title: p.title || '', imageUrl: p.imageUrl || '' })
+        }
+        setProductIndex(index)
+      }
       setLoading(false)
       if (autoSyncNoImage) autoSyncNoImageProducts(loaded)
     })
@@ -572,6 +608,7 @@ export default function TaskListView({
                           <TaskRow
                             key={task.id}
                             task={task}
+                            productIndex={productIndex}
                             toggling={togglingId === task.id}
                             onToggle={() => toggleComplete(task)}
                             onSetPriority={p => setPriority(task.id, p)}
@@ -609,6 +646,7 @@ function Chevron({ open }: { open: boolean }) {
 
 function TaskRow({
   task,
+  productIndex,
   toggling,
   onToggle,
   onSetPriority,
@@ -617,6 +655,7 @@ function TaskRow({
   onDelete,
 }: {
   task: Task
+  productIndex: Map<string, ProductLite>
   toggling: boolean
   onToggle: () => void
   onSetPriority: (priority: TaskPriority) => void
@@ -657,6 +696,28 @@ function TaskRow({
       flashSaved()
     }, 800)
   }
+
+  // A manually typed item code links the row to that product
+  const matchedProduct = useMemo(
+    () => (isProductTask ? null : findProductForText(titleValue, productIndex)),
+    [isProductTask, titleValue, productIndex]
+  )
+  // Product tasks fall back to the live catalogue image when the task copy is stale/empty
+  const rowImage =
+    task.imageUrl ||
+    matchedProduct?.imageUrl ||
+    (isProductTask ? findProductForText(task.sku, productIndex)?.imageUrl || '' : '')
+  const imageHref = task.productId || matchedProduct?.id || ''
+  const imageNode = rowImage ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={rowImage}
+      alt={matchedProduct?.title || titleValue}
+      className="w-12 h-12 object-contain rounded border border-gray-200 flex-shrink-0 bg-white"
+    />
+  ) : (
+    <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex-shrink-0 flex items-center justify-center text-xl">📦</div>
+  )
 
   function handleTitleChange(val: string) {
     setTitleValue(val)
@@ -704,14 +765,17 @@ function TaskRow({
           ))}
         </select>
 
-        {/* Image (product-linked tasks only) */}
-        {isProductTask && (
-          task.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={task.imageUrl} alt={titleValue} className="w-12 h-12 object-contain rounded border border-gray-200 flex-shrink-0" />
-          ) : (
-            <div className="w-12 h-12 bg-gray-100 rounded border border-gray-200 flex-shrink-0 flex items-center justify-center text-xl">📦</div>
-          )
+        {/* Image — product-linked tasks, or a typed title that matches an item code */}
+        {(isProductTask || matchedProduct) && (
+          imageHref ? (
+            <Link
+              href={`/admin/products/${imageHref}`}
+              title={matchedProduct?.title || task.productTitle || 'Edit product'}
+              className="flex-shrink-0"
+            >
+              {imageNode}
+            </Link>
+          ) : imageNode
         )}
 
         {/* Info */}
