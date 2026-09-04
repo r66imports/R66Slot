@@ -14,6 +14,37 @@ export function extractSku(description: string): string {
 }
 
 /**
+ * Do these two line-item sets move the same stock?
+ *
+ * An autosave posts the whole document every tick, line items included, so a PATCH
+ * carrying `lineItems` says nothing about whether the goods changed. Treating its mere
+ * presence as a stock event made every tick restore all lines and deduct them again,
+ * burying real history in the stock ledger and leaving drift on product quantities
+ * where the capped restores did not cancel out.
+ *
+ * Only the SKU and the quantity behind it move stock. Price edits, renamed
+ * descriptions, reordered rows and split or merged lines that keep the same totals all
+ * leave the shelf exactly where it was, so they compare equal here.
+ */
+export function sameStockFootprint(a: LineItem[] | undefined, b: LineItem[] | undefined): boolean {
+  const tally = (items: LineItem[] | undefined) => {
+    const m = new Map<string, number>()
+    for (const li of items || []) {
+      const sku = extractSku(li?.description || '').toUpperCase()
+      const qty = Number(li?.qty) || 0
+      if (!sku || qty <= 0) continue
+      m.set(sku, (m.get(sku) || 0) + qty)
+    }
+    return m
+  }
+  const ma = tally(a)
+  const mb = tally(b)
+  if (ma.size !== mb.size) return false
+  for (const [sku, qty] of ma) if (mb.get(sku) !== qty) return false
+  return true
+}
+
+/**
  * Auto-create draft products for any line items whose SKU doesn't exist in the products table.
  * Sets price from the line item unit price. All other details can be filled in later.
  */

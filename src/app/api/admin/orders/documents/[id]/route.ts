@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobAppendArrayItem, blobReplaceArrayItem, blobRemoveArrayItem } from '@/lib/blob-storage'
 import type { OrderDocument } from '../route'
-import { adjustStock, findStockShortfalls, shortfallMessage } from '@/lib/order-helpers'
+import { adjustStock, findStockShortfalls, shortfallMessage, sameStockFootprint } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
 
 const KEY = 'data/order-documents.json'
@@ -49,8 +49,18 @@ export async function PATCH(
     const wasStockable = isStockable(prev.type)
     const nowStockable = isStockable(newType)
 
-    // Only run stock logic if something stock-relevant actually changed
-    const stockRelevantChange = body.status !== undefined || body.type !== undefined || body.lineItems !== undefined
+    // Only run stock logic if something stock-relevant actually changed. An autosave
+    // resends the whole document every tick, so the presence of `lineItems` is not a
+    // change — only a different SKU/qty footprint is. Comparing the two stops each tick
+    // restoring and re-deducting every line for no net movement.
+    const itemsChanged = body.lineItems !== undefined && !sameStockFootprint(prev.lineItems, newItems)
+    // A stockable document that never took its stock still has to take it, even on a save
+    // that changed nothing — that is how a record left un-deducted catches up. It settles
+    // after one pass, because the deduction sets the flag and later saves find nothing to do.
+    const needsInitialDeduct =
+      body.lineItems !== undefined && !prev.stockDeducted && nowStockable && !isCancelled
+    const stockRelevantChange =
+      body.status !== undefined || body.type !== undefined || itemsChanged || needsInitialDeduct
 
     // Rule 1 — an invoice may never carry more than the shelf holds. Adding lines to an
     // existing invoice (Send to Invoice → Add to Existing) lands here rather than on POST,
@@ -58,7 +68,7 @@ export async function PATCH(
     // restored before the new ones are taken, so they count as available.
     // stockAlreadyReserved: the caller already took the stock elsewhere (Rule 31 — a site
     // order deducts at checkout), so there is nothing left to check.
-    if (body.lineItems !== undefined && newType === 'invoice' && !isCancelled && !body.stockAlreadyReserved) {
+    if (itemsChanged && newType === 'invoice' && !isCancelled && !body.stockAlreadyReserved) {
       const alreadyDeducted = prev.stockDeducted !== false && wasStockable ? prev.lineItems : []
       const shortfalls = await findStockShortfalls(newItems, { creditFrom: alreadyDeducted })
       if (shortfalls.length > 0) {
@@ -89,7 +99,7 @@ export async function PATCH(
           await adjustStock(prev.lineItems, 'add')
           body.stockDeducted = false
         }
-      } else if (prev.stockDeducted !== false && wasStockable && !isCancelled && body.lineItems) {
+      } else if (prev.stockDeducted !== false && wasStockable && !isCancelled && itemsChanged) {
         // Active invoice/SO with changed line items — reverse old qty, apply new qty (handles legacy undefined)
         await adjustStock(prev.lineItems, 'add')
         await adjustStock(newItems, 'subtract')
