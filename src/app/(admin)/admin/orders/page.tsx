@@ -4056,7 +4056,10 @@ function OrdersPageInner() {
   const clientViewSearchQ = clientViewSearch.toLowerCase().trim()
   const clientViewGroups: { clientName: string; docs: OrderDocument[] }[] = (() => {
     if (!clientViewSearchQ) return []
-    const matched = documents.filter(d => d.status !== 'archived' && d.clientName?.toLowerCase().includes(clientViewSearchQ))
+    const matched = documents.filter(d => d.status !== 'archived' && (
+      d.clientName?.toLowerCase().includes(clientViewSearchQ)
+      || d.lineItems.some((li) => splitSkuTitle(li.description || '').sku.toLowerCase().includes(clientViewSearchQ))
+    ))
     const byClient: Record<string, OrderDocument[]> = {}
     for (const doc of matched) {
       const key = doc.clientName || 'Unknown'
@@ -4076,7 +4079,11 @@ function OrdersPageInner() {
   const docRows = tab !== 'backorders'
     ? documents
         .filter((d) => d.type === cfg.docType && (showArchive ? d.status === 'archived' : d.status !== 'archived'))
-        .filter((d) => !searchLower || d.clientName?.toLowerCase().includes(searchLower) || d.clientEmail?.toLowerCase().includes(searchLower))
+        .filter((d) => !searchLower
+          || d.clientName?.toLowerCase().includes(searchLower)
+          || d.clientEmail?.toLowerCase().includes(searchLower)
+          || d.docNumber?.toLowerCase().includes(searchLower)
+          || d.lineItems.some((li) => splitSkuTitle(li.description || '').sku.toLowerCase().includes(searchLower)))
         .sort((a, b) => {
           let av: string | number = ''
           let bv: string | number = ''
@@ -4371,7 +4378,7 @@ function OrdersPageInner() {
         </svg>
         <input
           type="text"
-          placeholder="Search client name to view all their orders…"
+          placeholder="Search client name or SKU to view all their orders…"
           value={clientViewSearch}
           onChange={e => setClientViewSearch(e.target.value)}
           className="w-full pl-10 pr-8 py-2.5 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white shadow-sm"
@@ -4502,7 +4509,7 @@ function OrdersPageInner() {
             type="text"
             value={clientSearch}
             onChange={(e) => setClientSearch(e.target.value)}
-            placeholder="Search by client name…"
+            placeholder="Search client, doc # or SKU…"
             className="w-full pl-9 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
           />
           {clientSearch && (
@@ -4531,7 +4538,10 @@ function OrdersPageInner() {
             </div>
           ) : (
             Object.entries(backordersByClient)
-              .filter(([, g]) => !searchLower || g.displayName.toLowerCase().includes(searchLower) || g.email?.toLowerCase().includes(searchLower))
+              .filter(([, g]) => !searchLower
+                || g.displayName.toLowerCase().includes(searchLower)
+                || g.email?.toLowerCase().includes(searchLower)
+                || g.items.some((b) => (b.sku || '').toLowerCase().includes(searchLower)))
               .sort(([, a], [, b]) => a.displayName.localeCompare(b.displayName))
               .map(([key, group]) => {
                 const { displayName, email, items } = group
