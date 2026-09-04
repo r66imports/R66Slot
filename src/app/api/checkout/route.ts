@@ -56,12 +56,21 @@ export async function POST(request: Request) {
     // convenience only — a stale cart, a second tab, or a direct POST can all ask
     // for more than exists. Reject before anything is written.
     const shortfalls: Array<{ id: string; title: string; requested: number; available: number }> = []
+    // The cart's SKU is whatever the storefront happened to put there, and an empty one
+    // costs the order its link back to the product: Send to Invoice writes a bare title,
+    // and Stock Audit, which reads the SKU back out of that description, files the sale
+    // under a phantom SKU spelled like the title. The product id is what the cart reliably
+    // carries and what the deduction below already trusts, so resolve the SKU from it and
+    // stamp it on the order once, rather than depending on the client to send it.
+    const skuById: Record<string, string> = {}
     for (const item of items) {
       if (!item.id || !item.quantity) continue
       const res = await db.query(
-        `SELECT title, COALESCE(quantity, 0) AS quantity FROM products WHERE id = $1`,
+        `SELECT sku, title, COALESCE(quantity, 0) AS quantity FROM products WHERE id = $1`,
         [item.id]
       )
+      const foundSku = String(res.rows[0]?.sku || '').trim()
+      if (foundSku) skuById[item.id] = foundSku
       const available = Number(res.rows[0]?.quantity ?? 0)
       if (!res.rows.length || item.quantity > available) {
         shortfalls.push({
@@ -92,7 +101,11 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
       customer: body.customer,
       shipping: body.shipping,
-      items,
+      items: items.map((item) =>
+        item?.id && !String(item.sku || '').trim() && skuById[item.id]
+          ? { ...item, sku: skuById[item.id] }
+          : item
+      ),
       subtotal: body.subtotal,
       total: body.total,
     }
