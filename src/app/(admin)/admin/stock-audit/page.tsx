@@ -24,6 +24,7 @@ interface SkuAuditRow {
   unsyncedDocs: string[]
   invoices: InvoiceLine[]
   variance: number
+  historyPartial?: boolean
   status: 'ok' | 'unsynced' | 'oversold'
 }
 
@@ -230,6 +231,9 @@ export default function StockAuditPage() {
                         {row.startingSource === 'derived' && (
                           <span className="ml-1 text-[10px] font-normal text-gray-400" title="No stock log for this SKU — worked back from sales">est.</span>
                         )}
+                        {row.historyPartial && (
+                          <span className="ml-1 text-[10px] font-normal text-gray-400" title="This SKU was already trading before the stock log recorded movement, so the intake figure is incomplete">partial</span>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-right font-bold text-gray-900">
                         {row.totalSoldQty || '—'}
@@ -304,7 +308,14 @@ export default function StockAuditPage() {
               </div>
 
               {/* Does it add up? Logged in, less everything sold and reserved, should be what is on the shelf. */}
-              {detail.variance === 0 ? (
+              {detail.historyPartial ? (
+                <p className="mt-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  <strong>Partial history.</strong> This SKU was already selling before the stock log
+                  started recording movement for it, so the {detail.impliedStarting} logged in only
+                  covers part of what came through. Sales and stock on hand below are complete; the
+                  intake figure is not, so the two are not expected to reconcile.
+                </p>
+              ) : detail.variance === 0 ? (
                 <p className="mt-3 text-xs text-gray-500">
                   Balances: {detail.impliedStarting} logged in &minus; {detail.totalSoldQty} sold
                   {detail.totalReservedQty ? ` − ${detail.totalReservedQty} reserved` : ''}

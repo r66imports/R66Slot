@@ -29,6 +29,7 @@ export interface SkuAuditRow {
   unsyncedDocs: string[]
   invoices: InvoiceLine[]
   variance: number          // bookedIn - (current + sold + reserved); 0 = balances
+  historyPartial: boolean   // sales predate the log, so variance cannot be trusted
   status: 'ok' | 'unsynced' | 'oversold'
 }
 
@@ -63,7 +64,7 @@ export async function GET() {
     // knows the intake, so read it and keep the old derivation only as a fallback.
     // POS is deliberately NOT an intake source: a POS sale writes its own invoice, so
     // its stock movement is already accounted for on the sales side.
-    type LogAgg = { openingQty: number; intakeQty: number; intakeRows: number }
+    type LogAgg = { openingQty: number; intakeQty: number; intakeRows: number; firstMovement: string | null }
     const logMap: Record<string, LogAgg> = {}
     try {
       const logResult = await db.query(`
@@ -93,7 +94,11 @@ export async function GET() {
                ), 0) AS intake_qty,
                COUNT(*) FILTER (
                  WHERE d.source IN ('inventory_save','worksheet_import','product_create','manual')
-               ) AS intake_rows
+               ) AS intake_rows,
+               MIN(d.created_at) FILTER (
+                 WHERE d.source IN ('invoice','invoice_restore','salesorder','salesorder_restore',
+                                    'site_order','site_order_restore','pos')
+               ) AS first_movement
         FROM dedup d
         LEFT JOIN opening o ON o.sku = d.sku
         GROUP BY d.sku
@@ -103,6 +108,7 @@ export async function GET() {
           openingQty: parseInt(r.opening_qty, 10) || 0,
           intakeQty: parseInt(r.intake_qty, 10) || 0,
           intakeRows: parseInt(r.intake_rows, 10) || 0,
+          firstMovement: r.first_movement ? new Date(r.first_movement).toISOString().slice(0, 10) : null,
         }
       }
     } catch {
@@ -116,6 +122,7 @@ export async function GET() {
       totalReservedQty: number
       unsyncedDocs: string[]
       invoices: InvoiceLine[]
+      earliestSale: string      // yyyy-mm-dd of the oldest document touching this SKU
     }> = {}
 
     const ensure = (sku: string) => {
@@ -126,6 +133,7 @@ export async function GET() {
         totalReservedQty: 0,
         unsyncedDocs: [],
         invoices: [],
+        earliestSale: '',
       }
       return k
     }
@@ -143,6 +151,11 @@ export async function GET() {
         const sku = extractSku(li.description)
         if (!sku || li.qty <= 0) continue
         const k = ensure(sku)
+
+        const docDate = String((doc as any).date || (doc as any).createdAt || '').slice(0, 10)
+        if (docDate && (!skuData[k].earliestSale || docDate < skuData[k].earliestSale)) {
+          skuData[k].earliestSale = docDate
+        }
 
         if (doc.type === 'invoice') {
           skuData[k].totalSoldQty += li.qty
@@ -189,6 +202,10 @@ export async function GET() {
             ''
           if (!sku) continue
           const k = ensure(sku)
+          const orderDate = String(order.createdAt || '').slice(0, 10)
+          if (orderDate && (!skuData[k].earliestSale || orderDate < skuData[k].earliestSale)) {
+            skuData[k].earliestSale = orderDate
+          }
           skuData[k].totalSoldQty += qty
           skuData[k].syncedSoldQty += qty   // stock came off at checkout
           skuData[k].invoices.push({
@@ -226,8 +243,30 @@ export async function GET() {
       const startingSource: SkuAuditRow['startingSource'] = loggedStarting === null ? 'derived' : 'log'
       const variance = impliedStarting - derivedStarting
 
+      // ── Can the variance be trusted at all? ──
+      // The log only starts recording movement partway through a SKU's life; anything
+      // sold before that is invisible to it, while sales come from the documents blob,
+      // which goes back to the very first invoice. Grading a complete sales history
+      // against a half-written intake history reports a shortfall that never happened.
+      //
+      // A SKU whose oldest document predates its first logged movement is therefore
+      // reported as partial rather than short: the figure is unknowable, not wrong.
+      // Only rows reporting a real shortfall need this. A SKU with no log at all already
+      // derives its starting figure from sales, so it balances by construction and saying
+      // "partial" over it would tag most of the table with a caveat that explains nothing.
+      const firstMovement = log?.firstMovement ?? null
+      const historyPartial =
+        variance !== 0 &&
+        loggedStarting !== null &&
+        data.totalSoldQty > 0 &&
+        !!data.earliestSale &&
+        (firstMovement === null || data.earliestSale < firstMovement)
+
       const unsyncedQty = data.totalSoldQty - data.syncedSoldQty
-      const oversold = currentQty === 0 && data.totalSoldQty > 0 && impliedStarting < data.totalSoldQty
+      // Oversold means more went out than came in. With a partial history that cannot be
+      // established — the intake it would be measured against was never written down.
+      const oversold =
+        !historyPartial && currentQty === 0 && data.totalSoldQty > 0 && impliedStarting < data.totalSoldQty
 
       let status: SkuAuditRow['status'] = 'ok'
       if (unsyncedQty > 0) status = 'unsynced'
@@ -252,6 +291,7 @@ export async function GET() {
         unsyncedDocs: data.unsyncedDocs,
         invoices: sortedInvoices,
         variance,
+        historyPartial,
         status,
       })
     }
