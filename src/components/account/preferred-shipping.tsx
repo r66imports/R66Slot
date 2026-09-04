@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { SHIPPING_OPTIONS, shippingRequiresBranch } from '@/lib/shipping-options'
+import {
+  CARRIER_HEADINGS,
+  SHIPPING_OPTIONS,
+  getShippingOption,
+  shippingBranchLabel,
+  shippingBranchPlaceholder,
+  shippingRequiresBranch,
+} from '@/lib/shipping-options'
 
 type Status = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -57,14 +64,19 @@ export default function PreferredShipping() {
 
   function chooseOption(id: string) {
     setSelected(id)
-    // A kiosk option is incomplete without the branch — wait for it rather
+    // A PostNet branch is not a Courier Guy branch — carrying one across would
+    // print the wrong depot on the invoice, so drop it when the field changes.
+    const keep = shippingBranchLabel(id) === shippingBranchLabel(selected) ? branch : ''
+    if (keep !== branch) setBranch(keep)
+    // A branch option is incomplete without the branch — wait for it rather
     // than saving something the invoice can't use.
-    if (shippingRequiresBranch(id) && !branch.trim()) {
+    if (shippingRequiresBranch(id) && !keep.trim()) {
+      if (branchTimer.current) clearTimeout(branchTimer.current)
       setStatus('idle')
       setError('')
       return
     }
-    save(id, branch)
+    save(id, keep)
   }
 
   function changeBranch(value: string) {
@@ -100,7 +112,12 @@ export default function PreferredShipping() {
           <div className="space-y-5">
             {carriers.map(carrier => (
               <div key={carrier}>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">{carrier}</p>
+                <div className="mb-2">
+                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{CARRIER_HEADINGS[carrier].title}</p>
+                  {CARRIER_HEADINGS[carrier].note && (
+                    <p className="text-xs text-gray-500 mt-0.5">{CARRIER_HEADINGS[carrier].note}</p>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {SHIPPING_OPTIONS.filter(o => o.carrier === carrier).map(o => {
                     const active = selected === o.id
@@ -125,7 +142,9 @@ export default function PreferredShipping() {
                             <span className="block text-sm font-semibold text-gray-900">{o.label}</span>
                             {o.note && <span className="block text-xs text-amber-600 font-medium mt-0.5">⚠ {o.note}</span>}
                             {o.requiresBranch && (
-                              <span className="block text-xs text-gray-500 mt-0.5">Requires your Courier Guy branch</span>
+                              <span className="block text-xs text-gray-500 mt-0.5">
+                                Requires your {(o.branchLabel || 'branch').toLowerCase()}
+                              </span>
                             )}
                           </span>
                         </div>
@@ -133,26 +152,28 @@ export default function PreferredShipping() {
                     )
                   })}
                 </div>
+
+                {/* The branch belongs to the option that asks for it — keep it in
+                    that carrier's group rather than stranded below both lists. */}
+                {needsBranch && getShippingOption(selected)?.carrier === carrier && (
+                  <div className="mt-3">
+                    <label className="block text-sm font-medium mb-1.5">
+                      {shippingBranchLabel(selected)} <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      value={branch}
+                      onChange={e => changeBranch(e.target.value)}
+                      placeholder={`e.g. ${shippingBranchPlaceholder(selected)}`}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {branch.trim()
+                        ? 'This branch is printed on your invoice with the shipping method.'
+                        : `Enter your ${shippingBranchLabel(selected).toLowerCase()} to finish saving this option.`}
+                    </p>
+                  </div>
+                )}
               </div>
             ))}
-
-            {needsBranch && (
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Courier Guy Branch <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  value={branch}
-                  onChange={e => changeBranch(e.target.value)}
-                  placeholder="e.g. Courier Guy Rivonia, Rivonia Junction Centre"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {branch.trim()
-                    ? 'This branch is printed on your invoice with the shipping method.'
-                    : 'Enter your branch to finish saving this option.'}
-                </p>
-              </div>
-            )}
 
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>

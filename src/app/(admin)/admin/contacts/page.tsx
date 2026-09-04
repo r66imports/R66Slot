@@ -1,7 +1,13 @@
 ﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { SHIPPING_OPTIONS, shippingLabel, shippingRequiresBranch } from '@/lib/shipping-options'
+import {
+  SHIPPING_OPTIONS,
+  shippingBranchLabel,
+  shippingBranchPlaceholder,
+  shippingLabel,
+  shippingRequiresBranch,
+} from '@/lib/shipping-options'
 import { useColumnResize } from '@/hooks/use-column-resize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -314,7 +320,12 @@ function ContactModal({
                   value={form.preferredShipping}
                   onChange={e => {
                     const id = e.target.value
-                    setForm(p => ({ ...p, preferredShipping: id, courierGuyBranch: shippingRequiresBranch(id) ? p.courierGuyBranch : '' }))
+                    setForm(p => ({
+                      ...p,
+                      preferredShipping: id,
+                      // A PostNet branch is not a Courier Guy branch — drop it when the field changes
+                      courierGuyBranch: shippingBranchLabel(id) === shippingBranchLabel(p.preferredShipping) ? p.courierGuyBranch : '',
+                    }))
                   }}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -324,11 +335,11 @@ function ContactModal({
               </div>
               {shippingRequiresBranch(form.preferredShipping) && (
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">Courier Guy Branch <span className="text-red-500">*</span></label>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">{shippingBranchLabel(form.preferredShipping)} <span className="text-red-500">*</span></label>
                   <input
                     value={form.courierGuyBranch}
                     onChange={e => str('courierGuyBranch', e.target.value)}
-                    placeholder="Courier Guy Rivonia, Rivonia Junction Centre"
+                    placeholder={shippingBranchPlaceholder(form.preferredShipping)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>

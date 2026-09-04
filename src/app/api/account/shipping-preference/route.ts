@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { db } from '@/lib/db'
-import { getShippingOption, shippingRequiresBranch } from '@/lib/shipping-options'
+import { getShippingOption, shippingBranchLabel, shippingRequiresBranch } from '@/lib/shipping-options'
 import { syncShippingPreferenceToContact } from '@/lib/customer-address-sync'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest) {
   }
   if (shippingRequiresBranch(preferredShipping) && !courierGuyBranch) {
     return NextResponse.json(
-      { error: 'Please enter your Courier Guy branch for a Kiosk to Kiosk option' },
+      { error: `Please enter your ${shippingBranchLabel(preferredShipping).toLowerCase()} for this option` },
       { status: 400 }
     )
   }
@@ -79,7 +79,7 @@ export async function PUT(request: NextRequest) {
   customers[idx] = {
     ...customers[idx],
     preferredShipping,
-    // Only a kiosk option carries a branch — don't leave a stale one behind
+    // Only a branch option carries a branch — don't leave a stale one behind
     courierGuyBranch: shippingRequiresBranch(preferredShipping) ? courierGuyBranch : '',
     updatedAt: new Date().toISOString(),
   }
