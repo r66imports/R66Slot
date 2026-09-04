@@ -63,30 +63,46 @@ export async function GET() {
     // knows the intake, so read it and keep the old derivation only as a fallback.
     // POS is deliberately NOT an intake source: a POS sale writes its own invoice, so
     // its stock movement is already accounted for on the sales side.
-    type LogAgg = { openingQty: number; intakeQty: number }
+    type LogAgg = { openingQty: number; intakeQty: number; intakeRows: number }
     const logMap: Record<string, LogAgg> = {}
     try {
       const logResult = await db.query(`
-        WITH opening AS (
-          SELECT DISTINCT ON (UPPER(sku))
-                 UPPER(sku) AS sku,
-                 COALESCE(qty_before, 0) AS qty
+        WITH dedup AS (
+          -- One save can land in the log more than once — an autosave that fires three
+          -- times writes the same 1 -> 5 movement three times, milliseconds apart, and
+          -- summing those triples the intake. Same second, same source, same
+          -- before/after is the same movement: once the first made it 5, a second
+          -- 1 -> 5 cannot happen. Restocking 1 -> 5 again next week is a different
+          -- second, so it still counts.
+          SELECT UPPER(sku) AS sku,
+                 date_trunc('second', created_at) AS created_at,
+                 source, change_qty, qty_before, qty_after, MIN(id) AS id
           FROM stock_audit_log
-          ORDER BY UPPER(sku), created_at ASC, id ASC
+          GROUP BY UPPER(sku), date_trunc('second', created_at),
+                   source, change_qty, qty_before, qty_after
+        ),
+        opening AS (
+          SELECT DISTINCT ON (sku) sku, COALESCE(qty_before, 0) AS qty
+          FROM dedup
+          ORDER BY sku, created_at ASC, id ASC
         )
-        SELECT UPPER(l.sku) AS sku,
+        SELECT d.sku AS sku,
                MAX(o.qty) AS opening_qty,
-               COALESCE(SUM(l.change_qty) FILTER (
-                 WHERE l.source IN ('inventory_save','worksheet_import','product_create','manual')
-               ), 0) AS intake_qty
-        FROM stock_audit_log l
-        LEFT JOIN opening o ON o.sku = UPPER(l.sku)
-        GROUP BY UPPER(l.sku)
+               COALESCE(SUM(d.change_qty) FILTER (
+                 WHERE d.source IN ('inventory_save','worksheet_import','product_create','manual')
+               ), 0) AS intake_qty,
+               COUNT(*) FILTER (
+                 WHERE d.source IN ('inventory_save','worksheet_import','product_create','manual')
+               ) AS intake_rows
+        FROM dedup d
+        LEFT JOIN opening o ON o.sku = d.sku
+        GROUP BY d.sku
       `)
       for (const r of logResult.rows) {
         logMap[String(r.sku).toLowerCase()] = {
           openingQty: parseInt(r.opening_qty, 10) || 0,
           intakeQty: parseInt(r.intake_qty, 10) || 0,
+          intakeRows: parseInt(r.intake_rows, 10) || 0,
         }
       }
     } catch {
@@ -201,8 +217,11 @@ export async function GET() {
       const derivedStarting = currentQty + data.totalSoldQty + data.totalReservedQty
       // What the log says came in: stock on hand before logging began, plus every
       // intake since (worksheet import, inventory save, manual adjust, product create)
+      // A log holding only sales rows never recorded an intake, so its opening figure is
+      // just a mid-life snapshot and says nothing about what was booked in. Those fall
+      // back to the estimate rather than reporting a starting figure that was never set.
       const log = logMap[k]
-      const loggedStarting = log ? log.openingQty + log.intakeQty : null
+      const loggedStarting = log && log.intakeRows > 0 ? log.openingQty + log.intakeQty : null
       const impliedStarting = loggedStarting ?? derivedStarting
       const startingSource: SkuAuditRow['startingSource'] = loggedStarting === null ? 'derived' : 'log'
       const variance = impliedStarting - derivedStarting
