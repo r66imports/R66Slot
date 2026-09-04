@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import PreferredShipping from '@/components/account/preferred-shipping'
 
 interface Address {
   id: string
@@ -305,6 +306,8 @@ export default function AddressesPage() {
         </div>
         <Button onClick={() => setIsAdding(true)}>+ Add Address</Button>
       </div>
+
+      <PreferredShipping />
 
       {addresses.length === 0 ? (
         <Card>

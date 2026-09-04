@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { syncDefaultAddressToContact } from '@/lib/customer-address-sync'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-dev-secret-replace-in-production'
 const ADDRESSES_KEY = 'data/addresses.json'
@@ -36,6 +37,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   addresses[index] = { ...addresses[index], ...data, id, customerId, updatedAt: new Date().toISOString() }
   await blobWrite(ADDRESSES_KEY, addresses)
+
+  // Mirror the default address onto the admin contact record (Rule 53)
+  await syncDefaultAddressToContact(customerId)
+
   return NextResponse.json(addresses[index])
 }
 
@@ -50,5 +55,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (filtered.length === addresses.length) return NextResponse.json({ error: 'Address not found' }, { status: 404 })
 
   await blobWrite(ADDRESSES_KEY, filtered)
+
+  // Deleting the default can promote another address — re-sync (Rule 53)
+  await syncDefaultAddressToContact(customerId)
+
   return NextResponse.json({ success: true })
 }

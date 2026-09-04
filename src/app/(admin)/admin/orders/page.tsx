@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
+import { shippingLabel } from '@/lib/shipping-options'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { Backorder } from '@/types/backorder'
@@ -21,6 +22,13 @@ const SERVICE_TYPES = [
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// Shipping methods hard-coded in the invoice dropdown. A method that is not one
+// of these (and not a network courier) came from the client's own preference,
+// so it gets rendered as an extra option or the select would show blank.
+const STATIC_SHIPPING_METHODS = [
+  'Pudo Locker-to-Locker', 'Pudo Door-to-Door', 'Collection', 'Other',
+]
+
 interface ClientContact {
   id: string
   firstName: string
@@ -29,6 +37,8 @@ interface ClientContact {
   phone: string
   companyName: string
   companyAddress: string
+  preferredShipping?: string
+  courierGuyBranch?: string
 }
 
 type DocType = 'quote' | 'salesorder' | 'invoice'
@@ -1424,6 +1434,7 @@ function CreateDocumentModal({
   const [discountPct, setDiscountPct] = useState<number>((editDoc as any)?.depositMode ? ((editDoc as any)?.depositPct || 0) : ((editDoc as any)?.discountPct || 0))
   const [shippingCost, setShippingCost] = useState<number>((editDoc as any)?.shippingCost || 0)
   const [shippingMethod, setShippingMethod] = useState<string>((editDoc as any)?.shippingMethod || '')
+  const [clientShippingPref, setClientShippingPref] = useState<string>('')
   const [networkCouriers, setNetworkCouriers] = useState<{ id: string; name: string }[]>([])
   const [trackingNumber, setTrackingNumber] = useState<string>((editDoc as any)?.trackingNumber || '')
   const [depositPaid, setDepositPaid] = useState<number>((editDoc as any)?.depositPaid || 0)
@@ -1812,6 +1823,11 @@ function CreateDocumentModal({
                     setField('clientEmail', c.email)
                     setField('clientPhone', c.phone)
                     setField('clientAddress', c.companyAddress || '')
+                    // The customer's own shipping choice (Rule 54) - prefill it,
+                    // but never overwrite a method already chosen on this doc
+                    const pref = shippingLabel(c.preferredShipping, c.courierGuyBranch)
+                    setClientShippingPref(pref)
+                    if (pref && !shippingMethod) setShippingMethod(pref)
                     fetchClientCredit(name)
                   }}
                 />
@@ -2022,6 +2038,11 @@ function CreateDocumentModal({
                           onChange={(e) => setShippingMethod(e.target.value)}
                         >
                           <option value="">— None —</option>
+                          {/* The client's own choice (Rule 54) is not a menu entry —
+                              it only appears here once it is actually on this doc */}
+                          {shippingMethod && !STATIC_SHIPPING_METHODS.includes(shippingMethod) && !networkCouriers.some(c => c.name === shippingMethod) && (
+                            <option value={shippingMethod}>{shippingMethod}</option>
+                          )}
                           <option value="Pudo Locker-to-Locker">Pudo Locker-to-Locker</option>
                           <option value="Pudo Door-to-Door">Pudo Door-to-Door</option>
                           {networkCouriers.map((c) => (
@@ -2044,6 +2065,20 @@ function CreateDocumentModal({
                       </td>
                       <td />
                     </tr>
+                    {clientShippingPref && shippingMethod !== clientShippingPref && (
+                      <tr className="bg-blue-50/60">
+                        <td colSpan={2} className="px-3 py-1.5 text-right text-blue-500 text-xs">Client prefers</td>
+                        <td colSpan={3} className="px-2 py-1.5">
+                          <span className="text-xs font-semibold text-blue-800">🚚 {clientShippingPref}</span>
+                          <button
+                            type="button"
+                            onClick={() => setShippingMethod(clientShippingPref)}
+                            className="ml-2 text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                          >Use</button>
+                        </td>
+                        <td />
+                      </tr>
+                    )}
                     {shippingMethod && shippingMethod !== 'Collection' && (
                       <tr className="bg-gray-50">
                         <td colSpan={2} className="px-3 py-1.5 text-right text-gray-400 text-xs">Tracking #</td>
@@ -3941,8 +3976,19 @@ function OrdersPageInner() {
         const merged = [...base]
         for (const ct of ctList) {
           if (!ct.firstName && !ct.lastName) continue
-          if (ct.email && emailSet.has(ct.email.toLowerCase())) continue
-          merged.push({ id: ct.id, firstName: ct.firstName || '', lastName: ct.lastName || '', email: ct.email || '', phone: ct.phone || '', companyName: ct.companyName || '', companyAddress: ct.companyAddress || '' })
+          if (ct.email && emailSet.has(ct.email.toLowerCase())) {
+            // Already present from clients.json - carry the shipping preference
+            // across, or the client's own choice never reaches the invoice
+            if (ct.preferredShipping) {
+              const existing = merged.find((c: any) => c.email?.toLowerCase() === ct.email.toLowerCase())
+              if (existing) {
+                existing.preferredShipping = ct.preferredShipping
+                existing.courierGuyBranch = ct.courierGuyBranch || ''
+              }
+            }
+            continue
+          }
+          merged.push({ id: ct.id, firstName: ct.firstName || '', lastName: ct.lastName || '', email: ct.email || '', phone: ct.phone || '', companyName: ct.companyName || '', companyAddress: ct.companyAddress || '', preferredShipping: ct.preferredShipping || '', courierGuyBranch: ct.courierGuyBranch || '' })
           if (ct.email) emailSet.add(ct.email.toLowerCase())
         }
         merged.sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`))

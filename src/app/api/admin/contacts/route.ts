@@ -31,6 +31,9 @@ export interface Contact {
   deliveryKioskToKiosk: boolean
   deliveryPudoLocker: boolean
   deliveryPostnetAramex: boolean
+  // Preferred Shipping — chosen by the customer in their own back office (Rule 54)
+  preferredShipping?: string
+  courierGuyBranch?: string
   // Meta
   source: 'book-now' | 'manual' | 'import' | 'website'
   notes: string

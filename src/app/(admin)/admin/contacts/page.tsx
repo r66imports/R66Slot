@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { SHIPPING_OPTIONS, shippingLabel, shippingRequiresBranch } from '@/lib/shipping-options'
 import { useColumnResize } from '@/hooks/use-column-resize'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +27,8 @@ interface Contact {
   deliveryKioskToKiosk: boolean
   deliveryPudoLocker: boolean
   deliveryPostnetAramex: boolean
+  preferredShipping?: string
+  courierGuyBranch?: string
   source: 'book-now' | 'manual' | 'import' | 'website'
   isReseller?: boolean
   notes: string
@@ -55,6 +58,8 @@ const EMPTY_FORM = {
   deliveryKioskToKiosk: false,
   deliveryPudoLocker: false,
   deliveryPostnetAramex: false,
+  preferredShipping: '',
+  courierGuyBranch: '',
   isReseller: false,
   fullAccess: false,
   notes: '',
@@ -166,6 +171,34 @@ function ContactModal({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Addresses the customer entered in their own back office (Rule 53) —
+  // read-only here; "Use" fills the form, the admin still presses Save.
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([])
+  const initialEmail = initial?.email || ''
+  useEffect(() => {
+    if (!initialEmail) { setSavedAddresses([]); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/contact-addresses?email=${encodeURIComponent(initialEmail)}`)
+        const data = res.ok ? await res.json() : []
+        if (!cancelled) setSavedAddresses(data)
+      } catch { if (!cancelled) setSavedAddresses([]) }
+    })()
+    return () => { cancelled = true }
+  }, [initialEmail])
+
+  function useSavedAddress(a: any) {
+    setForm(p => ({
+      ...p,
+      addressStreet:     [a.address1, a.address2].map((v: string) => v?.trim()).filter(Boolean).join(', '),
+      addressCity:       a.city?.trim()    || '',
+      addressProvince:   a.state?.trim()   || '',
+      addressPostalCode: a.zip?.trim()     || '',
+      addressCountry:    a.country?.trim() || 'South Africa',
+    }))
+  }
+
   const str = (field: keyof FormData, val: string) =>
     setForm(p => ({ ...p, [field]: val }))
   const bool = (field: keyof FormData, val: boolean) =>
@@ -174,6 +207,8 @@ function ContactModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.firstName.trim()) return setError('First name is required')
+    if (shippingRequiresBranch(form.preferredShipping) && !form.courierGuyBranch.trim())
+      return setError('Enter the Courier Guy branch for a Kiosk to Kiosk shipping option')
     setSaving(true)
     setError('')
     try {
@@ -271,7 +306,66 @@ function ContactModal({
 
           {/* ── Address ───────────────────────────────────────── */}
           <div>
+            <SectionHeader icon="🚚" title="Preferred Shipping" subtitle="Appears on the invoice — the customer sets this in their account" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+              <div className={shippingRequiresBranch(form.preferredShipping) ? '' : 'sm:col-span-2'}>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Shipping Method</label>
+                <select
+                  value={form.preferredShipping}
+                  onChange={e => {
+                    const id = e.target.value
+                    setForm(p => ({ ...p, preferredShipping: id, courierGuyBranch: shippingRequiresBranch(id) ? p.courierGuyBranch : '' }))
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">— Not chosen —</option>
+                  {SHIPPING_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}{o.note ? ` (${o.note})` : ''}</option>)}
+                </select>
+              </div>
+              {shippingRequiresBranch(form.preferredShipping) && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Courier Guy Branch <span className="text-red-500">*</span></label>
+                  <input
+                    value={form.courierGuyBranch}
+                    onChange={e => str('courierGuyBranch', e.target.value)}
+                    placeholder="Courier Guy Rivonia, Rivonia Junction Centre"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+              {form.preferredShipping && (
+                <p className="sm:col-span-2 text-xs text-gray-500">Invoice will read: <span className="font-semibold text-gray-700">{shippingLabel(form.preferredShipping, form.courierGuyBranch) || '—'}</span></p>
+              )}
+            </div>
+
             <SectionHeader icon="📍" title="Address" subtitle="Home or delivery address" />
+            {savedAddresses.length > 0 && (
+              <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/60 px-3 py-2.5">
+                <p className="text-xs font-semibold text-blue-800 mb-2">🏠 Saved Addresses — entered by the customer</p>
+                <div className="space-y-1.5">
+                  {savedAddresses.map((a: any) => {
+                    const street = [a.address1, a.address2].map((v: string) => v?.trim()).filter(Boolean).join(', ')
+                    const inForm = form.addressStreet === street && form.addressCity === (a.city?.trim() || '')
+                    return (
+                      <div key={a.id} className="flex items-start justify-between gap-2 rounded-lg bg-white border border-blue-100 px-2.5 py-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-gray-700">
+                            {[a.firstName, a.lastName].filter(Boolean).join(' ') || '—'}
+                            {a.isDefault && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-semibold">Default</span>}
+                          </p>
+                          <p className="text-xs text-gray-600 break-words">{[street, a.city, a.state, a.zip, a.country].filter(Boolean).join(', ')}</p>
+                          {a.phone && <p className="text-[11px] text-gray-400">{a.phone}</p>}
+                        </div>
+                        {inForm
+                          ? <span className="text-[10px] font-semibold text-green-600 whitespace-nowrap mt-0.5">✓ In use</span>
+                          : <button type="button" onClick={() => useSavedAddress(a)} className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap">Use</button>}
+                      </div>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-blue-700/70 mt-2">Fills the fields below — press Save to apply. The existing address may be a kiosk or locker.</p>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Street Address</label>
@@ -713,7 +807,7 @@ function presetDates(days: number) {
   return { from: new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10), to }
 }
 
-function CustomerDashboardModal({ contact, onClose }: { contact: Contact; onClose: () => void }) {
+function CustomerDashboardModal({ contact, onClose, onRefresh }: { contact: Contact; onClose: () => void; onRefresh?: () => void }) {
   const [fullScreen, setFullScreen] = useState(false)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -723,6 +817,42 @@ function CustomerDashboardModal({ contact, onClose }: { contact: Contact; onClos
   const [activeTab, setActiveTab] = useState<'info' | 'invoices' | 'items' | 'outstanding' | 'credits' | 'backorders'>('info')
 
   const name = fullName(contact)
+
+  // Saved Addresses the customer entered in their own back office (Rule 53)
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([])
+  const [addrApplying, setAddrApplying] = useState<string | null>(null)
+  const [addrOverride, setAddrOverride] = useState<Contact | null>(null)
+  const addr = addrOverride || contact
+
+  function savedAddrStreet(a: any) {
+    return [a.address1, a.address2].map((v: string) => v?.trim()).filter(Boolean).join(', ')
+  }
+
+  // Copy a saved address onto the contact record - this is what invoices,
+  // quotes and statements autofill from.
+  async function applyAddress(a: any) {
+    const fields = {
+      addressStreet:     savedAddrStreet(a),
+      addressCity:       a.city?.trim()    || '',
+      addressProvince:   a.state?.trim()   || '',
+      addressPostalCode: a.zip?.trim()     || '',
+      addressCountry:    a.country?.trim() || 'South Africa',
+    }
+    setAddrApplying(a.id)
+    try {
+      const res = await fetch(`/api/admin/contacts/${contact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: contact.email, ...fields }),
+      })
+      if (!res.ok) throw new Error()
+      setAddrOverride({ ...contact, ...fields })
+      onRefresh?.()
+    } catch {
+      alert('Could not copy this address to the contact - please try again.')
+    }
+    setAddrApplying(null)
+  }
 
   const loadData = useCallback(async (from: string, to: string) => {
     setLoading(true)
@@ -743,6 +873,19 @@ function CustomerDashboardModal({ contact, onClose }: { contact: Contact; onClos
   }, [name])
 
   useEffect(() => { loadData('', '') }, [loadData])
+
+  useEffect(() => {
+    if (!contact.email) { setSavedAddresses([]); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/contact-addresses?email=${encodeURIComponent(contact.email)}`)
+        const data = res.ok ? await res.json() : []
+        if (!cancelled) setSavedAddresses(data)
+      } catch { if (!cancelled) setSavedAddresses([]) }
+    })()
+    return () => { cancelled = true }
+  }, [contact.email])
 
   function applyDates(from: string, to: string) {
     setDateFrom(from); setDateTo(to); loadData(from, to)
@@ -944,10 +1087,36 @@ function CustomerDashboardModal({ contact, onClose }: { contact: Contact; onClos
                   {contact.mobile && <p className="text-sm text-gray-500">{contact.mobile}</p>}
                 </div>
                 <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Address</p>
-                  {contact.addressStreet && <p className="text-sm text-gray-700">{contact.addressStreet}</p>}
-                  <p className="text-sm text-gray-700">{[contact.addressCity, contact.addressProvince, contact.addressPostalCode].filter(Boolean).join(', ')}</p>
-                  {contact.addressCountry && <p className="text-sm text-gray-500">{contact.addressCountry}</p>}
+                  {addr.addressStreet && <p className="text-sm text-gray-700">{addr.addressStreet}</p>}
+                  <p className="text-sm text-gray-700">{[addr.addressCity, addr.addressProvince, addr.addressPostalCode].filter(Boolean).join(', ')}</p>
+                  {addr.addressCountry && <p className="text-sm text-gray-500">{addr.addressCountry}</p>}
+                  {!addr.addressStreet && !addr.addressCity && <p className="text-sm text-gray-300 italic">No address on the contact record</p>}
                 </div>
+                {savedAddresses.length > 0 && (
+                  <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Saved Addresses <span className="font-normal normal-case text-gray-400">— entered by the customer</span></p>
+                    <div className="space-y-1.5">
+                      {savedAddresses.map((a: any) => {
+                        const street = savedAddrStreet(a)
+                        const inUse = (addr.addressStreet || '') === street && (addr.addressCity || '') === (a.city?.trim() || '')
+                        return (
+                          <div key={a.id} className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold text-gray-700">
+                                {[a.firstName, a.lastName].filter(Boolean).join(' ') || '—'}
+                                {a.isDefault && <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-semibold">Default</span>}
+                              </p>
+                              <p className="text-xs text-gray-600 break-words">{[street, a.city, a.state, a.zip, a.country].filter(Boolean).join(', ')}</p>
+                              {a.phone && <p className="text-[11px] text-gray-400">{a.phone}</p>}
+                            </div>
+                            {inUse
+                              ? <span className="text-[10px] font-semibold text-green-600 whitespace-nowrap mt-0.5">✓ In use</span>
+                              : <button onClick={() => applyAddress(a)} disabled={addrApplying === a.id} className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-gray-900 text-white hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap">{addrApplying === a.id ? '…' : 'Use'}</button>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 {contact.clubName && (
                   <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Club</p>
                     <p className="text-sm font-semibold text-indigo-700">🏁 {contact.clubName}</p>
@@ -965,6 +1134,11 @@ function CustomerDashboardModal({ contact, onClose }: { contact: Contact; onClos
                 )}
                 <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Delivery Preferences</p>
                   <DeliveryBadges c={contact} />
+                </div>
+                <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Preferred Shipping <span className="font-normal normal-case text-gray-400">— chosen by the customer</span></p>
+                  {contact.preferredShipping
+                    ? <p className="text-sm font-semibold text-blue-700">🚚 {shippingLabel(contact.preferredShipping, contact.courierGuyBranch)}</p>
+                    : <p className="text-sm text-gray-300 italic">Not chosen yet</p>}
                 </div>
                 {contact.notes && (
                   <div><p className="text-xs font-semibold text-gray-400 uppercase mb-1">Notes</p>
@@ -1373,6 +1547,8 @@ export default function ContactsPage() {
         email:                editItem.email,
         phone:                editItem.phone,
         mobile:               editItem.mobile            || '',
+        preferredShipping:    editItem.preferredShipping || '',
+        courierGuyBranch:     editItem.courierGuyBranch  || '',
         addressStreet:        editItem.addressStreet   || '',
         addressCity:          editItem.addressCity     || '',
         addressProvince:      editItem.addressProvince || '',
@@ -1695,6 +1871,7 @@ export default function ContactsPage() {
         <CustomerDashboardModal
           contact={dashboardContact}
           onClose={() => setDashboardContact(null)}
+          onRefresh={load}
         />
       )}
 

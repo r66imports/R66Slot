@@ -22,10 +22,12 @@ export async function PATCH(
     const body = await request.json()
 
     const contacts = await getContacts()
-    const idx = contacts.findIndex(c => c.id === id)
+    let idx = contacts.findIndex(c => c.id === id)
 
-    if (idx === -1) {
-      return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
+    // Virtual contacts (merged from customers.json by GET) have ephemeral IDs
+    // that don't exist in contacts.json. Fall back to email lookup, then create.
+    if (idx === -1 && body.email?.trim()) {
+      idx = contacts.findIndex(c => c.email?.toLowerCase() === body.email.trim().toLowerCase())
     }
 
     const allowedFields: (keyof Contact)[] = [
@@ -34,14 +36,53 @@ export async function PATCH(
       'clubName', 'clubMemberId',
       'companyName', 'companyVAT', 'companyAddress',
       'deliveryDoorToDoor', 'deliveryKioskToKiosk', 'deliveryPudoLocker', 'deliveryPostnetAramex',
+      'preferredShipping', 'courierGuyBranch',
       'source', 'notes',
     ]
 
-    const updates: Partial<Contact> = { updatedAt: new Date().toISOString() }
+    const now = new Date().toISOString()
+    const updates: Partial<Contact> = { updatedAt: now }
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         (updates as Record<string, unknown>)[field] = body[field]
       }
+    }
+
+    if (idx === -1) {
+      // Create a real contacts.json entry from the request body (promotes virtual contact)
+      const newContact: Contact = {
+        id: `contact-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        firstName:            body.firstName?.trim()      || '',
+        lastName:             body.lastName?.trim()       || '',
+        email:                body.email?.trim()          || '',
+        phone:                body.phone?.trim()          || '',
+        mobile:               body.mobile?.trim()         || '',
+        addressStreet:        body.addressStreet?.trim()  || '',
+        addressCity:          body.addressCity?.trim()    || '',
+        addressProvince:      body.addressProvince?.trim() || '',
+        addressPostalCode:    body.addressPostalCode?.trim() || '',
+        addressCountry:       body.addressCountry?.trim() || 'South Africa',
+        clubName:             body.clubName?.trim()       || '',
+        clubMemberId:         body.clubMemberId?.trim()   || '',
+        companyName:          body.companyName?.trim()    || '',
+        companyVAT:           body.companyVAT?.trim()     || '',
+        companyAddress:       body.companyAddress?.trim() || '',
+        deliveryDoorToDoor:    Boolean(body.deliveryDoorToDoor),
+        deliveryKioskToKiosk:  Boolean(body.deliveryKioskToKiosk),
+        deliveryPudoLocker:    Boolean(body.deliveryPudoLocker),
+        deliveryPostnetAramex: Boolean(body.deliveryPostnetAramex),
+        preferredShipping:    body.preferredShipping?.trim() || '',
+        courierGuyBranch:     body.courierGuyBranch?.trim()  || '',
+        source:               body.source || 'website',
+        notes:                body.notes?.trim() || '',
+        totalOrders: 0,
+        totalSpent:  0,
+        createdAt: now,
+        updatedAt: now,
+      }
+      contacts.push(newContact)
+      await saveContacts(contacts)
+      return NextResponse.json(newContact)
     }
 
     contacts[idx] = { ...contacts[idx], ...updates }

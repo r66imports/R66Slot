@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { syncDefaultAddressToContact } from '@/lib/customer-address-sync'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
 const ADDRESSES_KEY = 'data/addresses.json'
@@ -65,6 +66,9 @@ export async function POST(request: NextRequest) {
 
     addresses.push(newAddress)
     await saveAddresses(addresses)
+
+    // Mirror the default address onto the admin contact record (Rule 53)
+    await syncDefaultAddressToContact(decoded.id)
 
     return NextResponse.json(newAddress, { status: 201 })
   } catch (error) {

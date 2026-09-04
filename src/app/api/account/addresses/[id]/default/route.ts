@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { syncDefaultAddressToContact } from '@/lib/customer-address-sync'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-dev-secret-replace-in-production'
 const ADDRESSES_KEY = 'data/addresses.json'
@@ -22,6 +23,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     addresses.forEach(a => { if (a.customerId === decoded.id) a.isDefault = a.id === id })
     await blobWrite(ADDRESSES_KEY, addresses)
+
+    // Mirror the new default onto the admin contact record (Rule 53)
+    await syncDefaultAddressToContact(decoded.id)
+
     return NextResponse.json({ success: true })
   } catch {
     return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
