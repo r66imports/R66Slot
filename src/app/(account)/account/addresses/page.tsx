@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import PreferredShipping from '@/components/account/preferred-shipping'
+import AddressAutocomplete, { type ParsedAddress } from '@/components/account/address-autocomplete'
 
 interface Address {
   id: string
@@ -134,6 +135,44 @@ export default function AddressesPage() {
     }
   }
 
+  /**
+   * Copy a picked Google place onto the form.
+   *
+   * Google returns the postal code itself, so the pending Nominatim guess is
+   * cancelled first — otherwise it would land a second later and overwrite the
+   * authoritative value. Nominatim stays as the fallback for typed addresses.
+   *
+   * Country and Province are <select>s, so a value only lands if it matches an
+   * option; anything we do not list is dropped rather than writing a value the
+   * select cannot show. Empty fields are never written over an existing value.
+   */
+  const applyPlace = (place: ParsedAddress) => {
+    if (zipLookupRef.current) clearTimeout(zipLookupRef.current)
+    setLookingUpZip(false)
+
+    setFormData(prev => {
+      const next: Partial<Address> = { ...prev }
+      if (place.address1) next.address1 = place.address1
+      if (place.address2) next.address2 = place.address2
+      if (place.city) next.city = place.city
+      if (place.zip) next.zip = place.zip
+
+      // Country first — the province list depends on it.
+      if (COUNTRY_OPTIONS.includes(place.country)) next.country = place.country
+
+      const provinces = PROVINCE_OPTIONS[next.country || 'South Africa'] || []
+      if (provinces.length > 0) {
+        // Case-insensitive match so "kwazulu-natal" still selects "KwaZulu-Natal".
+        const match = provinces.find(p => p.toLowerCase() === place.state.toLowerCase())
+        if (match) next.state = match
+      } else if (place.state) {
+        next.state = place.state   // free-text province for unlisted countries
+      }
+
+      return next
+    })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const url = editingId ? `/api/account/addresses/${editingId}` : '/api/account/addresses'
@@ -224,18 +263,18 @@ export default function AddressesPage() {
                 )}
               </div>
 
-              {/* Street address */}
-              <div>
-                <label className="block text-sm font-medium mb-2">Address Line 1 *</label>
-                <Input
-                  type="text"
-                  name="address1"
-                  value={formData.address1 || ''}
-                  onChange={handleChange}
-                  placeholder="Street address, complex, suburb"
-                  required
-                />
-              </div>
+              {/* Street address — Google suggestions, Nominatim postal lookup as fallback */}
+              <AddressAutocomplete
+                value={formData.address1 || ''}
+                /* Routed through handleChange so typing (rather than picking) still
+                   triggers the Nominatim postal-code lookup. */
+                onChange={v => handleChange({ target: { name: 'address1', value: v } } as React.ChangeEvent<HTMLInputElement>)}
+                onSelect={applyPlace}
+                country={formData.country}
+                label="Address Line 1 *"
+                placeholder="Street address, complex, suburb"
+                required
+              />
 
               <div>
                 <label className="block text-sm font-medium mb-2">Address Line 2</label>
