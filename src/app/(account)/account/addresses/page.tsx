@@ -226,6 +226,13 @@ export default function AddressesPage() {
    * A required field left blank higher up the form blocks submit natively, and
    * on a phone the browser's own bubble is easy to miss — so say it in the page
    * too, next to the button the customer just pressed.
+   *
+   * Wired with onInvalidCapture, NOT onInvalid. React lists 'invalid' as a
+   * non-delegated event, so it attaches the listener straight to this <form>,
+   * and the native invalid event fires on the offending <input> with
+   * bubbles: false — it never reaches the form. The capture phase runs
+   * root -> target through every ancestor whether or not the event bubbles,
+   * so the form sees it there.
    */
   const handleInvalid = () => {
     setFormError('Some required fields above are still empty. Scroll up and fill in every field marked *.')
@@ -260,7 +267,7 @@ export default function AddressesPage() {
 
         <Card>
           <CardContent className="p-6">
-            <form onSubmit={handleSubmit} onInvalid={handleInvalid} className="space-y-4">
+            <form onSubmit={handleSubmit} onInvalidCapture={handleInvalid} className="space-y-4">
               {/* Name */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
