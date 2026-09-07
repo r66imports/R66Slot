@@ -158,7 +158,13 @@ function cashPaymentsOf(doc: OrderDoc): InvoiceCashPayment[] {
   const m2 = String(doc.paymentMethod2 || '').trim()
   const a1 = Number(doc.paymentMethod1Amount) || 0
   const a2 = Number(doc.paymentMethod2Amount) || 0
-  const paid = Number(doc.amountPaid) || 0
+  // A doc can carry a cash method with no figure anywhere: the payment fields were taken off
+  // the invoice form (Rule 44) and docs written before that kept the label without ever
+  // recording an amount. Reading that as R0.00 silently dropped six real cash payments worth
+  // R1 787.25. Statistics (totalPaid, below) and the Events report already read the same
+  // shape as the full document total, so match them rather than leave the three disagreeing.
+  // `??` and not `|| 0` on purpose — a genuine 0 (settled entirely by credit) is not cash.
+  const paid = doc.amountPaid ?? (doc.status === 'paid' ? docSubtotal(doc) : 0)
 
   if (isCashMethod(m1)) {
     // Split amounts are only populated on multi-method docs. Falling back to the full
