@@ -99,6 +99,8 @@ export default function AddressesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<Partial<Address>>({ country: 'South Africa' })
   const [lookingUpZip, setLookingUpZip] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
   const zipLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { fetchAddresses() }, [])
@@ -173,25 +175,60 @@ export default function AddressesPage() {
     })
   }
 
+  const closeForm = () => {
+    setIsAdding(false)
+    setEditingId(null)
+    setFormData({ country: 'South Africa' })
+    setFormError(null)
+  }
+
+  /**
+   * Save the address.
+   *
+   * Every failure has to say something. This silently swallowed a failed save —
+   * an expired login in particular — so the button looked dead: the customer
+   * pressed it, nothing moved, and no message told them why.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (saving) return
     const url = editingId ? `/api/account/addresses/${editingId}` : '/api/account/addresses'
     const method = editingId ? 'PUT' : 'POST'
+    setSaving(true)
+    setFormError(null)
     try {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
+
       if (res.ok) {
         fetchAddresses()
-        setIsAdding(false)
-        setEditingId(null)
-        setFormData({ country: 'South Africa' })
+        closeForm()
+        return
+      }
+
+      if (res.status === 401) {
+        setFormError('Your sign-in has expired. Open the Login page in a new tab, sign in again, then come back and press Add Address.')
+      } else {
+        const detail = await res.json().catch(() => null)
+        setFormError(detail?.error || `Could not save the address (error ${res.status}). Please try again.`)
       }
     } catch {
-      console.error('Failed to save address')
+      setFormError('No connection to the server. Check your signal and try again.')
+    } finally {
+      setSaving(false)
     }
+  }
+
+  /**
+   * A required field left blank higher up the form blocks submit natively, and
+   * on a phone the browser's own bubble is easy to miss — so say it in the page
+   * too, next to the button the customer just pressed.
+   */
+  const handleInvalid = () => {
+    setFormError('Some required fields above are still empty. Scroll up and fill in every field marked *.')
   }
 
   const handleDelete = async (id: string) => {
@@ -223,7 +260,7 @@ export default function AddressesPage() {
 
         <Card>
           <CardContent className="p-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} onInvalid={handleInvalid} className="space-y-4">
               {/* Name */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -321,9 +358,23 @@ export default function AddressesPage() {
                 <label htmlFor="isDefault" className="text-sm">Set as default address</label>
               </div>
 
+              {formError && (
+                <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
+                  {formError.startsWith('Your sign-in has expired') && (
+                    <>
+                      {' '}
+                      <a href="/account/login" className="font-semibold underline">Go to Login</a>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div className="flex gap-2 pt-4">
-                <Button type="submit">{editingId ? 'Update Address' : 'Add Address'}</Button>
-                <Button type="button" variant="outline" onClick={() => { setIsAdding(false); setEditingId(null); setFormData({ country: 'South Africa' }) }}>
+                <Button type="submit" disabled={saving}>
+                  {saving ? 'Saving...' : editingId ? 'Update Address' : 'Add Address'}
+                </Button>
+                <Button type="button" variant="outline" onClick={closeForm}>
                   Cancel
                 </Button>
               </div>

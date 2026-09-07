@@ -42,7 +42,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any
+    let decoded: any
+    try {
+      decoded = jwt.verify(token, JWT_SECRET)
+    } catch {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
     const addressData = await request.json()
 
     const addresses = await getAddresses()
@@ -72,6 +78,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(newAddress, { status: 201 })
   } catch (error) {
-    return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    // Past this point the token has already verified, so anything thrown here is
+    // a save failure. Reporting it as 401 sent customers off to log in again for
+    // a problem logging in could never fix.
+    console.error('Failed to save address', error)
+    return NextResponse.json({ error: 'Could not save the address. Please try again.' }, { status: 500 })
   }
 }
