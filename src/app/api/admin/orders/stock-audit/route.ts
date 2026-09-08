@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead } from '@/lib/blob-storage'
 import { db } from '@/lib/db'
-import { extractSku } from '@/lib/order-helpers'
+import { extractSku, isStockLine } from '@/lib/order-helpers'
 import type { OrderDocument } from '@/app/api/admin/orders/documents/route'
 
 const KEY = 'data/order-documents.json'
@@ -148,6 +148,7 @@ export async function GET() {
       else unsyncedDocs++
 
       for (const li of doc.lineItems || []) {
+        if (!isStockLine(li)) continue
         const sku = extractSku(li.description)
         if (!sku || li.qty <= 0) continue
         const k = ensure(sku)

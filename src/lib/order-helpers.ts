@@ -5,6 +5,21 @@ export interface LineItem {
   description: string
   qty: number
   unitPrice: number
+  /** Service lines (⚙ Add Service) sell labour, not goods — see `isStockLine`. */
+  _service?: boolean
+}
+
+/**
+ * Does this line move stock at all?
+ *
+ * Service lines carry a description like "Services - Tyre Truing", and `extractSku`
+ * splits on " - ", so every one of them read as SKU "Services". Rule 2 then created a
+ * draft product called Services with 0 on hand, and from the next invoice on Rule 1
+ * hard-blocked the sale: "SERVICES: 0 in stock, 1 requested". Labour has no shelf —
+ * service lines are excluded from every stock path here.
+ */
+export function isStockLine(li: { _service?: boolean } | undefined | null): boolean {
+  return !!li && !li._service
 }
 
 /** Extract SKU from a line item description like "SC-5068 – Car-motor test-bench" or "PT1172G25 – G25 Compound..." */
@@ -30,6 +45,7 @@ export function sameStockFootprint(a: LineItem[] | undefined, b: LineItem[] | un
   const tally = (items: LineItem[] | undefined) => {
     const m = new Map<string, number>()
     for (const li of items || []) {
+      if (!isStockLine(li)) continue
       const sku = extractSku(li?.description || '').toUpperCase()
       const qty = Number(li?.qty) || 0
       if (!sku || qty <= 0) continue
@@ -52,6 +68,7 @@ export async function autoCreateMissingProducts(items: LineItem[]): Promise<numb
   let created = 0
   const now = new Date().toISOString()
   for (const li of items) {
+    if (!isStockLine(li)) continue
     const sku = extractSku(li.description)
     if (!sku) continue
     const dashIdx = li.description.search(/\s*[–\-]\s*/)
@@ -109,6 +126,7 @@ export async function findStockShortfalls(
 ): Promise<StockShortfall[]> {
   const tally = (list: LineItem[], sign: 1 | -1, into: Map<string, number>) => {
     for (const li of list) {
+      if (!isStockLine(li)) continue
       const sku = extractSku(li.description)
       if (!sku || li.qty <= 0) continue
       const k = sku.toUpperCase()
@@ -156,6 +174,7 @@ export function shortfallMessage(shortfalls: StockShortfall[]): string {
 export async function adjustStock(items: LineItem[], direction: 'subtract' | 'add'): Promise<void> {
   const now = new Date().toISOString()
   for (const li of items) {
+    if (!isStockLine(li)) continue
     const sku = extractSku(li.description)
     if (!sku || li.qty <= 0) continue
     try {
