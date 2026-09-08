@@ -7,6 +7,8 @@ const SERVICE_TYPES = [
   { id: 'tyretruing', label: 'Services - Tyre Truing' },
   { id: 'braids',     label: 'Services - Braids' },
   { id: 'wiring',     label: 'Services - Wiring' },
+  { id: 'fitting',    label: 'Services - Fitting of Parts' },
+  { id: 'painting',   label: 'Services - Painting' },
 ]
 function svcLabel(id: string) { return SERVICE_TYPES.find(s => s.id === id)?.label ?? id }
 
