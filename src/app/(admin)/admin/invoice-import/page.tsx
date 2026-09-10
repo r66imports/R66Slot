@@ -12,6 +12,8 @@ interface CostingSettings { shippingMarkup: number; markup: number; includeVAT: 
 interface ParsedItem {
   id: string; sku: string; description: string
   qty: number; wholesalePrice: number; estRetailZAR: number
+  /** Supplier PDF cut the SKU short — the ellipsis is stripped, the full code must be typed in. */
+  skuTruncated?: boolean
 }
 
 interface SavedImport {
@@ -88,11 +90,12 @@ function detectShipping(rows: any[][], headerIdx: number, priceCol: number): num
   return 0
 }
 
-async function parsePdfInvoice(
-  file: File,
-  exchangeRate: number,
-  costing: CostingSettings,
-): Promise<{ invoiceNumber: string; items: ParsedItem[]; shippingAmount: number }> {
+// ─── Shared PDF text extraction ─────────────────────────────────────────────
+
+interface PdfCell { str: string; x: number }
+interface PdfRow  { y: number; cells: PdfCell[] }
+
+async function extractPdfRows(file: File): Promise<PdfRow[]> {
   const pdfjsLib = await import('pdfjs-dist')
   pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
     'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -132,6 +135,16 @@ async function parsePdfInvoice(
     }
   }
   rows.forEach(r => r.cells.sort((a, b) => a.x - b.x))
+  return rows
+}
+
+// ─── Generic invoice parser ──────────────────────────────────────────────────
+
+function parsePdfInvoice(
+  rows: PdfRow[],
+  exchangeRate: number,
+  costing: CostingSettings,
+): { invoiceNumber: string; items: ParsedItem[]; shippingAmount: number } {
 
   // ── Extract invoice number ──
   let invoiceNumber = ''
@@ -232,6 +245,210 @@ async function parsePdfInvoice(
   return { invoiceNumber, items: parsed, shippingAmount }
 }
 
+// ─── Sideways (French) invoice parser ──────────────────────────────────
+//
+// Sideways invoices are French-language PDFs. Only four things are read:
+//   Quantite    → qty          Référence  → sku
+//   P.U. HT     → wholesale     Facture N° → invoice number (value sits BELOW the label)
+// Every other column (Désignation, Remise, TVA, Montant HT …) is still mapped so its
+// cells are absorbed by their own column instead of bleeding into the ones we import.
+
+function deaccent(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function frKey(text: string): string {
+  return deaccent(text).toUpperCase().replace(/\s+/g, ' ').trim()
+}
+
+/** French numbers use a comma decimal and space/NBSP thousands: "1 234,56" → 1234.56 */
+function parseFrNum(val: any): number {
+  if (typeof val === 'number') return isNaN(val) ? 0 : val
+  let t = String(val ?? '')
+    .replace(/[\s\u00A0\u202F\u2009]/g, '')
+    .replace(/[\u20AC$\u00A3]/g, '')
+    .replace(/,/g, '.')
+    .replace(/[^0-9.\-]/g, '')
+  const parts = t.split('.')
+  if (parts.length > 2) t = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1]
+  const n = parseFloat(t)
+  return isNaN(n) ? 0 : n
+}
+
+type FrCol = 'sku' | 'desc' | 'qty' | 'price' | 'other'
+
+const FR_COL_RES: { name: FrCol; re: RegExp }[] = [
+  { name: 'sku',   re: /^(REFERENCE|REFERENCES|REF\.?|CODE(\s*ARTICLE)?)$/ },
+  { name: 'qty',   re: /^(QUANTITE|QUANTITES|QTE\.?|QTY|QT\.?)$/ },
+  { name: 'price', re: /^(P\.?\s*U\.?(\s*H\.?\s*T\.?)?|PU\s*HT|PRIX\s*(U\.?|UNITAIRE)(\s*H\.?\s*T\.?)?)$/ },
+  { name: 'desc',  re: /^(DESIGNATION|LIBELLE|DESCRIPTION|ARTICLE|PRODUIT)$/ },
+  // Columns we do not import, mapped so their values never land in ours:
+  { name: 'other', re: /^(%?\s*REM(ISE)?(\s*H\.?\s*T\.?)?|MONTANT(\s*(H\.?\s*T\.?|T\.?T\.?C\.?|TVA))?|TOTAL(\s*H\.?\s*T\.?)?|TVA|T\.V\.A\.?|TAUX(\s*TVA)?|TX|UNITE|UN\.?|COND\.?|POIDS|ECO[\s-]?PART|DEEE)$/ },
+]
+
+/**
+ * The real end of the table. Deliberately narrow: Sage prints "HS CODE ... Sous- total"
+ * rows in the MIDDLE of the table (and again on the last page), so a bare \bTOTAL\b
+ * would stop the parse on page 1 and silently drop every later page.
+ */
+const FR_STOP_RE = /\b(TOTAL\s*(H\.?\s*T\.?|T\.?T\.?C\.?|TVA|GENERAL)|NET\s*(H\.?\s*T\.?|A\s*PAYER)|BASE\s*H\.?\s*T\.?|ARRETE\s*LA\s*PRESENTE|MODE\s*DE\s*REGLEMENT|ESCOMPTE|IBAN|BIC)\b/
+
+/** Sub-total / customs rows inside the table — skipped, never a stop and never a line. */
+const FR_SKIP_RE = /\b(SOUS\s*-?\s*TOTAL|HS\s*CODE|REPORT)\b/
+
+const FR_DATE_RE = /^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}$/
+
+/** True when the PDF reads like a French invoice, so we can auto-pick this parser. */
+function looksFrench(rows: PdfRow[]): boolean {
+  const head = frKey(rows.slice(0, 90).map(r => r.cells.map(c => c.str).join(' ')).join(' '))
+  if (!/\bFACTURE\b/.test(head)) return false
+  return /\bREFERENCE\b/.test(head) || /\bQUANTITE\b/.test(head) || /\bP\.?\s*U\.?\s*H\.?T\.?\b/.test(head)
+}
+
+/**
+ * "Facture N°" is a label; the number itself sits on a row below it, in the same
+ * column. Falls back to an inline "Facture N° 12345" if the PDF puts it on one line.
+ */
+function findFrInvoiceNumber(rows: PdfRow[]): string {
+  for (let i = 0; i < Math.min(rows.length, 70); i++) {
+    for (const cell of rows[i].cells) {
+      if (!/^FACTURE\s*(N|NO|NUM)/.test(frKey(cell.str))) continue
+
+      const inline = cell.str.match(/FACTURE\s*N[^A-Za-z0-9]*([A-Z0-9][A-Z0-9\-_\/.]{1,})/i)
+      if (inline?.[1] && /\d/.test(inline[1])) return inline[1].replace(/[.,;]$/, '')
+
+      for (let j = i + 1; j <= i + 5 && j < rows.length; j++) {
+        for (const c of rows[j].cells) {
+          if (Math.abs(c.x - cell.x) > 90) continue
+          const v = c.str.trim().replace(/[.,;]$/, '')
+          if (FR_DATE_RE.test(v)) continue
+          if (!/\d/.test(v)) continue
+          if (/^[A-Z0-9][A-Z0-9\-_\/.]{2,}$/i.test(v)) return v
+        }
+      }
+
+      // Fallback: same row, immediately to the right of the label.
+      for (const c of rows[i].cells) {
+        if (c.x <= cell.x || c.x - cell.x > 140) continue
+        const v = c.str.trim().replace(/[.,;]$/, '')
+        if (FR_DATE_RE.test(v)) continue
+        if (!/\d/.test(v)) continue
+        if (/^[A-Z0-9][A-Z0-9\-_\/.]{2,}$/i.test(v)) return v
+      }
+    }
+  }
+  return ''
+}
+
+function parseSidewaysPdf(
+  rows: PdfRow[],
+  exchangeRate: number,
+  costing: CostingSettings,
+): { invoiceNumber: string; items: ParsedItem[] } {
+
+  // ── Locate the table header ──
+  let headerRowIdx = -1
+  const cols: { name: FrCol; x: number }[] = []
+
+  for (let i = 0; i < Math.min(rows.length, 90); i++) {
+    const found: { name: FrCol; x: number }[] = []
+    for (const cell of rows[i].cells) {
+      const key = frKey(cell.str)
+      const hit = FR_COL_RES.find(c => c.re.test(key))
+      if (hit) found.push({ name: hit.name, x: cell.x })
+    }
+    const hasSku = found.some(c => c.name === 'sku')
+    const hasQty = found.some(c => c.name === 'qty')
+    if (!hasSku || !(hasQty || found.some(c => c.name === 'price'))) continue
+
+    headerRowIdx = i
+    cols.push(...found)
+
+    // Headers wrap: "P.U." on one line, "HT" on the next — pick up what is still missing.
+    for (let j = i + 1; j <= i + 2 && j < rows.length; j++) {
+      for (const cell of rows[j].cells) {
+        const key = frKey(cell.str)
+        const hit = FR_COL_RES.find(c => c.re.test(key))
+        if (hit && hit.name !== 'other' && !cols.some(c => c.name === hit.name)) {
+          cols.push({ name: hit.name, x: cell.x })
+        }
+      }
+    }
+    break
+  }
+
+  if (headerRowIdx === -1) {
+    throw new Error('Could not find the Sideways table header. Expected Référence, Quantité and P.U. HT columns.')
+  }
+  cols.sort((a, b) => a.x - b.x)
+
+  // Assign by column boundaries (midpoints between header positions) rather than by
+  // nearest header. Headers are centred while values are left- or right-aligned, so a
+  // wide column like Désignation can sit far from its own header text.
+  const bounds = cols.map((col, i) => ({
+    name: col.name,
+    lo: i === 0 ? -Infinity : (cols[i - 1].x + col.x) / 2,
+    hi: i === cols.length - 1 ? Infinity : (col.x + cols[i + 1].x) / 2,
+  }))
+
+  const assignCol = (x: number): FrCol | null =>
+    bounds.find(b => x >= b.lo && x < b.hi)?.name ?? null
+
+  // ── Read the line items ──
+  const items: ParsedItem[] = []
+  let lastItemY = -Infinity
+
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    const row  = rows[i]
+    const text = frKey(row.cells.map(c => c.str).join(' '))
+    if (FR_STOP_RE.test(text)) break
+    if (FR_SKIP_RE.test(text)) continue
+
+    const vals: Partial<Record<FrCol, string>> = {}
+    for (const cell of row.cells) {
+      const col = assignCol(cell.x)
+      if (col && col !== 'other') vals[col] = ((vals[col] ?? '') + ' ' + cell.str).trim()
+    }
+
+    // Sage prints a narrow Référence column and cuts long codes off with an ellipsis
+    // ("SWCR/GA162..."). Keep the characters it did print and drop the dots — two codes
+    // can truncate to the same string (SWW/17.3X1 is both the Al and the Mg wheel), so
+    // the flag is what matters, not uniqueness.
+    const rawSku = stripCJK((vals.sku ?? '').trim())
+    const truncated = /\.{2,}$/.test(rawSku)
+    const sku = truncated ? rawSku.replace(/\.+$/, '') : rawSku
+    const qty = parseFrNum(vals.qty)
+
+    if (!sku || !qty) {
+      // Sage wraps a long Désignation onto its own row: description only, no other
+      // column, directly under the line it belongs to. Fold it back in.
+      const cont = (vals.desc ?? '').trim()
+      if (items.length && cont && !sku && !vals.qty && !vals.price && row.y - lastItemY <= 40) {
+        const prev = items[items.length - 1]
+        prev.description = stripCJK(`${prev.description} ${cont}`.trim())
+        lastItemY = row.y
+      }
+      continue
+    }
+
+    if (FR_COL_RES.some(c => c.re.test(frKey(sku)))) continue   // repeated header on page 2+
+
+    const wp = parseFrNum(vals.price)
+    items.push({
+      id: `sw_${Date.now()}_${i}`,
+      sku,
+      description: stripCJK((vals.desc ?? '').trim()),
+      qty,
+      wholesalePrice: wp,
+      estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT),
+      skuTruncated: truncated,
+    })
+    lastItemY = row.y
+  }
+
+  return { invoiceNumber: findFrInvoiceNumber(rows), items }
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InvoiceImportPage() {
@@ -253,6 +470,7 @@ export default function InvoiceImportPage() {
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [detectedShipping, setDetectedShipping] = useState(0)  // in supplier currency
   const [parseError, setParseError] = useState('')
+  const [parserUsed, setParserUsed] = useState<'generic' | 'sideways' | ''>('')
   const [parsing, setParsing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -279,7 +497,7 @@ export default function InvoiceImportPage() {
   useEffect(() => {
     if (!items.length) return
     setItems(prev => prev.map(it => ({ ...it, estRetailZAR: calcEstRetail(it.wholesalePrice, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT) })))
-  }, [exchangeRate, costing])
+  }, [exchangeRate, exchangeRates, currency, costing, supplier])
 
   const handleSupplierChange = (name: string) => {
     setSupplier(name)
@@ -288,13 +506,28 @@ export default function InvoiceImportPage() {
   }
 
   const parseFile = useCallback(async (file: File) => {
-    setParseError(''); setItems([]); setDetectedShipping(0); setInvoiceNumber(''); setFileName(file.name)
+    setParseError(''); setItems([]); setDetectedShipping(0); setInvoiceNumber(''); setParserUsed(''); setFileName(file.name)
     setParsing(true)
     try {
       // ── PDF branch ──
       if (file.name.toLowerCase().endsWith('.pdf')) {
-        const result = await parsePdfInvoice(file, exchangeRate, costing)
+        const rows = await extractPdfRows(file)
+
+        // Sideways ships French-language invoices with their own layout.
+        if (/sideways/i.test(supplier) || looksFrench(rows)) {
+          const result = parseSidewaysPdf(rows, currency === 'EUR' ? exchangeRate : (exchangeRates.EUR || 0), costing)
+          if (!result.items.length) { setParseError('No line items found. Check the invoice has Référence, Quantité and P.U. HT columns.'); return }
+          setParserUsed('sideways')
+          if (currency !== 'EUR') setCurrency('EUR')   // Sideways invoices are priced in EUR
+          setInvoiceNumber(result.invoiceNumber)
+          setDetectedShipping(0)
+          setItems(result.items)
+          return
+        }
+
+        const result = parsePdfInvoice(rows, exchangeRate, costing)
         if (!result.items.length) { setParseError('No line items found in PDF. Ensure the invoice has Refer NO / SKU, Quantity, and Wholesale Price columns.'); return }
+        setParserUsed('generic')
         setInvoiceNumber(result.invoiceNumber)
         setDetectedShipping(result.shippingAmount)
         setItems(result.items)
@@ -328,6 +561,7 @@ export default function InvoiceImportPage() {
       }
 
       if (!parsed.length) { setParseError('No line items found. Check SKU/ITEM and QTY columns have data.'); return }
+      setParserUsed('generic')
       setItems(parsed)
     } catch (err: any) { setParseError(`Parse failed: ${err.message}`) }
     finally { setParsing(false) }
@@ -412,6 +646,10 @@ export default function InvoiceImportPage() {
     } catch { setCreateError('Something went wrong.') }
     finally { setCreating(false) }
   }
+
+  // Sage prints a narrow Référence column and truncates long codes with an ellipsis
+  // ("SWCR/GA162..."). The full code is not in the PDF at all — it has to be typed in.
+  const truncatedSkus = items.filter(i => i.skuTruncated)
 
   const totalItems = items.reduce((s, i) => s + i.qty, 0)
   const totalWholesale = items.reduce((s, i) => s + i.wholesalePrice * i.qty, 0)
@@ -519,6 +757,16 @@ export default function InvoiceImportPage() {
           )}
         </div>
 
+        {/* Which parser ran */}
+        {parserUsed === 'sideways' && (
+          <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-xs text-indigo-700 flex items-center gap-2 flex-wrap">
+            <span className="font-semibold">🇫🇷 Sideways format</span>
+            <span className="text-indigo-500">
+              Read Référence → SKU, Quantité → Qty, P.U. HT → Wholesale (EUR), Facture N° → Invoice No.
+            </span>
+          </div>
+        )}
+
         {/* Invoice number extracted from PDF */}
         {invoiceNumber && (
           <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-center justify-between flex-wrap gap-2">
@@ -563,6 +811,27 @@ export default function InvoiceImportPage() {
             </div>
           </div>
 
+          {truncatedSkus.length > 0 && (
+            <div className="mx-5 mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800">
+              <div className="font-semibold mb-1.5">
+                ⚠ {truncatedSkus.length} SKU{truncatedSkus.length === 1 ? ' was' : 's were'} cut short by the supplier's PDF — partial reference only
+              </div>
+              <div className="text-amber-700 mb-2">
+                Sage prints a narrow Référence column, so the rest of the code isn't in the file. Complete
+                them here or in the worksheet. Two products can share the same partial reference, so use
+                the description to tell them apart.
+              </div>
+              <ul className="space-y-0.5">
+                {truncatedSkus.map(i => (
+                  <li key={i.id} className="flex gap-2">
+                    <span className="font-mono font-semibold shrink-0">{i.sku}</span>
+                    <span className="text-amber-600 truncate">{i.description || '—'}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -582,8 +851,9 @@ export default function InvoiceImportPage() {
                     <td className="px-4 py-2 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-2">
                       <input type="text" value={item.sku}
-                        onChange={e => setItems(p => p.map(i => i.id === item.id ? { ...i, sku: e.target.value } : i))}
-                        className="w-36 text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/50 font-mono" />
+                        onChange={e => setItems(p => p.map(i => i.id === item.id ? { ...i, sku: e.target.value, skuTruncated: false } : i))}
+                        title={item.skuTruncated ? 'Cut short by the supplier PDF — enter the full SKU' : undefined}
+                        className={`w-36 text-xs border rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/50 font-mono ${item.skuTruncated ? 'border-amber-400 bg-amber-50' : 'border-gray-200'}`} />
                     </td>
                     <td className="px-4 py-2">
                       <input type="text" value={item.description}
