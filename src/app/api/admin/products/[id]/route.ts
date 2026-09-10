@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { hasAdminSession, stripPrivateFields } from '@/lib/product-privacy'
 import { db } from '@/lib/db'
 import { isRuleActive } from '@/lib/site-rules'
 import type { Product } from '../route'
@@ -71,7 +72,8 @@ export async function GET(
     if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
-    return NextResponse.json(rowToProduct(result.rows[0]))
+    const product = rowToProduct(result.rows[0])
+    return NextResponse.json(await hasAdminSession() ? product : stripPrivateFields(product))
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

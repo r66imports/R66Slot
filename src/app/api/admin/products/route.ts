@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { hasAdminSession, stripPrivateFields, stripPrivateColumns } from '@/lib/product-privacy'
 import { db } from '@/lib/db'
 import { blobRead } from '@/lib/blob-storage'
 
@@ -124,7 +125,15 @@ export async function GET(request: Request) {
     const includeArchived = searchParams.get('includeArchived') === 'true'
     const fields = searchParams.get('fields')
 
-    const cache = { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30' } }
+    // Vary on Cookie: the body now differs for anonymous vs signed-in callers, and without
+    // this a cached anonymous copy could be served back to an admin with costs missing.
+    const cache = { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=30', 'Vary': 'Cookie' } }
+
+    // Anonymous callers (the storefront) never see landed cost or accounting mappings.
+    const isAdmin = await hasAdminSession()
+    const shape = (rows: any[]) => isAdmin
+      ? rows.map(rowToProduct)
+      : rows.map(r => stripPrivateFields(rowToProduct(r)))
 
     // Summary mode — returns brand/supplier group counts only (for brand grid)
     if (searchParams.get('summary') === '1') {
@@ -154,20 +163,20 @@ export async function GET(request: Request) {
       const cols = fields.split(',').map(f => f.trim()).filter(f => allowed.has(f))
       if (cols.length > 0) {
         const result = await db.query(`SELECT ${cols.join(', ')} FROM products WHERE status != 'archived' ORDER BY sku ASC`)
-        return NextResponse.json(result.rows, cache)
+        return NextResponse.json(isAdmin ? result.rows : result.rows.map(stripPrivateColumns), cache)
       }
     }
 
     let result
     if (includeArchived) {
       result = await db.query(`SELECT * FROM products WHERE status = 'archived' ORDER BY sku ASC`)
-      return NextResponse.json(result.rows.map(rowToProduct))
+      return NextResponse.json(shape(result.rows))
     } else if (brand) {
       result = await db.query(`SELECT * FROM products WHERE LOWER(brand) = LOWER($1) AND status != 'archived' ORDER BY sku ASC`, [brand])
-      return NextResponse.json(result.rows.map(rowToProduct), cache)
+      return NextResponse.json(shape(result.rows), cache)
     } else {
       result = await db.query(`SELECT * FROM products WHERE status != 'archived' ORDER BY sku ASC`)
-      return NextResponse.json(result.rows.map(rowToProduct), cache)
+      return NextResponse.json(shape(result.rows), cache)
     }
   } catch (error) {
     console.error('Error fetching products:', error)
