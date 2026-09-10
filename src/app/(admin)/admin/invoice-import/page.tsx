@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -15,6 +15,17 @@ interface ParsedItem {
   qty: number; wholesalePrice: number; estRetailZAR: number
   /** Supplier PDF cut the SKU short — the ellipsis is stripped, the full code must be typed in. */
   skuTruncated?: boolean
+  /** Price as printed on the line, before an invoice-level discount was spread back over it. */
+  listPrice?: number
+  /** Supplier flagged the line [Backorder] — ordered, not yet shipped. */
+  backorder?: boolean
+}
+
+/** Totals block of an invoice that discounts once at the bottom rather than per line. */
+interface InvoiceTotals {
+  subTotal: number; shipping: number; discount: number; total: number
+  /** discount ÷ sub-total, e.g. 0.4 for a 40% coupon. */
+  discountRate: number
 }
 
 interface SavedImport {
@@ -28,6 +39,11 @@ interface SavedImport {
 
 function stripCJK(text: string): string {
   return text.replace(/[⺀-鿿豈-﫿︰-﹏＀-￯]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+/** Punctuation-stripped SKU, so the invoice's SC-10225 still finds a catalogue SC10225. */
+function bareSku(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 function parseNum(val: any): number {
@@ -450,6 +466,207 @@ function parseSidewaysPdf(
   return { invoiceNumber: findFrInvoiceNumber(rows), items }
 }
 
+// ─── Slot Car Supply / Electric Dreams (US) invoice parser ───────────────────
+//
+// Printed from a browser rather than generated, so the table breaks three assumptions
+// the generic parser makes:
+//   • THERE IS NO QTY COLUMN. The quantity is the leading "N x " of the Products cell.
+//   • THE SKU IS UNDER "Model" — no column is named SKU / Item / Ref / Code, which is why
+//     the generic header scan cannot find this table at all and throws.
+//   • EVERY LINE PRINTS AT LIST PRICE. A percentage coupon is taken once, in the totals
+//     block, so the figure on the line is not the figure that was paid.
+// The totals block also sits BELOW the Sub-Total line, so the parse must read past it
+// rather than stopping there — shipping and the coupon are both printed underneath.
+
+const SCS_QTY_RE  = /^(\d+)\s*[xX]\s+/
+const SCS_STOP_RE = /\b(SUB\s*-?\s*TOTAL|GRAND\s*TOTAL)\b|\bTOTAL\s*:/
+
+/** Last money amount in a string. "Discount Coupon : -$216.59" arrives as a single cell. */
+function parseScsMoney(text: string): number | null {
+  const re = /(-)?\$\s*(-)?([\d,]+\.\d{2})/g
+  let m: RegExpExecArray | null
+  let last: number | null = null
+  while ((m = re.exec(text))) {
+    const n = parseFloat(m[3].replace(/,/g, ''))
+    last = (m[1] || m[2]) ? -n : n
+  }
+  return last
+}
+
+/** True when the PDF reads like a Slot Car Supply invoice, so we can auto-pick this parser. */
+function looksSlotCarSupply(rows: PdfRow[]): boolean {
+  const head = rows.slice(0, 60).map(r => r.cells.map(c => c.str).join(' ')).join(' ').toUpperCase()
+  if (!/SLOTCARSUPPLY\.COM|SLOT\s*CAR\s*SUPPLY|SCS\s+INVOICE|ELECTRIC\s*DREAMS/.test(head)) return false
+  return /\bPRODUCTS\b/.test(head) && /\bMODEL\b/.test(head)
+}
+
+/** The [Backorder] tag is carried on the row, not in the product name. */
+function cleanScsDescription(text: string): string {
+  return stripCJK(text).replace(/^\s*\[[^\]]*\]\s*/, '').trim()
+}
+
+function parseSlotCarSupplyPdf(
+  rows: PdfRow[],
+  exchangeRate: number,
+  costing: CostingSettings,
+): { invoiceNumber: string; items: ParsedItem[]; totals: InvoiceTotals } {
+
+  // ── Invoice number: "Invoice No. 139120" sits above the table ──
+  let invoiceNumber = ''
+  for (const row of rows.slice(0, 50)) {
+    const m = row.cells.map(c => c.str).join(' ').match(/Invoice\s+No\.?\s*:?\s*([A-Z0-9][A-Z0-9\-_.]{2,})/i)
+    if (m?.[1]) { invoiceNumber = m[1]; break }
+  }
+
+  // ── Locate the header row: "Products  Model  Tax  Price  Price  Total  Total" ──
+  let headerRowIdx = -1
+  let descX = -1, skuX = -1
+  const priceXs: number[] = []
+  const otherXs: number[] = []
+
+  for (let i = 0; i < Math.min(rows.length, 60); i++) {
+    const cells = rows[i].cells
+    const prod  = cells.find(c => /^PRODUCTS?$/i.test(c.str.trim()))
+    const model = cells.find(c => /^MODELS?$/i.test(c.str.trim()))
+    if (!prod || !model) continue
+
+    headerRowIdx = i
+    descX = prod.x
+    skuX  = model.x
+    for (const c of cells) {
+      if (c === prod || c === model) continue
+      if (/^PRICE$/i.test(c.str.trim())) priceXs.push(c.x)
+      else otherXs.push(c.x)                       // Tax, Total (ex), Total (inc)
+    }
+    break
+  }
+
+  if (headerRowIdx === -1) {
+    throw new Error('Could not find the Slot Car Supply table. Expected a "Products" column and a "Model" column.')
+  }
+  if (!priceXs.length) {
+    throw new Error('Slot Car Supply invoice has no Price column.')
+  }
+
+  // "Price" prints on one line with "(ex)" / "(inc)" on the next. Bind to the ex-tax
+  // column: Slot Car Supply bills South Africa at 0%, but that is their setting rather
+  // than a guarantee, and the pricelist figure has to be net of tax either way.
+  let priceX = Math.min(...priceXs)
+  for (let j = headerRowIdx + 1; j <= headerRowIdx + 2 && j < rows.length; j++) {
+    const ex = rows[j].cells.find(c => /^\(EX\)$/i.test(c.str.trim()))
+    if (!ex) continue
+    const near = priceXs.reduce((best, x) => Math.abs(x - ex.x) < Math.abs(best - ex.x) ? x : best, priceXs[0])
+    if (Math.abs(near - ex.x) <= 20) priceX = near
+    break
+  }
+
+  // Values are right-aligned under centred headers, so assign by the midpoints between
+  // adjacent header positions rather than by nearest header (same as the Sideways parser).
+  const cols: { name: 'desc' | 'sku' | 'price' | 'other'; x: number }[] = [
+    { name: 'desc'  as const, x: descX },
+    { name: 'sku'   as const, x: skuX },
+    { name: 'price' as const, x: priceX },
+    ...otherXs.map(x => ({ name: 'other' as const, x })),
+    ...priceXs.filter(x => x !== priceX).map(x => ({ name: 'other' as const, x })),
+  ].sort((a, b) => a.x - b.x)
+
+  const bounds = cols.map((col, i) => ({
+    name: col.name,
+    lo: i === 0 ? -Infinity : (cols[i - 1].x + col.x) / 2,
+    hi: i === cols.length - 1 ? Infinity : (col.x + cols[i + 1].x) / 2,
+  }))
+  const assignCol = (x: number) => bounds.find(b => x >= b.lo && x < b.hi)?.name ?? null
+
+  // ── Read the line items, then the totals block ──
+  const items: ParsedItem[] = []
+  const totals: InvoiceTotals = { subTotal: 0, shipping: 0, discount: 0, total: 0, discountRate: 0 }
+  let inTotals = false
+  let lastItemY = -Infinity
+
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    const row   = rows[i]
+    const text  = row.cells.map(c => c.str).join(' ')
+    const upper = text.toUpperCase()
+
+    if (!inTotals && SCS_STOP_RE.test(upper)) inTotals = true
+
+    if (inTotals) {
+      const money = parseScsMoney(text)
+      if (money === null) continue
+      if (/SUB\s*-?\s*TOTAL/.test(upper))              totals.subTotal = money
+      else if (SHIP_KEYS.some(k => upper.includes(k))) totals.shipping = Math.abs(money)
+      else if (/DISCOUNT|COUPON/.test(upper))          totals.discount = Math.abs(money)
+      else if (/\bTOTAL\s*:/.test(upper))              totals.total = money
+      continue
+    }
+
+    // The header repeats at the top of each printed page.
+    if (/^PRODUCTS?$/i.test(row.cells[0]?.str.trim() ?? '')) continue
+
+    const vals: Record<string, string> = {}
+    for (const cell of row.cells) {
+      const col = assignCol(cell.x)
+      if (col && col !== 'other') vals[col] = ((vals[col] ?? '') + ' ' + cell.str).trim()
+    }
+
+    const productCell = stripCJK((vals.desc ?? '').trim())
+    const qtyMatch    = productCell.match(SCS_QTY_RE)
+
+    if (!qtyMatch) {
+      // A long product name wraps onto its own row — description text only, no Model and
+      // no price, directly beneath the line it belongs to. Fold it back in.
+      if (items.length && productCell && !vals.sku && !vals.price && row.y - lastItemY <= 30) {
+        const prev = items[items.length - 1]
+        prev.description = `${prev.description} ${cleanScsDescription(productCell)}`.trim()
+        lastItemY = row.y
+      }
+      continue
+    }
+
+    // "Model" is narrow and a long code runs straight into the Tax cell, so pdf.js hands
+    // back "W17309715M 0.00%" as one string. Drop the tax, keep the code.
+    const sku = (stripCJK(vals.sku ?? '')
+      .replace(/\s*-?\d+(\.\d+)?\s*%\s*$/, '')
+      .trim()
+      .split(/\s+/)[0]) ?? ''
+    if (!sku) continue
+
+    const listPrice = parseNum(vals.price)
+    const body      = productCell.slice(qtyMatch[0].length)
+
+    items.push({
+      id: `scs_${Date.now()}_${i}`,
+      sku,
+      description: cleanScsDescription(body),
+      qty: parseInt(qtyMatch[1], 10),
+      wholesalePrice: listPrice,
+      listPrice,
+      backorder: /^\s*\[\s*BACK\s*-?\s*ORDER/i.test(body),
+      estRetailZAR: calcEstRetail(listPrice, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT),
+    })
+    lastItemY = row.y
+  }
+
+  // Their template cuts long names off mid-word and leaves the joining dash dangling
+  // ("… Offset HARD -"). Trim it only once the wrapped rows have been folded in, or the
+  // dash between the first half of the name and the second is lost with it.
+  for (const it of items) it.description = it.description.replace(/[\s\-–]+$/, '').trim()
+
+  // The coupon is taken once, off the sub-total, while every line prints at list. Spread it
+  // back so Wholesale is what was actually paid — Rule 12 writes this figure straight to the
+  // inventory pricelist and it drives every landed-cost calculation, so it cannot be the list
+  // price. Kept to 4 decimals: rounding each unit to cents loses ~$0.21 against the invoice.
+  if (totals.discount > 0 && totals.subTotal > 0) {
+    totals.discountRate = totals.discount / totals.subTotal
+    for (const it of items) {
+      it.wholesalePrice = Math.round((it.listPrice ?? 0) * (1 - totals.discountRate) * 10000) / 10000
+      it.estRetailZAR = calcEstRetail(it.wholesalePrice, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT)
+    }
+  }
+
+  return { invoiceNumber, items, totals }
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InvoiceImportPage() {
@@ -473,8 +690,9 @@ export default function InvoiceImportPage() {
   const [items, setItems] = useState<ParsedItem[]>([])
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [detectedShipping, setDetectedShipping] = useState(0)  // in supplier currency
+  const [invoiceTotals, setInvoiceTotals] = useState<InvoiceTotals | null>(null)
   const [parseError, setParseError] = useState('')
-  const [parserUsed, setParserUsed] = useState<'generic' | 'sideways' | ''>('')
+  const [parserUsed, setParserUsed] = useState<'generic' | 'sideways' | 'slotcarsupply' | ''>('')
   const [parsing, setParsing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -523,12 +741,26 @@ export default function InvoiceImportPage() {
   }
 
   const parseFile = useCallback(async (file: File) => {
-    setParseError(''); setItems([]); setDetectedShipping(0); setInvoiceNumber(''); setParserUsed(''); setFileName(file.name)
+    setParseError(''); setItems([]); setDetectedShipping(0); setInvoiceNumber(''); setParserUsed(''); setInvoiceTotals(null); setFileName(file.name)
     setParsing(true)
     try {
       // ── PDF branch ──
       if (file.name.toLowerCase().endsWith('.pdf')) {
         const rows = await extractPdfRows(file)
+
+        // Slot Car Supply print their invoice from a browser: no Qty column and the SKU
+        // under "Model", so the generic header scan cannot see the table at all.
+        if (/slot\s*car\s*supply|electric\s*dreams/i.test(supplier) || looksSlotCarSupply(rows)) {
+          const result = parseSlotCarSupplyPdf(rows, currency === 'USD' ? exchangeRate : (exchangeRates.USD || 0), costing)
+          if (!result.items.length) { setParseError('No line items found. Check the invoice has the Products, Model and Price (ex) columns.'); return }
+          setParserUsed('slotcarsupply')
+          if (currency !== 'USD') setCurrency('USD')   // Slot Car Supply invoices are priced in USD
+          setInvoiceNumber(result.invoiceNumber)
+          setDetectedShipping(result.totals.shipping)
+          setInvoiceTotals(result.totals)
+          setItems(result.items)
+          return
+        }
 
         // Sideways ships French-language invoices with their own layout.
         if (/sideways/i.test(supplier) || looksFrench(rows)) {
@@ -729,6 +961,33 @@ The worksheet it created is not affected.`)) return
   // ("SWCR/GA162..."). The full code is not in the PDF at all — it has to be typed in.
   const truncatedSkus = items.filter(i => i.skuTruncated)
 
+  // SKUs already saved in inventory. Suppliers that cut their own descriptions short
+  // (Slot Car Supply truncates mid-word) leave the catalogue title as the better name,
+  // so offer it in bulk here as well as per row through the SKU picker.
+  const catalogueBySku = useMemo(() => {
+    const m = new Map<string, ProductRef>()
+    for (const p of products) {
+      const k = bareSku(p.sku)
+      if (k && !m.has(k)) m.set(k, p)
+    }
+    return m
+  }, [products])
+
+  const catalogueMatches = items.filter(i => catalogueBySku.has(bareSku(i.sku)))
+  const catalogueTitleFixes = catalogueMatches.filter(i => {
+    const t = catalogueBySku.get(bareSku(i.sku))?.title?.trim()
+    return !!t && t !== i.description.trim()
+  })
+  const applyCatalogueTitles = () => {
+    setItems(p => p.map(i => {
+      const t = catalogueBySku.get(bareSku(i.sku))?.title?.trim()
+      return t ? { ...i, description: t } : i
+    }))
+  }
+
+  const backorderItems = items.filter(i => i.backorder)
+  const backorderQty = backorderItems.reduce((s, i) => s + i.qty, 0)
+
   const totalItems = items.reduce((s, i) => s + i.qty, 0)
   const totalWholesale = items.reduce((s, i) => s + i.wholesalePrice * i.qty, 0)
   const totalEstRetail = items.reduce((s, i) => s + i.estRetailZAR * i.qty, 0)
@@ -845,6 +1104,15 @@ The worksheet it created is not affected.`)) return
           </div>
         )}
 
+        {parserUsed === 'slotcarsupply' && (
+          <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-xs text-indigo-700 flex items-center gap-2 flex-wrap">
+            <span className="font-semibold">🇺🇸 Slot Car Supply format</span>
+            <span className="text-indigo-500">
+              Read Model → SKU, the &quot;N x&quot; prefix on Products → Qty, Price (ex) → Wholesale (USD), Invoice No. → Invoice No.
+            </span>
+          </div>
+        )}
+
         {/* Invoice number extracted from PDF */}
         {invoiceNumber && (
           <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-center justify-between flex-wrap gap-2">
@@ -858,6 +1126,26 @@ The worksheet it created is not affected.`)) return
               />
             </div>
             <span className="text-xs text-green-600">Auto-extracted · editable</span>
+          </div>
+        )}
+
+        {/* Invoice-level discount spread back over the lines */}
+        {invoiceTotals && invoiceTotals.discountRate > 0 && (
+          <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3 text-xs text-purple-800">
+            <div className="font-semibold text-sm mb-1">
+              🏷️ {(invoiceTotals.discountRate * 100).toFixed(2).replace(/\.00$/, '')}% discount applied to every line
+            </div>
+            <div className="text-purple-600">
+              The invoice prints each item at full price and takes the coupon off once, at the bottom.
+              Wholesale below is the <span className="font-semibold">net price actually paid</span>, so landed cost
+              and the inventory pricelist are right.
+            </div>
+            <div className="mt-2 flex gap-4 flex-wrap font-mono text-[11px] text-purple-700">
+              <span>Sub-total {currency} {invoiceTotals.subTotal.toFixed(2)}</span>
+              <span>− Discount {invoiceTotals.discount.toFixed(2)}</span>
+              {invoiceTotals.shipping > 0 && <span>+ Shipping {invoiceTotals.shipping.toFixed(2)}</span>}
+              {invoiceTotals.total > 0 && <span className="font-semibold">= Total {invoiceTotals.total.toFixed(2)}</span>}
+            </div>
           </div>
         )}
 
@@ -881,7 +1169,14 @@ The worksheet it created is not affected.`)) return
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
             <div>
               <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">3. Review — {items.length} Line Items · {totalItems} Units</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Edit inline. Remove rows with ✕.</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Edit inline. Remove rows with ✕.
+                {backorderItems.length > 0 && (
+                  <span className="text-amber-600 ml-1">
+                    · {backorderItems.length} line{backorderItems.length === 1 ? '' : 's'} ({backorderQty} unit{backorderQty === 1 ? '' : 's'}) marked BO — on backorder with the supplier
+                  </span>
+                )}
+              </p>
             </div>
             <div className="flex gap-4 text-xs text-gray-500">
               <span>Wholesale: <span className="font-semibold text-gray-800">{currency} {totalWholesale.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}</span></span>
@@ -910,6 +1205,27 @@ The worksheet it created is not affected.`)) return
             </div>
           )}
 
+          {catalogueTitleFixes.length > 0 && (
+            <div className="mx-5 mt-4 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-xs text-emerald-800">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <div className="font-semibold mb-1">
+                    ✓ {catalogueMatches.length} of {items.length} SKUs are already saved in your inventory
+                  </div>
+                  <div className="text-emerald-700">
+                    {catalogueTitleFixes.length} description{catalogueTitleFixes.length === 1 ? '' : 's'} differ{catalogueTitleFixes.length === 1 ? 's' : ''} from
+                    the saved product title — some suppliers cut long names off mid-word. Swap in your own
+                    titles, or pick them one at a time from the SKU box.
+                  </div>
+                </div>
+                <button onClick={applyCatalogueTitles}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 whitespace-nowrap">
+                  Use catalogue titles ({catalogueTitleFixes.length})
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -928,6 +1244,7 @@ The worksheet it created is not affected.`)) return
                   <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-2 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-2">
+                      <div className="flex items-center gap-1.5">
                       <input type="text" value={item.sku}
                         onChange={e => {
                           setItems(p => p.map(i => i.id === item.id ? { ...i, sku: e.target.value, skuTruncated: false } : i))
@@ -937,11 +1254,21 @@ The worksheet it created is not affected.`)) return
                         onBlur={() => setSkuPicker(cur => cur?.id === item.id ? null : cur)}
                         title={item.skuTruncated ? 'Cut short by the supplier PDF — pick the matching product' : undefined}
                         className={`w-36 text-xs border rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/50 font-mono ${item.skuTruncated ? 'border-amber-400 bg-amber-50' : 'border-gray-200'}`} />
+                      {catalogueBySku.has(bareSku(item.sku)) && (
+                        <span title="Already saved in inventory" className="text-emerald-600 text-xs leading-none">✓</span>
+                      )}
+                      </div>
                     </td>
                     <td className="px-4 py-2">
-                      <input type="text" value={item.description}
-                        onChange={e => setItems(p => p.map(i => i.id === item.id ? { ...i, description: e.target.value } : i))}
-                        className="w-full min-w-[200px] text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/50" />
+                      <div className="flex items-center gap-1.5">
+                        {item.backorder && (
+                          <span title="Supplier marked this line [Backorder] — ordered, not yet shipped"
+                            className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-300">BO</span>
+                        )}
+                        <input type="text" value={item.description}
+                          onChange={e => setItems(p => p.map(i => i.id === item.id ? { ...i, description: e.target.value } : i))}
+                          className="w-full min-w-[200px] text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/50" />
+                      </div>
                     </td>
                     <td className="px-4 py-2 text-center">
                       <input type="number" min={1} value={item.qty}
