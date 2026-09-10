@@ -7,6 +7,7 @@ import Link from 'next/link'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SupplierContact { id: string; name: string; preferredCurrency?: string }
+interface ProductRef { id: string; sku: string; title: string; brand: string }
 interface CostingSettings { shippingMarkup: number; markup: number; includeVAT: boolean }
 
 interface ParsedItem {
@@ -459,6 +460,9 @@ export default function InvoiceImportPage() {
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({})
   const [costing, setCosting] = useState<CostingSettings>({ shippingMarkup: 45, markup: 30, includeVAT: true })
   const [savedImports, setSavedImports] = useState<SavedImport[]>([])
+  const [products, setProducts] = useState<ProductRef[]>([])
+  /** Which SKU cell has the picker open, and where to draw it (fixed, so the table can't clip it). */
+  const [skuPicker, setSkuPicker] = useState<{ id: string; top: number; left: number; width: number } | null>(null)
   const [loadingMeta, setLoadingMeta] = useState(true)
 
   const [supplier, setSupplier] = useState('')
@@ -491,6 +495,19 @@ export default function InvoiceImportPage() {
       if (rates?.rates) setExchangeRates(rates.rates)
       setSavedImports(Array.isArray(imports) ? imports : [])
     }).finally(() => setLoadingMeta(false))
+  }, [])
+
+  // The catalogue is several MB and is only needed once there are rows to match, so it
+  // loads on its own rather than holding up the supplier list.
+  useEffect(() => {
+    fetch('/api/admin/products')
+      .then(r => r.json())
+      .then((prods: any[]) => setProducts(
+        (Array.isArray(prods) ? prods : [])
+          .map(p => ({ id: p.id, sku: p.sku || '', title: p.title || '', brand: p.brand || '' }))
+          .filter((p: ProductRef) => p.sku),
+      ))
+      .catch(() => setProducts([]))
   }, [])
 
   // Recalc est. retail when rate/costing changes
@@ -646,6 +663,47 @@ export default function InvoiceImportPage() {
     } catch { setCreateError('Something went wrong.') }
     finally { setCreating(false) }
   }
+
+  /**
+   * Candidates for a (usually partial) reference. Prefix matches rank first — a truncated
+   * Sideways ref like "SWW/17.3X1" is the front of the real code, so those are the closest.
+   */
+  const skuMatches = (value: string): ProductRef[] => {
+    const q = value.trim().toLowerCase()
+    if (!q) return []
+    // Sideways writes the same code two ways: the invoice prints SWW/AS173x where the
+    // catalogue has SWW/AS17.3X10MG. Compare punctuation-stripped as a second pass.
+    const bare = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const qBare = bare(q)
+
+    const starts: ProductRef[] = []
+    const loose: ProductRef[] = []
+    const rest: ProductRef[] = []
+    for (const prod of products) {
+      const sku = prod.sku.toLowerCase()
+      if (sku.startsWith(q)) starts.push(prod)
+      else if (qBare && bare(prod.sku).startsWith(qBare)) loose.push(prod)
+      else if (sku.includes(q) || prod.title.toLowerCase().includes(q)) rest.push(prod)
+    }
+    return [...starts, ...loose, ...rest].slice(0, 12)
+  }
+
+  const openSkuPicker = (id: string, el: HTMLInputElement) => {
+    const r = el.getBoundingClientRect()
+    setSkuPicker({ id, top: r.bottom + 4, left: r.left, width: Math.max(r.width, 300) })
+  }
+
+  // The picker is fixed-positioned, so it has to close when the page moves under it.
+  useEffect(() => {
+    if (!skuPicker) return
+    const close = () => setSkuPicker(null)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [skuPicker])
 
   // Sage prints a narrow Référence column and truncates long codes with an ellipsis
   // ("SWCR/GA162..."). The full code is not in the PDF at all — it has to be typed in.
@@ -851,8 +909,13 @@ export default function InvoiceImportPage() {
                     <td className="px-4 py-2 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-2">
                       <input type="text" value={item.sku}
-                        onChange={e => setItems(p => p.map(i => i.id === item.id ? { ...i, sku: e.target.value, skuTruncated: false } : i))}
-                        title={item.skuTruncated ? 'Cut short by the supplier PDF — enter the full SKU' : undefined}
+                        onChange={e => {
+                          setItems(p => p.map(i => i.id === item.id ? { ...i, sku: e.target.value, skuTruncated: false } : i))
+                          openSkuPicker(item.id, e.target)
+                        }}
+                        onFocus={e => openSkuPicker(item.id, e.target)}
+                        onBlur={() => setSkuPicker(cur => cur?.id === item.id ? null : cur)}
+                        title={item.skuTruncated ? 'Cut short by the supplier PDF — pick the matching product' : undefined}
                         className={`w-36 text-xs border rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary/50 font-mono ${item.skuTruncated ? 'border-amber-400 bg-amber-50' : 'border-gray-200'}`} />
                     </td>
                     <td className="px-4 py-2">
@@ -921,6 +984,46 @@ export default function InvoiceImportPage() {
           </div>
         </div>
       )}
+
+      {/* ── SKU picker ──
+          Fixed-positioned on purpose: the review table scrolls inside overflow-x-auto,
+          which would clip a dropdown on the lower rows — exactly where the truncated
+          Sideways refs land. */}
+      {skuPicker && (() => {
+        const row = items.find(i => i.id === skuPicker.id)
+        if (!row) return null
+        const matches = skuMatches(row.sku)
+        return (
+          <div
+            style={{ top: skuPicker.top, left: skuPicker.left, width: skuPicker.width }}
+            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg max-h-64 overflow-y-auto py-1"
+            onMouseDown={e => e.preventDefault()}
+          >
+            <div className="px-3 py-1.5 text-[11px] text-gray-400 border-b border-gray-100 truncate">
+              {row.description || 'Pick the matching product'}
+            </div>
+            {matches.length === 0 ? (
+              <div className="px-3 py-2.5 text-xs text-gray-400">
+                No product matches <span className="font-mono">{row.sku}</span>
+              </div>
+            ) : matches.map(prod => (
+              <button
+                key={prod.id}
+                type="button"
+                onClick={() => {
+                  setItems(p => p.map(i => i.id === row.id ? { ...i, sku: prod.sku, skuTruncated: false } : i))
+                  setSkuPicker(null)
+                }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+              >
+                <span className="font-mono font-semibold text-blue-700">{prod.sku}</span>
+                <span className="ml-2 text-gray-600">{prod.title}</span>
+                {prod.brand && <span className="ml-1 text-gray-400">· {prod.brand}</span>}
+              </button>
+            ))}
+          </div>
+        )
+      })()}
     </div>
   )
 }
