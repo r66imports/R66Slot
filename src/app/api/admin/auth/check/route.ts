@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getAdminUsers } from '@/lib/admin-users'
+import { verifyAdminSession } from '@/lib/admin-session'
 import { ALWAYS_ALLOWED } from '@/lib/admin-permissions'
 
 export async function GET() {
@@ -12,15 +13,16 @@ export async function GET() {
       return NextResponse.json({ authenticated: false })
     }
 
-    // Decode session to get username
-    let username = 'Admin'
-    try {
-      const decoded = Buffer.from(session.value, 'base64').toString('utf-8')
-      username = decoded.split(':')[0] || 'Admin'
-    } catch {
-      // malformed cookie — treat as unauthenticated
+    // Verify the same way the /api/admin gate in middleware.ts does. This used to only
+    // decode the username, so a cookie the gate rejects still reported authenticated:
+    // true — the admin UI rendered as normal and then every write behind it 401'd with
+    // "Unauthorized". Any disagreement between this check and the gate strands whoever
+    // is logged in: they look signed in but cannot save anything.
+    const verified = verifyAdminSession(session.value)
+    if (!verified) {
       return NextResponse.json({ authenticated: false })
     }
+    const username = verified.username
 
     // Main Admin — full access
     if (username === 'Admin') {
