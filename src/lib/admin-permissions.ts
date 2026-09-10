@@ -46,6 +46,7 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   // Supplier Network
   { group: 'Supplier Network', name: 'Supplier Network', href: '/admin/supplier-network' },
   { group: 'Supplier Network', name: 'Stock Sheets', href: '/admin/supplier-stock-sheets' },
+  { group: 'Supplier Network', name: 'Import Invoice', href: '/admin/invoice-import' },
   // Blog
   { group: 'Blog', name: 'Blog', href: '/admin/blog' },
   // Settings

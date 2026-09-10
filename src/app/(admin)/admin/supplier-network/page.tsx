@@ -405,6 +405,7 @@ export default function SupplierNetworkPage() {
     { label: 'Supplier Orders', href: '/admin/suppliers' },
     { label: 'Contacts', href: '/admin/supplier-contacts' },
     { label: 'Stock Sheets', href: '/admin/supplier-stock-sheets' },
+    { label: 'Import Invoice', href: '/admin/invoice-import' },
   ]
 
   return (
@@ -549,6 +550,7 @@ export default function SupplierNetworkPage() {
                   { label: 'Stock Sheets', href: '/admin/supplier-stock-sheets', desc: 'Uploaded price lists and Google Sheets per supplier.' },
                   { label: 'Pre-Order Dashboard', href: '/admin/preorder-dashboard', desc: 'Customer reservations and booking pipeline.' },
                   { label: 'Work Sheet', href: '/admin/worksheet', desc: 'Costing and purchase order worksheets.' },
+                  { label: 'Import Invoice', href: '/admin/invoice-import', desc: 'Parse a supplier PDF or Excel invoice into a costing worksheet.' },
                 ].map(r => (
                   <Link key={r.href} href={r.href} className="flex items-center gap-4 px-4 py-2.5 hover:bg-gray-50 transition-colors">
                     <span className="text-sm text-blue-600 font-medium w-44 shrink-0">{r.label}</span>
