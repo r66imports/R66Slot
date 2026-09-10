@@ -2464,6 +2464,8 @@ function WorksheetEditor({
               if (filledItems.length === 0) return null
               const totalCur = filledItems.reduce((s, it) => s + it.qty * effectiveW(it.wholesalePrice), 0)
               const totalZAR = filledItems.reduce((s, it) => s + it.qty * effectiveW(it.wholesalePrice) * exchangeRate, 0)
+              // Only real lines — a blank template row defaults to qty 1 and would inflate this.
+              const totalQty = items.filter((it) => it.sku.trim()).reduce((s, it) => s + it.qty, 0)
               return (
                 <tfoot>
                   <tr className="border-t-2 border-gray-200 bg-gray-50">
@@ -2479,6 +2481,11 @@ function WorksheetEditor({
                       + (jssMode ? 1 : 0)
                     } className="py-3 px-2 text-xs font-semibold text-gray-500 text-right uppercase tracking-wider pr-4">
                       Total
+                      {totalQty > 0 && (
+                        <span className="ml-2 font-normal normal-case tracking-normal text-gray-400">
+                          {totalQty} units
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-2">
                       <div className="flex items-center justify-end gap-1">

@@ -19,7 +19,7 @@ interface ParsedItem {
 
 interface SavedImport {
   id: string; supplierName: string; currency: string; wsId: string
-  shippingAmount: number; itemCount: number; fileName: string
+  shippingAmount: number; itemCount: number; totalQty?: number; fileName: string
   invoiceNumber?: string
   createdAt: string; updatedAt: string
 }
@@ -623,13 +623,33 @@ export default function InvoiceImportPage() {
       currency, wsId,
       shippingAmount: detectedShipping,
       itemCount: items.length,
+      totalQty: items.reduce((sum, i) => sum + i.qty, 0),
       fileName,
       invoiceNumber: invoiceNumber || undefined,
-      createdAt: currentSaved?.createdAt ?? new Date().toISOString(),
+      createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
     const res = await fetch('/api/admin/invoice-imports', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(record) })
-    if (res.ok) setSavedImports(prev => { const next = prev.filter(s => s.supplierName !== record.supplierName); return [record, ...next] })
+    // Every import is kept: prepend rather than replacing the supplier's previous row.
+    if (res.ok) setSavedImports(prev => [record, ...prev])
+  }
+
+  const [deletingId, setDeletingId] = useState('')
+
+  const handleDeleteImport = async (rec: SavedImport) => {
+    const when = new Date(rec.createdAt).toLocaleDateString('en-ZA')
+    if (!confirm(`Delete this import record?
+
+${rec.supplierName}${rec.invoiceNumber ? ` · Invoice ${rec.invoiceNumber}` : ''} · ${when}
+
+The worksheet it created is not affected.`)) return
+    setDeletingId(rec.id)
+    try {
+      const res = await fetch(`/api/admin/invoice-imports?id=${encodeURIComponent(rec.id)}`, { method: 'DELETE' })
+      if (res.ok) setSavedImports(prev => prev.filter(s => s.id !== rec.id))
+    } finally {
+      setDeletingId('')
+    }
   }
 
   const handleCreate = async () => {
@@ -981,6 +1001,46 @@ export default function InvoiceImportPage() {
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import history */}
+      {savedImports.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              Import History ({savedImports.length})
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Saved automatically on every import. Deleting a record leaves its worksheet untouched.
+            </p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {savedImports.map(rec => (
+              <div key={rec.id} className="px-5 py-3 flex items-center gap-4 flex-wrap hover:bg-gray-50 transition-colors">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-gray-800 truncate">
+                    {rec.supplierName}
+                    {rec.invoiceNumber && <span className="ml-2 font-mono text-xs text-gray-500">#{rec.invoiceNumber}</span>}
+                  </div>
+                  <div className="text-xs text-gray-400 truncate">
+                    {new Date(rec.createdAt).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
+                    {' · '}{rec.itemCount} line{rec.itemCount === 1 ? '' : 's'}
+                    {typeof rec.totalQty === 'number' && ` · ${rec.totalQty} units`}
+                    {rec.fileName && ` · ${rec.fileName}`}
+                  </div>
+                </div>
+                <Link href={`/admin/worksheet?id=${rec.wsId}`}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 font-semibold hover:bg-gray-100 whitespace-nowrap">
+                  Worksheet →
+                </Link>
+                <button onClick={() => handleDeleteImport(rec)} disabled={deletingId === rec.id}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-600 font-semibold hover:bg-red-50 disabled:opacity-40 whitespace-nowrap">
+                  {deletingId === rec.id ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
