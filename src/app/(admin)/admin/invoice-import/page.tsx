@@ -1011,7 +1011,11 @@ export default function InvoiceImportPage() {
                 key={prod.id}
                 type="button"
                 onClick={() => {
-                  setItems(p => p.map(i => i.id === row.id ? { ...i, sku: prod.sku, skuTruncated: false } : i))
+                  // Take the catalogue's description with the SKU — the supplier's
+                  // Désignation is their wording, not ours. Same as the worksheet picker.
+                  setItems(p => p.map(i => i.id === row.id
+                    ? { ...i, sku: prod.sku, description: prod.title || i.description, skuTruncated: false }
+                    : i))
                   setSkuPicker(null)
                 }}
                 className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
