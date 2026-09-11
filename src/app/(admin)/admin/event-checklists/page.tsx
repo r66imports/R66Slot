@@ -368,12 +368,25 @@ function soldFor(it: EventChecklistItem, report: Report) {
   return key ? allocatedQty(report.invoicedBySku.get(key)) : 0
 }
 
+/** What should come back from the event: Event Stock less what was invoiced. */
+function expectedBackFor(it: EventChecklistItem, report: Report) {
+  return Math.max(0, (it.qtyOut || 0) - soldFor(it, report))
+}
+
+/**
+ * A row counts as returned only while its count agrees with the invoices. A tick made
+ * before a late invoice landed stops counting until the row is recounted.
+ */
+function isReturnedOk(it: EventChecklistItem, report: Report) {
+  return !!it.returned && it.qtyIn === expectedBackFor(it, report)
+}
+
 function qtyTotals(items: EventChecklistItem[], report: Report) {
   let out = 0, back = 0, sold = 0, rows = 0, returned = 0
   const invoiceIds = new Set<string>()
   for (const it of items) {
     if (it.sku || it.qtyOut) rows += 1
-    if (it.returned) returned += 1
+    if (isReturnedOk(it, report)) returned += 1
     out += it.qtyOut || 0
     sold += soldFor(it, report)
     for (const a of report.invoicedBySku.get(it.sku.trim().toLowerCase()) || []) invoiceIds.add(a.docId)
@@ -717,6 +730,8 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
   }
 
   function setReturned(it: EventChecklistItem, returned: boolean) {
+    // Stock can only be booked back when the count agrees with Event Stock − Sold.
+    if (returned && it.qtyIn !== expectedBackFor(it, report)) return
     setItem(it.id, returned
       ? { returned: true, returnedAt: new Date().toISOString(), returnedBy: username || 'Admin' }
       : { returned: false, returnedAt: undefined, returnedBy: undefined })
@@ -816,11 +831,14 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
               {cl.items.map((it, i) => {
                 const allocs = allocsFor(it)
                 const sold = allocatedQty(allocs)
-                const expectedBack = Math.max(0, (it.qtyOut || 0) - sold)
+                const expectedBack = expectedBackFor(it, report)
+                const countOk = it.qtyIn !== null && it.qtyIn === expectedBack
+                // Ticked earlier, but the count no longer agrees (e.g. a late invoice) — flag it.
+                const staleReturn = !!it.returned && !countOk
                 const cap = capFor(it)
                 const overCap = cap !== null && (it.qtyOut || 0) > cap
                 return (
-                  <tr key={it.id} className={`border-b border-gray-100 ${it.returned ? 'bg-green-50/60' : ''}`}>
+                  <tr key={it.id} className={`border-b border-gray-100 ${staleReturn ? 'bg-amber-50/70' : it.returned ? 'bg-green-50/60' : ''}`}>
                     <td className="py-2 px-3 text-xs text-gray-400">{i + 1}</td>
                     <td className="py-2 px-3">
                       <SkuInput rowId={it.id} value={it.sku} products={products} autoFocus={focusId === it.id}
@@ -848,7 +866,7 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
                         disabled={it.returned} title={it.returned ? 'Untick Returned to change' : undefined}
                         onChange={(e) => setItem(it.id, { qtyIn: e.target.value === '' ? null : Math.min(toInt(e.target.value), it.qtyOut || 0) })}
                         className={`${numInput} disabled:bg-transparent disabled:border-transparent`} />
-                      {it.sku && !it.returned && (it.qtyOut || 0) > 0 && (
+                      {it.sku && (!it.returned || staleReturn) && (it.qtyOut || 0) > 0 && (
                         <div className={`text-[10px] mt-0.5 whitespace-nowrap ${it.qtyIn !== null && it.qtyIn !== expectedBack ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
                           {it.qtyIn !== null && it.qtyIn !== expectedBack ? `expected ${expectedBack}` : `expect ${expectedBack} back`}
                         </div>
@@ -872,11 +890,18 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
                       </div>
                     </td>
                     <td className="py-2 px-3 text-center">
-                      <input type="checkbox" checked={!!it.returned} disabled={it.qtyIn === null}
+                      {/* Unticking is always allowed; ticking needs QTY In to equal Event Stock − Sold. */}
+                      <input type="checkbox" checked={!!it.returned} disabled={!it.returned && !countOk}
                         onChange={(e) => setReturned(it, e.target.checked)}
-                        title={it.qtyIn === null ? 'Enter QTY In first' : 'Stock returned to the shop — confirmation only, stock levels are not changed'}
-                        className="w-5 h-5 accent-green-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30" />
-                      {it.returned && it.returnedAt && (
+                        title={it.qtyIn === null
+                          ? 'Enter QTY In first'
+                          : !countOk
+                            ? `QTY In must be ${expectedBack} (Event Stock ${it.qtyOut || 0} − Sold ${sold}) before stock can be returned`
+                            : 'Stock returned to the shop — confirmation only, stock levels are not changed'}
+                        className={`w-5 h-5 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30 ${staleReturn ? 'accent-amber-500' : 'accent-green-600'}`} />
+                      {staleReturn ? (
+                        <div className="text-[10px] text-amber-700 font-semibold whitespace-nowrap mt-0.5">expected {expectedBack} — untick to recount</div>
+                      ) : it.returned && it.returnedAt && (
                         <div className="text-[10px] text-green-700 whitespace-nowrap mt-0.5">
                           {it.returnedBy ? `${it.returnedBy} · ` : ''}{fmtDate(it.returnedAt)}
                         </div>
