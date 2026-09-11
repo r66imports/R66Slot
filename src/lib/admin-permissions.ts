@@ -31,12 +31,14 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Business & Store', name: 'Customers', href: '/admin/contacts' },
   { group: 'Business & Store', name: 'Customer Dashboard', href: '/admin/customer-dashboard' },
   { group: 'Business & Store', name: 'Suppliers', href: '/admin/supplier-contacts' },
-  { group: 'Business & Store', name: 'Events', href: '/admin/events' },
   { group: 'Business & Store', name: 'Payments', href: '/admin/payments' },
   { group: 'Business & Store', name: 'Customer Payments', href: '/admin/customer-payments' },
   { group: 'Business & Store', name: 'Payment Mapping', href: '/admin/payment-mapping' },
   { group: 'Business & Store', name: 'Accounting', href: '/admin/accounting' },
   { group: 'Business & Store', name: 'Sage Accounting', href: '/admin/sage' },
+  // Events
+  { group: 'Events', name: 'Events', href: '/admin/events' },
+  { group: 'Events', name: 'Event Checklists', href: '/admin/event-checklists' },
   // Shipping
   { group: 'Shipping', name: 'Shipping Network', href: '/admin/shipping-network' },
   { group: 'Shipping', name: 'Local Shipping', href: '/admin/shipping' },

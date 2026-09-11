@@ -161,9 +161,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       href: '/admin/supplier-network',
     },
     {
-      label: 'Business',
+      label: 'Events',
       items: [
         { name: 'Events', href: '/admin/events' },
+        { name: 'Event Checklists', href: '/admin/event-checklists' },
+      ],
+    },
+    {
+      label: 'Business',
+      items: [
         { name: 'Payments', href: '/admin/payments' },
         { name: 'Customer Payments', href: '/admin/customer-payments' },
         { name: 'Payment Mapping', href: '/admin/payment-mapping' },

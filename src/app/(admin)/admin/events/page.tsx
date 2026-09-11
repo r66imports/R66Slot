@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { paymentSplit, type SplitInvoice } from '@/lib/invoice-payment-split'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,19 +44,10 @@ interface SlotEvent {
   updatedAt: string
 }
 
-interface RawInvoice {
-  id: string
+interface RawInvoice extends SplitInvoice {
   type: string
-  status: string
   date: string
   clientName: string
-  lineItems: Array<{ description: string; qty: number; unitPrice: number }>
-  paymentMethod?: string
-  paymentMethod2?: string
-  paymentMethod1Amount?: number
-  paymentMethod2Amount?: number
-  discountPct?: number
-  shippingCost?: number
 }
 
 interface RawProduct {
@@ -154,14 +146,6 @@ function EventCompareChart({ events }: { events: SlotEvent[] }) {
 
 // ─── Shared: build sales items from invoices in a date range ──────────────────
 
-function categorizePM(method: string): 'cash' | 'card' | 'eft' | 'other' {
-  const m = method.toLowerCase().trim()
-  if (m.includes('cash')) return 'cash'
-  if (m.includes('card')) return 'card'
-  if (m.includes('eft') || m.includes('transfer') || m.includes('bank')) return 'eft'
-  return 'other'
-}
-
 async function buildSalesItems(from: string, to: string): Promise<{ items: EventSalesItem[]; revenue: number; cogs: number; paymentTotals: { cash: number; card: number; eft: number; other: number } }> {
     const [docsRes, prodsRes] = await Promise.all([
       fetch('/api/admin/orders/documents?type=invoice'),
@@ -187,17 +171,14 @@ async function buildSalesItems(from: string, to: string): Promise<{ items: Event
       const d = new Date(doc.date || '')
       if (d < fromDate || d > toDate) continue
 
-      // Track payment method totals
-      const subtotal = doc.lineItems.reduce((s, li) => s + li.qty * li.unitPrice, 0)
-      const discountAmt = subtotal * (doc.discountPct || 0) / 100
-      const docTotal = subtotal - discountAmt + (doc.shippingCost || 0)
-      const pm1 = doc.paymentMethod || ''
-      const pm2 = doc.paymentMethod2 || ''
-      const pm2Amt = Number(doc.paymentMethod2Amount) || 0
-      const pm1Amt = pm2 && pm2Amt > 0 ? docTotal - pm2Amt : docTotal
-      if (pm1) paymentTotals[categorizePM(pm1)] += pm1Amt
-      if (pm2 && pm2Amt > 0) paymentTotals[categorizePM(pm2)] += pm2Amt
-      if (!pm1 && !pm2) paymentTotals.other += docTotal
+      // Payment method totals — each payment in the invoice's history goes to its own
+      // method (Rule 44), so a card + cash invoice is no longer booked wholly to one.
+      // Unpaid balances stay in Other so the four cards still add up to the invoiced total.
+      const split = paymentSplit(doc)
+      paymentTotals.cash += split.cash
+      paymentTotals.card += split.card
+      paymentTotals.eft += split.eft
+      paymentTotals.other += split.other + split.unpaid
 
       for (const li of doc.lineItems) {
         if (!li.description) continue
