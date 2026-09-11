@@ -3,6 +3,7 @@ import { blobRead, blobAppendArrayItem, blobReplaceArrayItem, blobRemoveArrayIte
 import type { OrderDocument } from '../route'
 import { adjustStock, findStockShortfalls, shortfallMessage, sameStockFootprint } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
+import { documentTotal, isFullySettled, MONEY_EPSILON } from '@/lib/payment-math'
 
 const KEY = 'data/order-documents.json'
 const BIN_KEY = 'data/invoices-bin.json'
@@ -114,6 +115,18 @@ export async function PATCH(
         body.stockDeducted = false
       }
       // If type changes from salesorder→invoice and stockDeducted is already true: no action needed
+    }
+
+    // A Paid document whose total goes UP on this edit (a line added, a discount taken off,
+    // shipping added) is no longer paid. Left on 'paid', the list shows it green with no
+    // "Due" badge while the balance sits unpaid. Falls back to 'accepted', the same status the
+    // invoice modal uses when a payment is removed. Only on a rise, so a legacy doc that was
+    // already short is never flipped by an unrelated save.
+    if (prev.status === 'paid' && body.status === undefined) {
+      const merged = { ...prev, ...body } as any
+      if (documentTotal(merged) > documentTotal(prev as any) + MONEY_EPSILON && !isFullySettled(merged)) {
+        body.status = 'accepted'
+      }
     }
 
     // Request-only hints — they must not be persisted onto the document.
