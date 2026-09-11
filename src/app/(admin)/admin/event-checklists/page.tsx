@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { invoiceTotal, paymentSplit, type PaymentSplit, type SplitInvoice } from '@/lib/invoice-payment-split'
+import { invoiceTotal, paymentBucketOf, paymentSplit, type PaymentSplit, type SplitInvoice } from '@/lib/invoice-payment-split'
+import { useAdminAuth } from '@/lib/admin-auth-context'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -9,8 +10,13 @@ interface EventChecklistItem {
   id: string
   sku: string
   title: string
+  /** Event Stock — units taken to the event. */
   qtyOut: number
   qtyIn: number | null
+  /** Staff confirmed the unsold stock is back in the shop. */
+  returned?: boolean
+  returnedAt?: string
+  returnedBy?: string
 }
 
 interface EventChecklist {
@@ -73,14 +79,24 @@ function splitSkuTitle(description: string): { sku: string; title: string } {
   return { sku: '', title: description }
 }
 
-interface InvoiceRow { doc: Invoice; total: number; split: Split; included: boolean; methods: string }
+interface InvoiceRow { doc: Invoice; total: number; split: Split; included: boolean; methods: string; methodList: string[] }
+
+/** One invoice's share of a SKU — the trail behind the Sold figure. */
+interface Allocation { docId: string; docNumber: string; clientName: string; qty: number; methods: string[]; unpaid: number }
+
+function methodChipCls(m: string) {
+  const b = paymentBucketOf(m)
+  return b === 'card' ? 'bg-indigo-600 text-white' : b === 'cash' ? 'bg-emerald-600 text-white' : 'bg-gray-500 text-white'
+}
 
 interface Report {
   invoices: InvoiceRow[]
   totals: Split & { sales: number; count: number }
-  invoicedBySku: Map<string, number>
+  invoicedBySku: Map<string, Allocation[]>
   unlisted: Array<{ sku: string; title: string; qty: number }>
 }
+
+const allocatedQty = (a: Allocation[] | undefined) => (a || []).reduce((s, x) => s + x.qty, 0)
 
 const EXCLUDED_STATUSES = new Set(['rejected', 'cancelled'])
 
@@ -95,15 +111,18 @@ function buildReport(cl: EventChecklist, allInvoices: Invoice[]): Report {
     })
     .map((doc) => {
       const total = invoiceTotal(doc)
-      const fromHistory = (doc.payments || []).map((p) => String(p.paymentMethod || '').trim()).filter(Boolean)
-      const methods = Array.from(new Set(fromHistory.length ? fromHistory
-        : [doc.paymentMethod, doc.paymentMethod2].map((m) => String(m || '').trim()).filter(Boolean))).join(' + ')
-      return { doc, total, split: paymentSplit(doc, total), included: !excluded.has(doc.id), methods }
+      // Methods money was actually taken by — payments[] first (Rule 44), legacy fields after.
+      const fromHistory = (doc.payments || [])
+        .filter((p) => (Number(p.amountPaid) || 0) > 0.005)
+        .map((p) => String(p.paymentMethod || '').trim()).filter(Boolean)
+      const methodList = Array.from(new Set(fromHistory.length || (doc.payments || []).length ? fromHistory
+        : [doc.paymentMethod, doc.paymentMethod2].map((m) => String(m || '').trim()).filter(Boolean)))
+      return { doc, total, split: paymentSplit(doc, total), included: !excluded.has(doc.id), methods: methodList.join(' + '), methodList }
     })
     .sort((a, b) => (a.doc.date || '').localeCompare(b.doc.date || '') || (a.doc.docNumber || '').localeCompare(b.doc.docNumber || ''))
 
   const totals = { sales: 0, count: 0, card: 0, cash: 0, eft: 0, other: 0, unpaid: 0 }
-  const invoicedBySku = new Map<string, number>()
+  const invoicedBySku = new Map<string, Allocation[]>()
   const invoicedTitles = new Map<string, { sku: string; title: string }>()
   for (const row of invoices) {
     if (!row.included) continue
@@ -114,29 +133,40 @@ function buildReport(cl: EventChecklist, allInvoices: Invoice[]): Report {
       const { sku, title } = splitSkuTitle(li.description || '')
       if (!sku) continue
       const key = sku.toLowerCase()
-      invoicedBySku.set(key, (invoicedBySku.get(key) || 0) + (Number(li.qty) || 0))
+      const qty = Number(li.qty) || 0
+      const list = invoicedBySku.get(key) || []
+      // The same SKU on two lines of one invoice is still one entry in the trail.
+      const same = list.find((a) => a.docId === row.doc.id)
+      if (same) same.qty += qty
+      else list.push({ docId: row.doc.id, docNumber: row.doc.docNumber || '—', clientName: row.doc.clientName || '', qty, methods: row.methodList, unpaid: row.split.unpaid })
+      invoicedBySku.set(key, list)
       if (!invoicedTitles.has(key)) invoicedTitles.set(key, { sku, title })
     }
   }
 
   const onList = new Set(cl.items.map((it) => it.sku.trim().toLowerCase()).filter(Boolean))
   const unlisted = Array.from(invoicedBySku.entries())
-    .filter(([key, qty]) => !onList.has(key) && qty !== 0)
-    .map(([key, qty]) => ({ ...invoicedTitles.get(key)!, qty }))
+    .map(([key, allocs]) => ({ key, qty: allocatedQty(allocs) }))
+    .filter(({ key, qty }) => !onList.has(key) && qty !== 0)
+    .map(({ key, qty }) => ({ ...invoicedTitles.get(key)!, qty }))
     .sort((a, b) => a.sku.localeCompare(b.sku))
 
   return { invoices, totals, invoicedBySku, unlisted }
 }
 
+const toInt = (v: string) => Math.max(0, Math.floor(Number(v) || 0))
+
 function qtyTotals(items: EventChecklistItem[]) {
-  let out = 0, back = 0, sold = 0, pending = 0
+  let out = 0, back = 0, sold = 0, rows = 0, returned = 0
   for (const it of items) {
+    if (it.sku || it.qtyOut) rows += 1
+    if (it.returned) returned += 1
     out += it.qtyOut || 0
-    if (it.qtyIn === null) { if (it.sku || it.qtyOut) pending += 1; continue }
+    if (it.qtyIn === null) continue
     back += it.qtyIn
     sold += (it.qtyOut || 0) - it.qtyIn
   }
-  return { out, back, sold, pending }
+  return { out, back, sold, rows, returned }
 }
 
 // ─── SKU input with catalogue autofill ────────────────────────────────────────
@@ -358,6 +388,7 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
   onSaved: (c: EventChecklist) => void
   onDeleted: (id: string) => void
 }) {
+  const { username } = useAdminAuth()
   const [cl, setCl] = useState<EventChecklist>(initial)
   // Mirrors `cl` synchronously so back-to-back edits (e.g. a blur autofill landing right
   // after a keystroke) always build on the latest state, never a stale render.
@@ -429,17 +460,44 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
       if (!viaBlur) setTimeout(() => document.getElementById(`out-${dupe.id}`)?.focus(), 50)
       return
     }
-    setItem(rowId, { sku: p.sku, title: p.title })
+    // Same cap as typing into Event Stock — a quantity entered first can't outrun the SKU picked after.
+    const cap = Math.max(0, p.quantity) + allocatedQty(report.invoicedBySku.get(p.sku.toLowerCase()))
+    const clamp = row.qtyOut > cap ? { qtyOut: cap, qtyIn: row.qtyIn !== null && row.qtyIn > cap ? cap : row.qtyIn } : {}
+    setItem(rowId, { sku: p.sku, title: p.title, ...clamp })
     if (!viaBlur) setTimeout(() => document.getElementById(`out-${rowId}`)?.focus(), 50)
   }
 
   const report = useMemo(() => buildReport(cl, invoices), [cl, invoices])
   const q = qtyTotals(cl.items)
-  const invoicedOnList = cl.items.reduce((s, it) => s + (it.sku ? report.invoicedBySku.get(it.sku.trim().toLowerCase()) || 0 : 0), 0)
-  const variances = cl.items.filter((it) => {
-    if (!it.sku || it.qtyIn === null) return false
-    return (it.qtyOut || 0) - it.qtyIn !== (report.invoicedBySku.get(it.sku.trim().toLowerCase()) || 0)
-  }).length
+  const allocsFor = (it: EventChecklistItem) => (it.sku ? report.invoicedBySku.get(it.sku.trim().toLowerCase()) || [] : [])
+  const invoicedOnList = cl.items.reduce((s, it) => s + allocatedQty(allocsFor(it)), 0)
+
+  const productBySku = useMemo(() => new Map(products.map((p) => [p.sku.toLowerCase(), p])), [products])
+  /**
+   * Most that can go to the event: what inventory holds now, plus what this event has already
+   * invoiced (those units left inventory on invoice, but were part of the stock taken).
+   * A SKU that is not in inventory can't be booked at all. null = catalogue not loaded — no cap.
+   */
+  function capFor(it: EventChecklistItem): number | null {
+    if (products.length === 0 || !it.sku.trim()) return null
+    const p = productBySku.get(it.sku.trim().toLowerCase())
+    return Math.max(0, p ? p.quantity : 0) + allocatedQty(allocsFor(it))
+  }
+
+  function setEventStock(it: EventChecklistItem, raw: string) {
+    let qty = toInt(raw)
+    const cap = capFor(it)
+    if (cap !== null && qty > cap) qty = cap
+    // Stock back in can never be more than the stock that went out.
+    const qtyIn = it.qtyIn !== null && it.qtyIn > qty ? qty : it.qtyIn
+    setItem(it.id, { qtyOut: qty, qtyIn })
+  }
+
+  function setReturned(it: EventChecklistItem, returned: boolean) {
+    setItem(it.id, returned
+      ? { returned: true, returnedAt: new Date().toISOString(), returnedBy: username || 'Admin' }
+      : { returned: false, returnedAt: undefined, returnedBy: undefined })
+  }
 
   function toggleInvoice(id: string) {
     const ex = new Set(clRef.current.excludedInvoiceIds || [])
@@ -448,7 +506,6 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
   }
 
   const numInput = 'w-16 px-2 py-1.5 text-sm text-right border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400'
-  const toInt = (v: string) => Math.max(0, Math.floor(Number(v) || 0))
 
   return (
     <div>
@@ -502,12 +559,13 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 flex-wrap gap-2">
           <div>
             <h2 className="text-sm font-semibold text-gray-800">Stock Checklist</h2>
-            <p className="text-xs text-gray-400">Counting here never changes stock — stock drops when the sale is invoiced.</p>
+            <p className="text-xs text-gray-400">Counting here never changes stock — stock drops when the sale is invoiced. Tick Returned once the stock is back in the shop.</p>
           </div>
-          <div className="flex items-center gap-3 text-xs">
-            {q.pending > 0 && <span className="text-gray-500">{q.pending} to count back in</span>}
-            {variances > 0 && <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">{variances} mismatch{variances === 1 ? '' : 'es'}</span>}
-          </div>
+          {q.rows > 0 && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${q.returned === q.rows ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+              {q.returned === q.rows ? '✓ All returned to inventory' : `${q.returned}/${q.rows} returned to inventory`}
+            </span>
+          )}
         </div>
         {msg && <div className="px-4 py-2 bg-amber-50 text-amber-800 text-xs border-b border-amber-100">{msg}</div>}
         <div className="overflow-x-auto">
@@ -517,29 +575,22 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
                 <th className="text-left py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase w-8">#</th>
                 <th className="text-left py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">SKU</th>
                 <th className="text-left py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">Product</th>
-                <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">QTY Out</th>
-                <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">QTY In</th>
+                <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">Event Stock</th>
+                <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase whitespace-nowrap">QTY In</th>
                 <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">Sold</th>
-                <th className="text-right py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">Invoiced</th>
-                <th className="text-left py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">Check</th>
+                <th className="text-left py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">Invoice #</th>
+                <th className="text-center py-2.5 px-3 text-xs font-semibold text-gray-500 uppercase">Returned</th>
                 <th className="w-8" />
               </tr>
             </thead>
             <tbody>
               {cl.items.map((it, i) => {
                 const sold = it.qtyIn === null ? null : (it.qtyOut || 0) - it.qtyIn
-                const invoiced = it.sku ? report.invoicedBySku.get(it.sku.trim().toLowerCase()) || 0 : 0
-                let check: { text: string; cls: string } | null = null
-                if (sold !== null && sold < 0) check = { text: 'In is more than Out', cls: 'text-red-600' }
-                else if (it.sku && sold !== null) {
-                  check = sold === invoiced
-                    ? { text: '✓ Matches', cls: 'text-green-600' }
-                    : sold > invoiced
-                      ? { text: `${sold - invoiced} not invoiced`, cls: 'text-red-600 font-semibold' }
-                      : { text: `${invoiced - sold} invoiced over`, cls: 'text-amber-600 font-semibold' }
-                } else if (it.sku) check = { text: 'Count in pending', cls: 'text-gray-400' }
+                const allocs = allocsFor(it)
+                const cap = capFor(it)
+                const overCap = cap !== null && (it.qtyOut || 0) > cap
                 return (
-                  <tr key={it.id} className={`border-b border-gray-100 ${check?.cls.includes('red') ? 'bg-red-50/40' : ''}`}>
+                  <tr key={it.id} className={`border-b border-gray-100 ${it.returned ? 'bg-green-50/60' : ''}`}>
                     <td className="py-2 px-3 text-xs text-gray-400">{i + 1}</td>
                     <td className="py-2 px-3">
                       <SkuInput rowId={it.id} value={it.sku} products={products} autoFocus={focusId === it.id}
@@ -551,19 +602,53 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
                         className="w-full px-2 py-1.5 text-sm text-gray-700 border border-transparent hover:border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                     </td>
                     <td className="py-2 px-3 text-right">
-                      <input id={`out-${it.id}`} type="number" min={0} inputMode="numeric" value={it.qtyOut || ''}
-                        onChange={(e) => setItem(it.id, { qtyOut: toInt(e.target.value) })}
+                      <input id={`out-${it.id}`} type="number" min={0} max={cap ?? undefined} inputMode="numeric" value={it.qtyOut || ''}
+                        disabled={it.returned} title={it.returned ? 'Untick Returned to change' : undefined}
+                        onChange={(e) => setEventStock(it, e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRow() } }}
-                        className={numInput} />
+                        className={`${numInput} ${overCap ? 'border-red-400 text-red-600' : ''} disabled:bg-transparent disabled:border-transparent`} />
+                      {cap !== null && !it.returned && (
+                        <div className={`text-[10px] mt-0.5 whitespace-nowrap ${overCap ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
+                          {cap === 0 && !productBySku.has(it.sku.trim().toLowerCase()) ? 'Not in inventory' : overCap ? `Only ${cap} in inventory` : `of ${cap} in inventory`}
+                        </div>
+                      )}
                     </td>
                     <td className="py-2 px-3 text-right">
-                      <input type="number" min={0} inputMode="numeric" value={it.qtyIn ?? ''} placeholder="—"
-                        onChange={(e) => setItem(it.id, { qtyIn: e.target.value === '' ? null : toInt(e.target.value) })}
-                        className={numInput} />
+                      <input type="number" min={0} max={it.qtyOut || 0} inputMode="numeric" value={it.qtyIn ?? ''} placeholder="—"
+                        disabled={it.returned} title={it.returned ? 'Untick Returned to change' : undefined}
+                        onChange={(e) => setItem(it.id, { qtyIn: e.target.value === '' ? null : Math.min(toInt(e.target.value), it.qtyOut || 0) })}
+                        className={`${numInput} disabled:bg-transparent disabled:border-transparent`} />
                     </td>
-                    <td className="py-2 px-3 text-right font-bold text-gray-900">{sold === null ? <span className="text-gray-300">—</span> : sold}</td>
-                    <td className="py-2 px-3 text-right text-gray-600">{it.sku ? invoiced : ''}</td>
-                    <td className={`py-2 px-3 text-xs whitespace-nowrap ${check?.cls || ''}`}>{check?.text}</td>
+                    <td className={`py-2 px-3 text-right font-bold ${sold !== null && sold < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                      {sold === null ? <span className="text-gray-300">—</span> : sold}
+                    </td>
+                    <td className="py-2 px-3">
+                      <div className="flex flex-wrap gap-1">
+                        {allocs.map((a) => (
+                          <span key={a.docId} title={[a.clientName, a.unpaid > 0.005 ? `${fmtPrice(a.unpaid)} unpaid` : ''].filter(Boolean).join(' · ') || undefined}
+                            className="inline-flex items-center gap-1 font-mono text-[11px] pl-1.5 pr-0.5 py-0.5 rounded bg-indigo-50 text-indigo-700 whitespace-nowrap">
+                            {a.docNumber}<span className="text-indigo-400">×</span><span className="font-semibold">{a.qty}</span>
+                            {a.methods.map((m) => (
+                              <span key={m} className={`font-sans text-[10px] font-semibold px-1.5 rounded ${methodChipCls(m)}`}>{m}</span>
+                            ))}
+                            {a.methods.length === 0 && (
+                              <span className="font-sans text-[10px] font-semibold px-1.5 rounded bg-orange-100 text-orange-700">Unpaid</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-2 px-3 text-center">
+                      <input type="checkbox" checked={!!it.returned} disabled={it.qtyIn === null}
+                        onChange={(e) => setReturned(it, e.target.checked)}
+                        title={it.qtyIn === null ? 'Enter QTY In first' : 'Stock returned to the shop — confirmation only, stock levels are not changed'}
+                        className="w-5 h-5 accent-green-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30" />
+                      {it.returned && it.returnedAt && (
+                        <div className="text-[10px] text-green-700 whitespace-nowrap mt-0.5">
+                          {it.returnedBy ? `${it.returnedBy} · ` : ''}{fmtDate(it.returnedAt)}
+                        </div>
+                      )}
+                    </td>
                     <td className="py-2 px-2 text-right">
                       <button onClick={() => update({ items: clRef.current.items.filter((x) => x.id !== it.id) })}
                         className="text-gray-300 hover:text-red-500 text-lg leading-none px-1" title="Remove row">✕</button>
@@ -582,8 +667,9 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
                   <td className="py-2.5 px-3 text-right font-bold text-gray-900">{q.out}</td>
                   <td className="py-2.5 px-3 text-right font-bold text-gray-900">{q.back}</td>
                   <td className="py-2.5 px-3 text-right font-bold text-indigo-700">{q.sold}</td>
-                  <td className="py-2.5 px-3 text-right font-bold text-gray-700">{invoicedOnList}</td>
-                  <td colSpan={2} />
+                  <td className="py-2.5 px-3 text-xs font-semibold text-gray-600">{invoicedOnList > 0 ? `${invoicedOnList} invoiced` : ''}</td>
+                  <td className="py-2.5 px-3 text-center text-xs font-bold text-gray-600">{q.returned}/{q.rows}</td>
+                  <td />
                 </tr>
               </tfoot>
             )}
@@ -709,7 +795,7 @@ export default function EventChecklistsPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/admin/event-checklists').then((r) => (r.ok ? r.json() : [])),
-      fetch('/api/admin/products?fields=id,sku,title,price,quantity').then((r) => (r.ok ? r.json() : [])),
+      fetch('/api/admin/products?inventory=1').then((r) => (r.ok ? r.json() : [])),
       loadInvoices(),
     ]).then(([cls, prods]) => {
       setChecklists(cls)
@@ -717,6 +803,14 @@ export default function EventChecklistsPage() {
         .filter((p) => p.sku)
         .map((p) => ({ id: String(p.id), sku: String(p.sku).trim(), title: p.title || '', price: Number(p.price) || 0, quantity: Number(p.quantity) || 0 })))
     }).catch(() => {}).finally(() => setLoading(false))
+  }, [loadInvoices])
+
+  // Payments are usually recorded in another tab (Orders → Record Payment) — pick them up
+  // as soon as this tab is looked at again instead of waiting for a manual refresh.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') loadInvoices().catch(() => {}) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [loadInvoices])
 
   async function refreshInvoices() {
@@ -792,7 +886,7 @@ export default function EventChecklistsPage() {
 
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   {[
-                    { label: 'Out', value: q.out },
+                    { label: 'Event Stock', value: q.out },
                     { label: 'In', value: q.back },
                     { label: 'Sold', value: q.sold },
                   ].map((s) => (
@@ -810,7 +904,9 @@ export default function EventChecklistsPage() {
                 </div>
                 <div className="text-xs text-gray-400 mt-2">
                   {cl.items.length} SKU{cl.items.length === 1 ? '' : 's'}
-                  {q.pending > 0 && ` · ${q.pending} to count in`}
+                  {q.rows > 0 && (q.returned === q.rows
+                    ? <span className="text-green-600 font-semibold"> · ✓ All returned</span>
+                    : ` · ${q.returned}/${q.rows} returned`)}
                 </div>
               </button>
             )

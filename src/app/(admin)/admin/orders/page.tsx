@@ -267,6 +267,21 @@ function itemisedPayments(data: { payments?: DocPaymentEntry[] }): { label: stri
   }))
 }
 
+/**
+ * The Amount Paid row's label. With a single payment there are no itemised lines above it,
+ * so the row names the method itself — "Amount Paid (Card)". With two or more, each
+ * itemised line already carries its method. Every output path uses this (Rule 45).
+ */
+function amountPaidLabel(data: { payments?: DocPaymentEntry[]; paymentMethod?: string; paymentMethod2?: string }): string {
+  const history = data.payments || []
+  const paid = history.filter((p) => (p.amountPaid || 0) > 0.005)
+  let method = ''
+  if (paid.length === 1) method = String(paid[0].paymentMethod || '').trim()
+  // Legacy docs with no payment history: the flat field, but only when a single method was used.
+  else if (history.length === 0 && !String(data.paymentMethod2 || '').trim()) method = String(data.paymentMethod || '').trim()
+  return method ? `Amount Paid (${method})` : 'Amount Paid'
+}
+
 function fmtDateLong(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
 }
@@ -538,7 +553,7 @@ function DocumentBody({
           ))}
           {(data.amountPaid || 0) > 0 && (
             <div className="flex justify-between py-1 border-b border-blue-100 text-sm mt-1">
-              <span className="text-blue-600 font-medium">Amount Paid</span>
+              <span className="text-blue-600 font-medium">{amountPaidLabel(data)}</span>
               <span className="font-medium text-blue-600">-{fmtPrice(data.amountPaid)}</span>
             </div>
           )}
@@ -1209,6 +1224,9 @@ function CreateDocumentModal({
     // Record Payment only. Keeping them here made every "Update Invoice" write back the
     // stale value the modal opened with, wiping a method recorded while the modal was open.
   })
+  // The status the modal opened with. Recording a payment in here can move the doc to Paid,
+  // which this form's Status list cannot show — so an untouched Status is never written back.
+  const openedStatus = useRef(editDoc?.status)
   const [lineItems, setLineItems] = useState<LineItem[]>(
     editDoc?.lineItems?.length ? editDoc.lineItems : prefilledItems?.length ? prefilledItems : [newLine()]
   )
@@ -1559,6 +1577,9 @@ function CreateDocumentModal({
     setSaving(true)
     setError('')
     try {
+      // A Card/Cash amount typed into Record Payment but never "+ Record"-ed is still a
+      // payment — log it before saving rather than lose it silently.
+      if (editDoc && onRecordInlinePayment && parseFloat(inlineAmt) > 0) await handleInlineRecord()
       // Resolve the target supplier order up-front so its ref can be stamped on the document
       const targetSO = sendingToSO
         ? (soTargetRef === 'new'
@@ -1573,10 +1594,12 @@ function CreateDocumentModal({
         ? `/api/admin/orders/documents/${editDoc.id}`
         : '/api/admin/orders/documents'
       const method = editDoc ? 'PATCH' : 'POST'
+      const { status: formStatus, ...formFields } = form
+      const statusField = !editDoc || formStatus !== openedStatus.current ? { status: formStatus } : {}
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, preOrderDeposit, ...(targetSO ? { supplierOrderSent: true, supplierOrderRef: targetSO.ref, supplierOrderName: targetSO.name, supplierOrderSupplier: soSupplierName } : {}) }),
+        body: JSON.stringify({ ...formFields, ...statusField, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, preOrderDeposit, ...(targetSO ? { supplierOrderSent: true, supplierOrderRef: targetSO.ref, supplierOrderName: targetSO.name, supplierOrderSupplier: soSupplierName } : {}) }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -2507,7 +2530,7 @@ function generateDocHTML(data: DocViewData, template: OrderTemplate, selectedBan
       ` : ''}
       ${creditAppliedHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #d1fae5"><span style="color:#16a34a;font-weight:600">Credit Applied</span><span style="color:#16a34a;font-weight:600">-${fmtPrice(creditAppliedHTML)}</span></div>` : ''}
       ${itemisedPayments(data).map(p => `<div style="display:flex;justify-content:space-between;padding:2px 0;margin-top:2px;font-size:11px;color:#60a5fa"><span style="padding-left:12px">${p.label}</span><span>-${fmtPrice(p.amount)}</span></div>`).join('')}
-      ${amountPaidHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #dbeafe"><span style="color:#2563eb;font-weight:600">Amount Paid</span><span style="color:#2563eb;font-weight:600">-${fmtPrice(amountPaidHTML)}</span></div>` : ''}
+      ${amountPaidHTML > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:4px;border-top:1px solid #dbeafe"><span style="color:#2563eb;font-weight:600">${amountPaidLabel(data)}</span><span style="color:#2563eb;font-weight:600">-${fmtPrice(amountPaidHTML)}</span></div>` : ''}
       ${remainingHTML > 0.005 ? `<div style="display:flex;justify-content:space-between;padding:8px 12px;margin-top:4px;background:#ea580c;color:white;border-radius:8px;font-weight:700"><span>${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}</span><span>${fmtPrice(remainingHTML)}</span></div>` : ''}
     </div>
   </div>
@@ -2582,7 +2605,7 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
     ...(liveDepositEmail > 0 ? [`${data.docType === 'quote' ? 'Deposit to Pay' : 'Deposit Paid'}:  ${data.docType === 'quote' ? '' : '-'}${fmtPrice(liveDepositEmail)}`] : []),
     ...((data.creditApplied || 0) > 0 ? [`Credit Applied:  -${fmtPrice(data.creditApplied)}`] : []),
     ...itemisedPayments(data).map(p => `   ${p.label}:  -${fmtPrice(p.amount)}`),
-    ...((data.amountPaid || 0) > 0 ? [`Amount Paid:  -${fmtPrice(data.amountPaid)}`] : []),
+    ...((data.amountPaid || 0) > 0 ? [`${amountPaidLabel(data)}:  -${fmtPrice(data.amountPaid)}`] : []),
     ...((total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0)) > 0.005 ? [`${data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE'}:  ${fmtPrice(total - Math.max(liveDepositEmail, data.amountPaid || 0) - (data.creditApplied || 0))}`] : []),
     ...(data.shippingMethod ? [`Shipping via:  ${data.shippingMethod}`] : []),
     ...(data.trackingNumber ? [`Tracking #:  ${data.trackingNumber}`] : []),
@@ -2781,7 +2804,7 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
     footRows.push(mkFoot(`    ${p.label}`, `-${fmtPrice(p.amount)}`))
     paymentRowIdx.push(footRows.length - 1)
   }
-  if (amountPaidPDF > 0) { footRows.push(mkFoot('Amount Paid', `-${fmtPrice(amountPaidPDF)}`)); amountPaidIdx = footRows.length - 1 }
+  if (amountPaidPDF > 0) { footRows.push(mkFoot(amountPaidLabel(data), `-${fmtPrice(amountPaidPDF)}`)); amountPaidIdx = footRows.length - 1 }
   if (remainingPDF > 0.005) { footRows.push(mkFoot(data.docType === 'quote' ? 'BALANCE ON ARRIVAL' : 'BALANCE DUE', fmtPrice(remainingPDF))); balanceDueIdx = footRows.length - 1 }
 
   const pdfHead = hasDiscountsPDF

@@ -10,12 +10,17 @@ export interface EventChecklistItem {
   qtyOut: number
   /** null until the stock has been counted back in — Sold is only known once it is set. */
   qtyIn: number | null
+  /** Staff confirmed the unsold stock is back in the shop. Confirmation only — no stock moves. */
+  returned?: boolean
+  returnedAt?: string
+  returnedBy?: string
 }
 
 /**
  * Stock taken to an event and brought back. This is a count sheet only — it never moves
- * stock. Stock drops when the sale is invoiced; the checklist's Sold (Out − In) is compared
- * against the invoiced quantity so a missing or wrong invoice shows up as a variance.
+ * stock. Stock drops when the sale is invoiced; beside each SKU's Sold (Out − In) the page
+ * lists the invoice numbers, quantities and payment methods those units were billed on.
+ * Event Stock is capped at what inventory holds.
  */
 export interface EventChecklist {
   id: string
