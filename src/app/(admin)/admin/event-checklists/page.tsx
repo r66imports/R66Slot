@@ -82,17 +82,27 @@ function splitSkuTitle(description: string): { sku: string; title: string } {
 interface InvoiceRow { doc: Invoice; total: number; split: Split; included: boolean; methods: string; methodList: string[] }
 
 /** One invoice's share of a SKU — the trail behind the Sold figure. */
+/** Payment-mix colours, validated as a set (dataviz validate_palette, light surface). */
+const PAY_COLORS = {
+  card: { label: 'Card', hex: '#4f46e5', chip: 'bg-indigo-600' },
+  cash: { label: 'Cash', hex: '#059669', chip: 'bg-emerald-600' },
+  eft: { label: 'EFT', hex: '#c026d3', chip: 'bg-fuchsia-600' },
+  other: { label: 'Other / Credit', hex: '#0891b2', chip: 'bg-cyan-600' },
+} as const
+
 interface Allocation { docId: string; docNumber: string; clientName: string; qty: number; methods: string[]; unpaid: number }
 
 function methodChipCls(m: string) {
   const b = paymentBucketOf(m)
-  return b === 'card' ? 'bg-indigo-600 text-white' : b === 'cash' ? 'bg-emerald-600 text-white' : 'bg-gray-500 text-white'
+  return `${PAY_COLORS[b].chip} text-white`
 }
 
 interface Report {
   invoices: InvoiceRow[]
   totals: Split & { sales: number; count: number }
   invoicedBySku: Map<string, Allocation[]>
+  /** Line value per SKU after line and document discounts — what each SKU brought in. */
+  revenueBySku: Map<string, number>
   unlisted: Array<{ sku: string; title: string; qty: number }>
 }
 
@@ -123,6 +133,7 @@ function buildReport(cl: EventChecklist, allInvoices: Invoice[]): Report {
 
   const totals = { sales: 0, count: 0, card: 0, cash: 0, eft: 0, other: 0, unpaid: 0 }
   const invoicedBySku = new Map<string, Allocation[]>()
+  const revenueBySku = new Map<string, number>()
   const invoicedTitles = new Map<string, { sku: string; title: string }>()
   for (const row of invoices) {
     if (!row.included) continue
@@ -140,6 +151,9 @@ function buildReport(cl: EventChecklist, allInvoices: Invoice[]): Report {
       if (same) same.qty += qty
       else list.push({ docId: row.doc.id, docNumber: row.doc.docNumber || '—', clientName: row.doc.clientName || '', qty, methods: row.methodList, unpaid: row.split.unpaid })
       invoicedBySku.set(key, list)
+      const lineValue = qty * (Number(li.unitPrice) || 0) * (1 - (Number(li.discountPct) || 0) / 100)
+        * (1 - (Number(row.doc.discountPct) || 0) / 100)
+      revenueBySku.set(key, (revenueBySku.get(key) || 0) + lineValue)
       if (!invoicedTitles.has(key)) invoicedTitles.set(key, { sku, title })
     }
   }
@@ -151,22 +165,221 @@ function buildReport(cl: EventChecklist, allInvoices: Invoice[]): Report {
     .map(({ key, qty }) => ({ ...invoicedTitles.get(key)!, qty }))
     .sort((a, b) => a.sku.localeCompare(b.sku))
 
-  return { invoices, totals, invoicedBySku, unlisted }
+  return { invoices, totals, invoicedBySku, revenueBySku, unlisted }
 }
+
+// ─── Statistics ───────────────────────────────────────────────────────────────
+
+interface SkuStat { sku: string; title: string; taken: number; sold: number; counted: boolean; revenue: number }
+
+/**
+ * Sold is the invoiced quantity — the same figure as the checklist's Sold column. SKUs
+ * invoiced but not on the checklist are included too.
+ */
+function buildStats(cl: EventChecklist, report: Report) {
+  const rows: SkuStat[] = []
+  for (const it of cl.items) {
+    const key = it.sku.trim().toLowerCase()
+    if (!key) continue
+    const counted = it.qtyIn !== null
+    rows.push({
+      sku: it.sku.trim(),
+      title: it.title,
+      taken: it.qtyOut || 0,
+      sold: soldFor(it, report),
+      counted,
+      revenue: report.revenueBySku.get(key) || 0,
+    })
+  }
+  for (const u of report.unlisted) {
+    rows.push({ sku: u.sku, title: u.title, taken: 0, sold: u.qty, counted: false, revenue: report.revenueBySku.get(u.sku.toLowerCase()) || 0 })
+  }
+  const sellers = rows.filter((r) => r.sold > 0).sort((a, b) => b.sold - a.sold || b.revenue - a.revenue)
+  const taken = rows.reduce((s, r) => s + r.taken, 0)
+  const soldFromTaken = rows.filter((r) => r.taken > 0).reduce((s, r) => s + Math.min(r.sold, r.taken), 0)
+  return {
+    sellers,
+    top: sellers[0] || null,
+    notSold: rows.filter((r) => r.counted && r.taken > 0 && r.sold === 0),
+    skusTaken: rows.filter((r) => r.taken > 0).length,
+    taken,
+    returned: cl.items.reduce((s, it) => s + (it.qtyIn || 0), 0),
+    sold: rows.reduce((s, r) => s + r.sold, 0),
+    sellThrough: taken > 0 ? (soldFromTaken / taken) * 100 : null,
+    avgSale: report.totals.count > 0 ? report.totals.sales / report.totals.count : 0,
+  }
+}
+type EventStats = ReturnType<typeof buildStats>
+
+function StatsCard({ stats, onOpen, onHide }: { stats: EventStats; onOpen: () => void; onHide: () => void }) {
+  return (
+    <div role="button" tabIndex={0} onClick={onOpen}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+      className="relative flex-1 min-w-[170px] text-left bg-white rounded-xl border border-indigo-200 shadow-sm p-4 cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all">
+      <button type="button" onClick={(e) => { e.stopPropagation(); onHide() }} title="Hide statistics"
+        className="absolute top-2 right-2 text-gray-300 hover:text-gray-600 text-sm leading-none px-1">✕</button>
+      <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">📊 Statistics</div>
+      {stats.top ? (
+        <>
+          <div className="text-sm font-bold text-gray-900 truncate pr-4" title={stats.top.title}>🏆 {stats.top.sku}</div>
+          <div className="text-xs text-gray-500 mt-0.5">{stats.top.sold} sold · click for all</div>
+        </>
+      ) : (
+        <div className="text-sm text-gray-400 mt-1">No sales yet</div>
+      )}
+    </div>
+  )
+}
+
+function StatsModal({ cl, report, stats, onClose }: { cl: EventChecklist; report: Report; stats: EventStats; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const t = report.totals
+  const mix = (['card', 'cash', 'eft', 'other'] as const)
+    .map((k) => ({ key: k, ...PAY_COLORS[k], value: t[k] }))
+    .filter((m) => m.value > 0.005)
+  const received = mix.reduce((s, m) => s + m.value, 0)
+  const maxSold = stats.sellers[0]?.sold || 1
+  const pct = (v: number) => `${((v / received) * 100).toFixed(0)}%`
+
+  const tiles: Array<{ label: string; value: string; sub?: string }> = [
+    { label: 'Units sold', value: String(stats.sold) },
+    { label: 'Sell-through', value: stats.sellThrough === null ? '—' : `${stats.sellThrough.toFixed(0)}%`, sub: 'of Event Stock' },
+    { label: 'Total sales', value: fmtPrice(t.sales) },
+    { label: 'Avg per invoice', value: t.count ? fmtPrice(stats.avgSale) : '—', sub: `${t.count} invoice${t.count === 1 ? '' : 's'}` },
+    { label: 'SKUs taken', value: String(stats.skusTaken) },
+    { label: 'Units taken', value: String(stats.taken) },
+    { label: 'Units returned', value: String(stats.returned) },
+    { label: 'Unpaid', value: t.unpaid > 0.005 ? fmtPrice(t.unpaid) : '—' },
+  ]
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">📊 Statistics · {cl.name}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">{fmtRange(cl.date, cl.dateTo)}{cl.location ? ` · ${cl.location}` : ''}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none ml-4">✕</button>
+        </div>
+
+        <div className="overflow-y-auto p-6 space-y-6">
+          {/* KPI tiles */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {tiles.map((k) => (
+              <div key={k.label} className="bg-gray-50 rounded-xl p-3">
+                <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{k.label}</div>
+                <div className="text-lg font-bold text-gray-900 mt-0.5">{k.value}</div>
+                {k.sub && <div className="text-[11px] text-gray-400">{k.sub}</div>}
+              </div>
+            ))}
+          </div>
+
+          {/* Payment mix — one stacked bar, 2px surface gaps, labelled legend */}
+          <section>
+            <h3 className="text-sm font-semibold text-gray-800 mb-2">Payment mix</h3>
+            {received > 0.005 ? (
+              <>
+                <div className="flex h-3 gap-[2px] rounded overflow-hidden bg-white">
+                  {mix.map((m) => (
+                    <div key={m.key} style={{ width: pct(m.value), background: m.hex }}
+                      title={`${m.label}: ${fmtPrice(m.value)} (${pct(m.value)})`} />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-1 mt-2">
+                  {mix.map((m) => (
+                    <div key={m.key} className="flex items-center gap-1.5 text-xs text-gray-700">
+                      <span className="w-2.5 h-2.5 rounded-sm" style={{ background: m.hex }} />
+                      <span className="font-semibold">{m.label}</span>
+                      <span className="text-gray-500">{fmtPrice(m.value)} · {pct(m.value)}</span>
+                    </div>
+                  ))}
+                </div>
+                {t.unpaid > 0.005 && <p className="text-xs text-orange-600 mt-1.5">⏳ {fmtPrice(t.unpaid)} still unpaid — not in the mix above</p>}
+              </>
+            ) : (
+              <p className="text-sm text-gray-400">No payments recorded yet</p>
+            )}
+          </section>
+
+          {/* Top sellers — single series, one hue, ranked by units sold */}
+          <section>
+            <h3 className="text-sm font-semibold text-gray-800 mb-2">Top sellers</h3>
+            {stats.sellers.length === 0 ? (
+              <p className="text-sm text-gray-400">Nothing sold yet</p>
+            ) : (
+              <div className="space-y-1">
+                {stats.sellers.map((r, i) => (
+                  <div key={r.sku} className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1.2fr)_auto] items-center gap-3 py-1 px-1 rounded hover:bg-gray-50"
+                    title={`${r.sku} — ${r.title}: ${r.sold} sold${r.taken ? ` of ${r.taken} taken` : ''} · ${fmtPrice(r.revenue)}`}>
+                    <span className="text-xs text-gray-400 text-right">{i + 1}</span>
+                    <div className="min-w-0">
+                      <div className="font-mono text-xs text-gray-800 truncate">{r.sku}</div>
+                      <div className="text-[11px] text-gray-500 truncate">{r.title || '—'}</div>
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded">
+                      <div className="h-3 rounded bg-indigo-600" style={{ width: `${Math.max(2, (r.sold / maxSold) * 100)}%` }} />
+                    </div>
+                    <div className="text-right whitespace-nowrap">
+                      <div className="text-sm font-bold text-gray-900">{r.sold} sold</div>
+                      <div className="text-[11px] text-gray-500">
+                        {fmtPrice(r.revenue)}{r.taken > 0 ? ` · ${Math.round((Math.min(r.sold, r.taken) / r.taken) * 100)}% of ${r.taken}` : ' · not on list'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {stats.notSold.length > 0 && (
+            <section>
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">Didn&rsquo;t sell ({stats.notSold.length})</h3>
+              <div className="flex flex-wrap gap-1.5">
+                {stats.notSold.map((r) => (
+                  <span key={r.sku} title={r.title} className="font-mono text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-700">{r.sku} · {r.taken} taken</span>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <p className="text-[11px] text-gray-400">
+            Sold = the quantity invoiced. Sales and payment mix come from the invoices counted for this event.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
+const STATS_HIDDEN_KEY = 'r66.eventChecklist.statsHidden'
 
 const toInt = (v: string) => Math.max(0, Math.floor(Number(v) || 0))
 
-function qtyTotals(items: EventChecklistItem[]) {
+/** Sold is what was invoiced — the trail. QTY In is the physical count back, never used to derive Sold. */
+function soldFor(it: EventChecklistItem, report: Report) {
+  const key = it.sku.trim().toLowerCase()
+  return key ? allocatedQty(report.invoicedBySku.get(key)) : 0
+}
+
+function qtyTotals(items: EventChecklistItem[], report: Report) {
   let out = 0, back = 0, sold = 0, rows = 0, returned = 0
+  const invoiceIds = new Set<string>()
   for (const it of items) {
     if (it.sku || it.qtyOut) rows += 1
     if (it.returned) returned += 1
     out += it.qtyOut || 0
-    if (it.qtyIn === null) continue
-    back += it.qtyIn
-    sold += (it.qtyOut || 0) - it.qtyIn
+    sold += soldFor(it, report)
+    for (const a of report.invoicedBySku.get(it.sku.trim().toLowerCase()) || []) invoiceIds.add(a.docId)
+    if (it.qtyIn !== null) back += it.qtyIn
   }
-  return { out, back, sold, rows, returned }
+  return { out, back, sold, rows, returned, invoices: invoiceIds.size }
 }
 
 // ─── SKU input with catalogue autofill ────────────────────────────────────────
@@ -354,24 +567,25 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
 // ─── Totals cards ─────────────────────────────────────────────────────────────
 
-function MoneyCards({ totals }: { totals: Report['totals'] }) {
+function MoneyCards({ totals, children }: { totals: Report['totals']; children?: React.ReactNode }) {
   const cards = [
     { label: 'Total Sales', value: totals.sales, icon: '🧾', color: 'text-gray-900', show: true, sub: `${totals.count} invoice${totals.count === 1 ? '' : 's'}` },
     { label: 'Card', value: totals.card, icon: '💳', color: 'text-indigo-700', show: true },
     { label: 'Cash', value: totals.cash, icon: '💵', color: 'text-emerald-700', show: true },
-    { label: 'EFT', value: totals.eft, icon: '🏦', color: 'text-gray-700', show: totals.eft > 0.005 },
+    { label: 'EFT', value: totals.eft, icon: '🏦', color: 'text-fuchsia-700', show: totals.eft > 0.005 },
     { label: 'Other / Credit', value: totals.other, icon: '📋', color: 'text-gray-700', show: totals.other > 0.005 },
     { label: 'Unpaid', value: totals.unpaid, icon: '⏳', color: 'text-orange-600', show: totals.unpaid > 0.005 },
   ].filter((c) => c.show)
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className="flex flex-wrap gap-3">
       {cards.map((c) => (
-        <div key={c.label} className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+        <div key={c.label} className="flex-1 min-w-[150px] bg-white rounded-xl border border-gray-200 shadow-sm p-4">
           <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">{c.icon} {c.label}</div>
           <div className={`text-lg font-bold ${c.color}`}>{fmtPrice(c.value)}</div>
           {c.sub && <div className="text-xs text-gray-400 mt-0.5">{c.sub}</div>}
         </div>
       ))}
+      {children}
     </div>
   )
 }
@@ -398,6 +612,15 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
   const [msg, setMsg] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [showInvoices, setShowInvoices] = useState(false)
+  const [showStats, setShowStats] = useState(false)
+  // Hiding the Statistics card is a per-browser preference, not part of the checklist.
+  const [statsHidden, setStatsHidden] = useState(() => {
+    try { return localStorage.getItem(STATS_HIDDEN_KEY) === '1' } catch { return false }
+  })
+  function setStatsHiddenPref(hidden: boolean) {
+    setStatsHidden(hidden)
+    try { localStorage.setItem(STATS_HIDDEN_KEY, hidden ? '1' : '0') } catch {}
+  }
 
   // Debounced autosave, serialised so an older PATCH can never land after a newer one.
   const pending = useRef<EventChecklist | null>(null)
@@ -468,9 +691,9 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
   }
 
   const report = useMemo(() => buildReport(cl, invoices), [cl, invoices])
-  const q = qtyTotals(cl.items)
+  const stats = useMemo(() => buildStats(cl, report), [cl, report])
+  const q = qtyTotals(cl.items, report)
   const allocsFor = (it: EventChecklistItem) => (it.sku ? report.invoicedBySku.get(it.sku.trim().toLowerCase()) || [] : [])
-  const invoicedOnList = cl.items.reduce((s, it) => s + allocatedQty(allocsFor(it)), 0)
 
   const productBySku = useMemo(() => new Map(products.map((p) => [p.sku.toLowerCase(), p])), [products])
   /**
@@ -546,8 +769,14 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
       </div>
 
       {/* Money totals — from invoices */}
-      <MoneyCards totals={report.totals} />
+      <MoneyCards totals={report.totals}>
+        {!statsHidden && <StatsCard stats={stats} onOpen={() => setShowStats(true)} onHide={() => setStatsHiddenPref(true)} />}
+      </MoneyCards>
+      {showStats && <StatsModal cl={cl} report={report} stats={stats} onClose={() => setShowStats(false)} />}
       <p className="text-xs text-gray-400 mt-2 mb-6">
+        {statsHidden && (
+          <button onClick={() => setStatsHiddenPref(false)} className="text-indigo-600 hover:underline mr-2">📊 Show statistics</button>
+        )}
         Sales are the invoices dated {fmtRange(cl.date, cl.dateTo)}, split by the payment method recorded on each invoice.{' '}
         <button onClick={() => setShowInvoices(true)} className="text-indigo-600 hover:underline">
           {report.invoices.length} invoice{report.invoices.length === 1 ? '' : 's'} in range{report.invoices.length !== report.totals.count ? ` · ${report.invoices.length - report.totals.count} excluded` : ''}
@@ -585,8 +814,9 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
             </thead>
             <tbody>
               {cl.items.map((it, i) => {
-                const sold = it.qtyIn === null ? null : (it.qtyOut || 0) - it.qtyIn
                 const allocs = allocsFor(it)
+                const sold = allocatedQty(allocs)
+                const expectedBack = Math.max(0, (it.qtyOut || 0) - sold)
                 const cap = capFor(it)
                 const overCap = cap !== null && (it.qtyOut || 0) > cap
                 return (
@@ -618,10 +848,13 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
                         disabled={it.returned} title={it.returned ? 'Untick Returned to change' : undefined}
                         onChange={(e) => setItem(it.id, { qtyIn: e.target.value === '' ? null : Math.min(toInt(e.target.value), it.qtyOut || 0) })}
                         className={`${numInput} disabled:bg-transparent disabled:border-transparent`} />
+                      {it.sku && !it.returned && (it.qtyOut || 0) > 0 && (
+                        <div className={`text-[10px] mt-0.5 whitespace-nowrap ${it.qtyIn !== null && it.qtyIn !== expectedBack ? 'text-amber-600 font-semibold' : 'text-gray-400'}`}>
+                          {it.qtyIn !== null && it.qtyIn !== expectedBack ? `expected ${expectedBack}` : `expect ${expectedBack} back`}
+                        </div>
+                      )}
                     </td>
-                    <td className={`py-2 px-3 text-right font-bold ${sold !== null && sold < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                      {sold === null ? <span className="text-gray-300">—</span> : sold}
-                    </td>
+                    <td className="py-2 px-3 text-right font-bold text-gray-900">{it.sku ? sold : ''}</td>
                     <td className="py-2 px-3">
                       <div className="flex flex-wrap gap-1">
                         {allocs.map((a) => (
@@ -667,7 +900,7 @@ function ChecklistDetail({ initial, products, invoices, refreshing, onRefreshInv
                   <td className="py-2.5 px-3 text-right font-bold text-gray-900">{q.out}</td>
                   <td className="py-2.5 px-3 text-right font-bold text-gray-900">{q.back}</td>
                   <td className="py-2.5 px-3 text-right font-bold text-indigo-700">{q.sold}</td>
-                  <td className="py-2.5 px-3 text-xs font-semibold text-gray-600">{invoicedOnList > 0 ? `${invoicedOnList} invoiced` : ''}</td>
+                  <td className="py-2.5 px-3 text-xs font-semibold text-gray-600">{q.invoices > 0 ? `${q.invoices} invoice${q.invoices === 1 ? '' : 's'}` : ''}</td>
                   <td className="py-2.5 px-3 text-center text-xs font-bold text-gray-600">{q.returned}/{q.rows}</td>
                   <td />
                 </tr>
@@ -876,7 +1109,7 @@ export default function EventChecklistsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {visible.map((cl) => {
             const r = buildReport(cl, invoices)
-            const q = qtyTotals(cl.items)
+            const q = qtyTotals(cl.items, r)
             return (
               <button key={cl.id} onClick={() => setOpenId(cl.id)}
                 className="text-left bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all p-5 group">

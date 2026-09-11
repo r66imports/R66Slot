@@ -18,9 +18,9 @@ export interface EventChecklistItem {
 
 /**
  * Stock taken to an event and brought back. This is a count sheet only — it never moves
- * stock. Stock drops when the sale is invoiced; beside each SKU's Sold (Out − In) the page
- * lists the invoice numbers, quantities and payment methods those units were billed on.
- * Event Stock is capped at what inventory holds.
+ * stock. Stock drops when the sale is invoiced. Sold is the invoiced quantity, listed per
+ * SKU with the invoice numbers, quantities and payment methods; QTY In is the physical count
+ * back (expected = Event Stock − Sold). Event Stock is capped at what inventory holds.
  */
 export interface EventChecklist {
   id: string
