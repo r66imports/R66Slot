@@ -29,10 +29,34 @@ function NavLink({ item, hConfig, onClick }: {
 }) {
   const [hovered, setHovered] = useState(false)
   const [dropOpen, setDropOpen] = useState(false)
+  const [activeItem, setActiveItem] = useState<number | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const mouseInside = useRef(false)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { textColor, navFontFamily, navFontSize = 14, navFontWeight = 500, navHoverColor, navHoverEffect = 'color', backgroundColor } = hConfig
   const hoverColor = navHoverColor || '#ef4444'
   const hasDropdown = Array.isArray(item.dropdown) && item.dropdown.length > 0
+
+  const cancelClose = () => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
+  }
+
+  // Mouse only — touch fires emulated enter/leave that would fight the tap toggle.
+  const handlePointerEnter = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse') return
+    mouseInside.current = true
+    cancelClose()
+    setDropOpen(true)
+  }
+  // Short grace period so a cursor that slips off the edge doesn't snap the menu shut.
+  const handlePointerLeave = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse') return
+    mouseInside.current = false
+    cancelClose()
+    closeTimer.current = setTimeout(() => { setDropOpen(false); setActiveItem(null) }, 200)
+  }
+
+  useEffect(() => cancelClose, [])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -61,12 +85,16 @@ function NavLink({ item, hConfig, onClick }: {
 
   if (hasDropdown) {
     return (
-      <div ref={wrapRef} className="relative" onMouseEnter={() => setDropOpen(true)} onMouseLeave={() => setDropOpen(false)}>
+      <div ref={wrapRef} className="relative" onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
         <button
           style={linkStyle}
-          onClick={() => { setDropOpen(v => !v); onClick?.() }}
+          // With a mouse, hover already opened it — a click must not toggle it shut.
+          // `onClick` closes the mobile menu, so it runs from the dropdown links instead.
+          onClick={() => setDropOpen(v => mouseInside.current ? true : !v)}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
+          aria-expanded={dropOpen}
+          aria-haspopup="true"
         >
           {item.label}
           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transition-transform" style={{ transform: dropOpen ? 'rotate(180deg)' : 'none', color: 'inherit' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -74,25 +102,38 @@ function NavLink({ item, hConfig, onClick }: {
           </svg>
         </button>
 
-        {/* Dropdown panel */}
+        {/* Dropdown panel — the pt-2 wrapper is an invisible bridge so the cursor never leaves the hover area on the way down */}
         {dropOpen && (
-          <div
-            className="absolute top-full left-0 mt-1 min-w-[180px] rounded-xl border border-gray-200 shadow-xl overflow-hidden z-50"
-            style={{ backgroundColor: backgroundColor || '#ffffff' }}
-          >
-            {item.dropdown!.map((dd, i) => (
-              <Link
-                key={i}
-                href={dd.href}
-                target={dd.isExternal ? '_blank' : undefined}
-                rel={dd.isExternal ? 'noopener noreferrer' : undefined}
-                onClick={() => { setDropOpen(false); onClick?.() }}
-                className="block px-4 py-2.5 text-sm transition-colors hover:opacity-80"
-                style={{ color: textColor, fontFamily: navFontFamily || undefined, fontWeight: navFontWeight, borderBottom: i < item.dropdown!.length - 1 ? '1px solid rgba(0,0,0,0.06)' : undefined }}
-              >
-                {dd.label}
-              </Link>
-            ))}
+          <div className="absolute top-full left-0 pt-2 z-50">
+            <div
+              className="min-w-[200px] rounded-xl border border-gray-200 shadow-xl overflow-hidden py-1"
+              style={{ backgroundColor: backgroundColor || '#ffffff' }}
+            >
+              {item.dropdown!.map((dd, i) => {
+                const active = activeItem === i
+                return (
+                  <Link
+                    key={i}
+                    href={dd.href}
+                    target={dd.isExternal ? '_blank' : undefined}
+                    rel={dd.isExternal ? 'noopener noreferrer' : undefined}
+                    // Desktop: stay open until the cursor leaves the box. Mobile: close the menu after the tap.
+                    onClick={() => { if (onClick) { setDropOpen(false); onClick() } }}
+                    onMouseEnter={() => setActiveItem(i)}
+                    onMouseLeave={() => setActiveItem(null)}
+                    className="block px-4 py-2.5 text-sm whitespace-nowrap transition-colors"
+                    style={{
+                      color: active ? hoverColor : textColor,
+                      backgroundColor: active ? `${hoverColor}1a` : undefined,
+                      fontFamily: navFontFamily || undefined,
+                      fontWeight: navFontWeight,
+                    }}
+                  >
+                    {dd.label}
+                  </Link>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
