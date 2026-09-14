@@ -718,6 +718,85 @@ export function RenderedComponent({ component, isEditing, viewMode = 'desktop', 
       )
     }
 
+    // Specials and Landing Soon are the same slider as Latest Arrivals, each fed by its
+    // own product toggle.
+    case 'specials':
+    case 'landing-soon':
+    case 'latest-arrivals': {
+      const laCardSize = (settings.cardSize as string) || 'small'
+      const laCardW = { small: '160px', medium: '220px', large: '280px', xlarge: '360px' }[laCardSize] ?? '160px'
+      const laCardH = { small: '140px', medium: '200px', large: '260px', xlarge: '340px' }[laCardSize] ?? '140px'
+      const laBg = (settings.bgColor as string) || '#111111'
+      const laCardBg = (settings.cardBgColor as string) || '#1a1a1a'
+      const laTitleColor = (settings.titleColor as string) || '#ffffff'
+      const laPriceColor = (settings.priceColor as string) || '#ef4444'
+      const laDescColor = (settings.descColor as string) || '#9ca3af'
+      const laTitleSize = (settings.titleSize as string) || '13'
+      const laPriceSize = (settings.priceSize as string) || '16'
+      const laHeaderColor = (settings.headerColor as string) || '#ffffff'
+      const laHeaderSize = (settings.headerSize as string) || '28'
+      const laAccent = (settings.accentColor as string) || '#C41230'
+      const laDiscountColor = (settings.discountColor as string) || '#f59e0b'
+      const laDiscountedPriceColor = (settings.discountedPriceColor as string) || '#22c55e'
+      const mockCards = ['Item A', 'Item B', 'Item C', 'Item D', 'Item E']
+      // Auto-slide preview: 0 = off, 1 = one card every 10.5s … 10 = one card every 6s.
+      // The canvas can't run the live slider's JS stepping, so it shows the same average
+      // speed as a seamless CSS loop over a duplicated card row.
+      const laAutoSpeed = Math.max(0, Math.min(10, Number(settings.autoSpeed ?? 0)))
+      const laGap = 16
+      const laShift = mockCards.length * (parseInt(laCardW, 10) + laGap)
+      const laAnim = laAutoSpeed
+        ? {
+            animation: `sliderAutoPreview ${mockCards.length * (22 - laAutoSpeed) / 2}s linear infinite`,
+            ['--slider-shift' as string]: `${laShift}px`,
+          }
+        : {}
+      const laCards = laAutoSpeed ? [...mockCards, ...mockCards] : mockCards
+      return (
+        <div style={{ ...containerStyle, backgroundColor: laBg }}>
+          <div className="container mx-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 style={{ color: laHeaderColor, fontSize: `${laHeaderSize}px`, fontWeight: 700 }}>
+                {content || (type === 'specials' ? 'Specials' : type === 'landing-soon' ? 'Landing Soon' : 'Latest Arrivals')}
+              </h2>
+              <div className="flex gap-2">
+                <span className="w-8 h-8 rounded-full flex items-center justify-center text-white text-lg font-bold" style={{ background: laAccent }}>‹</span>
+                <span className="w-8 h-8 rounded-full flex items-center justify-center text-white text-lg font-bold" style={{ background: laAccent }}>›</span>
+              </div>
+            </div>
+            <div className="overflow-hidden">
+              <div className="flex gap-4 w-max" style={laAnim as React.CSSProperties}>
+              {laCards.map((label, i) => (
+                <div key={i} className="flex-none rounded-xl overflow-hidden" style={{ width: laCardW, background: laCardBg, border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="flex items-center justify-center" style={{ height: laCardH, background: 'rgba(255,255,255,0.04)' }}>
+                    <span style={{ fontSize: '2rem' }}>🏎️</span>
+                  </div>
+                  <div style={{ height: '3px', background: laAccent }} />
+                  <div className="p-2.5">
+                    <p className="font-semibold mb-1" style={{ color: laTitleColor, fontSize: `${laTitleSize}px` }}>{label} — Slot Car</p>
+                    {/* Specials preview retail struck through, the discount % and the new price */}
+                    {type === 'specials' ? (
+                      <div className="mb-1">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <p className="line-through" style={{ color: laPriceColor, fontSize: `${Math.max(10, Number(laPriceSize) - 4)}px` }}>R 299.99</p>
+                          <span className="font-bold" style={{ color: laDiscountColor, fontSize: `${Math.max(10, Number(laPriceSize) - 4)}px` }}>-10%</span>
+                        </div>
+                        <p className="font-bold" style={{ color: laDiscountedPriceColor, fontSize: `${laPriceSize}px` }}>R 269.99</p>
+                      </div>
+                    ) : (
+                      <p className="font-bold mb-1" style={{ color: laPriceColor, fontSize: `${laPriceSize}px` }}>R 299.99</p>
+                    )}
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: laDescColor }}>3 in stock</span>
+                  </div>
+                </div>
+              ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     case 'featured-product':
       return (
         <div style={containerStyle}>

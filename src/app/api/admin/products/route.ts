@@ -12,6 +12,8 @@ export interface Product {
   costPerItem: number | null
   preOrderPrice: number | null
   auctionReservePrice?: number | null
+  /** Retail discount % — display-only on the Specials slider; price stays full retail. */
+  discountPct?: number | null
   sku: string
   barcode: string
   brand: string
@@ -67,6 +69,7 @@ function rowToProduct(row: any): Product {
     compareAtPrice: row.compare_at_price ? parseFloat(row.compare_at_price) : null,
     costPerItem: row.cost_per_item ? parseFloat(row.cost_per_item) : null,
     preOrderPrice: row.pre_order_price ? parseFloat(row.pre_order_price) : null,
+    discountPct: row.discount_pct ? parseFloat(row.discount_pct) : null,
     sku: row.sku,
     barcode: row.barcode,
     brand: row.brand,

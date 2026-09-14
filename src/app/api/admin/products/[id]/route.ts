@@ -14,6 +14,7 @@ function rowToProduct(row: any): Product {
     costPerItem: row.cost_per_item ? parseFloat(row.cost_per_item) : null,
     preOrderPrice: row.pre_order_price ? parseFloat(row.pre_order_price) : null,
     auctionReservePrice: row.auction_reserve_price ? parseFloat(row.auction_reserve_price) : null,
+    discountPct: row.discount_pct ? parseFloat(row.discount_pct) : null,
     sku: row.sku,
     barcode: row.barcode,
     brand: row.brand,
@@ -93,6 +94,7 @@ export async function PUT(
 
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS pre_order_price NUMERIC`).catch(() => {})
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS auction_reserve_price NUMERIC`).catch(() => {})
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_pct NUMERIC`).catch(() => {})
 
     const result = await db.query(`
       UPDATE products SET
@@ -142,6 +144,7 @@ export async function PUT(
         custom_orgs = COALESCE($45, custom_orgs),
         category_ids = COALESCE($46, category_ids),
         auction_reserve_price = COALESCE($48, auction_reserve_price),
+        discount_pct = COALESCE($49, discount_pct),
         updated_at = $36
       WHERE id = $1
       RETURNING *
@@ -194,6 +197,7 @@ export async function PUT(
       Array.isArray(body.categoryIds) ? JSON.stringify(body.categoryIds) : null,
       body.preOrderPrice != null ? body.preOrderPrice : null,
       body.auctionReservePrice != null ? body.auctionReservePrice : null,
+      body.discountPct != null ? Math.max(0, Math.min(100, Number(body.discountPct) || 0)) : null,
     ])
 
     if (result.rowCount === 0) {

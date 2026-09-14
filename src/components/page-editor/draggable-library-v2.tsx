@@ -21,7 +21,7 @@ export function DraggableLibrary() {
   )
 
   const storeElements = COMPONENT_LIBRARY.filter(c =>
-    ['product-grid', 'product-card', 'product-carousel', 'featured-product', 'add-to-cart', 'price-display'].includes(c.type)
+    ['product-grid', 'product-card', 'product-carousel', 'featured-product', 'latest-arrivals', 'landing-soon', 'specials', 'add-to-cart', 'price-display'].includes(c.type)
   )
 
   return (
@@ -231,6 +231,9 @@ function getComponentDescription(type: PageComponent['type']): string {
     'product-card': 'Single product card',
     'product-carousel': 'Scrolling products',
     'featured-product': 'Highlighted product',
+    'latest-arrivals': 'New arrivals slider',
+    'landing-soon': 'Incoming stock slider',
+    specials: 'Specials slider',
     'add-to-cart': 'Cart button',
     'price-display': 'Price tag',
   }

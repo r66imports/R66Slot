@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { useLocalCart } from '@/context/local-cart-context'
 import type { PageComponent } from '@/lib/pages/schema'
@@ -274,6 +274,262 @@ function ProductGridLive({
           />
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Latest Arrivals / Landing Soon / Specials Slider ─────────────────────────
+// One slider, three feeds: Latest Arrivals reads /api/latest-arrivals, Landing Soon
+// reads /api/landing-soon, Specials reads /api/specials. Everything else — layout,
+// settings, colours — is identical.
+function ProductSliderLive({
+  endpoint,
+  defaultHeading,
+  emptyText,
+  defaultDaysVisible,
+  showDiscount = false,
+  settings,
+  content,
+  containerStyle,
+}: {
+  endpoint: string
+  defaultHeading: string
+  emptyText: string
+  defaultDaysVisible: number
+  showDiscount?: boolean
+  settings: Record<string, any>
+  content: string
+  containerStyle: React.CSSProperties
+}) {
+  const [items, setItems] = useState<any[]>([])
+  const [paused, setPaused] = useState(false)
+  const sliderRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    fetch(endpoint)
+      .then(r => r.json())
+      .then((data: any[]) => {
+        if (!Array.isArray(data)) return
+        // 0 (or blank) means never expire — used by Specials, which stay up until the
+        // product's Specials toggle is switched off.
+        const days = Number(settings.daysVisible ?? defaultDaysVisible)
+        if (!(days > 0)) { setItems(data); return }
+        const cutoff = Date.now() - days * 86400000
+        setItems(data.filter(item => new Date(item.addedAt).getTime() >= cutoff))
+      })
+      .catch(() => {})
+  }, [endpoint, defaultDaysVisible, settings.daysVisible])
+
+  const cardSizeMap: Record<string, { w: string; imgH: string }> = {
+    small:  { w: '160px', imgH: '140px' },
+    medium: { w: '220px', imgH: '200px' },
+    large:  { w: '280px', imgH: '260px' },
+    xlarge: { w: '360px', imgH: '340px' },
+  }
+  const cs = cardSizeMap[String(settings.cardSize || 'small')] ?? cardSizeMap.small
+
+  const scroll = (dir: 'left' | 'right') => {
+    const el = sliderRef.current
+    if (!el) return
+    const amount = dir === 'right' ? el.clientWidth * 0.8 : -(el.clientWidth * 0.8)
+    el.scrollBy({ left: amount, behavior: 'smooth' })
+  }
+
+  // Auto-slide: 0 = off, 1 = one card every 10.5s (slowest) … 10 = one card every 6s
+  // (fastest). Pauses while the cursor is over the slider so it can't fight the user.
+  const autoSpeed = Math.max(0, Math.min(10, Number(settings.autoSpeed ?? 0)))
+  // Does one set of cards overflow the row? Until it does there is nothing to scroll,
+  // so the slider sits still and shows each card once.
+  const [overflows, setOverflows] = useState(false)
+  useEffect(() => {
+    const el = sliderRef.current
+    if (!el || items.length === 0) return
+    const measure = () => {
+      const first = el.children[0] as HTMLElement | undefined
+      const last = el.children[items.length - 1] as HTMLElement | undefined
+      if (!first || !last) return
+      // One set's width, trailing gap included — the same figure whether or not the
+      // copy is rendered, so the answer cannot flip-flop once the copy appears.
+      const setW = last.offsetLeft + last.offsetWidth + 16 - first.offsetLeft
+      setOverflows(setW > el.clientWidth + 16)
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [items.length])
+  // Looping renders the cards twice so the loop never runs out of track; once we pass
+  // the first set we rewind by exactly one set width, invisible because the content
+  // beyond it is identical. Only when the cards overflow the row, though: with three
+  // specials and room for five, the copy sat right beside the originals and every card
+  // showed twice.
+  const loop = autoSpeed > 0 && overflows
+  const loopItems = loop ? [...items, ...items] : items
+  // Glides continuously rather than jumping a card at a time — a step every few
+  // seconds reads as a broken slider, not a moving one. Speed sets how long one
+  // card takes to travel its own width: (22 - speed) / 2 seconds.
+  useEffect(() => {
+    if (!loop || paused || items.length === 0) return
+    const el = sliderRef.current
+    if (!el) return
+    const secsPerCard = (22 - autoSpeed) / 2
+    let raf = 0
+    let last = 0
+    let pos = el.scrollLeft
+    let written = el.scrollLeft
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick)
+      if (!last) { last = now; return }
+      const dt = (now - last) / 1000
+      last = now
+      const first = el.children[0] as HTMLElement | undefined
+      const firstDup = el.children[items.length] as HTMLElement | undefined
+      if (!first) return
+      // An arrow click or a manual drag moves scrollLeft out from under us —
+      // pick up from wherever it actually is instead of yanking it back.
+      if (Math.abs(el.scrollLeft - written) > 1) pos = el.scrollLeft
+      // offsetLeft of the duplicate set's first card gives the exact set width,
+      // gaps included — safer than halving scrollWidth.
+      const setW = firstDup ? firstDup.offsetLeft - first.offsetLeft : 0
+      pos += ((first.offsetWidth + 16) / secsPerCard) * dt
+      if (setW > 0 && pos >= setW) pos -= setW
+      el.scrollLeft = pos
+      written = el.scrollLeft
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [loop, autoSpeed, paused, items.length])
+
+  const fmtPrice = (p: number) =>
+    `R ${Number(p).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
+
+  const bgColor = String(settings.bgColor || '#111111')
+  const cardBg = String(settings.cardBgColor || '#1a1a1a')
+  const titleColor = String(settings.titleColor || '#ffffff')
+  const priceColor = String(settings.priceColor || '#ef4444')
+  const descColor = String(settings.descColor || '#9ca3af')
+  const titleSize = String(settings.titleSize || '13')
+  const priceSize = String(settings.priceSize || '16')
+  const headerColor = String(settings.headerColor || '#ffffff')
+  const headerSize = String(settings.headerSize || '28')
+  const accentColor = String(settings.accentColor || '#C41230')
+  const discountColor = String(settings.discountColor || '#f59e0b')
+  const discountedPriceColor = String(settings.discountedPriceColor || '#22c55e')
+
+  return (
+    <div style={{ ...containerStyle, backgroundColor: bgColor, position: 'relative' }}>
+      <div className="container mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 style={{ color: headerColor, fontSize: `${headerSize}px`, fontWeight: 700 }}>
+            {content || defaultHeading}
+          </h2>
+          <div className="flex gap-2">
+            <button
+              onClick={() => scroll('left')}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
+              style={{ background: accentColor, color: '#fff' }}
+            >‹</button>
+            <button
+              onClick={() => scroll('right')}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-opacity hover:opacity-80"
+              style={{ background: accentColor, color: '#fff' }}
+            >›</button>
+          </div>
+        </div>
+
+        {items.length === 0 ? (
+          <p style={{ color: descColor, fontSize: '14px' }}>{emptyText}</p>
+        ) : (
+          // Snap must be off while auto-sliding, or it drags every sub-pixel scroll
+          // back to the nearest card and the slider sits still.
+          <div
+            ref={sliderRef}
+            className="flex gap-4 overflow-x-auto pb-2"
+            style={{ scrollSnapType: loop ? 'none' : 'x mandatory', scrollbarWidth: 'none' }}
+            onMouseEnter={() => setPaused(true)}
+            onMouseLeave={() => setPaused(false)}
+          >
+            {loopItems.map((item, i) => (
+              <Link
+                key={`${item.id}-${i}`}
+                href={item.productId ? `/product/${item.productId}` : `/products`}
+                className="flex-none hover:opacity-90 transition-opacity"
+                style={{ width: cs.w, scrollSnapAlign: 'start' }}
+              >
+                <div
+                  className="rounded-xl overflow-hidden"
+                  style={{ background: cardBg, border: `1px solid rgba(255,255,255,0.06)` }}
+                >
+                  {/* Image */}
+                  <div
+                    className="flex items-center justify-center overflow-hidden"
+                    style={{ height: cs.imgH, background: 'rgba(255,255,255,0.04)' }}
+                  >
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.title} className="w-full h-full object-contain p-2" />
+                    ) : (
+                      <span className="text-4xl">🏎️</span>
+                    )}
+                  </div>
+                  {/* Accent bar */}
+                  <div style={{ height: '3px', background: accentColor }} />
+                  {/* Details */}
+                  <div className="p-2.5">
+                    <p className="font-semibold leading-snug line-clamp-2 mb-1"
+                      style={{ color: titleColor, fontSize: `${titleSize}px` }}>
+                      {item.title}
+                    </p>
+                    {/* Specials show retail struck through, the discount %, and the new price.
+                        Latest Arrivals shows the plain price only. */}
+                    {(() => {
+                      const retail = Number(item.price) || 0
+                      const pct = Math.max(0, Math.min(100, Number(item.discountPct) || 0))
+                      // No compareAtPrice "was" fallback here: on R66Slot that field is the
+                      // internal Average Cost, and the public feeds never serve it.
+                      if (!showDiscount || !pct) {
+                        return (
+                          <p className="font-bold mb-1.5" style={{ color: priceColor, fontSize: `${priceSize}px` }}>
+                            {fmtPrice(retail)}
+                          </p>
+                        )
+                      }
+                      const was = retail
+                      const now = Math.round(retail * (1 - pct / 100) * 100) / 100
+                      return (
+                        <div className="mb-1.5">
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <p className="line-through" style={{ color: priceColor, fontSize: `${Math.max(10, Number(priceSize) - 4)}px` }}>
+                              {fmtPrice(was)}
+                            </p>
+                            <span className="font-bold" style={{ color: discountColor, fontSize: `${Math.max(10, Number(priceSize) - 4)}px` }}>
+                              -{Number.isInteger(pct) ? pct : pct.toFixed(1)}%
+                            </span>
+                          </div>
+                          <p className="font-bold" style={{ color: discountedPriceColor, fontSize: `${priceSize}px` }}>
+                            {fmtPrice(now)}
+                          </p>
+                        </div>
+                      )
+                    })()}
+                    {item.quantity > 0 ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>
+                        {item.quantity} in stock
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
+                        Pre Sold Out
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -1045,6 +1301,46 @@ export function ComponentRenderer({ component }: ComponentRendererProps) {
             </div>
           </div>
         </div>
+      )
+
+    case 'latest-arrivals':
+      return (
+        <ProductSliderLive
+          endpoint="/api/latest-arrivals"
+          defaultHeading="Latest Arrivals"
+          emptyText="No recent arrivals."
+          defaultDaysVisible={30}
+          settings={settings}
+          content={content}
+          containerStyle={containerStyle}
+        />
+      )
+
+    case 'landing-soon':
+      return (
+        <ProductSliderLive
+          endpoint="/api/landing-soon"
+          defaultHeading="Landing Soon"
+          emptyText="Nothing landing right now."
+          defaultDaysVisible={0}
+          settings={settings}
+          content={content}
+          containerStyle={containerStyle}
+        />
+      )
+
+    case 'specials':
+      return (
+        <ProductSliderLive
+          endpoint="/api/specials"
+          defaultHeading="Specials"
+          emptyText="No specials right now."
+          defaultDaysVisible={0}
+          showDiscount
+          settings={settings}
+          content={content}
+          containerStyle={containerStyle}
+        />
       )
 
     case 'featured-product':

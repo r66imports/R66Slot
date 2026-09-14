@@ -185,6 +185,47 @@ const COMPONENT_DEFAULTS: Array<{
     },
   },
   {
+    type: 'latest-arrivals',
+    defaultProps: {
+      content: 'Latest Arrivals',
+      styles: { paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: {
+        daysVisible: 30, cardSize: 'small', bgColor: '#111111', cardBgColor: '#1a1a1a',
+        titleColor: '#ffffff', priceColor: '#ef4444', descColor: '#9ca3af',
+        titleSize: '13', priceSize: '16', headerColor: '#ffffff', headerSize: '28', accentColor: '#C41230',
+      },
+    },
+  },
+  {
+    // Same slider as Latest Arrivals, fed by the Landing Soon toggle on the product page.
+    // daysVisible 0 = never expire — incoming stock stays up until the toggle is switched off.
+    type: 'landing-soon',
+    defaultProps: {
+      content: 'Landing Soon',
+      styles: { paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: {
+        daysVisible: 0, cardSize: 'small', bgColor: '#111111', cardBgColor: '#1a1a1a',
+        titleColor: '#ffffff', priceColor: '#ef4444', descColor: '#9ca3af',
+        titleSize: '13', priceSize: '16', headerColor: '#ffffff', headerSize: '28', accentColor: '#C41230',
+      },
+    },
+  },
+  {
+    // Same slider as Latest Arrivals, fed by the Specials toggle on the product page.
+    // daysVisible 0 = never expire — a special stays up until the toggle is switched off.
+    type: 'specials',
+    defaultProps: {
+      content: 'Specials',
+      styles: { paddingTop: '48px', paddingBottom: '48px', paddingLeft: '16px', paddingRight: '16px' },
+      settings: {
+        daysVisible: 0, cardSize: 'small', bgColor: '#111111', cardBgColor: '#1a1a1a',
+        titleColor: '#ffffff', priceColor: '#ef4444', descColor: '#9ca3af',
+        titleSize: '13', priceSize: '16', headerColor: '#ffffff', headerSize: '28', accentColor: '#C41230',
+        discountColor: '#f59e0b', discountedPriceColor: '#22c55e',
+      },
+    },
+  },
+  {
     type: 'quote',
     defaultProps: {
       content: 'Your quote text here.',

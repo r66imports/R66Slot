@@ -1375,6 +1375,113 @@ function ContentTab({
         </>
       )}
 
+      {/* Latest Arrivals / Landing Soon / Specials Settings — one panel, all three sliders */}
+      {(component.type === 'latest-arrivals' || component.type === 'landing-soon' || component.type === 'specials') && (
+        <>
+          {/* Header */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Header Text</label>
+            <input type="text" value={component.content} onChange={(e) => onUpdate({ content: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play font-bold" />
+          </div>
+          {/* Source (read-only reminder of which product toggle feeds this element) */}
+          <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+            <p className="text-[11px] text-gray-500 font-play">
+              Shows every product with{' '}
+              <span className="font-semibold text-gray-700">
+                {component.type === 'specials' ? 'Specials' : component.type === 'landing-soon' ? 'Landing Soon' : 'Latest Arrivals'}
+              </span>{' '}
+              switched ON in Product status.
+            </p>
+          </div>
+          {/* Days visible */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Days Visible</label>
+            <input type="number" min={0} max={365}
+              value={Number(component.settings.daysVisible ?? (component.type === 'latest-arrivals' ? 30 : 0))}
+              onChange={(e) => updateSetting('daysVisible', Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play" />
+            <p className="text-xs text-gray-400 mt-0.5">Products added within this many days will show — 0 = never expire</p>
+          </div>
+          {/* Card Size */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Card Size</label>
+            <select value={(component.settings.cardSize as string) || 'small'}
+              onChange={(e) => updateSetting('cardSize', e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-play">
+              <option value="small">Small (160px)</option>
+              <option value="medium">Medium (220px)</option>
+              <option value="large">Large (280px)</option>
+              <option value="xlarge">Extra Large (360px)</option>
+            </select>
+          </div>
+          {/* Auto-slide speed — 0 = off, 1 = slowest (one card every 10.5s), 10 = fastest (6s) */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 font-play">Slider Auto Speed</label>
+            <div className="flex items-center gap-3">
+              <input type="range" min={0} max={10} step={1}
+                value={Number(component.settings.autoSpeed ?? 0)}
+                onChange={(e) => updateSetting('autoSpeed', Number(e.target.value))}
+                className="flex-1 accent-[#C41230]" />
+              <span className="w-14 text-center text-sm font-play font-bold text-gray-700">
+                {Number(component.settings.autoSpeed ?? 0) === 0 ? 'Off' : Number(component.settings.autoSpeed)}
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Glides left → right on its own, looping forever. 0 = off, 1 = slowest, 10 = fastest. Speed sets how long a card takes to travel its own width — 10.5s at 1, 6s at 10. Pauses while hovering.
+            </p>
+          </div>
+          {/* Colours section */}
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-600 mb-2 font-play uppercase tracking-wider">Colours</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Background', key: 'bgColor', def: '#111111' },
+                { label: 'Card Background', key: 'cardBgColor', def: '#1a1a1a' },
+                { label: 'Accent / Bar', key: 'accentColor', def: '#C41230' },
+                { label: 'Header Text', key: 'headerColor', def: '#ffffff' },
+                { label: 'Title Text', key: 'titleColor', def: '#ffffff' },
+                { label: component.type === 'specials' ? 'Retail Price' : 'Price', key: 'priceColor', def: '#ef4444' },
+                { label: 'Badge / Stock', key: 'descColor', def: '#9ca3af' },
+                // Only Specials cards render a discount % and a discounted price.
+                ...(component.type === 'specials' ? [
+                  { label: 'Discount %', key: 'discountColor', def: '#f59e0b' },
+                  { label: 'Discounted Price', key: 'discountedPriceColor', def: '#22c55e' },
+                ] : []),
+              ].map(({ label, key, def }) => (
+                <div key={key}>
+                  <label className="block text-[10px] text-gray-400 mb-0.5 font-play">{label}</label>
+                  <div className="flex items-center gap-1.5">
+                    <input type="color" value={(component.settings[key] as string) || def}
+                      onChange={(e) => updateSetting(key, e.target.value)}
+                      className="w-7 h-7 rounded border border-gray-200 p-0.5 cursor-pointer" />
+                    <span className="text-xs font-mono text-gray-500">{(component.settings[key] as string) || def}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Font Sizes */}
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-xs font-semibold text-gray-600 mb-2 font-play uppercase tracking-wider">Font Sizes (px)</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Header', key: 'headerSize', def: '28' },
+                { label: 'Card Title', key: 'titleSize', def: '13' },
+                { label: 'Price', key: 'priceSize', def: '16' },
+              ].map(({ label, key, def }) => (
+                <div key={key}>
+                  <label className="block text-[10px] text-gray-400 mb-0.5 font-play">{label}</label>
+                  <input type="number" min={8} max={72} value={Number(component.settings[key] ?? def)}
+                    onChange={(e) => updateSetting(key, String(e.target.value))}
+                    className="w-full px-2 py-1 border border-gray-200 rounded text-sm font-play" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Button Options */}
       {component.type === 'button' && (
         <>

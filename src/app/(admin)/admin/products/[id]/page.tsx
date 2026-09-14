@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { MediaLibraryPicker } from '@/components/page-editor/media-library-picker'
 
 const BASE_CAR_BRANDS = ['Datsun 510', 'Ford Escort MK I', 'Ford Escort MK II', 'BMW M3 E30', 'Porsche 911', 'Ferrari 308', 'Lancia Delta', 'Audi Quattro']
+const fmtRand = (n: number) => Number(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
 interface Product {
   id: string
@@ -71,6 +72,19 @@ export default function EditProductPage({
   const [price, setPrice] = useState('')
   const [compareAtPrice, setCompareAtPrice] = useState('')
   const [preOrderPrice, setPreOrderPrice] = useState('')
+  // Retail discount. price stays the full retail figure; discountPct derives the
+  // discounted selling price, so the original retail is never overwritten.
+  const [discountPct, setDiscountPct] = useState('')
+  const discountPctNum = Math.max(0, Math.min(100, parseFloat(discountPct) || 0))
+  const discountedPrice = discountPctNum > 0
+    ? Math.round((parseFloat(price) || 0) * (1 - discountPctNum / 100) * 100) / 100
+    : 0
+  const [isLatestArrival, setIsLatestArrival] = useState(false)
+  const [latestArrivalId, setLatestArrivalId] = useState<string | null>(null)
+  const [isLandingSoon, setIsLandingSoon] = useState(false)
+  const [landingSoonId, setLandingSoonId] = useState<string | null>(null)
+  const [isSpecial, setIsSpecial] = useState(false)
+  const [specialId, setSpecialId] = useState<string | null>(null)
   const [costPerItem, setCostPerItem] = useState('')
   const [auctionReservePrice, setAuctionReservePrice] = useState('')
   const [sku, setSku] = useState('')
@@ -332,6 +346,7 @@ export default function EditProductPage({
           setPrice(found.price?.toString() || '')
           setCompareAtPrice(found.compareAtPrice?.toString() || '')
           setPreOrderPrice((found as any).preOrderPrice?.toString() || '')
+          setDiscountPct((found as any).discountPct?.toString() || '')
           setCostPerItem(found.costPerItem?.toString() || '')
           setAuctionReservePrice((found as any).auctionReservePrice?.toString() || '')
           setSku(found.sku || '')
@@ -340,6 +355,9 @@ export default function EditProductPage({
               .then(r => r.ok ? r.json() : {})
               .then((map: Record<string, string>) => setSkuEntityTag(map[found.sku.trim().toUpperCase()] || ''))
               .catch(() => {})
+            loadSliderStatus('/api/admin/latest-arrivals', found.sku, setIsLatestArrival, setLatestArrivalId)
+            loadSliderStatus('/api/admin/landing-soon', found.sku, setIsLandingSoon, setLandingSoonId)
+            loadSliderStatus('/api/admin/specials', found.sku, setIsSpecial, setSpecialId)
           }
           setBarcode(found.barcode || '')
           setTrackQuantity(found.trackQuantity ?? true)
@@ -495,6 +513,81 @@ export default function EditProductPage({
     } catch { /* non-critical */ }
   }
 
+  // ── Homepage slider toggles (Latest Arrivals / Landing Soon / Specials) ──────
+  // Each toggle saves immediately (not on Save) into its own blob; OFF removes the entry.
+  const loadSliderStatus = async (
+    endpoint: string,
+    productSku: string,
+    setOn: (v: boolean) => void,
+    setEntryId: (v: string | null) => void,
+  ) => {
+    try {
+      const res = await fetch(endpoint)
+      if (!res.ok) return
+      const entries: any[] = await res.json()
+      const match = Array.isArray(entries) ? entries.find(a => a.sku?.trim().toLowerCase() === productSku.trim().toLowerCase()) : null
+      setOn(!!match)
+      setEntryId(match?.id || null)
+    } catch { /* non-critical */ }
+  }
+
+  const toggleSlider = async (
+    endpoint: string,
+    isOn: boolean,
+    entryId: string | null,
+    setOn: (v: boolean) => void,
+    setEntryId: (v: string | null) => void,
+    extra: Record<string, unknown> = {},
+  ) => {
+    if (!sku) return
+    try {
+      if (isOn) {
+        if (entryId) await fetch(`${endpoint}?id=${encodeURIComponent(entryId)}`, { method: 'DELETE' })
+        setOn(false)
+        setEntryId(null)
+        return
+      }
+      // mediaFiles can still hold un-uploaded data: URLs, so fall back to the saved
+      // product record. The public feeds also resolve this server-side as a backstop.
+      const imgUrl = mediaFiles.find(f => !f.url.startsWith('data:'))?.url
+        || [product?.imageUrl, ...(product?.images || [])].find(u => u && !u.startsWith('data:'))
+        || ''
+      // compareAtPrice is deliberately not sent: on R66Slot it is the internal Average
+      // Cost, and these entries are served to the public storefront.
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku,
+          title,
+          imageUrl: imgUrl,
+          price: parseFloat(price) || 0,
+          quantity: parseInt(quantity) || 0,
+          productId: product?.id,
+          ...extra,
+        }),
+      })
+      if (res.ok) {
+        const saved = await res.json()
+        setOn(true)
+        setEntryId(saved?.id || null)
+      }
+    } catch { /* non-critical */ }
+  }
+
+  const isChasecar = () => /chasecar/i.test(sku) || /chasecar/i.test(title)
+
+  const handleToggleLatestArrival = () => {
+    if (!isLatestArrival && isChasecar()) { alert('This item cannot be sent to Latest Arrivals.'); return }
+    return toggleSlider('/api/admin/latest-arrivals', isLatestArrival, latestArrivalId, setIsLatestArrival, setLatestArrivalId)
+  }
+  const handleToggleLandingSoon = () => {
+    if (!isLandingSoon && isChasecar()) { alert('This item cannot be sent to Landing Soon.'); return }
+    return toggleSlider('/api/admin/landing-soon', isLandingSoon, landingSoonId, setIsLandingSoon, setLandingSoonId)
+  }
+  const handleToggleSpecial = () =>
+    toggleSlider('/api/admin/specials', isSpecial, specialId, setIsSpecial, setSpecialId, { discountPct: discountPctNum })
+
   // Autosave — saves current fields without redirecting
   // quantity and status go in a save ONLY when this form changed them — see loadedQuantity.
   // Both handleSave and doAutosave build their body from this one helper so the two stay
@@ -533,6 +626,8 @@ export default function EditProductPage({
           costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
           preOrderPrice: preOrderPrice ? cleanFloat(preOrderPrice) : null,
           auctionReservePrice: auctionReservePrice ? cleanFloat(auctionReservePrice) : null,
+          // Always a number — the PUT route COALESCEs, so null would keep the old discount.
+          discountPct: discountPctNum,
           sku, barcode, trackQuantity, ...changedStockFields(),
           weight: weight ? cleanFloat(weight) : null, weightUnit,
           brand: categoryBrands[0] || brand, productType: itemCategories[0] || productType, categoryBrands, itemCategories,
@@ -597,7 +692,7 @@ export default function EditProductPage({
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
     autosaveTimer.current = setTimeout(doAutosave, 1500)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, price, compareAtPrice, costPerItem, preOrderPrice, sku, barcode, trackQuantity,
+  }, [title, description, price, compareAtPrice, costPerItem, preOrderPrice, discountPct, sku, barcode, trackQuantity,
       quantity, weight, weightUnit, brand, productType, categoryBrands, itemCategories,
       carBrands, sidewaysBrands, isPreOrder, units, carTypes, sidewaysCarTypes, partType, scale, supplier, collections,
       selectedCarClasses, selectedRevoParts, selectedSidewaysParts, selectedSidewaysCarClasses,
@@ -737,6 +832,7 @@ export default function EditProductPage({
         price: cleanFloat(price),
         compareAtPrice: compareAtPrice ? cleanFloat(compareAtPrice) : null,
         costPerItem: costPerItem ? cleanFloat(costPerItem) : null,
+        discountPct: discountPctNum,
         sku,
         barcode,
         trackQuantity,
@@ -1223,6 +1319,56 @@ export default function EditProductPage({
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-500">Special price for pre-order invoices</p>
+              </div>
+              {/* Retail Discount — % and the resulting price are two-way bound. Price above stays
+                  the full retail figure so the original is never lost. Display-only: shown on the
+                  Specials slider; the store, cart, checkout and invoices still charge full price. */}
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
+                    Discount
+                    <span className="text-xs font-normal text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">🏷️ Specials</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="relative w-24 flex-shrink-0">
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="100"
+                        value={discountPct}
+                        onChange={(e) => setDiscountPct(e.target.value)}
+                        placeholder="0"
+                        className="w-full pl-3 pr-7 py-2 border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-400 focus:border-transparent text-sm"
+                      />
+                      <span className="absolute right-2 top-2 text-gray-400 text-sm">%</span>
+                    </div>
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-2 text-gray-500">R</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={discountedPrice > 0 ? discountedPrice.toFixed(2) : ''}
+                        onChange={(e) => {
+                          const dp = parseFloat(e.target.value)
+                          const p = parseFloat(price)
+                          if (!isNaN(dp) && !isNaN(p) && p > 0) {
+                            setDiscountPct(Math.max(0, Math.min(100, (1 - dp / p) * 100)).toFixed(1))
+                          } else if (e.target.value === '') {
+                            setDiscountPct('')
+                          }
+                        }}
+                        placeholder="0.00"
+                        className="w-full pl-7 pr-3 py-2 border border-rose-200 rounded-lg focus:ring-2 focus:ring-rose-400 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    {discountPctNum > 0
+                      ? `Retail R ${fmtRand(parseFloat(price) || 0)} less ${discountPctNum}% — sells at R ${fmtRand(discountedPrice)}`
+                      : 'Discounts the retail price. Shown on the Specials slider.'}
+                  </p>
+                </div>
               </div></>}
             </div>
 
@@ -1419,6 +1565,33 @@ export default function EditProductPage({
               {isPreOrder && (
                 <p className="text-xs text-amber-600 mb-4 -mt-2">Item is bookable. Auto-disables when stock arrives.</p>
               )}
+              {([
+                { on: isLatestArrival, onClick: handleToggleLatestArrival, icon: '🆕', label: 'Latest Arrivals', active: 'bg-purple-50 border-purple-400 text-purple-800', pill: 'bg-purple-400', note: 'text-purple-700' },
+                { on: isLandingSoon, onClick: handleToggleLandingSoon, icon: '🛬', label: 'Landing Soon', active: 'bg-sky-50 border-sky-400 text-sky-800', pill: 'bg-sky-400', note: 'text-sky-700' },
+                { on: isSpecial, onClick: handleToggleSpecial, icon: '🏷️', label: 'Specials', active: 'bg-rose-50 border-rose-400 text-rose-800', pill: 'bg-rose-400', note: 'text-rose-700' },
+              ]).map(t => (
+                <div key={t.label}>
+                  <button
+                    type="button"
+                    onClick={t.onClick}
+                    disabled={!sku}
+                    className={`w-full mb-4 flex items-center justify-between px-4 py-3 rounded-lg border-2 transition-all font-medium text-sm ${
+                      t.on ? t.active : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
+                    } disabled:opacity-40`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-base">{t.icon}</span>
+                      {t.label}
+                    </span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${t.on ? `${t.pill} text-white` : 'bg-gray-200 text-gray-400'}`}>
+                      {t.on ? 'ON' : 'OFF'}
+                    </span>
+                  </button>
+                  {t.on && (
+                    <p className={`text-xs ${t.note} mb-4 -mt-2`}>This product shows on the homepage {t.label} slider.</p>
+                  )}
+                </div>
+              ))}
               {!statusCollapsed && <><select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}

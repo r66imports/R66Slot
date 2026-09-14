@@ -159,6 +159,14 @@ select,
   50% { transform: translateY(-20px); }
 }
 
+/* Page-editor canvas only — previews the Latest Arrivals / Specials auto-slide speed.
+   The card row is rendered twice and shifted by exactly one set (--slider-shift),
+   so the loop restart is seamless. The live slider steps card-by-card in JS instead. */
+@keyframes sliderAutoPreview {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-1 * var(--slider-shift, 0px))); }
+}
+
 .animate-fadeIn {
   animation: fadeIn var(--anim-duration, 0.6s) var(--anim-delay, 0s) both;
 }
