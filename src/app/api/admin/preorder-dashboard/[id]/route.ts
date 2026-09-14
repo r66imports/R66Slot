@@ -127,7 +127,17 @@ export async function PATCH(
         const prev = stored[c.id]
         if (!prev?.linkedDocNumber) return c
         const sameLink = c.linkedDocId === prev.linkedDocId && c.linkedDocNumber === prev.linkedDocNumber
-        if (sameLink || !c.linkedDocNumber) return c
+        if (sameLink) return c
+        // A save carrying no link at all comes from a card that never saw it — a second tab,
+        // or a card loaded before Send-to linked the Quote. Nothing on the dashboard clears a
+        // link on purpose, so while the stored one names a live document it stays. (How an
+        // R66Emporium entry lost its Quote link, 12 Sept 2026.)
+        if (!c.linkedDocNumber && !c.linkedDocId) {
+          const held = lookup(prev)
+          return held && held.status !== 'archived'
+            ? { ...c, linkedDocId: prev.linkedDocId, linkedDocNumber: prev.linkedDocNumber }
+            : c
+        }
         const incoming = lookup(c), held = lookup(prev)
         if (held && held.status !== 'archived' && (!incoming || incoming.status === 'archived')) {
           console.warn('[preorder] stale link ignored on save', { sku: (current as any).sku, customer: c.name, tried: c.linkedDocNumber, kept: prev.linkedDocNumber })
@@ -141,6 +151,9 @@ export async function PATCH(
     for (const field of allowedFields) {
       if (field in body) (updated as any)[field] = body[field]
     }
+    // POST already trims; an edited SKU did not. A leading space matched no product, so the
+    // image never reached the product and Send-to copied the space onto the Quote line.
+    if (typeof (updated as any).sku === 'string') (updated as any).sku = (updated as any).sku.trim()
 
     // Auto-unpublish only when Supplier Order is set and fully booked
     if (!('published' in body) && updated.published) {

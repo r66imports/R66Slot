@@ -318,7 +318,10 @@ export default function EditProductPage({
 
   const loadProduct = async () => {
     try {
-      const res = await fetch('/api/admin/products')
+      // no-store: the list is served with a 60s browser cache. Reopening a product within
+      // that window loaded the copy from before the last save — old images and all — and
+      // the next autosave wrote them back over the new ones.
+      const res = await fetch('/api/admin/products', { cache: 'no-store' })
       if (res.ok) {
         const products: Product[] = await res.json()
         const found = products.find((p) => p.id === id)
@@ -422,8 +425,8 @@ export default function EditProductPage({
         }, 150)
       }
     } finally {
+      // isLoaded is set by the effect after the autosave effect, once these values render.
       setLoading(false)
-      isLoaded.current = true
     }
   }
 
@@ -520,7 +523,7 @@ export default function EditProductPage({
       // Upload pasted images first — the API COALESCEs, so sending the filtered
       // list before they upload would wipe images off the record instead.
       const imageUrls = savedImageUrls(await uploadPendingImages())
-      await fetch(`/api/admin/products/${id}`, {
+      const res = await fetch(`/api/admin/products/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -551,6 +554,13 @@ export default function EditProductPage({
           seo: { metaTitle: seoTitle, metaDescription: seoDescription, metaKeywords: seoKeywords, ogImage: seoImage },
         }),
       })
+      // A rejected save (expired login, server error) used to show "Saved ✓" anyway.
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        setSaveError(`Autosave failed: ${err.error || `server error (${res.status})`}`)
+        setAutosaveStatus('idle')
+        return
+      }
       commitStockBaseline()
       setAutosaveStatus('saved')
       setTimeout(() => setAutosaveStatus('idle'), 2000)
@@ -594,6 +604,14 @@ export default function EditProductPage({
       customOrgData,
       tags, status, boxSize, dimLength, dimWidth, dimHeight, eta, pageIds, pageUrl,
       seoTitle, seoDescription, seoKeywords, seoImage, salesAccount, purchaseAccount, mediaFiles])
+
+  // The form counts as loaded only once the loaded values have rendered — this effect sits
+  // below the autosave effect so, on that render, autosave still sees "not loaded". Set
+  // inside loadProduct, it landed a render early: the product's own values read as an edit
+  // and every open saved them straight back 1.5s later.
+  useEffect(() => {
+    if (!loading) isLoaded.current = true
+  }, [loading])
 
   // Click-outside — close all custom dropdowns (registered once; no state deps needed)
   useEffect(() => {
@@ -652,6 +670,8 @@ export default function EditProductPage({
     uploadingRef.current = true
     try {
       const resolved: { name: string; url: string; type: string }[] = []
+      const uploaded = new Map<string, string>()   // data: URL → saved URL
+      const failed: string[] = []
       for (const file of current) {
         if (!file.url.startsWith('data:')) {
           resolved.push(file)
@@ -665,16 +685,25 @@ export default function EditProductPage({
           const uploadRes = await fetch('/api/admin/media/upload', { method: 'POST', body: formData })
           if (uploadRes.ok) {
             const data = await uploadRes.json()
+            uploaded.set(file.url, data.url)
             resolved.push({ ...file, url: data.url })
           } else {
+            // The route says why (file type, size, R2 config, login) — say it on the page.
+            // Left silent, the thumbnail stayed while every save quietly left it out.
+            const err = await uploadRes.json().catch(() => ({}))
+            failed.push(`${file.name}: ${err.error || `upload failed (${uploadRes.status})`}`)
             resolved.push(file)
           }
         } catch (err) {
           console.error('Image upload failed:', err)
+          failed.push(`${file.name}: upload failed — check your connection`)
           resolved.push(file)
         }
       }
-      setMediaFiles(resolved)
+      // Merge into the list as it stands now, not the copy taken when the upload began —
+      // writing that copy back undid any image removed, reordered or added meanwhile.
+      if (uploaded.size) setMediaFiles(prev => prev.map(f => (uploaded.has(f.url) ? { ...f, url: uploaded.get(f.url)! } : f)))
+      if (failed.length) setSaveError(`Image not saved — ${failed.join('; ')}`)
       return resolved
     } finally {
       uploadingRef.current = false
@@ -1038,7 +1067,7 @@ export default function EditProductPage({
                       )}
                       {/* Remove */}
                       <button
-                        onClick={() => setMediaFiles(mediaFiles.filter((_, i) => i !== index))}
+                        onClick={() => setMediaFiles(prev => prev.filter((_, i) => i !== index))}
                         className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         ×

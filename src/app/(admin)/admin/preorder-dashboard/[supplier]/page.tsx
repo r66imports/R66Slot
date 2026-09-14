@@ -5,6 +5,35 @@ import Link from 'next/link'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
 
+// Photos go up as files the moment they are chosen, and the card saves only the link that
+// comes back. They used to ride inside every autosave as base64 — a third bigger than the
+// file — and past ~7.5MB that crossed the server's 10MB request limit: the save failed, the
+// page never said so, and every later save on that card failed with it (found on R66Emporium,
+// 12 Sept 2026). Large photos are scaled down first; the storefront never shows more than 2400px.
+async function shrinkImage(file: Blob): Promise<Blob> {
+  if (file.size <= 3 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/.test(file.type)) return file
+  try {
+    const bmp = await createImageBitmap(file)
+    const scale = Math.min(1, 2400 / Math.max(bmp.width, bmp.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale)
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+    const out = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/jpeg', 0.88))
+    return out && out.size < file.size ? out : file
+  } catch { return file }
+}
+async function uploadImageFile(file: Blob, name = 'image.jpg'): Promise<string> {
+  const body = await shrinkImage(file)
+  const fd = new FormData()
+  fd.append('file', body, body === file ? name : name.replace(/\.\w+$/, '') + '.jpg')
+  const res = await fetch('/api/admin/media/upload', { method: 'POST', body: fd })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || !data.url) throw new Error(data.error || `upload failed (${res.status})`)
+  return data.url
+}
+
 interface Contact { id: string; firstName: string; lastName: string; email?: string; phone?: string }
 interface SupplierContact { id: string; name: string; preferredCurrency?: string }
 interface DashboardCustomer {
@@ -207,7 +236,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     return `INV${String(next).padStart(4,'0')}`
   }
 
-  const lineItem=()=>({id:`li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,description:`${form.sku} – ${form.description}`,qty:customer.qty,unitPrice})
+  const lineItem=()=>({id:`li_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,description:`${(form.sku||'').trim()} – ${form.description}`,qty:customer.qty,unitPrice})
   const notify=(docNumber:string,docId:string)=>{setLinkedDocNumber(docNumber);onLinked(docNumber,docId)}
   // Rule 60 — converting a Quote moves the whole document, so every dashboard entry it
   // covers has to follow it, not just the card whose dropdown was used. The server sweeps
@@ -391,7 +420,7 @@ The card has NOT been linked — please check the document.`)
   const appendToExisting = async (target:any) => {
     setSending(true);setOpen(false)
     try{
-      const skuPrefix=form.sku?`${form.sku} –`:null
+      const skuPrefix=form.sku?.trim()?`${form.sku.trim()} –`:null
       // Only the newly added quantity is checked — what the invoice already holds was
       // deducted when it was raised.
       if(target.type==='invoice'&&await blockedByStock([lineItem()])) return
@@ -559,7 +588,8 @@ function ItemCard({
   const [sendingWs,setSendingWs]=useState(false); const [posterLoading,setPosterLoading]=useState(false)
   const [supplierOpen,setSupplierOpen]=useState(false); const [isDragging,setIsDragging]=useState(false)
   const [imageSize,setImageSize]=useState<'sm'|'md'|'lg'>('sm')
-  const [autoSaveStatus,setAutoSaveStatus]=useState<'idle'|'pending'|'saving'|'saved'>('idle')
+  const [autoSaveStatus,setAutoSaveStatus]=useState<'idle'|'pending'|'saving'|'saved'|'error'>('idle')
+  const [imageUploading,setImageUploading]=useState(false)
   const [autoCalc,setAutoCalc]=useState(true); const [autoCalc2,setAutoCalc2]=useState(true)
   const [copied,setCopied]=useState(false); const [showSeo,setShowSeo]=useState(false)
   const [showWsPicker,setShowWsPicker]=useState(false); const [wsList,setWsList]=useState<any[]>([]); const [loadingWsList,setLoadingWsList]=useState(false)
@@ -594,7 +624,7 @@ function ItemCard({
         await onSave(item.id,data)
         if(customersDirty.current) customersDirty.current=false
         setAutoSaveStatus('saved'); setTimeout(()=>setAutoSaveStatus('idle'),3000)
-      }catch{setAutoSaveStatus('idle')}
+      }catch{setAutoSaveStatus('error')}   // the next edit retries
     },1500)
     return()=>{if(autoSaveTimer.current) clearTimeout(autoSaveTimer.current)}
   },[form])
@@ -604,7 +634,12 @@ function ItemCard({
   },[])
 
   const set=(field:keyof FormState,value:any)=>setForm(f=>({...f,[field]:value}))
-  const handleImageFile=(file:File)=>{const r=new FileReader();r.onload=e=>set('imageUrl',e.target?.result as string);r.readAsDataURL(file)}
+  const handleImageFile=async(file:Blob,name='image.jpg')=>{
+    setImageUploading(true)
+    try{set('imageUrl',await uploadImageFile(file,(file as File).name||name))}
+    catch(e:any){window.alert(`Image not saved — ${e?.message||'upload failed'}`)}
+    finally{setImageUploading(false)}
+  }
   const handleDragOver=(e:React.DragEvent)=>{e.preventDefault();e.stopPropagation();setIsDragging(true)}
   const handleDragLeave=(e:React.DragEvent)=>{e.preventDefault();e.stopPropagation();setIsDragging(false)}
   const handleDrop=(e:React.DragEvent)=>{
@@ -612,7 +647,8 @@ function ItemCard({
     const file=Array.from(e.dataTransfer.files).find(f=>f.type.startsWith('image/'))
     if(file){handleImageFile(file);return}
     const url=e.dataTransfer.getData('text/uri-list')||e.dataTransfer.getData('text/plain')
-    if(url&&(url.startsWith('http')||url.startsWith('data:image'))) set('imageUrl',url)
+    if(url?.startsWith('data:image')){fetch(url).then(r=>r.blob()).then(b=>handleImageFile(b,'dropped.png')).catch(()=>{});return}
+    if(url&&url.startsWith('http')) set('imageUrl',url)
   }
   const isPastCutoff=!!form.cutoffDate&&daysUntilCutoff(form.cutoffDate)<=0
   const addCustomer=(c:Contact)=>{
@@ -656,7 +692,7 @@ function ItemCard({
       if(res.ok){await fetch(`/api/admin/preorder-dashboard/${item.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({shipmentStatus:'shipping_soon',linkedWsId:ws.id})});set('shipmentStatus','shipping_soon');set('linkedWsId',ws.id)}
     }finally{setSendingWs(false)}
   }
-  const handleSave=async()=>{setSaving(true);try{const{customers,...fieldsOnly}=formRef.current;const data=customersDirty.current?formRef.current:fieldsOnly;await onSave(item.id,data);if(customersDirty.current) customersDirty.current=false}finally{setSaving(false)}}
+  const handleSave=async()=>{setSaving(true);try{const{customers,...fieldsOnly}=formRef.current;const data=customersDirty.current?formRef.current:fieldsOnly;await onSave(item.id,data);if(customersDirty.current) customersDirty.current=false}catch(e:any){window.alert(`Not saved — ${e?.message||'server error'}`)}finally{setSaving(false)}}
   const handleDelete=async()=>{setDeleting(true);try{await onDelete(item.id)}finally{setDeleting(false);setConfirmDelete(false)}}
   const handleSendToWorksheet=async()=>{setSendingWs(true);try{await onSendToWorksheet(item.id,formRef.current)}finally{setSendingWs(false)}}
 
@@ -690,6 +726,7 @@ function ItemCard({
             </label>
             {!isNew&&<span className={`text-[10px] font-medium whitespace-nowrap ${alert.active?(alert.days<=1?'text-white/70':'text-black/60'):'text-gray-400'}`}>
               {autoSaveStatus==='pending'&&'…'}{autoSaveStatus==='saving'&&'Saving…'}{autoSaveStatus==='saved'&&'✓ Saved'}
+              {autoSaveStatus==='error'&&<span className="text-red-600 font-semibold">⚠ Not saved</span>}
               {autoSaveStatus==='idle'&&item.updatedAt&&`Saved ${new Date(item.updatedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`}
             </span>}
           </div>
@@ -744,6 +781,7 @@ function ItemCard({
             </div>
             <div ref={imageZoneRef} tabIndex={0} onDragOver={handleDragOver} onDragEnter={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={()=>{if(!form.imageUrl) imageInputRef.current?.click()}}
               className={`relative w-full ${IMAGE_HEIGHTS[imageSize]} border-2 border-dashed rounded-lg overflow-hidden cursor-pointer transition-all flex items-center justify-center focus:outline-none ${isDragging?'border-indigo-500 bg-indigo-50 scale-[1.01]':'border-gray-200 bg-gray-50 hover:border-indigo-300'}`}>
+              {imageUploading&&<div className="absolute inset-0 z-10 bg-white/80 flex items-center justify-center text-xs font-semibold text-indigo-600">Uploading…</div>}
               {form.imageUrl?(
                 <><img src={form.imageUrl} alt="product" className="object-contain h-full w-full"/>
                 <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 gap-2">
@@ -855,7 +893,7 @@ function ItemCard({
                 {!isNew&&<div><label className="block text-xs text-gray-500 mb-0.5">Pre-Order Page Link</label><div className="flex gap-1"><input type="text" readOnly value={`${typeof window!=='undefined'?window.location.origin:''}/pre-order/${item.id}`} className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 bg-gray-50 text-gray-600 select-all"/><button type="button" onClick={()=>{const url=`${window.location.origin}/pre-order/${item.id}`;navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000)})}} className={`shrink-0 text-xs px-2 py-1 rounded font-semibold transition-colors ${copied?'bg-green-100 text-green-700':'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{copied?'✓ Copied':'Copy'}</button></div></div>}
                 <div>
                   <label className="block text-xs text-gray-500 mb-0.5">OG Image</label>
-                  <input ref={seoImageInputRef} type="file" accept="image/*" className="hidden" onChange={e=>{if(e.target.files?.[0]){const r=new FileReader();r.onload=ev=>set('seoImageUrl',ev.target?.result as string);r.readAsDataURL(e.target.files![0])}}}/>
+                  <input ref={seoImageInputRef} type="file" accept="image/*" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f) uploadImageFile(f,f.name).then(u=>set('seoImageUrl',u)).catch(err=>window.alert(`SEO image not saved — ${err?.message||'upload failed'}`))}}/>
                   {form.seoImageUrl?(
                     <div className="relative group h-20 border border-gray-200 rounded-lg overflow-hidden bg-gray-50"><img src={form.seoImageUrl} alt="OG" className="h-full w-full object-contain"/><div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 gap-2"><button type="button" onClick={()=>seoImageInputRef.current?.click()} className="bg-white rounded px-2 py-0.5 text-xs font-medium shadow hover:bg-gray-100">Replace</button><button type="button" onClick={()=>set('seoImageUrl',undefined)} className="bg-white rounded px-2 py-0.5 text-xs font-medium text-red-600 shadow hover:bg-red-50">Remove</button></div></div>
                   ):(
@@ -1074,16 +1112,17 @@ export default function SupplierPreOrderPage() {
       const res = await fetch('/api/admin/preorder-dashboard', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
       })
-      if (res.ok) { await loadItems(); setNewItem(null) }
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Save failed (${res.status})`) }
+      await loadItems(); setNewItem(null)
       return
     }
     const res = await fetch(`/api/admin/preorder-dashboard/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     })
-    if (res.ok) {
-      const updated = await res.json()
-      setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i))
-    }
+    // A rejected save used to be dropped here while the card said "Saved" — throw, so it can't.
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Save failed (${res.status})`) }
+    const updated = await res.json()
+    setItems(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i))
   }
 
   const handleDelete = async (id: string) => {
