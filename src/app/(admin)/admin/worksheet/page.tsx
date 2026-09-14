@@ -45,6 +45,7 @@ interface WsItem {
   wholesalePrice: number
   retailOverride: string
   sentToInventory?: boolean
+  skuChecked?: boolean  // cross-reference tick — only highlights the SKU green
 }
 
 interface NewSkuRow {
@@ -2219,14 +2220,21 @@ function WorksheetEditor({
 
                     {/* SKU */}
                     <td className="py-2 px-2">
-                      <div className="relative">
+                      <div className="relative flex items-center gap-1.5">
+                        <input
+                          type="checkbox"
+                          checked={!!it.skuChecked}
+                          onChange={() => updateItem(it.id, { skuChecked: !it.skuChecked })}
+                          title={it.skuChecked ? 'Checked — untick to clear' : 'Tick once this SKU has been cross-referenced'}
+                          className="w-4 h-4 shrink-0 rounded accent-green-600 cursor-pointer"
+                        />
                         <input
                           value={it.sku || it.skuSearch}
                           onFocus={() => setActiveSkuRow(it.id)}
                           onChange={(e) => { updateItem(it.id, { sku: '', skuSearch: e.target.value }); setActiveSkuRow(it.id) }}
                           onBlur={() => { if (!it.sku && it.skuSearch) updateItem(it.id, { sku: it.skuSearch, skuSearch: '' }) }}
                           placeholder="SKU or name"
-                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+                          className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 ${it.skuChecked ? 'bg-green-100 border-green-400 text-green-800 font-semibold' : 'border-gray-200'}`}
                         />
                         {activeSkuRow === it.id && skuMatches.length > 0 && (
                           <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-64 max-h-48 overflow-y-auto py-1">
