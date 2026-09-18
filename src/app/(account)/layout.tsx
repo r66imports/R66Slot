@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils/cn'
+import { AccountSkinProvider } from '@/components/account/AccountSkinProvider'
+import { SkinPicker } from '@/components/account/SkinPicker'
 
 export default function AccountLayout({
   children,
@@ -27,6 +29,7 @@ export default function AccountLayout({
     return <div className="min-h-screen bg-gray-50">{children}</div>
   }
 
+
   const navigation = [
     { name: 'Dashboard', href: '/account', icon: '🏠' },
     { name: 'Orders', href: '/account/orders', icon: '📦' },
@@ -39,7 +42,7 @@ export default function AccountLayout({
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <AccountSkinProvider className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">My Account</h1>
@@ -108,6 +111,8 @@ export default function AccountLayout({
                   Logout
                 </button>
               </div>
+
+              <SkinPicker />
             </nav>
           </aside>
 
@@ -115,6 +120,6 @@ export default function AccountLayout({
           <main className="flex-1">{children}</main>
         </div>
       </div>
-    </div>
+    </AccountSkinProvider>
   )
 }

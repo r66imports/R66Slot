@@ -8,6 +8,9 @@
 /* Responsive Canvas Styles for Freeform Editor */
 @import '../styles/responsive-canvas.css';
 
+/* Account Skins — client-chosen colour schemes for the My Account area */
+@import '../styles/account-skins.css';
+
 :root {
   --font-assistant: 'Assistant', system-ui, sans-serif;
   --font-play: 'Play', system-ui, sans-serif;

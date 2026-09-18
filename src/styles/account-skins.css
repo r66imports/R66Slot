@@ -1,0 +1,250 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCOUNT SKINS — client-chosen colour schemes for the customer back office.
+
+   The account pages are written in plain Tailwind greys. Rather than rewrite
+   every page for every skin, this sheet remaps the grayscale + primary
+   utilities *inside the account wrapper only* onto the skin's CSS variables
+   (set inline by src/app/(account)/layout.tsx from src/lib/account-skins.ts).
+
+   Consequences worth knowing before editing:
+   • Scope is [data-skin] — the storefront header, footer and every other page
+     are untouched, so site branding never changes with a client's skin.
+   • Declarations are !important because Tailwind's utilities and this sheet
+     can land either side of each other in the bundle; !important makes the
+     result order-independent.
+   • Semantic colours (status chips, success/error boxes) are NOT flattened —
+     a green chip stays green. On dark skins they are re-mixed against the card
+     so they read as tinted badges instead of glowing white blocks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-skin] {
+  background-color: var(--skin-bg) !important;
+  color: var(--skin-text);
+}
+
+/* Native widgets (scrollbars, date pickers, spinners) follow the canvas. */
+[data-skin][data-skin-dark='1'] {
+  color-scheme: dark;
+}
+
+/* ── Surfaces ───────────────────────────────────────────────────────────── */
+[data-skin] .bg-white {
+  background-color: var(--skin-surface) !important;
+}
+[data-skin] .bg-gray-50 {
+  background-color: var(--skin-bg) !important;
+}
+[data-skin] .bg-gray-100,
+[data-skin] .bg-gray-200 {
+  background-color: var(--skin-surface-2) !important;
+}
+[data-skin] .hover\:bg-gray-50:hover,
+[data-skin] .hover\:bg-gray-50\/60:hover,
+[data-skin] .hover\:bg-gray-100:hover {
+  background-color: var(--skin-surface-2) !important;
+}
+
+/* The heavy neutral button — "+ Add row", the floating View Order bar. */
+[data-skin] .bg-gray-900,
+[data-skin] .bg-gray-800,
+[data-skin] .bg-black {
+  background-color: var(--skin-strong) !important;
+  color: var(--skin-strong-fg) !important;
+}
+[data-skin] .hover\:bg-gray-800:hover,
+[data-skin] .hover\:bg-gray-700:hover {
+  background-color: var(--skin-accent) !important;
+  color: var(--skin-accent-fg) !important;
+}
+
+/* ── Type ───────────────────────────────────────────────────────────────── */
+[data-skin] .text-gray-900,
+[data-skin] .text-gray-800 {
+  color: var(--skin-text) !important;
+}
+[data-skin] .text-gray-700,
+[data-skin] .text-gray-600 {
+  color: var(--skin-muted) !important;
+}
+[data-skin] .text-gray-500,
+[data-skin] .text-gray-400,
+[data-skin] .text-gray-300 {
+  color: var(--skin-faint) !important;
+}
+[data-skin] .hover\:text-gray-900:hover,
+[data-skin] .hover\:text-gray-800:hover,
+[data-skin] .hover\:text-gray-700:hover {
+  color: var(--skin-text) !important;
+}
+
+/* ── Rules and dividers ─────────────────────────────────────────────────── */
+[data-skin] .border-gray-100,
+[data-skin] .border-gray-200,
+[data-skin] .border-gray-300,
+[data-skin] .border-gray-400 {
+  border-color: var(--skin-border) !important;
+}
+[data-skin] .hover\:border-gray-400:hover {
+  border-color: var(--skin-accent) !important;
+}
+[data-skin] .divide-y > :not([hidden]) ~ :not([hidden]),
+[data-skin] .divide-gray-50 > :not([hidden]) ~ :not([hidden]),
+[data-skin] .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+[data-skin] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--skin-border) !important;
+}
+
+/* Bare border-b / border-t etc. fall back to Tailwind's gray-200, which is a
+   glaring hairline on a dark skin. The :not() chain keeps every deliberately
+   coloured border (amber notices, green confirmations, the accent stripe). */
+[data-skin] .border:not([class*='-gray-']):not([class*='-amber-']):not([class*='-green-']):not([class*='-red-']):not([class*='-blue-']):not([class*='border-primary']),
+[data-skin] .border-b:not([class*='-gray-']):not([class*='-amber-']):not([class*='-green-']):not([class*='-red-']):not([class*='-blue-']):not([class*='border-primary']),
+[data-skin] .border-t:not([class*='-gray-']):not([class*='-amber-']):not([class*='-green-']):not([class*='-red-']):not([class*='-blue-']):not([class*='border-primary']),
+[data-skin] .border-l:not([class*='-gray-']):not([class*='-amber-']):not([class*='-green-']):not([class*='-red-']):not([class*='-blue-']):not([class*='border-primary']),
+[data-skin] .border-r:not([class*='-gray-']):not([class*='-amber-']):not([class*='-green-']):not([class*='-red-']):not([class*='-blue-']):not([class*='border-primary']) {
+  border-color: var(--skin-border) !important;
+}
+
+/* ── Accent ─────────────────────────────────────────────────────────────── */
+[data-skin] .bg-primary {
+  background-color: var(--skin-accent) !important;
+  color: var(--skin-accent-fg) !important;
+}
+[data-skin] .bg-primary .text-black,
+[data-skin] .bg-primary .text-white {
+  color: var(--skin-accent-fg) !important;
+}
+/* The de-emphasised count inside a selected chip. */
+[data-skin] .bg-primary .text-black\/60,
+[data-skin] .bg-primary .text-white\/60 {
+  color: color-mix(in srgb, var(--skin-accent-fg) 60%, transparent) !important;
+}
+[data-skin] .hover\:bg-primary\/90:hover,
+[data-skin] .hover\:bg-primary-dark:hover {
+  background-color: var(--skin-accent-dark) !important;
+  color: var(--skin-accent-fg) !important;
+}
+[data-skin] .text-primary {
+  color: var(--skin-accent) !important;
+}
+[data-skin] .hover\:text-primary:hover {
+  color: var(--skin-accent-dark) !important;
+}
+[data-skin] .border-primary {
+  border-color: var(--skin-accent) !important;
+}
+[data-skin] .bg-primary\/5 {
+  background-color: color-mix(in srgb, var(--skin-accent) 8%, var(--skin-surface)) !important;
+}
+[data-skin] .bg-primary\/15 {
+  background-color: color-mix(in srgb, var(--skin-accent) 18%, var(--skin-surface)) !important;
+}
+[data-skin] .focus\:ring-primary:focus,
+[data-skin] .focus-visible\:ring-primary:focus-visible {
+  --tw-ring-color: var(--skin-accent) !important;
+}
+
+/* ── Form controls ──────────────────────────────────────────────────────── */
+[data-skin] input:not([type='checkbox']):not([type='radio']):not([type='range']),
+[data-skin] textarea,
+[data-skin] select {
+  background-color: var(--skin-input-bg) !important;
+  color: var(--skin-text) !important;
+}
+[data-skin] input::placeholder,
+[data-skin] textarea::placeholder {
+  color: var(--skin-faint) !important;
+}
+[data-skin][data-skin-dark='1'] input[type='checkbox'],
+[data-skin][data-skin-dark='1'] input[type='radio'] {
+  accent-color: var(--skin-accent);
+}
+
+/* ── Dark skins: semantic badges re-mixed against the card ──────────────── */
+[data-skin][data-skin-dark='1'] .bg-amber-50 {
+  background-color: color-mix(in srgb, #f59e0b 14%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .border-amber-200 {
+  border-color: color-mix(in srgb, #f59e0b 40%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .text-amber-800,
+[data-skin][data-skin-dark='1'] .text-amber-700 {
+  color: #fcd34d !important;
+}
+[data-skin][data-skin-dark='1'] .bg-green-50 {
+  background-color: color-mix(in srgb, #22c55e 14%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .border-green-200 {
+  border-color: color-mix(in srgb, #22c55e 40%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .text-green-800,
+[data-skin][data-skin-dark='1'] .text-green-700 {
+  color: #86efac !important;
+}
+[data-skin][data-skin-dark='1'] .bg-red-50 {
+  background-color: color-mix(in srgb, #ef4444 14%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .border-red-200 {
+  border-color: color-mix(in srgb, #ef4444 40%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .text-red-700,
+[data-skin][data-skin-dark='1'] .text-red-600 {
+  color: #fca5a5 !important;
+}
+[data-skin][data-skin-dark='1'] .hover\:bg-red-50:hover {
+  background-color: color-mix(in srgb, #ef4444 16%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .hover\:text-red-700:hover,
+[data-skin][data-skin-dark='1'] .hover\:text-red-600:hover {
+  color: #fca5a5 !important;
+}
+
+/* Status chips (Supplier Pre Orders history, order status). */
+[data-skin][data-skin-dark='1'] .bg-blue-100 {
+  background-color: color-mix(in srgb, #3b82f6 22%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .bg-indigo-100 {
+  background-color: color-mix(in srgb, #6366f1 22%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .bg-purple-100 {
+  background-color: color-mix(in srgb, #a855f7 22%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .bg-amber-100,
+[data-skin][data-skin-dark='1'] .bg-yellow-100 {
+  background-color: color-mix(in srgb, #f59e0b 22%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .bg-teal-100 {
+  background-color: color-mix(in srgb, #14b8a6 22%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .bg-green-100 {
+  background-color: color-mix(in srgb, #22c55e 22%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .bg-red-100 {
+  background-color: color-mix(in srgb, #ef4444 22%, var(--skin-surface)) !important;
+}
+[data-skin][data-skin-dark='1'] .text-blue-800,
+[data-skin][data-skin-dark='1'] .text-blue-700 {
+  color: #93c5fd !important;
+}
+[data-skin][data-skin-dark='1'] .text-indigo-800 {
+  color: #a5b4fc !important;
+}
+[data-skin][data-skin-dark='1'] .text-purple-800 {
+  color: #d8b4fe !important;
+}
+[data-skin][data-skin-dark='1'] .text-amber-800,
+[data-skin][data-skin-dark='1'] .text-yellow-700 {
+  color: #fcd34d !important;
+}
+[data-skin][data-skin-dark='1'] .text-teal-800 {
+  color: #5eead4 !important;
+}
+
+/* Shadows disappear on a dark canvas — give the cards an edge instead. */
+[data-skin][data-skin-dark='1'] .shadow-sm {
+  box-shadow: 0 0 0 1px var(--skin-border) !important;
+}
+[data-skin][data-skin-dark='1'] .shadow-lg,
+[data-skin][data-skin-dark='1'] .shadow-xl {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--skin-border) !important;
+}
