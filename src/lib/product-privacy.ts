@@ -9,10 +9,26 @@ import { verifyAdminSession } from '@/lib/admin-session'
  * These fields are internal and no storefront component reads them, so they are dropped
  * for anonymous callers and returned in full for a signed-in admin.
  */
-const PRIVATE_FIELDS = ['costPerItem', 'purchaseAccount', 'salesAccount'] as const
+const PRIVATE_FIELDS = [
+  'costPerItem',
+  'purchaseAccount',
+  'salesAccount',
+  // On R66Slot compareAtPrice is the internal Average Cost, NOT a "was" price —
+  // it is labelled "Average Cost (internal)" on Product Edit. It was being
+  // returned to anonymous callers, so 261 SKUs had their cost readable by anyone
+  // with the URL, and the storefront rendered it as a struck-through was-price
+  // wherever cost happened to exceed retail. The public "was" price on this site
+  // comes from discountPct, never from this field.
+  'compareAtPrice',
+] as const
 
 /** Snake-case equivalents, for the handlers that return raw DB rows. */
-const PRIVATE_COLUMNS = ['cost_per_item', 'purchase_account', 'sales_account'] as const
+const PRIVATE_COLUMNS = [
+  'cost_per_item',
+  'purchase_account',
+  'sales_account',
+  'compare_at_price',
+] as const
 
 export async function hasAdminSession(): Promise<boolean> {
   try {

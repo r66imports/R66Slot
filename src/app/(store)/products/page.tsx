@@ -155,9 +155,9 @@ export default function ProductsPage() {
                   {p.price > 0 ? (
                     <div className="flex items-baseline gap-2">
                       <span className="text-lg font-bold text-gray-900">R{p.price.toFixed(2)}</span>
-                      {p.compareAtPrice && p.compareAtPrice > p.price && (
-                        <span className="text-sm text-gray-400 line-through">R{p.compareAtPrice.toFixed(2)}</span>
-                      )}
+                      {/* No compareAtPrice "was" price: on R66Slot that field is
+                          the internal Average Cost, so rendering it published our
+                          cost. discountPct is the public was-price mechanism. */}
                     </div>
                   ) : (
                     <span className="text-sm text-gray-500 italic">POA</span>

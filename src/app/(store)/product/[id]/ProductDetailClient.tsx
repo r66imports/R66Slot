@@ -120,11 +120,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <span className="text-3xl font-bold text-gray-900">
               {product.price > 0 ? `R${product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : 'POA'}
             </span>
-            {product.compareAtPrice && product.compareAtPrice > product.price && (
-              <span className="text-lg text-gray-400 line-through">
-                R{product.compareAtPrice.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
-              </span>
-            )}
+            {/* No compareAtPrice "was" price here: on R66Slot that field is the
+                internal Average Cost, not a former retail price. Rendering it
+                published our cost wherever cost happened to exceed retail — on
+                SWK02/B it advertised "was R689" against R575, which was the cost.
+                The public was-price on this site comes from discountPct. */}
           </div>
 
           {!outOfStock && !isPreOrder && product.quantity > 0 && (
