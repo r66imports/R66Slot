@@ -38,6 +38,11 @@
 [data-skin] .bg-gray-200 {
   background-color: var(--skin-surface-2) !important;
 }
+/* Muted fills: disabled dots, placeholder blocks. */
+[data-skin] .bg-gray-300,
+[data-skin] .bg-gray-400 {
+  background-color: var(--skin-faint) !important;
+}
 [data-skin] .hover\:bg-gray-50:hover,
 [data-skin] .hover\:bg-gray-50\/60:hover,
 [data-skin] .hover\:bg-gray-100:hover {
@@ -47,6 +52,7 @@
 /* The heavy neutral button — "+ Add row", the floating View Order bar. */
 [data-skin] .bg-gray-900,
 [data-skin] .bg-gray-800,
+[data-skin] .bg-gray-700,
 [data-skin] .bg-black {
   background-color: var(--skin-strong) !important;
   color: var(--skin-strong-fg) !important;
@@ -78,6 +84,7 @@
 }
 
 /* ── Rules and dividers ─────────────────────────────────────────────────── */
+[data-skin] .border-gray-50,
 [data-skin] .border-gray-100,
 [data-skin] .border-gray-200,
 [data-skin] .border-gray-300,
@@ -114,6 +121,11 @@
 [data-skin] .bg-primary .text-white {
   color: var(--skin-accent-fg) !important;
 }
+/* Same-element pairings such as `bg-primary text-secondary` are already handled
+   by the colour above; this covers the nested spans. */
+[data-skin] .bg-primary .text-secondary {
+  color: var(--skin-accent-fg) !important;
+}
 /* The de-emphasised count inside a selected chip. */
 [data-skin] .bg-primary .text-black\/60,
 [data-skin] .bg-primary .text-white\/60 {
@@ -136,9 +148,17 @@
 [data-skin] .bg-primary\/5 {
   background-color: color-mix(in srgb, var(--skin-accent) 8%, var(--skin-surface)) !important;
 }
+[data-skin] .bg-primary\/10 {
+  background-color: color-mix(in srgb, var(--skin-accent) 12%, var(--skin-surface)) !important;
+}
 [data-skin] .bg-primary\/15 {
   background-color: color-mix(in srgb, var(--skin-accent) 18%, var(--skin-surface)) !important;
 }
+[data-skin] .bg-primary\/90 {
+  background-color: color-mix(in srgb, var(--skin-accent) 90%, transparent) !important;
+  color: var(--skin-accent-fg) !important;
+}
+[data-skin] .ring-primary,
 [data-skin] .focus\:ring-primary:focus,
 [data-skin] .focus-visible\:ring-primary:focus-visible {
   --tw-ring-color: var(--skin-accent) !important;
