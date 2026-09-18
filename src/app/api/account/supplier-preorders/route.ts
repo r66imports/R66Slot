@@ -53,7 +53,12 @@ export async function GET(_request: NextRequest) {
     const accounts = savedAccounts.length > 0 ? savedAccounts : DEFAULT_COSTING_ACCOUNTS
 
     const mine = all
-      .filter((o) => o.customerId === decoded.id || o.clientEmail?.toLowerCase() === email)
+      // A binned request is gone as far as the client is concerned, even though
+      // admin can still recover it for 30 days.
+      .filter(
+        (o) =>
+          !o.deletedAt && (o.customerId === decoded.id || o.clientEmail?.toLowerCase() === email)
+      )
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
     // Strip wholesale prices and re-price unlocked lines on the way out.

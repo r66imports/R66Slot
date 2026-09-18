@@ -118,7 +118,45 @@ export interface SupplierPreOrder {
   createdAt: string
   updatedAt: string
   submittedAt?: string
+  /**
+   * Archive is history: the request was created, dealt with, and is kept as a
+   * record of what was sent to the supplier. It is not a deletion and can still
+   * be binned.
+   */
   archivedAt?: string
+  /**
+   * In the Bin. Set instead of removing the row, so a delete can be undone. The
+   * Bin auto-empties after BIN_RETENTION_DAYS; a binned request is hidden from
+   * the client immediately, as though it were gone.
+   */
+  deletedAt?: string
+  /** Where Restore puts it back to. */
+  statusBeforeDelete?: SupplierPreOrderStatus
+}
+
+/** How long a binned pre-order survives before it is purged for good. */
+export const BIN_RETENTION_DAYS = 30
+
+/** Binned pre-orders older than the retention window. */
+export function expiredBinItems<T extends { deletedAt?: string }>(
+  orders: T[],
+  now: number = Date.now()
+): T[] {
+  const cutoff = now - BIN_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  return orders.filter((o) => {
+    if (!o.deletedAt) return false
+    const t = new Date(o.deletedAt).getTime()
+    // An unparseable date would otherwise live in the Bin forever.
+    return !Number.isFinite(t) || t <= cutoff
+  })
+}
+
+/** Whole days left before a binned pre-order is purged; 0 means it is due. */
+export function binDaysRemaining(deletedAt: string, now: number = Date.now()): number {
+  const t = new Date(deletedAt).getTime()
+  if (!Number.isFinite(t)) return 0
+  const elapsedDays = (now - t) / (24 * 60 * 60 * 1000)
+  return Math.max(0, Math.ceil(BIN_RETENTION_DAYS - elapsedDays))
 }
 
 /** Shown to clients wherever an estimate appears. */

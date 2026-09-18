@@ -5,7 +5,9 @@ import { compareSku, formatZAR } from '@/lib/preorder-pricing'
 import { documentTotal, settledAmount, balanceDue, MONEY_EPSILON } from '@/lib/payment-math'
 import type { CostingAccount, SupplierPreOrder, SupplierPreOrderLine } from '@/types/supplier-preorder'
 
-type Order = SupplierPreOrder & { totalZAR: number; exRate: number }
+type Order = SupplierPreOrder & { totalZAR: number; exRate: number; binDaysLeft?: number }
+
+type Tab = 'open' | 'archived' | 'bin'
 
 interface OpenSupplierOrder {
   ref: string
@@ -27,8 +29,10 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function SupplierPreOrdersAdminPage() {
-  const [tab, setTab] = useState<'open' | 'archived'>('open')
+  const [tab, setTab] = useState<Tab>('open')
   const [orders, setOrders] = useState<Order[]>([])
+  const [binCount, setBinCount] = useState(0)
+  const [retentionDays, setRetentionDays] = useState(30)
   const [accounts, setAccounts] = useState<CostingAccount[]>([])
   const [docs, setDocs] = useState<any[]>([])
   const [supplierOrders, setSupplierOrders] = useState<OpenSupplierOrder[]>([])
@@ -52,6 +56,18 @@ export default function SupplierPreOrdersAdminPage() {
         const data = await poRes.json()
         setOrders(data.orders || [])
         setAccounts(data.accounts || [])
+        setBinCount(data.binCount || 0)
+        setRetentionDays(data.binRetentionDays || 30)
+        // The 30-day sweep runs off this read, so say what it took rather than
+        // letting rows vanish silently.
+        if ((data.autoPurged || []).length > 0) {
+          setNote({
+            kind: 'ok',
+            text: `Bin auto-emptied: ${data.autoPurged.join(', ')} passed ${
+              data.binRetentionDays || 30
+            } days and were removed for good.`,
+          })
+        }
       }
       if (docRes.ok) setDocs(await docRes.json())
       if (soRes.ok) {
@@ -114,6 +130,130 @@ export default function SupplierPreOrdersAdminPage() {
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const refsFor = (ids: string[]) => orders.filter((o) => ids.includes(o.id)).map((o) => o.ref)
+
+  /**
+   * Delete → the Bin. The client reads the same store, so a binned request
+   * disappears from their account straight away; there is no separate
+   * client-side copy to clean up. Recoverable here for the retention window,
+   * which is why this does not need the dire warning a real delete does.
+   */
+  const binOrders = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const refs = refsFor(ids)
+    const what = refs.length === 1 ? refs[0] : `${refs.length} pre orders (${refs.join(', ')})`
+    if (
+      !confirm(
+        `Move ${what} to the Bin?\n\nIt disappears from the client's account immediately. You can restore it from the Bin for ${retentionDays} days, after which it is removed for good.`
+      )
+    )
+      return
+
+    setBusy(true)
+    setNote(null)
+    try {
+      const res = await fetch(
+        `/api/admin/supplier-preorders?ids=${ids.map(encodeURIComponent).join(',')}`,
+        { method: 'DELETE' }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not move to the Bin')
+      setNote({
+        kind: 'ok',
+        text: `${(data.refs || refs).join(', ')} moved to the Bin and removed from the client's account. Restorable for ${data.retentionDays ?? retentionDays} days.`,
+      })
+      setSelected((prev) => prev.filter((x) => !ids.includes(x)))
+      setExpanded(null)
+    } catch (e: any) {
+      setNote({ kind: 'err', text: e?.message || 'Could not move to the Bin' })
+    } finally {
+      await load()
+      setBusy(false)
+    }
+  }
+
+  const restoreOrders = async (ids: string[]) => {
+    if (ids.length === 0) return
+    setBusy(true)
+    setNote(null)
+    try {
+      const res = await fetch('/api/admin/supplier-preorders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore', ids }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Restore failed')
+      setNote({
+        kind: 'ok',
+        text: `Restored ${(data.restored || []).join(', ')} — back where it was, and visible to the client again.`,
+      })
+      setSelected((prev) => prev.filter((x) => !ids.includes(x)))
+      setExpanded(null)
+    } catch (e: any) {
+      setNote({ kind: 'err', text: e?.message || 'Restore failed' })
+    } finally {
+      await load()
+      setBusy(false)
+    }
+  }
+
+  /** Permanent. Nothing brings these back. */
+  const purgeOrders = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const refs = refsFor(ids)
+    const what = refs.length === 1 ? refs[0] : `${refs.length} pre orders (${refs.join(', ')})`
+    if (
+      !confirm(
+        `Permanently delete ${what}?\n\nThis cannot be undone — there is no further bin to recover it from.`
+      )
+    )
+      return
+
+    setBusy(true)
+    setNote(null)
+    try {
+      const res = await fetch(
+        `/api/admin/supplier-preorders?ids=${ids.map(encodeURIComponent).join(',')}&permanent=true`,
+        { method: 'DELETE' }
+      )
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Delete failed')
+      setNote({ kind: 'ok', text: `${(data.refs || refs).join(', ')} deleted for good.` })
+      setSelected((prev) => prev.filter((x) => !ids.includes(x)))
+      setExpanded(null)
+    } catch (e: any) {
+      setNote({ kind: 'err', text: e?.message || 'Delete failed' })
+    } finally {
+      await load()
+      setBusy(false)
+    }
+  }
+
+  const emptyBin = async () => {
+    if (!confirm(`Empty the Bin?\n\nAll ${binCount} binned pre orders are deleted for good. This cannot be undone.`))
+      return
+    setBusy(true)
+    setNote(null)
+    try {
+      const res = await fetch('/api/admin/supplier-preorders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'empty' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not empty the Bin')
+      setNote({ kind: 'ok', text: `Bin emptied — ${(data.purged || []).length} removed for good.` })
+      setSelected([])
+      setExpanded(null)
+    } catch (e: any) {
+      setNote({ kind: 'err', text: e?.message || 'Could not empty the Bin' })
+    } finally {
+      await load()
+      setBusy(false)
+    }
+  }
 
   // Selection must stay within one supplier — a supplier order goes to one supplier.
   const selectedOrders = orders.filter((o) => selected.includes(o.id))
@@ -320,9 +460,14 @@ export default function SupplierPreOrdersAdminPage() {
           merged into one only when you send them. <strong>Requests, not stock</strong> — nothing
           here touches Inventory.
         </p>
+        <p className="text-xs text-gray-500 mt-2">
+          <strong>Archived</strong> is history — requests that were created and sent to a supplier
+          order, kept as a record. <strong>Bin</strong> is deleted: hidden from the client straight
+          away, restorable for {retentionDays} days, then gone.
+        </p>
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         {(['open', 'archived'] as const).map((t) => (
           <button
             key={t}
@@ -338,7 +483,53 @@ export default function SupplierPreOrdersAdminPage() {
             {t === 'open' ? 'Open' : 'Archived'}
           </button>
         ))}
+
+        <button
+          type="button"
+          onClick={() => {
+            setTab('bin')
+            setSelected([])
+          }}
+          title={`Bin — deleted pre orders, auto-emptied after ${retentionDays} days`}
+          aria-label={`Bin (${binCount})`}
+          className={`ml-auto flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md ${
+            tab === 'bin'
+              ? 'bg-gray-900 text-white'
+              : 'bg-white border border-gray-300 text-gray-700 hover:border-gray-400'
+          }`}
+        >
+          <span className="text-base leading-none">🗑</span>
+          <span>Bin</span>
+          {binCount > 0 && (
+            <span
+              className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                tab === 'bin' ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'
+              }`}
+            >
+              {binCount}
+            </span>
+          )}
+        </button>
       </div>
+
+      {tab === 'bin' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+          <p className="text-sm text-gray-600">
+            Deleted pre orders. Already hidden from the client. Emptied automatically after{' '}
+            {retentionDays} days.
+          </p>
+          {orders.length > 0 && (
+            <button
+              type="button"
+              onClick={emptyBin}
+              disabled={busy}
+              className="px-3 py-2 text-sm font-medium rounded-md border border-red-300 text-red-600 bg-white hover:bg-red-50 disabled:opacity-40"
+            >
+              Empty Bin
+            </button>
+          )}
+        </div>
+      )}
 
       {note && (
         <div
@@ -352,18 +543,18 @@ export default function SupplierPreOrdersAdminPage() {
         </div>
       )}
 
-      {/* Send bar */}
-      {tab === 'open' && selected.length > 0 && (
+      {/* Selection bar — sending is open-tab only, deleting works on both */}
+      {selected.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium text-amber-900">
             {selected.length} selected
             {sendableSupplier && !mixedSuppliers ? ` · ${sendableSupplier}` : ''}
           </span>
-          {mixedSuppliers ? (
+          {tab === 'open' && mixedSuppliers ? (
             <span className="text-sm text-red-700">
               Different suppliers selected — send one supplier at a time.
             </span>
-          ) : (
+          ) : tab === 'open' ? (
             <>
               <button
                 type="button"
@@ -395,14 +586,46 @@ export default function SupplierPreOrdersAdminPage() {
                 Merge
               </button>
             </>
-          )}
-          <button
-            type="button"
-            onClick={() => setSelected([])}
-            className="text-sm text-amber-800 underline ml-auto"
-          >
-            Clear
-          </button>
+          ) : null}
+
+          <div className="flex items-center gap-3 ml-auto">
+            {tab === 'bin' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => restoreOrders(selected)}
+                  disabled={busy}
+                  className="px-3 py-2 text-sm font-medium rounded-md bg-gray-900 text-white disabled:opacity-40"
+                >
+                  Restore selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => purgeOrders(selected)}
+                  disabled={busy}
+                  className="px-3 py-2 text-sm font-medium rounded-md border border-red-300 text-red-600 bg-white hover:bg-red-50 disabled:opacity-40"
+                >
+                  Delete forever
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => binOrders(selected)}
+                disabled={busy}
+                className="px-3 py-2 text-sm font-medium rounded-md border border-red-300 text-red-600 bg-white hover:bg-red-50 disabled:opacity-40"
+              >
+                Delete selected
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="text-sm text-amber-800 underline"
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
 
@@ -411,7 +634,11 @@ export default function SupplierPreOrdersAdminPage() {
       ) : orders.length === 0 ? (
         <div className="bg-white rounded-lg shadow-sm p-10 text-center">
           <p className="text-sm text-gray-500">
-            {tab === 'open' ? 'No client pre orders yet.' : 'Nothing archived yet.'}
+            {tab === 'open'
+              ? 'No client pre orders yet.'
+              : tab === 'archived'
+                ? 'Nothing archived yet.'
+                : 'The Bin is empty.'}
           </p>
         </div>
       ) : (
@@ -432,15 +659,13 @@ export default function SupplierPreOrdersAdminPage() {
                 return (
                   <div key={order.id} className="px-5 py-3">
                     <div className="flex items-center gap-3">
-                      {tab === 'open' && (
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(order.id)}
-                          onChange={() => toggleSelect(order.id)}
-                          className="w-4 h-4"
-                          aria-label={`Select ${order.ref}`}
-                        />
-                      )}
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(order.id)}
+                        onChange={() => toggleSelect(order.id)}
+                        className="w-4 h-4"
+                        aria-label={`Select ${order.ref}`}
+                      />
                       <button
                         type="button"
                         onClick={() => setExpanded(isOpen ? null : order.id)}
@@ -716,12 +941,75 @@ export default function SupplierPreOrdersAdminPage() {
                             >
                               Archive
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => binOrders([order.id])}
+                              disabled={busy}
+                              className="px-3 py-2 text-sm font-medium rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40 ml-auto"
+                            >
+                              🗑 Delete
+                            </button>
                           </div>
                         )}
                         {tab === 'archived' && (
-                          <p className="text-xs text-gray-500 italic">
-                            Archived {order.archivedAt ? new Date(order.archivedAt).toLocaleDateString('en-ZA') : ''} — kept for records only.
-                          </p>
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs text-gray-500 italic">
+                              Archived{' '}
+                              {order.archivedAt
+                                ? new Date(order.archivedAt).toLocaleDateString('en-ZA')
+                                : ''}
+                              {order.supplierOrderRef
+                                ? ` — sent to ${order.supplierOrderRef}.`
+                                : ' — history of what was created.'}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => binOrders([order.id])}
+                              disabled={busy}
+                              className="px-3 py-2 text-sm font-medium rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                            >
+                              🗑 Delete
+                            </button>
+                          </div>
+                        )}
+                        {tab === 'bin' && (
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-xs text-gray-500 italic">
+                              Deleted{' '}
+                              {order.deletedAt
+                                ? new Date(order.deletedAt).toLocaleDateString('en-ZA')
+                                : ''}
+                              {typeof order.binDaysLeft === 'number' && (
+                                <span
+                                  className={
+                                    order.binDaysLeft <= 3 ? 'text-red-600 font-medium' : undefined
+                                  }
+                                >
+                                  {' '}
+                                  · {order.binDaysLeft} day
+                                  {order.binDaysLeft === 1 ? '' : 's'} before it goes for good
+                                </span>
+                              )}
+                            </p>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => restoreOrders([order.id])}
+                                disabled={busy}
+                                className="px-3 py-2 text-sm font-medium rounded-md bg-gray-900 text-white disabled:opacity-40"
+                              >
+                                Restore
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => purgeOrders([order.id])}
+                                disabled={busy}
+                                className="px-3 py-2 text-sm font-medium rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                              >
+                                Delete forever
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}

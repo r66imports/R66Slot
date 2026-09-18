@@ -36,6 +36,14 @@ export async function POST(request: Request) {
     const selected = all.filter((o) => ids.includes(o.id))
     if (selected.length === 0) return NextResponse.json({ error: 'Pre orders not found' }, { status: 404 })
 
+    const binned = selected.filter((o) => o.deletedAt)
+    if (binned.length > 0) {
+      return NextResponse.json(
+        { error: `${binned.map((o) => o.ref).join(', ')} is in the Bin. Restore it first.` },
+        { status: 409 }
+      )
+    }
+
     const archived = selected.filter((o) => o.status === 'archived')
     if (archived.length > 0) {
       return NextResponse.json(
