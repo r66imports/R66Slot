@@ -175,7 +175,16 @@ export default function NewProductPage() {
       .then(r => r.json())
       .then((entries: any[]) => {
         const entry = Array.isArray(entries) ? entries.find((e: any) => (e.sku || '').toLowerCase() === sku.toLowerCase()) : null
-        setWholesaleInfo(entry ? { price: Number(entry.wholesalePrice), currency: found.preferredCurrency || 'ZAR' } : null)
+        // Entry currency wins; never default to ZAR — that is how a €33.90
+        // wholesale came to be read as R33.90 and the costing went wrong.
+        setWholesaleInfo(
+          entry
+            ? {
+                price: Number(entry.wholesalePrice),
+                currency: (entry.currency || found.preferredCurrency || '').toUpperCase(),
+              }
+            : null
+        )
       })
       .catch(() => setWholesaleInfo(null))
   }, [supplier, sku, supplierOptions])
@@ -831,11 +840,13 @@ export default function NewProductPage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Wholesale Price
-                      {wholesaleInfo && <span className="ml-1 text-xs font-normal text-gray-400">({wholesaleInfo.currency})</span>}
+                      {wholesaleInfo?.currency && <span className="ml-1 text-xs font-normal text-gray-400">({wholesaleInfo.currency})</span>}
                     </label>
                     <div className={`w-full px-3 py-2 border rounded-lg text-sm ${wholesaleInfo ? 'border-gray-300 bg-gray-50 text-gray-900 font-semibold' : 'border-gray-200 bg-gray-50 text-gray-400 italic'}`}>
                       {wholesaleInfo
-                        ? `${{ EUR: '€', USD: '$', GBP: '£', ZAR: 'R' }[wholesaleInfo.currency] ?? wholesaleInfo.currency}${wholesaleInfo.price.toFixed(2)}`
+                        ? (wholesaleInfo.currency
+                            ? `${{ EUR: '€', USD: '$', GBP: '£', ZAR: 'R' }[wholesaleInfo.currency] ?? `${wholesaleInfo.currency} `}${wholesaleInfo.price.toFixed(2)}`
+                            : `${wholesaleInfo.price.toFixed(2)} — currency not set`)
                         : supplier && sku ? 'Not in pricelist' : '— No supplier / SKU —'}
                     </div>
                   </div>

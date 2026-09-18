@@ -452,7 +452,7 @@ export default function ProductsPage() {
   const [showCatDropdown, setShowCatDropdown] = useState(false)
   const [revoFilter, setRevoFilter] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
-  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string; preferredCurrency?: string }[]>([])
   const [supplierSkus, setSupplierSkus] = useState<Record<string, Set<string>>>({}) // supplierId → Set<sku>
   const [pricelistEntries, setPricelistEntries] = useState<{ supplierId: string; sku: string; wholesalePrice: number }[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -555,7 +555,7 @@ export default function ProductsPage() {
       fetch('/api/admin/supplier-contacts').then((r) => r.ok ? r.json() : []),
       fetch('/api/admin/inventory-pricelists').then((r) => r.ok ? r.json() : []),
     ]).then(([sups, pricelist]: [any[], any[]]) => {
-      if (Array.isArray(sups)) setSuppliers(sups.map((s) => ({ id: s.id, name: s.name })))
+      if (Array.isArray(sups)) setSuppliers(sups.map((s) => ({ id: s.id, name: s.name, preferredCurrency: s.preferredCurrency })))
       if (Array.isArray(pricelist)) {
         const map: Record<string, Set<string>> = {}
         for (const entry of pricelist) {
@@ -848,6 +848,49 @@ export default function ProductsPage() {
         values.forEach((v, i) => { obj[`_col_${i}`] = v || '' })
         return profile.mapRow(obj)
       })
+
+      /**
+       * A supplier price list quotes the SUPPLIER's currency. costPerItem is our
+       * internal ZAR cost, so writing a EUR "Last Cost" straight into it stores
+       * €33.90 as R33.90 and every margin downstream is nonsense.
+       *
+       * The cost column therefore goes to the inventory pricelist — which is
+       * read back in the supplier's own currency (Rule 20) — and costPerItem is
+       * left alone for the Worksheet to fill with a real landed ZAR figure.
+       *
+       * This used to be hard-coded to the NSR profile; it is driven by the
+       * supplier's Preferred Currency now, so every foreign supplier is covered
+       * and a supplier switched to ZAR stops being treated as foreign without a
+       * code change.
+       */
+      const currencyOf = (name: string) =>
+        (suppliers.find((s) => s.name?.toLowerCase() === (name || '').toLowerCase())
+          ?.preferredCurrency || '').toUpperCase()
+
+      const plBySupplier = new Map<string, { supplierId: string; sku: string; wholesalePrice: number; shopQty: number }[]>()
+      let movedToPricelist = 0
+
+      for (const row of rows as any[]) {
+        const supplierName = (row.supplier || profile.brandKey || '').trim()
+        const currency = currencyOf(supplierName)
+        // NSR already routes its EUR column here explicitly.
+        const foreignCost = row._plPriceEur ?? (currency && currency !== 'ZAR' ? row.costPerItem : '')
+        const amount = parseFloat(String(foreignCost || '')) || 0
+        if (amount <= 0) continue
+
+        const sup = suppliers.find((s) => s.name?.toLowerCase() === supplierName.toLowerCase())
+        if (!sup) continue
+
+        // Out of the ZAR field, into the price list where its currency is known.
+        if (row.costPerItem) {
+          row.costPerItem = ''
+          movedToPricelist++
+        }
+        const list = plBySupplier.get(sup.id) || []
+        list.push({ supplierId: sup.id, sku: row.sku as string, wholesalePrice: amount, shopQty: 0 })
+        plBySupplier.set(sup.id, list)
+      }
+
       const res = await fetch('/api/admin/products', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -863,35 +906,36 @@ export default function ProductsPage() {
           })
         } catch {}
 
-        // NSR: post EUR wholesale prices to pricelist (shown as Wholesale Price on product edit page)
-        if (importProfile === 'nsr') {
+        // Supplier-currency costs → inventory pricelist, for every profile whose
+        // supplier is foreign (see the note where plBySupplier is built).
+        for (const [, entries] of plBySupplier) {
+          const usable = entries.filter((e) => e.sku && e.wholesalePrice > 0)
+          if (usable.length === 0) continue
           try {
-            const nsrSup = suppliers.find((s) => s.name?.toLowerCase() === 'nsr')
-            if (nsrSup) {
-              const plEntries = rows
-                .filter((r) => r.sku && (r as any)._plPriceEur)
-                .map((r) => ({
-                  supplierId: nsrSup.id,
-                  sku: r.sku as string,
-                  wholesalePrice: parseFloat((r as any)._plPriceEur as string) || 0,
-                  shopQty: 0,
-                }))
-                .filter((e) => e.wholesalePrice > 0)
-              if (plEntries.length > 0) {
-                await fetch('/api/admin/inventory-pricelists', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ entries: plEntries }),
-                })
-              }
-            }
+            await fetch('/api/admin/inventory-pricelists', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ entries: usable }),
+            })
           } catch {}
         }
 
         const parts = []
         if (data.imported > 0) parts.push(`${data.imported} new`)
         if (data.updated > 0) parts.push(`${data.updated} updated`)
-        alert(`Import complete: ${parts.join(', ')} product${(data.imported + data.updated) !== 1 ? 's' : ''}`)
+        const plTotal = [...plBySupplier.values()].reduce((s, e) => s + e.length, 0)
+        // Say where the cost went, or a foreign price list looks like it lost its costs.
+        const costNote =
+          plTotal > 0
+            ? `\n\n${plTotal} supplier price${plTotal === 1 ? '' : 's'} saved to the price list in the supplier's currency${
+                movedToPricelist > 0
+                  ? `. Cost per item was left blank on ${movedToPricelist} — it is a Rand figure and the Worksheet fills it when the shipment lands.`
+                  : '.'
+              }`
+            : ''
+        alert(
+          `Import complete: ${parts.join(', ')} product${(data.imported + data.updated) !== 1 ? 's' : ''}${costNote}`
+        )
         setShowImportModal(false)
         setImportText('')
         setViewMode('brands')

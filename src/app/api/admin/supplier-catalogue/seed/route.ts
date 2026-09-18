@@ -71,7 +71,9 @@ export async function POST(request: Request) {
         sku,
         description: (product?.title || '').trim(),
         wholesalePrice: Number(entry.wholesalePrice) || 0,
-        currency: (supplier?.preferredCurrency || 'EUR').toUpperCase(),
+        // The price list entry's own currency wins — re-deriving it from the
+        // supplier is what let a EUR price be read as ZAR in the first place.
+        currency: (entry.currency || supplier?.preferredCurrency || '').toUpperCase(),
         source: 'inventory',
         active: true,
         createdAt: now,

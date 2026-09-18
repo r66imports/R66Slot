@@ -8,6 +8,12 @@ import { MediaLibraryPicker } from '@/components/page-editor/media-library-picke
 const BASE_CAR_BRANDS = ['Datsun 510', 'Ford Escort MK I', 'Ford Escort MK II', 'BMW M3 E30', 'Porsche 911', 'Ferrari 308', 'Lancia Delta', 'Audi Quattro']
 const fmtRand = (n: number) => Number(n || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 
+/** Anything not listed falls back to the ISO code, never to a bare number. */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  EUR: '€', USD: '$', GBP: '£', ZAR: 'R', CHF: 'CHF ', JPY: '¥',
+  AUD: 'A$', CAD: 'C$', HKD: 'HK$', CNY: '¥',
+}
+
 interface Product {
   id: string
   title: string
@@ -102,6 +108,19 @@ export default function EditProductPage({
   const [supplier, setSupplier] = useState('')
   const [supplierOptions, setSupplierOptions] = useState<{ id: string; name: string; preferredCurrency?: string }[]>([])
   const [wholesaleInfo, setWholesaleInfo] = useState<{ price: number; currency: string } | null>(null)
+
+  /**
+   * Cost per item is a Rand figure. When it matches a foreign wholesale price to
+   * the cent it is not a coincidence — it is that price copied across without
+   * conversion, which is how R33.90 came to stand for €33.90 and every margin
+   * built on it went wrong. Flag it rather than quietly costing from it.
+   */
+  const costLooksForeign =
+    !!wholesaleInfo &&
+    !!wholesaleInfo.currency &&
+    wholesaleInfo.currency !== 'ZAR' &&
+    wholesaleInfo.price > 0 &&
+    Math.abs((parseFloat(costPerItem) || 0) - wholesaleInfo.price) < 0.01
   const [collections, setCollections] = useState<string[]>([])
   const [tags, setTags] = useState('')
   const [status, setStatus] = useState('draft')
@@ -280,7 +299,17 @@ export default function EditProductPage({
       .then(r => r.json())
       .then((entries: any[]) => {
         const entry = Array.isArray(entries) ? entries.find((e: any) => (e.sku || '').toLowerCase() === sku.toLowerCase()) : null
-        setWholesaleInfo(entry ? { price: Number(entry.wholesalePrice), currency: found.preferredCurrency || 'ZAR' } : null)
+        // The entry's own currency wins; the supplier's is only a fallback for
+        // rows saved before the field existed. Never default to ZAR — that is
+        // what made a €33.90 wholesale read as R33.90 and wrecked the costing.
+        setWholesaleInfo(
+          entry
+            ? {
+                price: Number(entry.wholesalePrice),
+                currency: (entry.currency || found.preferredCurrency || '').toUpperCase(),
+              }
+            : null
+        )
       })
       .catch(() => setWholesaleInfo(null))
   }, [supplier, sku, supplierOptions])
@@ -1233,7 +1262,25 @@ export default function EditProductPage({
                 <h3 className="text-sm font-medium text-gray-700 group-hover:text-gray-900">Pricing (Rand)</h3>
                 <svg className={`w-4 h-4 text-gray-400 transition-transform ${pricingCollapsed ? '-rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </button>
-              {!pricingCollapsed && <><div className="grid grid-cols-2 gap-4">
+              {!pricingCollapsed && <>
+              {/* The supplier's wholesale price, in the supplier's own currency —
+                  every estimate is costed from it, so it belongs where the costing
+                  is read, not only beside the Supplier field. Every other figure on
+                  this card is Rand. */}
+              {wholesaleInfo && (
+                <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <span className="text-xs font-medium text-gray-600">
+                    Wholesale {wholesaleInfo.currency && `(${wholesaleInfo.currency})`}
+                    <span className="ml-1 font-normal text-gray-400">from {supplier || 'supplier'}</span>
+                  </span>
+                  <span className={`text-sm font-semibold ${wholesaleInfo.currency ? 'text-gray-900' : 'text-amber-700'}`}>
+                    {wholesaleInfo.currency
+                      ? `${CURRENCY_SYMBOLS[wholesaleInfo.currency] ?? `${wholesaleInfo.currency} `}${wholesaleInfo.price.toFixed(2)}`
+                      : `${wholesaleInfo.price.toFixed(2)} — currency not set`}
+                  </span>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Price</label>
                   <div className="relative">
@@ -1281,10 +1328,20 @@ export default function EditProductPage({
                       value={costPerItem}
                       onChange={(e) => setCostPerItem(e.target.value)}
                       placeholder="0.00"
-                      className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                      className={`w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                        costLooksForeign ? 'border-amber-400 bg-amber-50' : 'border-gray-300'
+                      }`}
                     />
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">Customers won&apos;t see this</p>
+                  {costLooksForeign ? (
+                    <p className="mt-2 text-xs text-amber-700">
+                      This is the same number as the {wholesaleInfo?.currency} wholesale price, so it
+                      is almost certainly {wholesaleInfo?.currency} sitting in a Rand field. It must
+                      be the landed Rand cost.
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-xs text-gray-500">Customers won&apos;t see this</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5">
@@ -1417,13 +1474,35 @@ export default function EditProductPage({
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Wholesale Price
-                      {wholesaleInfo && <span className="ml-1 text-xs font-normal text-gray-400">({wholesaleInfo.currency})</span>}
+                      {wholesaleInfo?.currency && (
+                        <span className="ml-1 text-xs font-normal text-gray-400">
+                          ({wholesaleInfo.currency})
+                        </span>
+                      )}
                     </label>
-                    <div className={`w-full px-3 py-2 border rounded-lg text-sm ${wholesaleInfo ? 'border-gray-300 bg-gray-50 text-gray-900 font-semibold' : 'border-gray-200 bg-gray-50 text-gray-400 italic'}`}>
+                    <div
+                      className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                        wholesaleInfo && !wholesaleInfo.currency
+                          ? 'border-amber-300 bg-amber-50 text-amber-900 font-semibold'
+                          : wholesaleInfo
+                            ? 'border-gray-300 bg-gray-50 text-gray-900 font-semibold'
+                            : 'border-gray-200 bg-gray-50 text-gray-400 italic'
+                      }`}
+                    >
                       {wholesaleInfo
-                        ? `${{ EUR: '€', USD: '$', GBP: '£', ZAR: 'R' }[wholesaleInfo.currency] ?? wholesaleInfo.currency}${wholesaleInfo.price.toFixed(2)}`
-                        : supplier && sku ? 'Not in pricelist' : '— No supplier / SKU —'}
+                        ? wholesaleInfo.currency
+                          ? `${CURRENCY_SYMBOLS[wholesaleInfo.currency] ?? `${wholesaleInfo.currency} `}${wholesaleInfo.price.toFixed(2)}`
+                          : `${wholesaleInfo.price.toFixed(2)} — currency not set`
+                        : supplier && sku
+                          ? 'Not in pricelist'
+                          : '— No supplier / SKU —'}
                     </div>
+                    {wholesaleInfo && !wholesaleInfo.currency && (
+                      <p className="mt-1 text-xs text-amber-700">
+                        Set this supplier’s Preferred Currency — every estimate is costed from this
+                        price.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center">

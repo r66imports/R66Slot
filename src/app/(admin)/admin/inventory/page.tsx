@@ -245,7 +245,11 @@ export default function InventoryPage() {
   // ─── Derived data ──────────────────────────────────────────────────────────
 
   const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId) || null
-  const currency = selectedSupplier?.preferredCurrency || 'EUR'
+  // Defaulting to EUR guesses at a supplier's currency and quietly relabels the
+  // number; an unset currency is shown as unset instead, because every estimate
+  // downstream is costed from this price.
+  const currency = (selectedSupplier?.preferredCurrency || '').toUpperCase()
+  const currencyLabel = currency || 'currency not set'
 
   const filtered = products.filter((p) => {
     if (p.status === 'draft') return false
@@ -632,7 +636,7 @@ export default function InventoryPage() {
 
     autoTable(doc, {
       startY: tableStartY,
-      head: [['SKU', 'Description', 'Qty', `Unit Price (${currency})`, `Total (${currency})`]],
+      head: [['SKU', 'Description', 'Qty', `Unit Price (${currencyLabel})`, `Total (${currencyLabel})`]],
       body: rows,
       foot: [['', '', '', 'Grand Total', `${currency} ${grandTotal.toFixed(2)}`]],
       styles: { fontSize: 8, cellPadding: 3 },
@@ -872,7 +876,7 @@ export default function InventoryPage() {
                 <th className="text-center px-3 py-3 text-xs font-semibold text-amber-600 uppercase w-20">Reserved</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-blue-600 uppercase w-20">Total Inv</th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-32">
-                  Wholesale ({currency})
+                  Wholesale ({currencyLabel})
                 </th>
                 <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-24">
                   <div>
@@ -1391,8 +1395,8 @@ export default function InventoryPage() {
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">SKU</th>
                     <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Description</th>
                     <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Restock Qty</th>
-                    <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Unit Price ({currency})</th>
-                    <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Total ({currency})</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Unit Price ({currencyLabel})</th>
+                    <th className="text-right px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Total ({currencyLabel})</th>
                   </tr>
                 </thead>
                 <tbody>
