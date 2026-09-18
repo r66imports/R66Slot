@@ -504,6 +504,30 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Page Editor', 'Online Store'],
     category: 'Page Editor',
   },
+  {
+    id: 'supplier_preorders_never_inventory',
+    name: 'Rule 59 — Supplier Pre Orders Are Requests, Never Inventory',
+    description: `A Supplier Pre Order is a client asking us to order something from a supplier. It is not stock and must never behave like stock. Submitting, editing, merging or archiving one creates no product, writes nothing to products.quantity, raises no reservation and produces no stock-log movement. The Supplier Catalogue behind it (data/supplier-catalogue.json) is likewise a list of what a supplier can sell us, not what we own — a SKU can sit on the sheet forever without ever having been a product, which is the point: clients request items we have never carried. Stock only ever appears the ordinary way, when the goods are merged into a Supplier Order, shipped, and landed through the Worksheet. A client may also type in a SKU that is not on the sheet at all; those lines are flagged isNewSku and carry no price until someone costs them by hand.`,
+    active: true,
+    appliesTo: ['Supplier Pre Orders', 'Supplier Catalogue', 'Inventory'],
+    category: 'Orders',
+  },
+  {
+    id: 'supplier_preorder_estimate_formula',
+    name: 'Rule 60 — Supplier Pre Order Estimated Retail',
+    description: `Every estimate on a Supplier Pre Order comes from one function, calcEstRetailZAR in src/lib/preorder-pricing.ts, so the client sheet, the admin page and the quote can never disagree. The formula is landed = wholesale × exRate × (1 + (shipping% + customs% + handling%)/100), then × landedMultiplier, then retail = landed × (1 + markup%) × (1 + vat%). It is seeded to reproduce the Business Calculator's Spare Parts mode exactly: that calculator carries shipping and customs as one 45% figure, split here into 25% shipping + 20% customs so the two can be tuned separately — 25 + 20 must keep summing to whatever the calculator uses or the two will quote different prices for the same item. 100 EUR at R20.00 gives R4 335.50 in both. landedMultiplier is 1 for BOTH accounts: the Worksheet's calcEntityFinalLanded adds 15% on landed for Route 66 Imports as an internal inter-company figure, but a client is quoted against the Spare Parts Calculator, which has no such uplift, so the client estimate does not apply it either. The field is kept so it can be raised on the Costing Accounts panel without a deploy. The percentages come from the costing account (data/costing-accounts.json), chosen per supplier and overridable by an admin per order; the client never sees or picks the account, the wholesale price or the percentages. The exchange rate is live and re-read on every page load, so an estimate moves until it is fixed — which is why every client-facing price carries the disclaimer that estimated retail prices fluctuate with the rate of exchange. Once a Worksheet Final covers a SKU, the line's finalExRate and derived shipping/customs/handling percentages are copied onto it and priceLocked is set; a locked line is never re-priced against the live rate again.`,
+    active: true,
+    appliesTo: ['Supplier Pre Orders', 'Worksheet', 'Quotes'],
+    category: 'Orders',
+  },
+  {
+    id: 'supplier_catalogue_brand_mapping',
+    name: 'Rule 61 — Brand Drives the Supplier Pre Order Sheet',
+    description: `The client sheet is brand-first: a client picks one or more brands and gets that brand's SKUs in natural alphanumeric order (so RS9, RS10, RS100 — never the plain string sort that puts RS100 before RS9). The brand is what resolves the supplier, and through the supplier the currency and the costing account: picking Sideways reaches Slotcar Boutique's currency and account. That mapping lives in the brands[] array on the supplier contact and is maintained on the Supplier Catalogue page. A catalogue item with no brand can never be found by a client, so the Price List import skips those rows and reports them rather than burying them in the sheet. The brand list a client sees is built from catalogue items that are actually orderable, so a brand with an empty or fully deactivated sheet never appears as a choice.`,
+    active: true,
+    appliesTo: ['Supplier Pre Orders', 'Supplier Catalogue', 'Suppliers'],
+    category: 'Orders',
+  },
 ]
 
 export async function GET() {

@@ -30,6 +30,7 @@ export default function AccountLayout({
   const navigation = [
     { name: 'Dashboard', href: '/account', icon: '🏠' },
     { name: 'Orders', href: '/account/orders', icon: '📦' },
+    { name: 'Supplier Pre Orders', href: '/account/supplier-preorders', icon: '📋' },
     { name: 'Addresses', href: '/account/addresses', icon: '📍' },
     { name: 'Profile', href: '/account/profile', icon: '👤' },
     { name: 'My Bids', href: '/account/auctions', icon: '🔨' },

@@ -19,7 +19,30 @@ export interface SupplierContact {
   country: string
   website: string
   notes: string
+  isActive?: boolean
   preferredCurrency?: string
+  /**
+   * Brands this supplier sells. Drives the Supplier Pre Order sheet: a client
+   * picking "Sideways" reaches Slotcar Boutique's currency and costing account
+   * through this mapping.
+   */
+  brands?: string[]
+  /** Which entity costs this supplier's goods. JDM is standard, R66 is spare parts. */
+  defaultAccount?: 'JDM' | 'R66'
+}
+
+function cleanBrands(value: unknown, fallback: string[] = []): string[] {
+  if (!Array.isArray(value)) return fallback
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of value) {
+    const b = String(raw ?? '').trim()
+    const key = b.toLowerCase()
+    if (!b || seen.has(key)) continue
+    seen.add(key)
+    out.push(b)
+  }
+  return out.sort((a, b) => a.localeCompare(b))
 }
 
 const DEFAULTS: SupplierContact[] = [
@@ -61,6 +84,8 @@ export async function POST(request: Request) {
       website: body.website?.trim() || '',
       notes: body.notes?.trim() || '',
       preferredCurrency: body.preferredCurrency?.trim() || '',
+      brands: cleanBrands(body.brands),
+      defaultAccount: body.defaultAccount === 'R66' ? 'R66' : 'JDM',
     }
     current.push(newSupplier)
     await blobWrite(KEY, current)
