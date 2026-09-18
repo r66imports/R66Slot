@@ -109,6 +109,54 @@ export interface StockShortfall {
 }
 
 /**
+ * The one product row a SKU's stock lives on.
+ *
+ * Duplicate SKUs happen — an import creating a case variant is enough, and
+ * NSR-3043f / NSR-3043F sat in the catalogue that way. When they do, the stock
+ * path used to disagree with itself: findStockShortfalls read ONE arbitrary row
+ * (`LIMIT 1`, no ORDER BY) while adjustStock updated EVERY matching row (no
+ * LIMIT at all). So a sale of one unit was checked against one record and then
+ * deducted from both — a silent double deduction that only showed up as stock
+ * drifting low.
+ *
+ * Both now resolve through here, so the row that is checked is the row that is
+ * deducted. Active wins over draft/archived because that is what the storefront
+ * actually sells; ties break on the most recently updated, then id, so the
+ * choice is stable between two calls rather than whatever Postgres returns
+ * first. TRIM guards against whitespace inside a SKU.
+ */
+async function resolveStockRow(
+  sku: string
+): Promise<{ id: string; quantity: number; trackQuantity: boolean; duplicates: number } | null> {
+  const res = await db.query(
+    `SELECT id, COALESCE(quantity, 0) AS q, track_quantity,
+            COUNT(*) OVER () AS matches
+       FROM products
+      WHERE LOWER(TRIM(sku)) = LOWER(TRIM($1))
+      ORDER BY (status = 'active') DESC, updated_at DESC NULLS LAST, id
+      LIMIT 1`,
+    [sku]
+  )
+  const row = res.rows[0]
+  if (!row) return null
+  const duplicates = Number(row.matches) || 1
+  if (duplicates > 1) {
+    // Never silent: a duplicate means stock for this SKU is split across records
+    // and only one of them is being moved.
+    console.warn(
+      `[stock] SKU ${sku} matches ${duplicates} product records — using ${row.id}. ` +
+        `Merge the duplicates; the others will not be adjusted.`
+    )
+  }
+  return {
+    id: row.id,
+    quantity: Number(row.q) || 0,
+    trackQuantity: row.track_quantity !== false,
+    duplicates,
+  }
+}
+
+/**
  * Line items that ask for more stock than the product actually has.
  *
  * An invoice raised against an empty product used to deduct nothing at all — the old
@@ -141,16 +189,13 @@ export async function findStockShortfalls(
   const shortfalls: StockShortfall[] = []
   for (const [sku, requested] of wanted) {
     if (requested <= 0) continue
-    const res = await db.query(
-      `SELECT COALESCE(quantity, 0) AS q, track_quantity FROM products WHERE UPPER(sku) = $1 LIMIT 1`,
-      [sku]
-    )
-    const row = res.rows[0]
+    const row = await resolveStockRow(sku)
     // Unknown SKU — Rule 2 auto-creates it as a draft product, there is no stock to check.
     // track_quantity = false means the product deliberately opts out of stock control.
-    if (!row || row.track_quantity === false) continue
-    const available = Number(row.q) || 0
-    if (requested > available) shortfalls.push({ sku, requested, available })
+    if (!row || !row.trackQuantity) continue
+    if (requested > row.quantity) {
+      shortfalls.push({ sku, requested, available: row.quantity })
+    }
   }
   return shortfalls
 }
@@ -178,22 +223,19 @@ export async function adjustStock(items: LineItem[], direction: 'subtract' | 'ad
     const sku = extractSku(li.description)
     if (!sku || li.qty <= 0) continue
     try {
-      if (direction === 'subtract') {
-        await db.query(
-          `UPDATE products SET quantity = COALESCE(quantity, 0) - $1, updated_at = $2 WHERE LOWER(sku) = LOWER($3) RETURNING quantity`,
-          [li.qty, now, sku]
-        )
-        // Rule 30: selling out no longer flips the product to Pre-Order. A sold-out
-        // item reads Sold Out — Pre Order / Book Now is for products deliberately
-        // flagged as pre-order items.
-      } else {
-        await db.query(
-          `UPDATE products SET quantity = COALESCE(quantity, 0) + $1, updated_at = $2 WHERE LOWER(sku) = LOWER($3) RETURNING quantity`,
-          [li.qty, now, sku]
-        )
-        // Restoring stock must not clear a deliberately-set pre-order flag either —
-        // the flag is owned by the product, not by the stock level.
-      }
+      // Target one row by id, resolved the same way findStockShortfalls resolves
+      // it. Matching on LOWER(sku) with no LIMIT updated every duplicate record,
+      // so one sale came off two products at once.
+      const row = await resolveStockRow(sku)
+      if (!row) continue
+      const delta = direction === 'subtract' ? -li.qty : li.qty
+      await db.query(
+        `UPDATE products SET quantity = COALESCE(quantity, 0) + $1, updated_at = $2 WHERE id = $3`,
+        [delta, now, row.id]
+      )
+      // Rule 30: selling out does not flip the product to Pre-Order, and restoring
+      // stock does not clear a deliberately-set pre-order flag. The flag is owned
+      // by the product, not by the stock level.
     } catch {
       // best-effort
     }
