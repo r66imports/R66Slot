@@ -1,5 +1,7 @@
 ﻿'use client'
 
+import { extractPdfRows, type PdfRow } from '@/lib/catalogue-import'
+
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -108,52 +110,8 @@ function detectShipping(rows: any[][], headerIdx: number, priceCol: number): num
 }
 
 // ─── Shared PDF text extraction ─────────────────────────────────────────────
-
-interface PdfCell { str: string; x: number }
-interface PdfRow  { y: number; cells: PdfCell[] }
-
-async function extractPdfRows(file: File): Promise<PdfRow[]> {
-  const pdfjsLib = await import('pdfjs-dist')
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    'pdfjs-dist/build/pdf.worker.min.mjs',
-    import.meta.url,
-  ).toString()
-
-  const buf = await file.arrayBuffer()
-  const pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise
-
-  // Collect all text cells with absolute (x, y) coordinates — y=0 at top
-  const allCells: { str: string; x: number; y: number }[] = []
-  let yOffset = 0
-  for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
-    const page = await pdfDoc.getPage(pageNum)
-    const vp   = page.getViewport({ scale: 1 })
-    const tc   = await page.getTextContent()
-    for (const item of (tc.items as any[])) {
-      if (!item.str?.trim()) continue
-      allCells.push({
-        str: item.str.trim(),
-        x:   Math.round(item.transform[4]),
-        y:   Math.round(yOffset + vp.height - item.transform[5]),
-      })
-    }
-    yOffset += Math.round(vp.height) + 30
-  }
-
-  // Cluster into rows by Y (6pt tolerance)
-  allCells.sort((a, b) => a.y - b.y || a.x - b.x)
-  const rows: { y: number; cells: { str: string; x: number }[] }[] = []
-  for (const cell of allCells) {
-    const last = rows[rows.length - 1]
-    if (last && Math.abs(cell.y - last.y) <= 6) {
-      last.cells.push({ str: cell.str, x: cell.x })
-    } else {
-      rows.push({ y: cell.y, cells: [{ str: cell.str, x: cell.x }] })
-    }
-  }
-  rows.forEach(r => r.cells.sort((a, b) => a.x - b.x))
-  return rows
-}
+// Lives in @/lib/catalogue-import so the Supplier Catalogue importer reads PDFs
+// exactly the same way this page does; the two must not drift apart.
 
 // ─── Generic invoice parser ──────────────────────────────────────────────────
 

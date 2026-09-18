@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { compareSku, formatZAR, accountById, calcEstRetailZAR } from '@/lib/preorder-pricing'
+import CatalogueImportModal from '@/components/admin/catalogue-import-modal'
 import type { CostingAccount, SupplierCatalogueItem } from '@/types/supplier-preorder'
 
 interface Supplier {
@@ -36,6 +37,7 @@ export default function SupplierCataloguePage() {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [showCosting, setShowCosting] = useState(false)
+  const [showImport, setShowImport] = useState(false)
 
   const supplier = useMemo(() => suppliers.find((s) => s.id === selectedId), [suppliers, selectedId])
 
@@ -366,11 +368,20 @@ export default function SupplierCataloguePage() {
             />
             <button
               type="button"
+              onClick={() => setShowImport(true)}
+              disabled={busy || !supplier}
+              className="px-3 py-2 text-sm font-medium rounded-md bg-primary text-black disabled:opacity-40"
+            >
+              Import price list
+            </button>
+            <button
+              type="button"
               onClick={() => runSeed(true)}
               disabled={busy}
               className="px-3 py-2 text-sm rounded-md border border-gray-300 hover:bg-gray-50 disabled:opacity-40"
+              title="Pull SKUs already linked to a supplier on the Price Lists page"
             >
-              Import from Price Lists (dry run)
+              From Price Lists (dry run)
             </button>
             <button
               type="button"
@@ -378,7 +389,7 @@ export default function SupplierCataloguePage() {
               disabled={busy}
               className="px-3 py-2 text-sm font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40"
             >
-              Import
+              From Price Lists
             </button>
           </div>
         </div>
@@ -525,6 +536,26 @@ export default function SupplierCataloguePage() {
           </table>
         </div>
       </div>
+
+      {showImport && supplier && (
+        <CatalogueImportModal
+          supplierId={supplier.id}
+          supplierName={supplier.name}
+          supplierCurrency={currency}
+          brands={supplier.brands || []}
+          onClose={() => setShowImport(false)}
+          onImported={(added, updated) => {
+            setShowImport(false)
+            setNote({
+              kind: 'ok',
+              text: `Imported ${added} new item${added === 1 ? '' : 's'}${
+                updated > 0 ? `, updated ${updated} existing` : ''
+              }.`,
+            })
+            loadCatalogue(selectedId)
+          }}
+        />
+      )}
     </div>
   )
 }

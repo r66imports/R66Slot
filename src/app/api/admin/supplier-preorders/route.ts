@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { blobRead, blobWrite, blobReplaceArrayItem } from '@/lib/blob-storage'
 import { getRates, rateFor } from '@/lib/exchange-rates'
 import { accountById, lineEstRetailZAR, DEFAULT_COSTING_ACCOUNTS } from '@/lib/preorder-pricing'
-import { sweepBin } from '@/lib/supplier-preorder-bin'
-import { binDaysRemaining, BIN_RETENTION_DAYS } from '@/types/supplier-preorder'
 import type { CostingAccount, SupplierPreOrder } from '@/types/supplier-preorder'
 
 const KEY = 'data/supplier-preorders.json'
@@ -22,10 +20,6 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'open'
-
-    // Lazy 30-day sweep: no scheduler here, so an admin opening the page is what
-    // keeps the Bin honest. Runs before the read so a purged row never renders.
-    const swept = await sweepBin()
 
     const [all, savedAccounts, rateData] = await Promise.all([
       blobRead<SupplierPreOrder[]>(KEY, []),
@@ -61,13 +55,7 @@ export async function GET(request: Request) {
       const totalZAR = lines
         .filter((l) => l.status !== 'rejected')
         .reduce((s, l) => s + l.qty * l.estRetailZAR, 0)
-      return {
-        ...o,
-        lines,
-        totalZAR: Math.round(totalZAR * 100) / 100,
-        exRate: rate,
-        binDaysLeft: o.deletedAt ? binDaysRemaining(o.deletedAt) : undefined,
-      }
+      return { ...o, lines, totalZAR: Math.round(totalZAR * 100) / 100, exRate: rate }
     })
 
     return NextResponse.json({
@@ -75,8 +63,6 @@ export async function GET(request: Request) {
       accounts,
       rateFetchedAt: rateData.fetchedAt,
       binCount: binned.length,
-      binRetentionDays: BIN_RETENTION_DAYS,
-      autoPurged: swept.purged,
     })
   } catch (error) {
     console.error('Error fetching supplier pre orders:', error)
@@ -85,8 +71,6 @@ export async function GET(request: Request) {
       accounts: DEFAULT_COSTING_ACCOUNTS,
       rateFetchedAt: '',
       binCount: 0,
-      binRetentionDays: BIN_RETENTION_DAYS,
-      autoPurged: [],
     })
   }
 }
@@ -147,7 +131,7 @@ export async function PATCH(request: Request) {
 /**
  * DELETE — move to the Bin.
  *
- * ?id=abc            bin one (recoverable for BIN_RETENTION_DAYS)
+ * ?id=abc            bin one (recoverable until the Bin is emptied)
  * ?ids=a,b,c         bin several in one write
  * &permanent=true    purge outright, skipping the Bin
  *
@@ -195,7 +179,6 @@ export async function DELETE(request: Request) {
       permanent: false,
       binned: targets.length,
       refs: targets.map((o) => o.ref),
-      retentionDays: BIN_RETENTION_DAYS,
     })
   } catch (error: any) {
     console.error('Error binning supplier pre orders:', error)
@@ -208,7 +191,8 @@ export async function DELETE(request: Request) {
  *
  * restore puts a binned request back to the status it held when it was binned,
  * so restoring something archived returns it to Archive rather than to Open.
- * empty purges the whole Bin now instead of waiting out the retention window.
+ * empty purges the whole Bin. Nothing expires on a timer — the Bin holds what
+ * it holds until an admin clears it, so a delete is never lost to a clock.
  */
 export async function POST(request: Request) {
   try {

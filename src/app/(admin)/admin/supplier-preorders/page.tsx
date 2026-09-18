@@ -5,7 +5,7 @@ import { compareSku, formatZAR } from '@/lib/preorder-pricing'
 import { documentTotal, settledAmount, balanceDue, MONEY_EPSILON } from '@/lib/payment-math'
 import type { CostingAccount, SupplierPreOrder, SupplierPreOrderLine } from '@/types/supplier-preorder'
 
-type Order = SupplierPreOrder & { totalZAR: number; exRate: number; binDaysLeft?: number }
+type Order = SupplierPreOrder & { totalZAR: number; exRate: number }
 
 type Tab = 'open' | 'archived' | 'bin'
 
@@ -32,7 +32,6 @@ export default function SupplierPreOrdersAdminPage() {
   const [tab, setTab] = useState<Tab>('open')
   const [orders, setOrders] = useState<Order[]>([])
   const [binCount, setBinCount] = useState(0)
-  const [retentionDays, setRetentionDays] = useState(30)
   const [accounts, setAccounts] = useState<CostingAccount[]>([])
   const [docs, setDocs] = useState<any[]>([])
   const [supplierOrders, setSupplierOrders] = useState<OpenSupplierOrder[]>([])
@@ -57,17 +56,6 @@ export default function SupplierPreOrdersAdminPage() {
         setOrders(data.orders || [])
         setAccounts(data.accounts || [])
         setBinCount(data.binCount || 0)
-        setRetentionDays(data.binRetentionDays || 30)
-        // The 30-day sweep runs off this read, so say what it took rather than
-        // letting rows vanish silently.
-        if ((data.autoPurged || []).length > 0) {
-          setNote({
-            kind: 'ok',
-            text: `Bin auto-emptied: ${data.autoPurged.join(', ')} passed ${
-              data.binRetentionDays || 30
-            } days and were removed for good.`,
-          })
-        }
       }
       if (docRes.ok) setDocs(await docRes.json())
       if (soRes.ok) {
@@ -136,8 +124,9 @@ export default function SupplierPreOrdersAdminPage() {
   /**
    * Delete → the Bin. The client reads the same store, so a binned request
    * disappears from their account straight away; there is no separate
-   * client-side copy to clean up. Recoverable here for the retention window,
-   * which is why this does not need the dire warning a real delete does.
+   * client-side copy to clean up. It stays recoverable here until an admin
+   * empties the Bin — nothing expires on a timer — which is why this does not
+   * need the dire warning a real delete does.
    */
   const binOrders = async (ids: string[]) => {
     if (ids.length === 0) return
@@ -145,7 +134,7 @@ export default function SupplierPreOrdersAdminPage() {
     const what = refs.length === 1 ? refs[0] : `${refs.length} pre orders (${refs.join(', ')})`
     if (
       !confirm(
-        `Move ${what} to the Bin?\n\nIt disappears from the client's account immediately. You can restore it from the Bin for ${retentionDays} days, after which it is removed for good.`
+        `Move ${what} to the Bin?\n\nIt disappears from the client's account immediately. You can restore it from the Bin at any time — nothing goes for good until you empty the Bin.`
       )
     )
       return
@@ -161,7 +150,7 @@ export default function SupplierPreOrdersAdminPage() {
       if (!res.ok) throw new Error(data?.error || 'Could not move to the Bin')
       setNote({
         kind: 'ok',
-        text: `${(data.refs || refs).join(', ')} moved to the Bin and removed from the client's account. Restorable for ${data.retentionDays ?? retentionDays} days.`,
+        text: `${(data.refs || refs).join(', ')} moved to the Bin and removed from the client's account. Restorable until you empty the Bin.`,
       })
       setSelected((prev) => prev.filter((x) => !ids.includes(x)))
       setExpanded(null)
@@ -463,7 +452,7 @@ export default function SupplierPreOrdersAdminPage() {
         <p className="text-xs text-gray-500 mt-2">
           <strong>Archived</strong> is history — requests that were created and sent to a supplier
           order, kept as a record. <strong>Bin</strong> is deleted: hidden from the client straight
-          away, restorable for {retentionDays} days, then gone.
+          away, restorable at any time, and cleared only when you empty the Bin.
         </p>
       </div>
 
@@ -490,7 +479,7 @@ export default function SupplierPreOrdersAdminPage() {
             setTab('bin')
             setSelected([])
           }}
-          title={`Bin — deleted pre orders, auto-emptied after ${retentionDays} days`}
+          title="Bin — deleted pre orders, kept until you empty it"
           aria-label={`Bin (${binCount})`}
           className={`ml-auto flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md ${
             tab === 'bin'
@@ -515,8 +504,8 @@ export default function SupplierPreOrdersAdminPage() {
       {tab === 'bin' && (
         <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
           <p className="text-sm text-gray-600">
-            Deleted pre orders. Already hidden from the client. Emptied automatically after{' '}
-            {retentionDays} days.
+            Deleted pre orders. Already hidden from the client. Restore anything here, or empty the
+            Bin when you are sure.
           </p>
           {orders.length > 0 && (
             <button
@@ -979,16 +968,8 @@ export default function SupplierPreOrdersAdminPage() {
                               {order.deletedAt
                                 ? new Date(order.deletedAt).toLocaleDateString('en-ZA')
                                 : ''}
-                              {typeof order.binDaysLeft === 'number' && (
-                                <span
-                                  className={
-                                    order.binDaysLeft <= 3 ? 'text-red-600 font-medium' : undefined
-                                  }
-                                >
-                                  {' '}
-                                  · {order.binDaysLeft} day
-                                  {order.binDaysLeft === 1 ? '' : 's'} before it goes for good
-                                </span>
+                              {order.statusBeforeDelete && (
+                                <span> · was {order.statusBeforeDelete.replace('-', ' ')}</span>
                               )}
                             </p>
                             <div className="flex gap-2">
