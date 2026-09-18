@@ -88,7 +88,11 @@ export function lineEstRetailZAR(
   account: CostingAccount
 ): number {
   if (line.priceLocked) return Number(line.estRetailZAR) || 0
-  return calcEstRetailZAR(line.wholesalePrice, exRate, account)
+  const calculated = calcEstRetailZAR(line.wholesalePrice, exRate, account)
+  // No wholesale price means the line was priced from what we already sell the
+  // item for, not through the calculator. Recomputing would return 0 and blank
+  // the price out on every read, so the stored figure stands.
+  return calculated > 0 ? calculated : Number(line.estRetailZAR) || 0
 }
 
 /** Order total in ZAR across active lines only — rejected lines do not count. */

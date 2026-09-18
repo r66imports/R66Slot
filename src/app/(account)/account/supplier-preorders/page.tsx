@@ -52,7 +52,7 @@ interface SubmittedOrder {
   totalZAR: number
 }
 
-/** Selected quantity plus enough of the item to render it once its brand is deselected. */
+/** Quantity plus enough of the item to render it once its brand is deselected. */
 type CartEntry = { item: CatalogueItem; qty: number }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -68,8 +68,10 @@ const STATUS_STYLES: Record<string, string> = {
 export default function SupplierPreOrdersPage() {
   const [brands, setBrands] = useState<BrandRow[]>([])
   const [selectedBrands, setSelectedBrands] = useState<string[]>([])
+  const [brandsOpen, setBrandsOpen] = useState(true)
   const [items, setItems] = useState<CatalogueItem[]>([])
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [cart, setCart] = useState<Record<string, CartEntry>>({})
   const [customLines, setCustomLines] = useState<CustomLine[]>([])
   const [notes, setNotes] = useState('')
@@ -80,6 +82,7 @@ export default function SupplierPreOrdersPage() {
   const [loadingItems, setLoadingItems] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [showOrder, setShowOrder] = useState(false)
 
   const [history, setHistory] = useState<SubmittedOrder[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -111,10 +114,19 @@ export default function SupplierPreOrdersPage() {
     loadHistory()
   }, [loadHistory])
 
-  // Items whenever the brand selection changes. Prices come back re-calculated
-  // against the live rate, so switching brands also refreshes the estimates.
+  // Typing shouldn't fire a request per keystroke.
   useEffect(() => {
-    if (selectedBrands.length === 0) {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  /**
+   * Items for the current brand selection and/or search. Search runs server-side
+   * and works with no brand selected, so a client who knows the SKU can find it
+   * without guessing which brand it belongs to.
+   */
+  useEffect(() => {
+    if (selectedBrands.length === 0 && !debouncedSearch) {
       setItems([])
       return
     }
@@ -122,7 +134,9 @@ export default function SupplierPreOrdersPage() {
     setLoadingItems(true)
     ;(async () => {
       try {
-        const qs = new URLSearchParams({ brands: selectedBrands.join(',') })
+        const qs = new URLSearchParams()
+        if (selectedBrands.length > 0) qs.set('brands', selectedBrands.join(','))
+        if (debouncedSearch) qs.set('q', debouncedSearch)
         const res = await fetch(`/api/account/supplier-catalogue?${qs}`)
         if (res.ok && !cancelled) {
           const data = await res.json()
@@ -136,32 +150,25 @@ export default function SupplierPreOrdersPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedBrands])
+  }, [selectedBrands, debouncedSearch])
 
-  const toggleBrand = (brand: string) => {
+  const toggleBrand = (brand: string) =>
     setSelectedBrands((prev) =>
       prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]
     )
-  }
 
-  const setQty = (item: CatalogueItem, qty: number) => {
+  const setQty = (item: CatalogueItem, qty: number) =>
     setCart((prev) => {
       const next = { ...prev }
       if (qty <= 0) delete next[item.id]
       else next[item.id] = { item, qty }
       return next
     })
-  }
 
-  const visibleItems = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    const filtered = q
-      ? items.filter(
-          (i) => i.sku.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
-        )
-      : items
-    return [...filtered].sort((a, b) => a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku))
-  }, [items, search])
+  const visibleItems = useMemo(
+    () => [...items].sort((a, b) => a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku)),
+    [items]
+  )
 
   const cartEntries = useMemo(
     () =>
@@ -174,11 +181,20 @@ export default function SupplierPreOrdersPage() {
   const catalogueTotal = cartEntries.reduce((s, e) => s + e.qty * e.item.estRetailZAR, 0)
   const customCount = customLines.filter((l) => l.sku.trim()).length
   const lineCount = cartEntries.length + customCount
+  const unitCount =
+    cartEntries.reduce((s, e) => s + e.qty, 0) +
+    customLines.filter((l) => l.sku.trim()).reduce((s, l) => s + l.qty, 0)
 
   const addCustomLine = () =>
     setCustomLines((prev) => [
       ...prev,
-      { key: `cl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, brand: selectedBrands[0] || '', sku: '', description: '', qty: 1 },
+      {
+        key: `cl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        brand: selectedBrands[0] || '',
+        sku: '',
+        description: '',
+        qty: 1,
+      },
     ])
 
   const updateCustomLine = (key: string, patch: Partial<CustomLine>) =>
@@ -222,10 +238,14 @@ export default function SupplierPreOrdersPage() {
       if (!res.ok) throw new Error(data?.error || 'Failed to send')
 
       const refs = (data.orders || []).map((o: any) => o.ref).join(', ')
-      setMessage({ kind: 'ok', text: `Sent. Reference ${refs}. We'll confirm pricing once the order is placed.` })
+      setMessage({
+        kind: 'ok',
+        text: `Sent. Reference ${refs}. We'll confirm pricing once the order is placed.`,
+      })
       setCart({})
       setCustomLines([])
       setNotes('')
+      setShowOrder(false)
       loadHistory()
     } catch (err: any) {
       setMessage({ kind: 'err', text: err?.message || 'Failed to send' })
@@ -234,13 +254,85 @@ export default function SupplierPreOrdersPage() {
     }
   }
 
+  /** The running selection — same list in the panel and the modal. */
+  const OrderLines = ({ compact }: { compact?: boolean }) => (
+    <div className="divide-y divide-gray-100">
+      {cartEntries.map((e) => (
+        <div key={e.item.id} className="py-2 flex items-center justify-between gap-4 text-sm">
+          <div className="min-w-0">
+            <span className="font-mono text-xs text-gray-500">{e.item.sku}</span>
+            <span className="mx-2 text-gray-300">–</span>
+            <span className="text-gray-800">{e.item.description || e.item.brand}</span>
+            <span className="ml-2 text-xs text-gray-400">{e.item.brand}</span>
+          </div>
+          <div className="flex items-center gap-3 whitespace-nowrap">
+            {compact ? (
+              <span className="text-gray-500">× {e.qty}</span>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setQty(e.item, e.qty - 1)}
+                  className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+                  aria-label={`Decrease ${e.item.sku}`}
+                >
+                  −
+                </button>
+                <span className="w-8 text-center text-gray-700">{e.qty}</span>
+                <button
+                  type="button"
+                  onClick={() => setQty(e.item, e.qty + 1)}
+                  className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+                  aria-label={`Increase ${e.item.sku}`}
+                >
+                  +
+                </button>
+              </div>
+            )}
+            <span className="font-semibold w-28 text-right">
+              {e.item.estRetailZAR > 0 ? formatZAR(e.qty * e.item.estRetailZAR) : 'On request'}
+            </span>
+            {!compact && (
+              <button
+                type="button"
+                onClick={() => setQty(e.item, 0)}
+                className="text-gray-400 hover:text-red-600 px-1"
+                aria-label={`Remove ${e.item.sku}`}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      {customLines
+        .filter((l) => l.sku.trim())
+        .map((l) => (
+          <div key={l.key} className="py-2 flex items-center justify-between gap-4 text-sm">
+            <div className="min-w-0">
+              <span className="font-mono text-xs text-gray-500">{l.sku}</span>
+              <span className="mx-2 text-gray-300">–</span>
+              <span className="text-gray-800">{l.description || l.brand || 'New item'}</span>
+              <span className="ml-2 text-[10px] uppercase tracking-wide bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                New SKU
+              </span>
+            </div>
+            <div className="flex items-center gap-3 whitespace-nowrap">
+              <span className="text-gray-500">× {l.qty}</span>
+              <span className="text-gray-400 w-28 text-right">To be priced</span>
+            </div>
+          </div>
+        ))}
+    </div>
+  )
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-bold text-gray-900">Supplier Pre Orders</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Choose a brand, pick the items you want and send us the list. This is a request for us to
-          order on your behalf — nothing is reserved or charged until we confirm.
+          Choose a brand or search for a SKU, pick what you want and send us the list. This is a
+          request for us to order on your behalf — nothing is reserved or charged until we confirm.
         </p>
         {disclaimer && (
           <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
@@ -254,75 +346,120 @@ export default function SupplierPreOrdersPage() {
         )}
       </div>
 
-      {/* Brands */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h3 className="font-semibold text-gray-900 mb-3">Brands</h3>
-        {loadingBrands ? (
-          <p className="text-sm text-gray-500">Loading brands…</p>
-        ) : brands.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No supplier sheets are available yet. Please check back soon.
-          </p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {brands.map((b) => {
-              const on = selectedBrands.includes(b.brand)
-              return (
-                <button
-                  key={b.brand}
-                  type="button"
-                  onClick={() => toggleBrand(b.brand)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                    on
-                      ? 'bg-primary text-black border-primary'
-                      : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  {b.brand}
-                  <span className={`ml-2 text-xs ${on ? 'text-black/60' : 'text-gray-400'}`}>
-                    {b.count}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-        )}
-        {selectedBrands.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSelectedBrands([])}
-            className="mt-3 text-xs text-gray-500 hover:text-gray-700 underline"
-          >
-            Clear selection
-          </button>
+      {/* Search — always available, with or without a brand chosen */}
+      <div className="bg-white rounded-lg shadow-sm p-4">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search any SKU or description…"
+          className="w-full px-4 py-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        {debouncedSearch && selectedBrands.length === 0 && (
+          <p className="text-xs text-gray-500 mt-2">Searching all brands.</p>
         )}
       </div>
 
-      {/* Catalogue */}
-      {selectedBrands.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <h3 className="font-semibold text-gray-900">
-              Items{' '}
-              <span className="text-sm font-normal text-gray-500">
-                ({visibleItems.length}
-                {search.trim() && items.length !== visibleItems.length ? ` of ${items.length}` : ''})
+      {/* Brands — collapsible */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-gray-900">
+            Brands
+            {selectedBrands.length > 0 && (
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                {selectedBrands.length} selected
               </span>
-            </h3>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search SKU or description…"
-              className="w-full sm:w-72 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
+            )}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setBrandsOpen((v) => !v)}
+            className="text-sm text-gray-500 hover:text-gray-800"
+          >
+            {brandsOpen ? 'Hide ▲' : 'Show ▼'}
+          </button>
+        </div>
+
+        {brandsOpen && (
+          <>
+            {loadingBrands ? (
+              <p className="text-sm text-gray-500 mt-3">Loading brands…</p>
+            ) : brands.length === 0 ? (
+              <p className="text-sm text-gray-500 mt-3">
+                No brands are available yet. Please check back soon.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {brands.map((b) => {
+                  const on = selectedBrands.includes(b.brand)
+                  return (
+                    <button
+                      key={b.brand}
+                      type="button"
+                      onClick={() => toggleBrand(b.brand)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+                        on
+                          ? 'bg-primary text-black border-primary'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      {b.brand}
+                      {b.count > 0 && (
+                        <span className={`ml-2 text-xs ${on ? 'text-black/60' : 'text-gray-400'}`}>
+                          {b.count}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {selectedBrands.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setSelectedBrands([])}
+                className="mt-3 text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Clear selection
+              </button>
+            )}
+          </>
+        )}
+
+        {!brandsOpen && selectedBrands.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {selectedBrands.map((b) => (
+              <span
+                key={b}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/15 text-sm text-gray-800"
+              >
+                {b}
+                <button
+                  type="button"
+                  onClick={() => toggleBrand(b)}
+                  className="text-gray-400 hover:text-red-600"
+                  aria-label={`Remove ${b}`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
           </div>
+        )}
+      </div>
+
+      {/* Items */}
+      {(selectedBrands.length > 0 || debouncedSearch) && (
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <h3 className="font-semibold text-gray-900 mb-4">
+            Items <span className="text-sm font-normal text-gray-500">({visibleItems.length})</span>
+          </h3>
 
           {loadingItems ? (
             <p className="text-sm text-gray-500 py-6 text-center">Loading items…</p>
           ) : visibleItems.length === 0 ? (
             <p className="text-sm text-gray-500 py-6 text-center">
-              Nothing matches that search. Use “Add an item not listed” below if the SKU is new.
+              Nothing matches. Use “Add an item not listed” below if the SKU is new to us.
             </p>
           ) : (
             <div className="overflow-x-auto -mx-6 px-6">
@@ -388,13 +525,46 @@ export default function SupplierPreOrdersPage() {
         </div>
       )}
 
+      {/* Running selection — sits directly below the list so switching brands
+          never looks like it discarded what was already chosen. */}
+      {lineCount > 0 && (
+        <div className="bg-white rounded-lg shadow-sm p-6 border-l-4 border-primary">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-semibold text-gray-900">
+              Your selection so far{' '}
+              <span className="text-sm font-normal text-gray-500">
+                ({lineCount} line{lineCount === 1 ? '' : 's'}, {unitCount} item
+                {unitCount === 1 ? '' : 's'})
+              </span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => setShowOrder(true)}
+              className="text-sm font-medium text-gray-700 underline"
+            >
+              View order
+            </button>
+          </div>
+          <OrderLines />
+          <div className="flex items-center justify-between border-t border-gray-200 pt-3 mt-3">
+            <span className="font-semibold text-gray-900">Estimated total</span>
+            <span className="text-lg font-bold">{formatZAR(catalogueTotal)}</span>
+          </div>
+          {customCount > 0 && (
+            <p className="text-xs text-gray-500 mt-1">
+              Excludes {customCount} item{customCount === 1 ? '' : 's'} we still need to price.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* New SKUs */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="font-semibold text-gray-900">Add an item not listed</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              For SKUs that aren’t on the sheet yet. We’ll price these by hand and come back to you.
+              For SKUs we don’t carry yet. We’ll price these by hand and come back to you.
             </p>
           </div>
           <button
@@ -413,6 +583,7 @@ export default function SupplierPreOrdersPage() {
             {customLines.map((l) => (
               <div key={l.key} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
                 <input
+                  list="brand-options"
                   value={l.brand}
                   onChange={(e) => updateCustomLine(l.key, { brand: e.target.value })}
                   placeholder="Brand"
@@ -454,64 +625,15 @@ export default function SupplierPreOrdersPage() {
             ))}
           </div>
         )}
+        <datalist id="brand-options">
+          {brands.map((b) => (
+            <option key={b.brand} value={b.brand} />
+          ))}
+        </datalist>
       </div>
 
-      {/* Basket + submit */}
+      {/* Notes + submit */}
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h3 className="font-semibold text-gray-900 mb-3">Your request</h3>
-
-        {lineCount === 0 ? (
-          <p className="text-sm text-gray-500">Nothing selected yet.</p>
-        ) : (
-          <>
-            <div className="divide-y divide-gray-100 mb-4">
-              {cartEntries.map((e) => (
-                <div key={e.item.id} className="py-2 flex items-center justify-between gap-4 text-sm">
-                  <div className="min-w-0">
-                    <span className="font-mono text-xs text-gray-500">{e.item.sku}</span>
-                    <span className="mx-2 text-gray-300">–</span>
-                    <span className="text-gray-800">{e.item.description || e.item.brand}</span>
-                  </div>
-                  <div className="flex items-center gap-4 whitespace-nowrap">
-                    <span className="text-gray-500">× {e.qty}</span>
-                    <span className="font-semibold w-28 text-right">
-                      {e.item.estRetailZAR > 0 ? formatZAR(e.qty * e.item.estRetailZAR) : 'On request'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {customLines
-                .filter((l) => l.sku.trim())
-                .map((l) => (
-                  <div key={l.key} className="py-2 flex items-center justify-between gap-4 text-sm">
-                    <div className="min-w-0">
-                      <span className="font-mono text-xs text-gray-500">{l.sku}</span>
-                      <span className="mx-2 text-gray-300">–</span>
-                      <span className="text-gray-800">{l.description || l.brand || 'New item'}</span>
-                      <span className="ml-2 text-[10px] uppercase tracking-wide bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
-                        New SKU
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 whitespace-nowrap">
-                      <span className="text-gray-500">× {l.qty}</span>
-                      <span className="text-gray-400 w-28 text-right">To be priced</span>
-                    </div>
-                  </div>
-                ))}
-            </div>
-
-            <div className="flex items-center justify-between border-t border-gray-200 pt-3 mb-4">
-              <span className="font-semibold text-gray-900">Estimated total</span>
-              <span className="text-lg font-bold">{formatZAR(catalogueTotal)}</span>
-            </div>
-            {customCount > 0 && (
-              <p className="text-xs text-gray-500 -mt-2 mb-4">
-                Excludes {customCount} item{customCount === 1 ? '' : 's'} we still need to price.
-              </p>
-            )}
-          </>
-        )}
-
         <label className="block text-sm font-medium text-gray-700 mb-1">Notes for us</label>
         <textarea
           value={notes}
@@ -618,6 +740,93 @@ export default function SupplierPreOrdersPage() {
           </div>
         )}
       </div>
+
+      {/* Floating View Order bar */}
+      {lineCount > 0 && !showOrder && (
+        <div className="fixed bottom-4 inset-x-0 px-4 z-40 pointer-events-none">
+          <div className="max-w-3xl mx-auto pointer-events-auto">
+            <button
+              type="button"
+              onClick={() => setShowOrder(true)}
+              className="w-full flex items-center justify-between gap-4 px-5 py-3 rounded-full bg-gray-900 text-white shadow-lg hover:bg-gray-800"
+            >
+              <span className="font-medium">
+                View order · {lineCount} line{lineCount === 1 ? '' : 's'}
+              </span>
+              <span className="font-bold">{formatZAR(catalogueTotal)}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* View Order modal */}
+      {showOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setShowOrder(false)}
+        >
+          <div
+            className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-lg shadow-xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">
+                Your order{' '}
+                <span className="text-sm font-normal text-gray-500">
+                  {lineCount} line{lineCount === 1 ? '' : 's'}, {unitCount} item
+                  {unitCount === 1 ? '' : 's'}
+                </span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowOrder(false)}
+                className="text-gray-400 hover:text-gray-700 text-xl leading-none px-2"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="px-5 py-3 overflow-y-auto flex-1">
+              {lineCount === 0 ? (
+                <p className="text-sm text-gray-500 py-6 text-center">Nothing selected yet.</p>
+              ) : (
+                <OrderLines />
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-gray-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-gray-900">Estimated total</span>
+                <span className="text-lg font-bold">{formatZAR(catalogueTotal)}</span>
+              </div>
+              {customCount > 0 && (
+                <p className="text-xs text-gray-500">
+                  Excludes {customCount} item{customCount === 1 ? '' : 's'} we still need to price.
+                </p>
+              )}
+              {disclaimer && <p className="text-xs text-gray-500">{disclaimer}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowOrder(false)}
+                  className="flex-1 px-4 py-3 rounded-md border border-gray-300 text-gray-700 font-medium"
+                >
+                  Keep shopping
+                </button>
+                <button
+                  type="button"
+                  onClick={submit}
+                  disabled={submitting || lineCount === 0}
+                  className="flex-1 px-4 py-3 rounded-md bg-primary text-black font-semibold disabled:opacity-40"
+                >
+                  {submitting ? 'Sending…' : 'Send request'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

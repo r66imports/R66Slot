@@ -3,10 +3,15 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead, blobAppendArrayItems } from '@/lib/blob-storage'
 import { getRates, rateFor } from '@/lib/exchange-rates'
-import { accountById, calcEstRetailZAR, DEFAULT_COSTING_ACCOUNTS } from '@/lib/preorder-pricing'
+import {
+  accountById,
+  calcEstRetailZAR,
+  lineEstRetailZAR,
+  DEFAULT_COSTING_ACCOUNTS,
+} from '@/lib/preorder-pricing'
+import { findBySkus } from '@/lib/supplier-catalogue'
 import type {
   CostingAccount,
-  SupplierCatalogueItem,
   SupplierPreOrder,
   SupplierPreOrderLine,
 } from '@/types/supplier-preorder'
@@ -64,9 +69,7 @@ export async function GET(_request: NextRequest) {
         status: l.status,
         isNewSku: l.isNewSku,
         priceLocked: l.priceLocked,
-        estRetailZAR: l.priceLocked
-          ? l.estRetailZAR
-          : Math.round(calcEstRetailZAR(l.wholesalePrice, rate, account) * 100) / 100,
+        estRetailZAR: Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100,
       }))
       const total = lines
         .filter((l) => l.status !== 'rejected')
@@ -111,15 +114,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Add at least one item with a quantity' }, { status: 400 })
     }
 
-    const [catalogue, suppliers, savedAccounts, existing, rateData] = await Promise.all([
-      blobRead<SupplierCatalogueItem[]>('data/supplier-catalogue.json', []),
+    // Resolve every submitted SKU against Inventory + the wholesale catalogue in
+    // one pass. Prices are recomputed here; whatever the browser sent is ignored.
+    const [matches, suppliers, savedAccounts, existing, rateData] = await Promise.all([
+      findBySkus(usable.map((l) => String(l.sku || ''))),
       blobRead<SupplierContact[]>('data/supplier-contacts.json', []),
       blobRead<CostingAccount[]>('data/costing-accounts.json', []),
       blobRead<SupplierPreOrder[]>(KEY, []),
       getRates(),
     ])
     const accounts = savedAccounts.length > 0 ? savedAccounts : DEFAULT_COSTING_ACCOUNTS
-    const byId = new Map(catalogue.map((c) => [c.id, c]))
     const supplierById = new Map(suppliers.map((s) => [s.id, s]))
     // A client-typed SKU carries no supplier, so fall back to whoever owns the brand.
     const supplierByBrand = new Map<string, SupplierContact>()
@@ -131,10 +135,11 @@ export async function POST(request: NextRequest) {
     const groups = new Map<string, SupplierPreOrderLine[]>()
 
     for (const raw of usable) {
-      const match = raw.catalogueItemId ? byId.get(raw.catalogueItemId) : undefined
+      const sku = String(raw.sku || '').trim().toUpperCase()
+      const match = matches.get(sku)
       const brand = (match?.brand || raw.brand || '').trim()
       const supplier =
-        (match ? supplierById.get(match.supplierId) : undefined) ||
+        (match?.supplierId ? supplierById.get(match.supplierId) : undefined) ||
         supplierByBrand.get(brand.toLowerCase())
       const supplierId = match?.supplierId || supplier?.id || ''
       const currency = (match?.currency || supplier?.preferredCurrency || 'EUR').toUpperCase()
@@ -142,16 +147,23 @@ export async function POST(request: NextRequest) {
       const rate = rateFor(rateData.rates, currency)
       const wholesale = match?.wholesalePrice || 0
 
+      // A wholesale price prices through the calculator; an Inventory item with
+      // none keeps the retail we already sell it for. Neither means admin prices
+      // it by hand, and the client sees "On request".
+      const calculated = calcEstRetailZAR(wholesale, rate, account)
+      const estRetailZAR =
+        calculated > 0 ? calculated : match?.estRetailZAR || 0
+
       const line: SupplierPreOrderLine = {
         id: `spl_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        catalogueItemId: match?.id,
+        catalogueItemId: match && !match.id.startsWith('p:') ? match.id : undefined,
         brand,
-        sku: (match?.sku || raw.sku || '').trim().toUpperCase(),
+        sku: match?.sku || sku,
         description: (match?.description || raw.description || '').trim(),
         qty: Math.max(1, Math.floor(Number(raw.qty) || 1)),
         wholesalePrice: wholesale,
         currency,
-        estRetailZAR: Math.round(calcEstRetailZAR(wholesale, rate, account) * 100) / 100,
+        estRetailZAR: Math.round(estRetailZAR * 100) / 100,
         exRateAtSubmit: rate,
         priceLocked: false,
         status: 'active',
