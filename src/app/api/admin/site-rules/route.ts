@@ -536,6 +536,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Supplier Pre Orders', 'Supplier Orders', 'Quotes', 'Inventory'],
     category: 'Orders',
   },
+  {
+    id: 'estimate_prices_float_with_exchange_rate',
+    name: 'Rule 63 — Estimated Retail Prices Always Float With the Exchange Rate',
+    description: `An estimated retail price is never a stored number. It is DERIVED, on every read, from the supplier's wholesale price in the supplier's own currency multiplied by the live exchange rate, and it moves as that rate moves — which is why every client-facing estimate carries the disclaimer that estimated retail prices fluctuate with the rate of exchange. The wholesale price is the single source of truth and it must carry its currency: a price without a unit is not a price, and inferring one from the supplier at read time (or worse, defaulting to ZAR) is what once made a €33.90 Sideways price read as R33.90 and every margin built on it wrong. So the currency is stored on the price list entry itself, stamped when written, and changing a supplier's currency later cannot silently re-interpret prices already quoted. It follows that a converted ZAR figure must never be frozen into a product field as a substitute for the estimate — the moment it is stored it stops floating, and it is stale by the next rate change. costPerItem is the one exception and it is not an estimate: it is the REAL landed Rand cost of goods actually received, written by the Worksheet when a shipment lands, and at that point it is a historical fact that must not move. A foreign wholesale price copied into costPerItem is therefore always a bug — the two are different quantities in different currencies — and the Product Edit page flags the field when it equals the foreign wholesale price to the cent, because that equality is the signature of an un-converted copy rather than a coincidence.`,
+    active: true,
+    appliesTo: ['Products', 'Inventory', 'Supplier Pre Orders', 'Worksheet', 'Online Store'],
+    category: 'Inventory',
+  },
 ]
 
 export async function GET() {
