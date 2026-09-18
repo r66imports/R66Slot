@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { hasAdminSession, stripPrivateFields, stripPrivateColumns } from '@/lib/product-privacy'
 import { db } from '@/lib/db'
 import { blobRead } from '@/lib/blob-storage'
+import { estimateFor, loadEstimateContext } from '@/lib/preorder-estimate'
 
 export interface Product {
   id: string
@@ -134,9 +135,46 @@ export async function GET(request: Request) {
 
     // Anonymous callers (the storefront) never see landed cost or accounting mappings.
     const isAdmin = await hasAdminSession()
-    const shape = (rows: any[]) => isAdmin
-      ? rows.map(rowToProduct)
-      : rows.map(r => stripPrivateFields(rowToProduct(r)))
+
+    /**
+     * Rule 63 — the Book Now / pre-order price is an estimate, so it is derived
+     * from the supplier's wholesale price times the live rate rather than served
+     * from the stored column, and it moves as the rate moves. `preOrderPrice`
+     * keeps the stored figure so nothing that relied on it breaks;
+     * `preOrderPriceLive` is the number to display.
+     *
+     * The working (wholesale, currency, rate) is admin-only — a client is shown
+     * the estimate, never what we pay. Estimates failing must not take the
+     * product list down, so a failure serves the stored figures unchanged.
+     */
+    const shape = async (rows: any[]) => {
+      const mapped = isAdmin
+        ? rows.map(rowToProduct)
+        : rows.map(r => stripPrivateFields(rowToProduct(r)))
+      try {
+        const ctx = await loadEstimateContext()
+        return mapped.map((p: any) => {
+          const est = estimateFor(ctx, p)
+          return {
+            ...p,
+            preOrderPriceLive: est.estimateZAR,
+            preOrderPriceSource: est.source,
+            preOrderPriceFloating: est.floating,
+            ...(isAdmin
+              ? {
+                  wholesalePrice: est.wholesalePrice || null,
+                  wholesaleCurrency: est.currency || null,
+                  wholesaleExRate: est.exRate || null,
+                  costingAccount: est.accountId,
+                }
+              : {}),
+          }
+        })
+      } catch (err) {
+        console.error('Live pre-order estimates unavailable:', err)
+        return mapped
+      }
+    }
 
     // Summary mode — returns brand/supplier group counts only (for brand grid)
     if (searchParams.get('summary') === '1') {
@@ -173,13 +211,13 @@ export async function GET(request: Request) {
     let result
     if (includeArchived) {
       result = await db.query(`SELECT * FROM products WHERE status = 'archived' ORDER BY sku ASC`)
-      return NextResponse.json(shape(result.rows))
+      return NextResponse.json(await shape(result.rows))
     } else if (brand) {
       result = await db.query(`SELECT * FROM products WHERE LOWER(brand) = LOWER($1) AND status != 'archived' ORDER BY sku ASC`, [brand])
-      return NextResponse.json(shape(result.rows), cache)
+      return NextResponse.json(await shape(result.rows), cache)
     } else {
       result = await db.query(`SELECT * FROM products WHERE status != 'archived' ORDER BY sku ASC`)
-      return NextResponse.json(shape(result.rows), cache)
+      return NextResponse.json(await shape(result.rows), cache)
     }
   } catch (error) {
     console.error('Error fetching products:', error)

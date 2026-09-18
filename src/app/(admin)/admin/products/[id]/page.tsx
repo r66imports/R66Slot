@@ -110,6 +110,21 @@ export default function EditProductPage({
   const [wholesaleInfo, setWholesaleInfo] = useState<{ price: number; currency: string } | null>(null)
 
   /**
+   * The server-derived Book Now estimate (Rule 63). Computed in
+   * @/lib/preorder-estimate and returned on the product read, so this page shows
+   * exactly what the storefront and the Pre-Order Dashboard show.
+   */
+  const [liveEstimate, setLiveEstimate] = useState<{
+    estimateZAR: number
+    source: 'live' | 'landed' | 'stored'
+    floating: boolean
+    wholesalePrice: number
+    currency: string
+    exRate: number
+    accountId: string
+  } | null>(null)
+
+  /**
    * Cost per item is a Rand figure. When it matches a foreign wholesale price to
    * the cent it is not a coincidence — it is that price copied across without
    * conversion, which is how R33.90 came to stand for €33.90 and every margin
@@ -375,6 +390,21 @@ export default function EditProductPage({
           setPrice(found.price?.toString() || '')
           setCompareAtPrice(found.compareAtPrice?.toString() || '')
           setPreOrderPrice((found as any).preOrderPrice?.toString() || '')
+          // Derived server-side so this page cannot disagree with the storefront.
+          const f = found as any
+          setLiveEstimate(
+            f.preOrderPriceSource
+              ? {
+                  estimateZAR: Number(f.preOrderPriceLive) || 0,
+                  source: f.preOrderPriceSource,
+                  floating: !!f.preOrderPriceFloating,
+                  wholesalePrice: Number(f.wholesalePrice) || 0,
+                  currency: (f.wholesaleCurrency || '').toUpperCase(),
+                  exRate: Number(f.wholesaleExRate) || 0,
+                  accountId: f.costingAccount || 'JDM',
+                }
+              : null
+          )
           setDiscountPct((found as any).discountPct?.toString() || '')
           setCostPerItem(found.costPerItem?.toString() || '')
           setAuctionReservePrice((found as any).auctionReservePrice?.toString() || '')
@@ -1363,19 +1393,53 @@ export default function EditProductPage({
                 </div>
               </div>
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Book for Next Shipment Price</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  Book for Next Shipment Price
+                  {liveEstimate?.floating && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                      LIVE
+                    </span>
+                  )}
+                </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2 text-gray-500">R</span>
                   <input
                     type="number"
                     step="0.01"
-                    value={preOrderPrice}
+                    value={liveEstimate?.floating ? liveEstimate.estimateZAR.toFixed(2) : preOrderPrice}
                     onChange={(e) => setPreOrderPrice(e.target.value)}
                     placeholder="0.00"
-                    className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                    readOnly={!!liveEstimate?.floating}
+                    title={liveEstimate?.floating ? 'Derived from the wholesale price and the live exchange rate' : undefined}
+                    className={`w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-gray-900 focus:border-transparent ${
+                      liveEstimate?.floating
+                        ? 'border-emerald-300 bg-emerald-50 text-gray-900 font-semibold cursor-not-allowed'
+                        : 'border-gray-300'
+                    }`}
                   />
                 </div>
-                <p className="mt-2 text-xs text-gray-500">Special price for pre-order invoices</p>
+                {/* Rule 63 — while a SKU is still on order its Book Now price is an
+                    estimate and floats with the rate, so a typed figure would be
+                    stale by the next rate change. Once the shipment lands the price
+                    settles and the field is editable again. */}
+                {liveEstimate?.floating ? (
+                  <p className="mt-2 text-xs text-emerald-700">
+                    Floats with the exchange rate:{' '}
+                    {liveEstimate.currency && liveEstimate.wholesalePrice > 0
+                      ? `${CURRENCY_SYMBOLS[liveEstimate.currency] ?? `${liveEstimate.currency} `}${liveEstimate.wholesalePrice.toFixed(2)} × ${liveEstimate.exRate.toFixed(4)}`
+                      : 'live rate'}{' '}
+                    → {liveEstimate.accountId} costing. Locks when the shipment lands.
+                  </p>
+                ) : liveEstimate?.source === 'landed' ? (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Shipment has landed — this price is settled and no longer floats.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Special price for pre-order invoices. Add a wholesale price to this SKU’s
+                    supplier price list and it will float with the exchange rate.
+                  </p>
+                )}
               </div>
               {/* Retail Discount — % and the resulting price are two-way bound. Price above stays
                   the full retail figure so the original is never lost. Display-only: shown on the
