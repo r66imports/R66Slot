@@ -528,6 +528,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Supplier Pre Orders', 'Supplier Catalogue', 'Suppliers'],
     category: 'Orders',
   },
+  {
+    id: 'supplier_preorder_send_merge_archive',
+    name: 'Rule 62 — Supplier Pre Orders: Send, Merge, Pay, Archive',
+    description: `Client pre-orders are gathered separately from the supplier orders we raise ourselves, and join them only when sent. Every selected pre-order for a supplier lands on ONE supplier order ref, whether that is a new SPO-ORD#### or an existing non-client order being merged into; a send spanning two suppliers is refused outright, because one supplier order goes to one supplier. Merge targets deliberately exclude orders already built from client requests — those are the thing being merged, not a destination. The pushed line carries the WHOLESALE price in the supplier's currency, never the client's ZAR estimate: a supplier order is what we pay, not what we charge. Client-typed SKUs travel with a note to confirm them with the supplier. Send to Quote posts to /api/admin/orders/documents with stockAlreadyReserved:true — that flag is load-bearing, not decoration: without it the documents API runs autoCreateMissingProducts and every client-requested SKU becomes a draft Inventory product, breaking Rule 59. Add-to-existing offers open QUOTES only, never invoices or sales orders: those are stockable, so appending to one runs the PATCH route's adjustStock and deducts inventory for goods not yet even ordered from the supplier. Note stockAlreadyReserved does NOT prevent that on PATCH — it only skips the shortfall check; skipStockAdjust is the flag that stops the movement, and both are sent. Adding uses appendLineItems so the server merges against the document as it stands; building the array client-side from a stale copy is what used to drop lines when two sends raced. A quote that comes back with no lines never badges the pre-order as quoted — an unlinked request can be retried, a wrongly-linked one strands the client. Deposit Paid and Invoice Paid are read off the linked document through payment-math.ts (settledAmount / balanceDue), never hand-rolled. Mark as Paid then Archive; an archived pre-order is a read-only record and the server refuses to edit, re-price or re-send it, so a stale tab cannot reopen one.`,
+    active: true,
+    appliesTo: ['Supplier Pre Orders', 'Supplier Orders', 'Quotes', 'Inventory'],
+    category: 'Orders',
+  },
 ]
 
 export async function GET() {

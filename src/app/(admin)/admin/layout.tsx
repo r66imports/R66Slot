@@ -139,6 +139,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       badge: newSiteOrders,
       items: [
         { name: 'Site Orders', href: '/admin/site-orders' },
+        { name: 'Supplier Pre Orders', href: '/admin/supplier-preorders' },
         { name: 'Orders', href: '/admin/orders' },
         { name: 'Back Orders', href: '/admin/orders?tab=backorders' },
         { name: 'Quotes', href: '/admin/orders?tab=quotes' },

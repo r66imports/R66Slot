@@ -17,6 +17,7 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Content', name: 'Stock Audit', href: '/admin/stock-audit' },
   // Order Network
   { group: 'Order Network', name: 'Site Orders', href: '/admin/site-orders' },
+  { group: 'Order Network', name: 'Supplier Pre Orders', href: '/admin/supplier-preorders' },
   { group: 'Order Network', name: 'Orders (Sales)', href: '/admin/orders' },
   { group: 'Order Network', name: 'Pre Orders', href: '/admin/preorder-list' },
   { group: 'Order Network', name: 'Pre Order Dashboard', href: '/admin/preorder-dashboard' },
