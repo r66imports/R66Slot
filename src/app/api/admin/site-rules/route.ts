@@ -544,6 +544,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Products', 'Inventory', 'Supplier Pre Orders', 'Worksheet', 'Online Store'],
     category: 'Inventory',
   },
+  {
+    id: 'account_skins_are_cosmetic',
+    name: 'Rule 64 — Account Skins Are Cosmetic and Client-Owned',
+    description: `A client may choose a colour skin for their My Account area — Route 66, Chrome, Pit Lane, Emerald, Carbon, Midnight, Plum or Mono — and the choice is theirs alone: it is stored on their customer record as accountSkin, mirrored to localStorage so it applies before first paint, and follows them to another browser or device. A skin is PURELY COSMETIC. It is a set of CSS variables and nothing else, so it can never change a price, a quantity, a permission, what a client may see, or what any document says. Scope stops at the account wrapper: the storefront header, footer and product pages keep site branding, because a client recolouring their own back office must never repaint the shop for anyone. The skin repaints the grayscale and primary Tailwind utilities inside [data-skin] rather than each page being rewritten, which is what makes a new account page skinned for free — but it also means semantic colour must stay semantic: status chips, success and error boxes keep their own hue and are only re-mixed against the card on dark skins so they read as tinted badges instead of glowing blocks. The default skin, Route 66, reproduces the account area exactly as it looked before skins existed, so a client who never picks one sees no change at all, and an unknown or retired skin id falls back to it rather than leaving the account unstyled.`,
+    active: true,
+    appliesTo: ['My Account', 'Supplier Pre Orders', 'Online Store'],
+    category: 'Online Store',
+  },
 ]
 
 export async function GET() {
