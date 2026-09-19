@@ -52,6 +52,7 @@ interface DashboardItem {
   customers: DashboardCustomer[]; extraQty?: number; minOrderQty?: number | null
   resellerMoq?: number; resellerOnly?: boolean
   notes?: string; createdAt: string; updatedAt?: string
+  sentToLatestArrivals?: boolean; sentToLandingSoon?: boolean
 }
 type FormState = Omit<DashboardItem, 'id' | 'createdAt'>
 interface DashboardOptions { brands: string[]; units: string[]; etas: string[] }
@@ -689,6 +690,7 @@ function ItemCard({
   const customersDirty = useRef(false)
   const [saving,setSaving]=useState(false); const [deleting,setDeleting]=useState(false); const [confirmDelete,setConfirmDelete]=useState(false)
   const [sendingWs,setSendingWs]=useState(false); const [posterLoading,setPosterLoading]=useState(false)
+  const [sendingArrivals,setSendingArrivals]=useState(false); const [sendingLanding,setSendingLanding]=useState(false)
   const [supplierOpen,setSupplierOpen]=useState(false); const [isDragging,setIsDragging]=useState(false)
   const [imageSize,setImageSize]=useState<'sm'|'md'|'lg'>('sm')
   const [autoSaveStatus,setAutoSaveStatus]=useState<'idle'|'pending'|'saving'|'saved'|'error'>('idle')
@@ -798,6 +800,61 @@ function ItemCard({
   const handleSave=async()=>{setSaving(true);try{const{customers,...fieldsOnly}=formRef.current;const data=customersDirty.current?formRef.current:fieldsOnly;await onSave(item.id,data);if(customersDirty.current) customersDirty.current=false}catch(e:any){window.alert(`Not saved — ${e?.message||'server error'}`)}finally{setSaving(false)}}
   const handleDelete=async()=>{setDeleting(true);try{await onDelete(item.id)}finally{setDeleting(false);setConfirmDelete(false)}}
   const handleSendToWorksheet=async()=>{setSendingWs(true);try{await onSendToWorksheet(item.id,formRef.current)}finally{setSendingWs(false)}}
+  // Latest Arrivals is the post-arrival slider, so the card's qty is live Inventory stock,
+  // not the dashboard's own reservation slots. compareAtPrice is deliberately NOT sent —
+  // on R66Slot it holds Average Cost, which must never reach a public card.
+  const handleSendToLatestArrivals=async()=>{
+    const f=formRef.current
+    if(!f.sku||/chasecar/i.test(f.sku)||/chasecar/i.test(f.description||'')){window.alert('This item cannot be sent to Latest Arrivals.');return}
+    setSendingArrivals(true)
+    try{
+      const prod=await fetch('/api/admin/products?fields=sku,quantity,price,id').then(r=>r.json()).catch(()=>[])
+      const match=(Array.isArray(prod)?prod:[]).find((p:any)=>p.sku?.trim().toLowerCase()===f.sku.trim().toLowerCase())
+      const payload={
+        sku:f.sku,
+        title:f.description||f.sku,
+        imageUrl:f.imageUrl||'',
+        price:parsePrice(f.retailPrice||f.estimatedRetailPrice||'0')||Number(match?.price)||0,
+        quantity:Number(match?.quantity)||0,
+        productId:match?.id||undefined,
+      }
+      const res=await fetch('/api/admin/latest-arrivals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      if(res.ok) set('sentToLatestArrivals',true)
+      else{const err=await res.json().catch(()=>({}));window.alert(`Latest Arrivals failed: ${err.error||res.status}`)}
+    }catch{window.alert('Latest Arrivals failed — please try again.')}
+    finally{setSendingArrivals(false)}
+  }
+  // Same payload as Latest Arrivals, different blob — Landing Soon is the pre-arrival
+  // slider, so a dashboard item can sit on it before the shipment lands and move across
+  // afterwards. Chasecars stay off both: neither reveal is meant to be public.
+  const handleSendToLandingSoon=async()=>{
+    const f=formRef.current
+    if(!f.sku||/chasecar/i.test(f.sku)||/chasecar/i.test(f.description||'')){window.alert('This item cannot be sent to Landing Soon.');return}
+    setSendingLanding(true)
+    try{
+      const prod=await fetch('/api/admin/products?fields=sku,quantity,price,id').then(r=>r.json()).catch(()=>[])
+      const match=(Array.isArray(prod)?prod:[]).find((p:any)=>p.sku?.trim().toLowerCase()===f.sku.trim().toLowerCase())
+      // Pre-arrival, so the card's qty is the dashboard's remaining slots — the same
+      // "(N in stock)" figure shown on this card — not Inventory, which is still 0 until
+      // the shipment lands. /api/landing-soon recomputes this live; this is only the
+      // snapshot written to the blob.
+      const reserved=(f.customers||[]).reduce((s,c)=>s+(Number(c.qty)||0),0)
+      const moq=Number(f.minOrderQty)||0
+      const available=moq>0?Math.max(0,moq-reserved):Math.max(0,Number(f.extraQty)||0)
+      const landingPayload={
+        sku:f.sku,
+        title:f.description||f.sku,
+        imageUrl:f.imageUrl||'',
+        price:parsePrice(f.estimatedRetailPrice||f.retailPrice||'0')||Number(match?.price)||0,
+        quantity:available,
+        productId:match?.id||undefined,
+      }
+      const res=await fetch('/api/admin/landing-soon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(landingPayload)})
+      if(res.ok) set('sentToLandingSoon',true)
+      else{const err=await res.json().catch(()=>({}));window.alert(`Landing Soon failed: ${err.error||res.status}`)}
+    }catch{window.alert('Landing Soon failed — please try again.')}
+    finally{setSendingLanding(false)}
+  }
 
   const unitPrice=parsePrice(form.estimatedRetailPrice)
   const totalQty=form.customers.reduce((sum,c)=>sum+c.qty,0)
@@ -869,6 +926,12 @@ function ItemCard({
             <label className="flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={form.showRetail!==false} onChange={e=>set('showRetail',e.target.checked)} className="w-3.5 h-3.5 accent-rose-600"/><span className="text-[10px] font-semibold text-gray-600 whitespace-nowrap">Show Retail</span></label>
             <button onClick={async()=>{setPosterLoading(true);try{await generatePoster(formRef.current,item.sku)}finally{setPosterLoading(false)}}} disabled={posterLoading} className="text-[11px] px-2.5 py-1 rounded-lg bg-rose-700 text-white hover:bg-rose-800 disabled:opacity-60 font-semibold whitespace-nowrap">{posterLoading?'⏳':'🖼 Poster'}</button>
             <button onClick={()=>set('published',!form.published)} className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors ${form.published?'bg-emerald-600 text-white hover:bg-emerald-700':'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>{form.published?'🟢 Published':'⚫ Publish'}</button>
+            <button onClick={handleSendToLatestArrivals} disabled={sendingArrivals} className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors disabled:opacity-60 ${form.sentToLatestArrivals?'bg-purple-700 text-white hover:bg-purple-800':'bg-purple-100 text-purple-800 hover:bg-purple-200'}`} title="Send this item to the Latest Arrivals section on the Home Page">
+              {sendingArrivals?'Sending…':form.sentToLatestArrivals?'🆕 In Latest Arrivals':'🆕 Send to Latest Arrivals'}
+            </button>
+            <button onClick={handleSendToLandingSoon} disabled={sendingLanding} className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors disabled:opacity-60 ${form.sentToLandingSoon?'bg-sky-700 text-white hover:bg-sky-800':'bg-sky-100 text-sky-800 hover:bg-sky-200'}`} title="Send this item to the Landing Soon section on the Home Page">
+              {sendingLanding?'Sending…':form.sentToLandingSoon?'🛬 In Landing Soon':'🛬 Send to Landing Soon'}
+            </button>
             <button onClick={()=>onDuplicate(item.id)} className="text-[11px] px-2.5 py-1 rounded-lg font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 whitespace-nowrap transition-colors">⧉ Duplicate</button>
             <button onClick={()=>{const url=`${window.location.origin}/preorder/${item.id}`;navigator.clipboard.writeText(url).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),2000)})}} className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition-colors ${copied?'bg-green-100 text-green-700':'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{copied?'✓ Copied':'🔗 Copy Link'}</button>
             {form.published&&<button onClick={()=>window.open(`/preorder/${item.id}`,'_blank')} className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 font-semibold whitespace-nowrap">🌐 Pre-Order Page</button>}
@@ -1091,6 +1154,7 @@ export default function SupplierPreOrderPage() {
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [sortAsc, setSortAsc] = useState(false)
   const [search, setSearch] = useState('')
+  const [showArrived, setShowArrived] = useState(false)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -1174,8 +1238,14 @@ export default function SupplierPreOrderPage() {
     return sortAsc ? v : -v
   })
 
+  // An item sent to Latest Arrivals has landed — it is no longer a pre-order, so it leaves the
+  // dashboard. Hidden, not deleted: its customers and document links stay, "Show arrived"
+  // brings it back, and a search still finds it.
+  const arrivedCount = items.filter(i => i.sentToLatestArrivals).length
+  const current = showArrived || search.trim() ? sorted : sorted.filter(i => !i.sentToLatestArrivals)
+
   // "New Orders" filters the list down to items with at least one not-yet-seen reservation
-  const newFiltered = sortBy === 'new' ? sorted.filter(i => i.customers.some(c => (c as any).isNew)) : sorted
+  const newFiltered = sortBy === 'new' ? current.filter(i => i.customers.some(c => (c as any).isNew)) : current
 
   const filtered = search.trim()
     ? newFiltered.filter(i =>
@@ -1403,6 +1473,13 @@ export default function SupplierPreOrderPage() {
               <button onClick={() => { setSearch(''); setPage(1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
             )}
           </div>
+          {arrivedCount > 0 && (
+            <button onClick={() => { setShowArrived(v => !v); setPage(1) }}
+              className={`text-sm px-3 py-1.5 rounded-lg border font-medium transition-colors whitespace-nowrap ${showArrived ? 'bg-purple-700 text-white border-purple-700' : 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'}`}
+              title="Items sent to Latest Arrivals have landed and are hidden from the pre-order list">
+              🆕 {showArrived ? 'Hide' : 'Show'} arrived ({arrivedCount})
+            </button>
+          )}
           <div className="h-4 w-px bg-gray-200"/>
           <button onClick={() => { setViewAllSearch(''); setShowViewAll(true) }} className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 font-medium transition-colors">
             👁 View All ({items.length})

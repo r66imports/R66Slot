@@ -89,6 +89,8 @@ export interface PreOrderDashboardItem {
   seoImageUrl?: string
   shipmentStatus?: 'preorder' | 'shipping_soon' | 'shipping'
   linkedWsId?: string
+  sentToLatestArrivals?: boolean
+  sentToLandingSoon?: boolean
   customers: { id: string; name: string; email?: string; phone?: string; qty: number; depositPaid?: boolean; depositPaidDate?: string }[]
   // Pricing Tier 2
   wholesalePrice2?: string

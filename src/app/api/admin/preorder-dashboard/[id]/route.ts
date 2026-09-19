@@ -108,6 +108,8 @@ export async function PATCH(
       'estimatedRetailPrice2', 'moq2Qty', 'moq2Enabled', 'moq2ResellerOnly',
       'showRetail',
       'onSalesPage', 'salesTier1Discount', 'salesTier2Discount',
+      // Home Page sliders — drop either and the button re-reads "Send" after a reload
+      'sentToLatestArrivals', 'sentToLandingSoon',
       'notes',
     ]
     // A card saved from a page that was loaded before its Quote was converted carries the
