@@ -303,7 +303,7 @@ ${canvasHTML}
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-100 flex flex-col font-play">
+    <div className="fixed inset-x-0 bottom-0 top-20 bg-gray-100 flex flex-col font-play">
       {/* ─── TOP TOOLBAR ─── */}
       <div className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 shadow-sm z-50">
         <div className="flex items-center gap-4">
