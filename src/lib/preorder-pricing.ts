@@ -70,6 +70,16 @@ export function calcLandedZAR(wholesale: number, exRate: number, account: Costin
   return base * (account.landedMultiplier || 1)
 }
 
+/**
+ * A supplier who bills us in Rands is local: nothing was shipped in and nothing
+ * was cleared through customs, so the import percentages in calcEstRetailZAR
+ * would invent a cost we never paid. Local retail is a price we set, not one we
+ * derive — the estimate comes from Inventory instead (Rule 65).
+ */
+export function isLocalSupplierCurrency(code: string): boolean {
+  return (code || '').trim().toUpperCase() === 'ZAR'
+}
+
 /** Estimated retail per unit in ZAR, incl. markup and VAT. */
 export function calcEstRetailZAR(wholesale: number, exRate: number, account: CostingAccount): number {
   const landed = calcLandedZAR(wholesale, exRate, account)
@@ -83,12 +93,17 @@ export function calcEstRetailZAR(wholesale: number, exRate: number, account: Cos
  * to. Everything else re-prices against the current rate on every read.
  */
 export function lineEstRetailZAR(
-  line: Pick<SupplierPreOrderLine, 'wholesalePrice' | 'estRetailZAR' | 'priceLocked'>,
+  line: Pick<SupplierPreOrderLine, 'wholesalePrice' | 'estRetailZAR' | 'priceLocked' | 'currency'>,
   exRate: number,
   account: CostingAccount
 ): number {
   if (line.priceLocked) return Number(line.estRetailZAR) || 0
-  const calculated = calcEstRetailZAR(line.wholesalePrice, exRate, account)
+  // A local supplier's line was priced from Inventory and never went through
+  // the calculator (Rule 65); recomputing it would re-add shipping and customs
+  // that were never paid, and quietly undo the stored figure on every read.
+  const calculated = isLocalSupplierCurrency(line.currency)
+    ? 0
+    : calcEstRetailZAR(line.wholesalePrice, exRate, account)
   // No wholesale price means the line was priced from what we already sell the
   // item for, not through the calculator. Recomputing would return 0 and blank
   // the price out on every read, so the stored figure stands.

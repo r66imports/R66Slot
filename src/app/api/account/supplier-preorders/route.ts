@@ -6,6 +6,7 @@ import { getRates, rateFor } from '@/lib/exchange-rates'
 import {
   accountById,
   calcEstRetailZAR,
+  isLocalSupplierCurrency,
   lineEstRetailZAR,
   DEFAULT_COSTING_ACCOUNTS,
 } from '@/lib/preorder-pricing'
@@ -153,9 +154,12 @@ export async function POST(request: NextRequest) {
       const wholesale = match?.wholesalePrice || 0
 
       // A wholesale price prices through the calculator; an Inventory item with
-      // none keeps the retail we already sell it for. Neither means admin prices
-      // it by hand, and the client sees "On request".
-      const calculated = calcEstRetailZAR(wholesale, rate, account)
+      // none — or any local supplier, who incurred no shipping or customs —
+      // keeps the retail we already sell it for. Neither means admin prices it
+      // by hand, and the client sees "On request".
+      const calculated = isLocalSupplierCurrency(currency)
+        ? 0
+        : calcEstRetailZAR(wholesale, rate, account)
       const estRetailZAR =
         calculated > 0 ? calculated : match?.estRetailZAR || 0
 

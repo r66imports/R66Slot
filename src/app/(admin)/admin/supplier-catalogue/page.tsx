@@ -1,7 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { compareSku, formatZAR, accountById, calcEstRetailZAR } from '@/lib/preorder-pricing'
+import {
+  compareSku,
+  formatZAR,
+  accountById,
+  calcEstRetailZAR,
+  isLocalSupplierCurrency,
+} from '@/lib/preorder-pricing'
 import CatalogueImportModal from '@/components/admin/catalogue-import-modal'
 import type { CostingAccount, SupplierCatalogueItem } from '@/types/supplier-preorder'
 
@@ -452,7 +458,9 @@ export default function SupplierCataloguePage() {
                   />
                 </td>
                 <td className="py-2 pr-3 text-right text-gray-500">
-                  {formatZAR(calcEstRetailZAR(draft.wholesalePrice, rate, account))}
+                  {isLocalSupplierCurrency(currency)
+                    ? 'From Inventory'
+                    : formatZAR(calcEstRetailZAR(draft.wholesalePrice, rate, account))}
                 </td>
                 <td></td>
                 <td className="py-2 text-right">
@@ -496,11 +504,17 @@ export default function SupplierCataloguePage() {
                     <span className="ml-1 text-xs text-gray-400">{item.currency}</span>
                   </td>
                   <td className="py-2 pr-3 text-right font-semibold">
-                    {formatZAR(
-                      calcEstRetailZAR(
-                        item.wholesalePrice,
-                        item.currency === currency ? rate : rates[item.currency] || 0,
-                        account
+                    {isLocalSupplierCurrency(item.currency) ? (
+                      <span className="font-normal text-gray-500" title="A local supplier pays no shipping or customs, so the client is quoted the Inventory retail price (Rule 65)">
+                        From Inventory
+                      </span>
+                    ) : (
+                      formatZAR(
+                        calcEstRetailZAR(
+                          item.wholesalePrice,
+                          item.currency === currency ? rate : rates[item.currency] || 0,
+                          account
+                        )
                       )
                     )}
                   </td>

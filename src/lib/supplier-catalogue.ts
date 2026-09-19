@@ -1,6 +1,12 @@
 import { blobRead } from '@/lib/blob-storage'
 import { db } from '@/lib/db'
-import { accountById, calcEstRetailZAR, compareSku, DEFAULT_COSTING_ACCOUNTS } from '@/lib/preorder-pricing'
+import {
+  accountById,
+  calcEstRetailZAR,
+  compareSku,
+  DEFAULT_COSTING_ACCOUNTS,
+  isLocalSupplierCurrency,
+} from '@/lib/preorder-pricing'
 import { getRates, rateFor } from '@/lib/exchange-rates'
 import type { CostingAccount, SupplierCatalogueItem } from '@/types/supplier-preorder'
 import type { SupplierContact } from '@/app/api/admin/supplier-contacts/route'
@@ -226,7 +232,11 @@ export async function getMergedItems(opts: {
     const account = accountById(ctx.accounts, supplier?.defaultAccount)
     const currency = (item.currency || supplier?.preferredCurrency || 'EUR').toUpperCase()
     const rate = rateFor(ctx.rateData.rates, currency)
-    const calculated = calcEstRetailZAR(item.wholesalePrice, rate, account)
+    // Local suppliers skip the calculator and keep the retail we already sell
+    // at; a local SKU we have never stocked reads "On request" (Rule 65).
+    const calculated = isLocalSupplierCurrency(currency)
+      ? 0
+      : calcEstRetailZAR(item.wholesalePrice, rate, account)
 
     const existing = bySku.get(sku)
     bySku.set(sku, {
