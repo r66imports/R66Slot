@@ -192,7 +192,9 @@ function extractDominantHue(img: HTMLImageElement): number | null {
 }
 
 async function generatePoster(form: FormState, sku: string): Promise<void> {
-  const W = 1080, H = 1920; const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H
+  /* 16:9 landscape. The portrait stack becomes two columns: product image on
+     the left, details on the right, with the accent bands top and bottom. */
+  const W = 1920, H = 1080; const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H
   const ctx = canvas.getContext('2d')!
   if (!document.fonts.check('30px "Play"')) {
     try {
@@ -207,34 +209,56 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   let ACCENT: string, DARK: string, MID: string
   if (hue !== null) { ACCENT = hslToHex(hue, 0.88, 0.48); DARK = hslToHex(hue, 0.45, 0.07); MID = hslToHex(hue, 0.30, 0.13) }
   else { ACCENT = '#C41230'; DARK = '#111111'; MID = '#1e1e1e' }
+
+  const BAND = 210, FOOT = 104
   ctx.fillStyle = DARK; ctx.fillRect(0, 0, W, H)
-  ctx.fillStyle = ACCENT; ctx.fillRect(0, 0, W, 130)
+
+  // ── Header band ──
+  ctx.fillStyle = ACCENT; ctx.fillRect(0, 0, W, BAND)
+  const LOGO = 220 // double the old 110
   const logo = await loadImage('/logo.webp')
-  if (logo) { ctx.drawImage(logo, 14, 10, 110, 110) }
-  else { ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'left'; ctx.fillText('R66', 16, 60); ctx.font = 'bold 22px Arial'; ctx.fillText('SLOT', 16, 90) }
-  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 66px Arial'; ctx.textAlign = 'center'; ctx.fillText('PRE ORDER', W / 2 + 55, 90)
-  const imgTop = 142, imgH = 820
-  ctx.fillStyle = MID; ctx.fillRect(0, imgTop, W, imgH)
-  if (prod) { const scale = Math.min(980 / prod.naturalWidth, (imgH - 30) / prod.naturalHeight); const w = prod.naturalWidth * scale, h = prod.naturalHeight * scale; ctx.drawImage(prod, (W - w) / 2, imgTop + (imgH - h) / 2, w, h) }
-  const sepY = imgTop + imgH + 24; ctx.fillStyle = ACCENT; ctx.fillRect(40, sepY, W - 80, 8)
+  if (logo) { ctx.drawImage(logo, 24, (BAND - LOGO) / 2, LOGO, LOGO) }
+  else { ctx.fillStyle = '#ffffff'; ctx.font = 'bold 52px Arial'; ctx.textAlign = 'left'; ctx.fillText('R66', 28, 100); ctx.font = 'bold 38px Arial'; ctx.fillText('SLOT', 28, 150) }
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 92px Arial'; ctx.textAlign = 'center'
+  ctx.fillText('PRE ORDER', 24 + LOGO + (W - 24 - LOGO) / 2, BAND / 2 + 32)
+
+  // ── Left column: product image ──
+  const colGap = 40
+  const imgW = Math.round(W * 0.52)
+  const bodyTop = BAND, bodyH = H - BAND - FOOT
+  ctx.fillStyle = MID; ctx.fillRect(0, bodyTop, imgW, bodyH)
+  if (prod) {
+    const scale = Math.min((imgW - 60) / prod.naturalWidth, (bodyH - 60) / prod.naturalHeight)
+    const w = prod.naturalWidth * scale, h = prod.naturalHeight * scale
+    ctx.drawImage(prod, (imgW - w) / 2, bodyTop + (bodyH - h) / 2, w, h)
+  }
+  // Accent divider between the columns
+  ctx.fillStyle = ACCENT; ctx.fillRect(imgW, bodyTop, 8, bodyH)
+
+  // ── Right column: details ──
+  const colX = imgW + 8 + colGap
+  const colW = W - colX - colGap
   type Sec = { h: number; draw: (top: number) => void }
   const secs: Sec[] = []
-  secs.push({ h: 46, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = '38px Arial'; ctx.textAlign = 'left'; ctx.fillText(`SKU: ${sku || form.sku || '—'}`, 60, top + 38) } })
-  if (form.brand) { secs.push({ h: 64, draw: (top) => { ctx.font = 'bold 38px Arial'; ctx.textAlign = 'left'; const bw = ctx.measureText(form.brand).width + 52; ctx.fillStyle = ACCENT; ctx.beginPath(); ctx.roundRect(60, top, bw, 64, 10); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.fillText(form.brand, 86, top + 50) } }) }
-  ctx.font = 'bold 46px Arial'
-  const descLines = wrapTextLines(ctx, form.description || '—', W - 120).slice(0, 3)
-  secs.push({ h: descLines.length * 72, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = 'bold 46px Arial'; ctx.textAlign = 'left'; descLines.forEach((ln, i) => ctx.fillText(ln, 60, top + 52 + i * 72)) } })
-  if (form.notes) { ctx.font = 'italic 40px Arial'; const noteLines = wrapTextLines(ctx, form.notes, W - 120).slice(0, 2); secs.push({ h: noteLines.length * 52, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = 'italic 40px Arial'; ctx.textAlign = 'left'; noteLines.forEach((ln, i) => ctx.fillText(ln, 60, top + 40 + i * 52)) } }) }
-  if (form.showRetail !== false) { const price = parseFloat(form.estimatedRetailPrice || form.retailPrice || '0'); const priceText = price > 0 ? `R ${price.toFixed(2)}` : 'POA'; secs.push({ h: 120, draw: (top) => { ctx.fillStyle = ACCENT; ctx.font = 'bold 104px Arial'; ctx.textAlign = 'left'; ctx.fillText(priceText, 60, top + 104) } }) }
-  secs.push({ h: 50, draw: (top) => { ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.font = '42px Arial'; ctx.fillText('ETA', 60, top + 42); ctx.font = 'bold 42px Arial'; ctx.fillText(form.eta || '—', 180, top + 42) } })
+  secs.push({ h: 46, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = '38px Arial'; ctx.textAlign = 'left'; ctx.fillText(`SKU: ${sku || form.sku || '—'}`, colX, top + 38) } })
+  if (form.brand) { secs.push({ h: 64, draw: (top) => { ctx.font = 'bold 38px Arial'; ctx.textAlign = 'left'; const bw = ctx.measureText(form.brand).width + 52; ctx.fillStyle = ACCENT; ctx.beginPath(); ctx.roundRect(colX, top, bw, 64, 10); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.fillText(form.brand, colX + 26, top + 50) } }) }
+  ctx.font = 'bold 50px Arial'
+  const descLines = wrapTextLines(ctx, form.description || '—', colW).slice(0, 3)
+  secs.push({ h: descLines.length * 66, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = 'bold 50px Arial'; ctx.textAlign = 'left'; descLines.forEach((ln, i) => ctx.fillText(ln, colX, top + 50 + i * 66)) } })
+  if (form.notes) { ctx.font = 'italic 38px Arial'; const noteLines = wrapTextLines(ctx, form.notes, colW).slice(0, 2); secs.push({ h: noteLines.length * 50, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = 'italic 38px Arial'; ctx.textAlign = 'left'; noteLines.forEach((ln, i) => ctx.fillText(ln, colX, top + 38 + i * 50)) } }) }
+  if (form.showRetail !== false) { const price = parseFloat(form.estimatedRetailPrice || form.retailPrice || '0'); const priceText = price > 0 ? `R ${price.toFixed(2)}` : 'POA'; secs.push({ h: 112, draw: (top) => { ctx.fillStyle = ACCENT; ctx.font = 'bold 100px Arial'; ctx.textAlign = 'left'; ctx.fillText(priceText, colX, top + 98) } }) }
+  secs.push({ h: 50, draw: (top) => { ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.font = '42px Arial'; ctx.fillText('ETA', colX, top + 42); ctx.font = 'bold 42px Arial'; ctx.fillText(form.eta || '—', colX + 120, top + 42) } })
   const totalQtyP = form.customers.reduce((s, c) => s + c.qty, 0); const moqP = form.minOrderQty ?? 0; const inStockP = moqP > 0 ? Math.max(0, moqP - totalQtyP) : (form.extraQty ?? 0); const isSoldOut = !!form.orderPlaced && inStockP === 0
-  if (isSoldOut) { ctx.font = '30px Play'; const stw = ctx.measureText('SOLD OUT').width; const sbw = stw + 48, sbh = 56; secs.push({ h: sbh, draw: (top) => { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.roundRect(60, top, sbw, sbh, 8); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.font = '30px Play'; ctx.textAlign = 'left'; ctx.fillText('SOLD OUT', 84, top + 34) } }) }
-  else if (moqP > 0) { const labelText = 'Qty Available'; const qtyText = `${totalQtyP} of ${moqP} Reserved`; ctx.font = '30px Play'; const labelW = ctx.measureText(labelText).width; const qtyW = ctx.measureText(qtyText).width; const bPadX = 20, bh = 56, boxGap = 20; secs.push({ h: bh, draw: (top) => { ctx.font = '30px Play'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.fillText(labelText, 60, top + 34); const bx = 60 + labelW + boxGap; ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.roundRect(bx, top, qtyW + bPadX * 2, bh, 8); ctx.fill(); ctx.fillStyle = '#000000'; ctx.fillText(qtyText, bx + bPadX, top + 34) } }) }
-  else { secs.push({ h: 50, draw: (top) => { ctx.fillStyle = '#22c55e'; ctx.font = 'bold 42px Arial'; ctx.textAlign = 'left'; ctx.fillText('Pre-Order Now', 60, top + 42) } }) }
-  const contentTop = sepY + 16, contentBottom = H - 90, totalH = secs.reduce((s, sec) => s + sec.h, 0)
-  const gap = Math.max(16, Math.floor((contentBottom - contentTop - totalH) / (secs.length + 1)))
+  if (isSoldOut) { ctx.font = '30px Play'; const stw = ctx.measureText('SOLD OUT').width; const sbw = stw + 48, sbh = 56; secs.push({ h: sbh, draw: (top) => { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.roundRect(colX, top, sbw, sbh, 8); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.font = '30px Play'; ctx.textAlign = 'left'; ctx.fillText('SOLD OUT', colX + 24, top + 34) } }) }
+  else if (moqP > 0) { const labelText = 'Qty Available'; const qtyText = `${totalQtyP} of ${moqP} Reserved`; ctx.font = '30px Play'; const labelW = ctx.measureText(labelText).width; const qtyW = ctx.measureText(qtyText).width; const bPadX = 20, bh = 56, boxGap = 20; secs.push({ h: bh, draw: (top) => { ctx.font = '30px Play'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.fillText(labelText, colX, top + 34); const bx = colX + labelW + boxGap; ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.roundRect(bx, top, qtyW + bPadX * 2, bh, 8); ctx.fill(); ctx.fillStyle = '#000000'; ctx.fillText(qtyText, bx + bPadX, top + 34) } }) }
+  else { secs.push({ h: 50, draw: (top) => { ctx.fillStyle = '#22c55e'; ctx.font = 'bold 42px Arial'; ctx.textAlign = 'left'; ctx.fillText('Pre-Order Now', colX, top + 42) } }) }
+
+  const contentTop = bodyTop + 30, contentBottom = H - FOOT - 30, totalH = secs.reduce((s, sec) => s + sec.h, 0)
+  const gap = Math.max(14, Math.floor((contentBottom - contentTop - totalH) / (secs.length + 1)))
   let y = contentTop + gap; for (const sec of secs) { sec.draw(y); y += sec.h + gap }
-  ctx.fillStyle = ACCENT; ctx.fillRect(0, H - 90, W, 90); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'center'; ctx.fillText('www.r66slot.co.za', W / 2, H - 28)
+
+  // ── Footer ──
+  ctx.fillStyle = ACCENT; ctx.fillRect(0, H - FOOT, W, FOOT); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 44px Arial'; ctx.textAlign = 'center'; ctx.fillText('www.r66slot.co.za', W / 2, H - 36)
   canvas.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sku || form.sku || 'preorder'}-poster.jpg`; a.click(); URL.revokeObjectURL(url) }, 'image/jpeg', 0.92)
 }
 
