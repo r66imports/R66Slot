@@ -230,15 +230,40 @@ export async function getMergedItems(opts: {
     })
   }
 
+  // Inventory is the authority on WHICH BRAND a SKU belongs to; the catalogue is
+  // only a price sheet. Its brand can be stale or plain wrong — an import that
+  // typed every Revo line as "Revo" put 36 spares (screws, gears, bearings, body
+  // plates) into the Revo car list, because a catalogue row was listed under its
+  // own brand no matter what the product said. So where we stock the SKU, the
+  // product's brand decides both whether the row belongs in this brand's list and
+  // what brand it shows as. A catalogue-only SKU still uses the row's own brand.
+  const catalogueSkus = [
+    ...new Set(ctx.catalogue.filter((i) => i.active !== false && i.sku).map((i) => upper(i.sku))),
+  ]
+  const brandBySku = new Map<string, string>()
+  if (catalogueSkus.length > 0) {
+    const stocked = await db.query(
+      `SELECT UPPER(TRIM(sku)) AS sku, brand
+         FROM products
+        WHERE status != 'archived' AND brand IS NOT NULL AND TRIM(brand) <> ''
+          AND UPPER(TRIM(sku)) = ANY($1)`,
+      [catalogueSkus]
+    )
+    for (const row of stocked.rows as { sku: string; brand: string }[]) {
+      brandBySku.set(row.sku, row.brand.trim())
+    }
+  }
+
   // Catalogue on top — adds unstocked SKUs and overrides price where we know
   // what the supplier charges.
   for (const item of ctx.catalogue) {
     if (item.active === false || !item.sku) continue
     const sku = upper(item.sku)
+    const itemBrand = brandBySku.get(sku) || (item.brand || '').trim()
     if (skus.length > 0) {
       if (!skus.includes(sku)) continue
     } else {
-      const brandMatch = brands.length === 0 || brands.includes((item.brand || '').toLowerCase())
+      const brandMatch = brands.length === 0 || brands.includes(itemBrand.toLowerCase())
       const searchMatch =
         !search ||
         sku.toLowerCase().includes(search) ||
@@ -261,7 +286,7 @@ export async function getMergedItems(opts: {
       id: item.id,
       supplierId: supplier?.id || item.supplierId || '',
       supplierName: supplier?.name || item.supplierName || '',
-      brand: item.brand || existing?.brand || '',
+      brand: itemBrand || existing?.brand || '',
       sku,
       description: (item.description || existing?.description || '').trim(),
       estRetailZAR:
