@@ -58,6 +58,8 @@ interface SubmittedOrder {
 /** Quantity plus enough of the item to render it once its brand is deselected. */
 type CartEntry = { item: CatalogueItem; qty: number }
 
+type SortKey = 'brand' | 'sku' | 'description' | 'stock' | 'price'
+
 const STATUS_STYLES: Record<string, string> = {
   submitted: 'bg-blue-100 text-blue-800',
   reviewed: 'bg-indigo-100 text-indigo-800',
@@ -75,6 +77,8 @@ export default function SupplierPreOrdersPage() {
   const [items, setItems] = useState<CatalogueItem[]>([])
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [sortBy, setSortBy] = useState<SortKey>('brand')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [cart, setCart] = useState<Record<string, CartEntry>>({})
   const [customLines, setCustomLines] = useState<CustomLine[]>([])
   const [notes, setNotes] = useState('')
@@ -169,10 +173,52 @@ export default function SupplierPreOrdersPage() {
       return next
     })
 
-  const visibleItems = useMemo(
-    () => [...items].sort((a, b) => a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku)),
-    [items]
-  )
+  /**
+   * Sorting. Brand → SKU stays the default; a client hunting on price or on
+   * what is already on the shelf can re-sort by any column. Ties always fall
+   * back to brand → SKU so the order never looks random.
+   */
+  const visibleItems = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...items].sort((a, b) => {
+      let cmp = 0
+      if (sortBy === 'brand') cmp = a.brand.localeCompare(b.brand)
+      else if (sortBy === 'sku') cmp = compareSku(a.sku, b.sku)
+      else if (sortBy === 'description')
+        cmp = (a.description || '').localeCompare(b.description || '')
+      else if (sortBy === 'stock') cmp = a.qtyAvailable - b.qtyAvailable
+      else if (sortBy === 'price') cmp = a.estRetailZAR - b.estRetailZAR
+      if (cmp !== 0) return cmp * dir
+      return a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku)
+    })
+  }, [items, sortBy, sortDir])
+
+  /** Header cell that sorts the sheet; clicking the active column flips it. */
+  const sortTh = (col: SortKey, label: string, className: string) => {
+    const active = sortBy === col
+    return (
+      <th className={`${className} font-medium`}>
+        <button
+          type="button"
+          onClick={() => {
+            if (active) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+            else {
+              setSortBy(col)
+              setSortDir('asc')
+            }
+          }}
+          className={`group inline-flex items-center gap-1 uppercase tracking-wide ${
+            active ? 'text-gray-900' : 'hover:text-gray-700'
+          }`}
+        >
+          {label}
+          <span className={active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}>
+            {active && sortDir === 'desc' ? '↑' : '↓'}
+          </span>
+        </button>
+      </th>
+    )
+  }
 
   const cartEntries = useMemo(
     () =>
@@ -470,12 +516,12 @@ export default function SupplierPreOrdersPage() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
-                    <th className="py-2 pr-4 font-medium">Brand</th>
+                    {sortTh('brand', 'Brand', 'py-2 pr-4')}
                     <th className="py-2 pr-2 font-medium sr-only">Photo</th>
-                    <th className="py-2 pr-4 font-medium">SKU</th>
-                    <th className="py-2 pr-4 font-medium">Description</th>
-                    <th className="py-2 pr-4 font-medium text-center whitespace-nowrap">In Stock</th>
-                    <th className="py-2 pr-4 font-medium text-right whitespace-nowrap">Est. Retail</th>
+                    {sortTh('sku', 'SKU', 'py-2 pr-4')}
+                    {sortTh('description', 'Description', 'py-2 pr-4')}
+                    {sortTh('stock', 'In Stock', 'py-2 pr-4 text-center whitespace-nowrap')}
+                    {sortTh('price', 'Est. Retail', 'py-2 pr-4 text-right whitespace-nowrap')}
                     <th className="py-2 font-medium text-center">Qty</th>
                   </tr>
                 </thead>

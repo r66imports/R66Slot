@@ -21,6 +21,8 @@ interface Supplier {
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'ZAR', 'CHF', 'JPY', 'AUD', 'CAD', 'HKD', 'CNY']
 
+type SortKey = 'brand' | 'sku' | 'description' | 'wholesale' | 'retail' | 'live'
+
 const blankRow = () => ({
   id: '',
   brand: '',
@@ -38,6 +40,8 @@ export default function SupplierCataloguePage() {
   const [rates, setRates] = useState<Record<string, number>>({})
 
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<SortKey>('brand')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [draft, setDraft] = useState(blankRow())
   const [brandInput, setBrandInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -163,6 +167,20 @@ export default function SupplierCataloguePage() {
     }
   }
 
+  /** Est. Retail for one row, in ZAR — the figure the client is quoted. */
+  const retailOf = useCallback(
+    (i: SupplierCatalogueItem) =>
+      isLocalSupplierCurrency(i.currency)
+        ? 0
+        : calcEstRetailZAR(
+            i.wholesalePrice,
+            i.currency === currency ? rate : rates[i.currency] || 0,
+            account
+          ),
+    [currency, rate, rates, account]
+  )
+
+  /** Brand → SKU is the default; ties fall back to it so nothing looks random. */
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase()
     const rows = q
@@ -170,8 +188,47 @@ export default function SupplierCataloguePage() {
           (i) => i.sku.toLowerCase().includes(q) || i.description.toLowerCase().includes(q)
         )
       : catalogue
-    return [...rows].sort((a, b) => a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku))
-  }, [catalogue, search])
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...rows].sort((a, b) => {
+      let cmp = 0
+      if (sortBy === 'brand') cmp = a.brand.localeCompare(b.brand)
+      else if (sortBy === 'sku') cmp = compareSku(a.sku, b.sku)
+      else if (sortBy === 'description')
+        cmp = (a.description || '').localeCompare(b.description || '')
+      else if (sortBy === 'wholesale') cmp = a.wholesalePrice - b.wholesalePrice
+      else if (sortBy === 'retail') cmp = retailOf(a) - retailOf(b)
+      else if (sortBy === 'live') cmp = Number(a.active !== false) - Number(b.active !== false)
+      if (cmp !== 0) return cmp * dir
+      return a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku)
+    })
+  }, [catalogue, search, sortBy, sortDir, retailOf])
+
+  /** Header cell that sorts the list; clicking the active column flips it. */
+  const sortTh = (col: SortKey, label: string, className: string) => {
+    const active = sortBy === col
+    return (
+      <th className={`${className} font-medium`}>
+        <button
+          type="button"
+          onClick={() => {
+            if (active) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+            else {
+              setSortBy(col)
+              setSortDir('asc')
+            }
+          }}
+          className={`group inline-flex items-center gap-1 uppercase tracking-wide ${
+            active ? 'text-gray-900' : 'hover:text-gray-700'
+          }`}
+        >
+          {label}
+          <span className={active ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}>
+            {active && sortDir === 'desc' ? '↑' : '↓'}
+          </span>
+        </button>
+      </th>
+    )
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -404,12 +461,12 @@ export default function SupplierCataloguePage() {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
-                <th className="py-2 pr-3 font-medium">Brand</th>
-                <th className="py-2 pr-3 font-medium">SKU</th>
-                <th className="py-2 pr-3 font-medium">Description</th>
-                <th className="py-2 pr-3 font-medium text-right">Wholesale</th>
-                <th className="py-2 pr-3 font-medium text-right">Est. Retail</th>
-                <th className="py-2 pr-3 font-medium text-center">Live</th>
+                {sortTh('brand', 'Brand', 'py-2 pr-3')}
+                {sortTh('sku', 'SKU', 'py-2 pr-3')}
+                {sortTh('description', 'Description', 'py-2 pr-3')}
+                {sortTh('wholesale', 'Wholesale', 'py-2 pr-3 text-right')}
+                {sortTh('retail', 'Est. Retail', 'py-2 pr-3 text-right')}
+                {sortTh('live', 'Live', 'py-2 pr-3 text-center')}
                 <th className="py-2 font-medium"></th>
               </tr>
             </thead>
