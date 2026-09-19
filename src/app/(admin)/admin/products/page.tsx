@@ -476,6 +476,10 @@ export default function ProductsPage() {
   const [bulkBrand, setBulkBrand] = useState('')
   const [bulkBranding, setBulkBranding] = useState(false)
   const [bulkBrandDone, setBulkBrandDone] = useState(0)
+  const [showSupplierModal, setShowSupplierModal] = useState(false)
+  const [bulkSupplier, setBulkSupplier] = useState('')
+  const [bulkSuppliering, setBulkSuppliering] = useState(false)
+  const [bulkSupplierDone, setBulkSupplierDone] = useState(0)
   const [fixingDupes, setFixingDupes] = useState(false)
   const [viewMode, setViewMode] = useState<'brands' | 'products'>('brands')
   const [groupBy, setGroupBy] = useState<'brand' | 'supplier'>('brand')
@@ -688,6 +692,35 @@ export default function ProductsPage() {
       fetchBrandSummary()
     } catch (err) { console.error('Bulk brand error:', err) }
     finally { setBulkBranding(false) }
+  }
+
+  const handleBulkSupplier = async () => {
+    const supplier = bulkSupplier.trim()
+    if (!selectedIds.size || !supplier) return
+    setBulkSuppliering(true)
+    setBulkSupplierDone(0)
+    try {
+      const ids = Array.from(selectedIds)
+      // 10 at a time — a full brand can be 400+ rows
+      for (let i = 0; i < ids.length; i += 10) {
+        await Promise.all(ids.slice(i, i + 10).map((id) =>
+          fetch(`/api/admin/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ supplier }),
+          })
+        ))
+        setBulkSupplierDone(Math.min(i + 10, ids.length))
+      }
+      setProducts((prev) => prev.map((p) =>
+        selectedIds.has(p.id) ? { ...p, supplier } : p
+      ))
+      setSelectedIds(new Set())
+      setShowSupplierModal(false)
+      setBulkSupplier('')
+      fetchBrandSummary()
+    } catch (err) { console.error('Bulk supplier error:', err) }
+    finally { setBulkSuppliering(false) }
   }
 
   const exportCSV = (rows: Product[], profileKey = 'generic') => {
@@ -1031,7 +1064,11 @@ export default function ProductsPage() {
       const matchRevo = !revoFilter || (p.itemCategories || []).includes(revoFilter)
       const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
       const supplierName = supplierFilter ? (suppliers.find(s => s.id === supplierFilter)?.name || '') : ''
-      const matchSupplier = !supplierFilter || (!!p.brand && p.brand.toLowerCase() === supplierName.toLowerCase())
+      // A product's own supplier wins; only an unassigned product falls back to
+      // its brand name, so the old brand-name matching keeps working until a
+      // supplier is set on it (bulk Change Supplier sets it).
+      const ownSupplier = (p.supplier || '').trim() || (p.brand || '').trim()
+      const matchSupplier = !supplierFilter || ownSupplier.toLowerCase() === supplierName.toLowerCase()
       return matchBrand && matchCat && matchRevo && matchSearch && matchSupplier
     })
     .sort((a, b) => {
@@ -1349,6 +1386,9 @@ export default function ProductsPage() {
           </button>
           <button onClick={() => { setBulkBrand(''); setShowBrandModal(true) }} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-900 rounded hover:bg-gray-100">
             Change Brand
+          </button>
+          <button onClick={() => { setBulkSupplier(''); setShowSupplierModal(true) }} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-900 rounded hover:bg-gray-100">
+            Change Supplier
           </button>
           <button onClick={handleBulkDelete} disabled={bulkDeleting} className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
             {bulkDeleting ? 'Deleting…' : 'Delete Selected'}
@@ -1748,6 +1788,48 @@ export default function ProductsPage() {
               <Button variant="outline" onClick={() => setShowBrandModal(false)} disabled={bulkBranding}>Cancel</Button>
               <Button onClick={handleBulkBrand} disabled={bulkBranding || !bulkBrand.trim()}>
                 {bulkBranding ? `Updating ${bulkBrandDone}/${selectedIds.size}…` : `Update ${selectedIds.size} Product${selectedIds.size > 1 ? 's' : ''}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Change Supplier Modal ── */}
+      {showSupplierModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-1">Change Supplier</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {selectedIds.size} product{selectedIds.size > 1 ? 's' : ''} selected. This sets the Supplier on each product. Brand, categories, prices and stock are untouched.
+            </p>
+
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Pick a supplier</label>
+            <select
+              value={suppliers.some((sup) => sup.name === bulkSupplier) ? bulkSupplier : ''}
+              onChange={(e) => setBulkSupplier(e.target.value)}
+              className="w-full mb-3 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">— Select supplier —</option>
+              {suppliers.map((sup) => (
+                <option key={sup.id} value={sup.name}>
+                  {sup.name}{sup.preferredCurrency ? ` (${sup.preferredCurrency})` : ''}
+                </option>
+              ))}
+            </select>
+
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Or type a new one</label>
+            <input
+              type="text"
+              value={bulkSupplier}
+              onChange={(e) => setBulkSupplier(e.target.value)}
+              placeholder="Supplier name"
+              className="w-full mb-4 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowSupplierModal(false)} disabled={bulkSuppliering}>Cancel</Button>
+              <Button onClick={handleBulkSupplier} disabled={bulkSuppliering || !bulkSupplier.trim()}>
+                {bulkSuppliering ? `Updating ${bulkSupplierDone}/${selectedIds.size}…` : `Update ${selectedIds.size} Product${selectedIds.size > 1 ? 's' : ''}`}
               </Button>
             </div>
           </div>

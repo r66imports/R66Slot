@@ -560,6 +560,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Supplier Pre Orders', 'Supplier Catalogue', 'Suppliers'],
     category: 'Orders',
   },
+  {
+    id: 'bulk_change_supplier',
+    name: 'Rule 66 — Bulk Change Supplier Assigns the Supplier and Nothing Else',
+    description: `Tick any batch of rows on the Inventory (Products) page and "Change Supplier" in the bulk bar writes one supplier name onto every selected product. It is a FILING action, not a costing one: it PATCHes products.supplier and touches nothing else — brand, Category (Brand), item categories, price, wholesale price, cost, quantity and status are all left exactly as they were, and no stock movement or ledger row is produced. This is the deliberate difference from "Change Brand", which also replaces Category (Brand) because brand and category brand are one idea; a supplier is who we buy from, which is a separate fact from what the thing is. Rows are PATCHed ten at a time with a live counter because a brand can run to 400+ products, and the list and brand/supplier summary are refreshed in place afterwards rather than by reload, so nothing else on the page is lost. The supplier may be picked from the supplier contacts dropdown — which shows each supplier's preferred currency, so Revo Slot (USD) and Revo Spares/BRM (EUR) can never be confused — or typed in free-form for a supplier not yet on the network. This exists because one brand can be split across two suppliers (Rule 63's currency trap is the reason it matters): Revo livery cars and white kits are bought from Revo Slot in USD while every Revo spare comes from Revo Spares/BRM in EUR, and the split is classified by item category, NEVER by the SKU prefix. Assigning the supplier by hand in batches is how that split is maintained, so the supplier filter, the Suppliers grouping on the brand grid and the per-supplier CSV exports all agree. A product's own supplier field is what the Supplier filter matches; only a product that has never been assigned one falls back to matching on its brand name, so the filter keeps working for un-assigned stock and gets sharper as batches are filed.`,
+    active: true,
+    appliesTo: ['Inventory', 'Products', 'Suppliers'],
+    category: 'Inventory',
+  },
 ]
 
 export async function GET() {
