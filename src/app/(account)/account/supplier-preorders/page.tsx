@@ -18,6 +18,8 @@ interface CatalogueItem {
   brand: string
   sku: string
   description: string
+  /** What it sells for on the site today; 0 when we have never carried it. */
+  retailZAR: number
   estRetailZAR: number
   imageUrl: string
   qtyAvailable: number
@@ -60,7 +62,7 @@ interface SubmittedOrder {
 /** Quantity plus enough of the item to render it once its brand is deselected. */
 type CartEntry = { item: CatalogueItem; qty: number }
 
-type SortKey = 'brand' | 'sku' | 'description' | 'stock' | 'onorder' | 'price'
+type SortKey = 'brand' | 'sku' | 'description' | 'stock' | 'onorder' | 'retail' | 'price'
 
 const STATUS_STYLES: Record<string, string> = {
   submitted: 'bg-blue-100 text-blue-800',
@@ -191,6 +193,7 @@ export default function SupplierPreOrdersPage() {
         cmp = (a.description || '').localeCompare(b.description || '')
       else if (sortBy === 'stock') cmp = a.qtyAvailable - b.qtyAvailable
     else if (sortBy === 'onorder') cmp = a.qtyOnOrder - b.qtyOnOrder
+    else if (sortBy === 'retail') cmp = a.retailZAR - b.retailZAR
       else if (sortBy === 'price') cmp = a.estRetailZAR - b.estRetailZAR
       if (cmp !== 0) return cmp * dir
       return a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku)
@@ -664,6 +667,7 @@ export default function SupplierPreOrdersPage() {
                     {sortTh('description', 'Description', 'py-2 pr-4')}
                     {sortTh('stock', 'In Stock', 'py-2 pr-4 text-center whitespace-nowrap')}
                     {sortTh('onorder', 'Qty Ordered', 'py-2 pr-4 text-center whitespace-nowrap')}
+                    {sortTh('retail', 'Retail', 'py-2 pr-4 text-right whitespace-nowrap')}
                     {sortTh('price', 'Est. Retail', 'py-2 pr-4 text-right whitespace-nowrap')}
                     <th className="py-2 font-medium text-center">Qty</th>
                   </tr>
@@ -711,6 +715,12 @@ export default function SupplierPreOrdersPage() {
                           ) : (
                             <span className="text-gray-400">0</span>
                           )}
+                        </td>
+                        <td
+                          className="py-2 pr-4 text-right text-gray-600 whitespace-nowrap"
+                          title="What this sells for on the site today"
+                        >
+                          {item.retailZAR > 0 ? formatZAR(item.retailZAR) : '—'}
                         </td>
                         <td className="py-2 pr-4 text-right font-semibold whitespace-nowrap">
                           {item.estRetailZAR > 0 ? formatZAR(item.estRetailZAR) : 'On request'}

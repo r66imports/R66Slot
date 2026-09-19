@@ -43,6 +43,13 @@ export interface MergedItem {
   description: string
   estRetailZAR: number
   /**
+   * What the SKU sells for on the site today (products.price). 0 when we have
+   * never carried it — a catalogue-only line has no shelf price, and neither
+   * does a product that was never priced. Never a cost: on R66Slot
+   * compareAtPrice is Average Cost and never leaves the admin.
+   */
+  retailZAR: number
+  /**
    * catalogue — priced through the costing calculator from a wholesale price
    * product   — no wholesale known, falling back to what we already sell it for
    * unpriced  — neither; the client sees "On request" and admin prices it
@@ -226,6 +233,7 @@ export async function getMergedItems(opts: {
       sku,
       description: (p.title || '').trim(),
       estRetailZAR: Math.round(fallback * 100) / 100,
+      retailZAR: Math.round((Number(p.price) || 0) * 100) / 100,
       priceSource: fallback > 0 ? 'product' : 'unpriced',
       wholesalePrice: 0,
       currency: (supplier?.preferredCurrency || 'EUR').toUpperCase(),
@@ -298,6 +306,9 @@ export async function getMergedItems(opts: {
         calculated > 0
           ? Math.round(calculated * 100) / 100
           : existing?.estRetailZAR || 0,
+      // The catalogue is a wholesale sheet — it knows nothing about our shelf
+      // price, so whatever Inventory knew stands.
+      retailZAR: existing?.retailZAR || 0,
       priceSource:
         calculated > 0 ? 'catalogue' : existing && existing.estRetailZAR > 0 ? 'product' : 'unpriced',
       wholesalePrice: item.wholesalePrice || 0,

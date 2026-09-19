@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
             sku: i.sku,
             description: i.description,
             estRetailZAR: i.estRetailZAR,
+            retailZAR: i.retailZAR,
             imageUrl: i.imageUrl,
             qtyAvailable: i.qtyAvailable,
             qtyOnOrder: onOrder[i.sku.trim().toUpperCase()] || 0,
