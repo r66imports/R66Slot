@@ -45,6 +45,8 @@ interface SubmittedLine {
   isNewSku: boolean
   priceLocked: boolean
   estRetailZAR: number
+  /** Shelf price at download time; 0 for a SKU we have never carried. */
+  retailZAR: number
 }
 
 interface SubmittedOrder {
@@ -315,11 +317,12 @@ export default function SupplierPreOrdersPage() {
       const live = order.lines.filter((l) => l.status !== 'rejected')
       autoTable(doc, {
         startY: 44,
-        head: [['SKU', 'Description', 'Qty', 'Est. Retail', 'Line Total']],
+        head: [['SKU', 'Description', 'Qty', 'Retail', 'Est. Retail', 'Line Total']],
         body: order.lines.map((l) => [
           l.sku || '—',
           `${l.description || l.brand}${l.status === 'rejected' ? '  (not available)' : ''}`,
           String(l.qty),
+          l.retailZAR > 0 ? formatZAR(l.retailZAR) : '—',
           l.estRetailZAR > 0 ? formatZAR(l.estRetailZAR) : 'To be priced',
           l.status === 'rejected'
             ? '—'
@@ -336,11 +339,12 @@ export default function SupplierPreOrdersPage() {
         },
         alternateRowStyles: { fillColor: [249, 250, 251] },
         columnStyles: {
-          0: { cellWidth: 28, fontStyle: 'bold' },
+          0: { cellWidth: 26, fontStyle: 'bold' },
           1: { cellWidth: 'auto' },
-          2: { cellWidth: 14, halign: 'center' },
-          3: { cellWidth: 28, halign: 'right' },
-          4: { cellWidth: 30, halign: 'right' },
+          2: { cellWidth: 12, halign: 'center' },
+          3: { cellWidth: 26, halign: 'right' },
+          4: { cellWidth: 26, halign: 'right' },
+          5: { cellWidth: 28, halign: 'right' },
         },
         didParseCell: (data: any) => {
           if (data.section === 'body' && order.lines[data.row.index]?.status === 'rejected') {

@@ -36,7 +36,10 @@ export default function SupplierPreOrdersAdminPage() {
   const [accounts, setAccounts] = useState<CostingAccount[]>([])
   /** Photo + on-hand qty by SKU. Derived server-side, never written back. */
   const [skuInfo, setSkuInfo] = useState<
-    Record<string, { imageUrl: string; qtyAvailable: number; qtyOnOrder: number }>
+    Record<
+      string,
+      { imageUrl: string; qtyAvailable: number; retailZAR: number; qtyOnOrder: number }
+    >
   >(
     {}
   )
@@ -782,6 +785,12 @@ export default function SupplierPreOrdersAdminPage() {
                                 <th className="py-2 pr-3 font-medium text-right">
                                   Wholesale ({order.currency})
                                 </th>
+                                <th
+                                  className="py-2 pr-3 font-medium text-right whitespace-nowrap"
+                                  title="What this sells for on the site today"
+                                >
+                                  Retail
+                                </th>
                                 <th className="py-2 pr-3 font-medium text-right">Est. Retail</th>
                                 <th className="py-2 font-medium text-center">Keep</th>
                               </tr>
@@ -888,6 +897,11 @@ export default function SupplierPreOrdersAdminPage() {
                                         disabled={tab === 'archived' || l.priceLocked}
                                         className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-right disabled:bg-gray-100"
                                       />
+                                    </td>
+                                    <td className="py-2 pr-3 text-right text-gray-600 whitespace-nowrap">
+                                      {(skuInfo[l.sku.trim().toUpperCase()]?.retailZAR || 0) > 0
+                                        ? formatZAR(skuInfo[l.sku.trim().toUpperCase()].retailZAR)
+                                        : '—'}
                                     </td>
                                     <td className="py-2 pr-3 text-right font-semibold">
                                       {l.estRetailZAR > 0 ? formatZAR(l.estRetailZAR) : '—'}

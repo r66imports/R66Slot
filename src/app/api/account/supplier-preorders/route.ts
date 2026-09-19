@@ -10,7 +10,7 @@ import {
   lineEstRetailZAR,
   DEFAULT_COSTING_ACCOUNTS,
 } from '@/lib/preorder-pricing'
-import { findBySkus } from '@/lib/supplier-catalogue'
+import { findBySkus, getSkuInfo } from '@/lib/supplier-catalogue'
 import type {
   CostingAccount,
   SupplierPreOrder,
@@ -62,6 +62,11 @@ export async function GET(_request: NextRequest) {
       )
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
+    // What each SKU sells for on the site today, so a saved copy can show the
+    // shelf price beside the estimate. Retail only — getSkuInfo carries nothing
+    // a client may not see.
+    const info = await getSkuInfo(mine.flatMap((o) => o.lines.map((l) => l.sku)))
+
     // Strip wholesale prices and re-price unlocked lines on the way out.
     const safe = mine.map((o) => {
       const account = accountById(accounts, o.account)
@@ -76,6 +81,7 @@ export async function GET(_request: NextRequest) {
         isNewSku: l.isNewSku,
         priceLocked: l.priceLocked,
         estRetailZAR: Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100,
+        retailZAR: info[l.sku.trim().toUpperCase()]?.retailZAR || 0,
       }))
       const total = lines
         .filter((l) => l.status !== 'rejected')

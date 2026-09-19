@@ -338,6 +338,8 @@ export async function findBySkus(skus: string[]): Promise<Map<string, MergedItem
 export interface SkuInfo {
   imageUrl: string
   qtyAvailable: number
+  /** products.price — what it sells for on the site today; 0 if never priced. */
+  retailZAR: number
   /** Qty already placed with the supplier — see getOnOrderQtyBySku. */
   qtyOnOrder: number
   title: string
@@ -392,7 +394,7 @@ export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo
 
   const [rows, onOrder] = await Promise.all([
     db.query(
-      `SELECT sku, title, image_url, images, quantity
+      `SELECT sku, title, image_url, images, quantity, price
          FROM products
         WHERE UPPER(TRIM(sku)) = ANY($1)`,
       [wanted]
@@ -407,6 +409,7 @@ export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo
     out[sku] = {
       imageUrl: firstImage(p),
       qtyAvailable: Number(p.quantity) || 0,
+      retailZAR: Math.round((Number(p.price) || 0) * 100) / 100,
       qtyOnOrder: onOrder[sku] || 0,
       title: (p.title || '').trim(),
     }
@@ -415,7 +418,7 @@ export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo
   // order — the request is exactly how such a SKU reaches us.
   for (const sku of wanted) {
     if (!out[sku] && onOrder[sku]) {
-      out[sku] = { imageUrl: '', qtyAvailable: 0, qtyOnOrder: onOrder[sku], title: '' }
+      out[sku] = { imageUrl: '', qtyAvailable: 0, retailZAR: 0, qtyOnOrder: onOrder[sku], title: '' }
     }
   }
   return out
