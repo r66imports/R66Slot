@@ -450,7 +450,8 @@ export default function ProductsPage() {
   const [categoryFilters, setCategoryFilters] = useState<string[]>([])
   const [showBrandDropdown, setShowBrandDropdown] = useState(false)
   const [showCatDropdown, setShowCatDropdown] = useState(false)
-  const [revoFilter, setRevoFilter] = useState('')
+  const [revoFilters, setRevoFilters] = useState<string[]>([])
+  const [showUnitDropdown, setShowUnitDropdown] = useState(false)
   const [supplierFilter, setSupplierFilter] = useState('')
   const [suppliers, setSuppliers] = useState<{ id: string; name: string; preferredCurrency?: string }[]>([])
   const [supplierSkus, setSupplierSkus] = useState<Record<string, Set<string>>>({}) // supplierId → Set<sku>
@@ -488,6 +489,7 @@ export default function ProductsPage() {
   const colPickerRef = useRef<HTMLDivElement>(null)
   const brandDropdownRef = useRef<HTMLDivElement>(null)
   const catDropdownRef = useRef<HTMLDivElement>(null)
+  const unitDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!showColPicker) return
@@ -521,6 +523,17 @@ export default function ProductsPage() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showCatDropdown])
+
+  useEffect(() => {
+    if (!showUnitDropdown) return
+    const handler = (e: MouseEvent) => {
+      if (unitDropdownRef.current && !unitDropdownRef.current.contains(e.target as Node)) {
+        setShowUnitDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showUnitDropdown])
 
   // Task 2: categories
   const [categories, setCategories] = useState<Category[]>([])
@@ -1061,7 +1074,7 @@ export default function ProductsPage() {
           ? !p.brand?.trim() && !p.supplier?.trim()
           : p.brand?.toLowerCase() === brandFilter.toLowerCase()
       const matchCat = categoryFilters.length === 0 || categoryFilters.some((f) => (p.collections || []).includes(f) || (p.categories || []).includes(f))
-      const matchRevo = !revoFilter || (p.itemCategories || []).includes(revoFilter)
+      const matchRevo = revoFilters.length === 0 || revoFilters.some((f) => (p.itemCategories || []).includes(f))
       const matchSearch = !searchQuery || p.title.toLowerCase().includes(searchQuery.toLowerCase()) || (p.sku || '').toLowerCase().includes(searchQuery.toLowerCase())
       const supplierName = supplierFilter ? (suppliers.find(s => s.id === supplierFilter)?.name || '') : ''
       // A product's own supplier wins; only an unassigned product falls back to
@@ -1310,18 +1323,49 @@ export default function ProductsPage() {
           )}
         </div>
 
-        {/* Item Categories (Unit) filter */}
+        {/* ── Item Categories (Unit) multi-select ── */}
         {allRevoParts.length > 0 && (
-          <select
-            value={revoFilter}
-            onChange={(e) => setRevoFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-gray-900"
-          >
-            <option value="">Item Categories (Unit)</option>
-            {allRevoParts.map((part) => (
-              <option key={part} value={part}>{part}</option>
-            ))}
-          </select>
+          <div className="relative" ref={unitDropdownRef}>
+            <button
+              onClick={() => setShowUnitDropdown((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 ${revoFilters.length > 0 ? 'border-gray-900 font-semibold text-gray-900 bg-gray-50' : 'border-gray-300 text-gray-700'}`}
+            >
+              {revoFilters.length === 0
+                ? 'Item Categories (Unit)'
+                : revoFilters.length === 1 ? revoFilters[0] : `${revoFilters.length} selected`}
+              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showUnitDropdown && (
+              <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[240px] py-2 max-h-72 overflow-y-auto">
+                <div className="flex items-center justify-between px-3 pb-1.5 border-b border-gray-100 mb-1">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Filter by Item Category</p>
+                  {revoFilters.length > 0 && (
+                    <button onClick={() => setRevoFilters([])} className="text-[10px] text-red-500 hover:text-red-700 font-medium">Clear all</button>
+                  )}
+                </div>
+                {allRevoParts.map((part) => (
+                  <label key={part} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={revoFilters.includes(part)}
+                      onChange={() =>
+                        setRevoFilters((prev) =>
+                          prev.includes(part) ? prev.filter((f) => f !== part) : [...prev, part]
+                        )
+                      }
+                      className="h-3.5 w-3.5 accent-gray-900 flex-shrink-0"
+                    />
+                    <span className="text-sm text-gray-700 flex-1 leading-tight">{part}</span>
+                    <span className="text-[11px] text-gray-400 flex-shrink-0">
+                      {products.filter((p) => (p.itemCategories || []).includes(part)).length}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {/* Supplier filter */}
@@ -1338,9 +1382,9 @@ export default function ProductsPage() {
           </select>
         )}
 
-        {(searchQuery || brandFilter || categoryFilters.length > 0 || revoFilter || supplierFilter) && (
+        {(searchQuery || brandFilter || categoryFilters.length > 0 || revoFilters.length > 0 || supplierFilter) && (
           <button
-            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilters([]); setRevoFilter(''); setSupplierFilter('') }}
+            onClick={() => { setSearchQuery(''); setBrandFilter(''); setCategoryFilters([]); setRevoFilters([]); setSupplierFilter('') }}
             className="px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-lg"
           >
             Clear ✕
