@@ -8,6 +8,7 @@ import {
   isLocalSupplierCurrency,
 } from '@/lib/preorder-pricing'
 import { getRates, rateFor } from '@/lib/exchange-rates'
+import { loadEstimateContext, estimateFor } from '@/lib/preorder-estimate'
 import type {
   CostingAccount,
   SupplierCatalogueItem,
@@ -80,6 +81,8 @@ interface ProductRow {
   supplier: string | null
   price: string | number | null
   pre_order_price: string | number | null
+  /** Real landed Rand cost, written only by the Worksheet — see Rule 63. */
+  cost_per_item?: string | number | null
   image_url: string | null
   images: string[] | null
   quantity: number | null
@@ -206,14 +209,23 @@ export async function getMergedItems(opts: {
   }
   params.push(limit)
 
-  const rows = await db.query(
-    `SELECT sku, title, brand, supplier, price, pre_order_price, image_url, images, quantity
-       FROM products
-      WHERE ${where.join(' AND ')}
-      ORDER BY sku ASC
-      LIMIT $${params.length}`,
-    params
-  )
+  const [rows, estCtx] = await Promise.all([
+    db.query(
+      `SELECT sku, title, brand, supplier, price, pre_order_price, cost_per_item,
+              image_url, images, quantity
+         FROM products
+        WHERE ${where.join(' AND ')}
+        ORDER BY sku ASC
+        LIMIT $${params.length}`,
+      params
+    ),
+    // Rule 63: an estimate is worked out from the supplier's wholesale price and
+    // the live rate, never stored. The sheet used to fall back to what we sell
+    // the item for, which made Est. Retail read identical to Retail on every
+    // stocked SKU — the estimate has to go through the costing calculator
+    // wherever a wholesale price exists.
+    loadEstimateContext(),
+  ])
 
   const bySku = new Map<string, MergedItem>()
 
@@ -225,6 +237,17 @@ export async function getMergedItems(opts: {
     // pre_order_price is set precisely for items bought ahead, so it beats the
     // shelf price when both exist.
     const fallback = Number(p.pre_order_price) || Number(p.price) || 0
+    // The same estimator the Pre-Order Dashboard and the booking widget use, so
+    // a client cannot be shown one number here and another there. 'live' means
+    // it was calculated off a wholesale price and floats with the rate;
+    // anything else means no wholesale is known and we are back to the fallback.
+    const est = estimateFor(estCtx, {
+      sku: p.sku,
+      preOrderPrice: p.pre_order_price,
+      costPerItem: p.cost_per_item,
+      supplier: p.supplier,
+    })
+    const priced = est.source === 'live' ? Math.round(est.estimateZAR * 100) / 100 : fallback
     bySku.set(sku, {
       id: `p:${sku}`,
       supplierId: supplier?.id || '',
@@ -232,11 +255,13 @@ export async function getMergedItems(opts: {
       brand,
       sku,
       description: (p.title || '').trim(),
-      estRetailZAR: Math.round(fallback * 100) / 100,
+      estRetailZAR: Math.round(priced * 100) / 100,
       retailZAR: Math.round((Number(p.price) || 0) * 100) / 100,
-      priceSource: fallback > 0 ? 'product' : 'unpriced',
-      wholesalePrice: 0,
-      currency: (supplier?.preferredCurrency || 'EUR').toUpperCase(),
+      priceSource:
+        est.source === 'live' ? 'catalogue' : priced > 0 ? 'product' : 'unpriced',
+      // Admin-only — the client route never sends either field on.
+      wholesalePrice: est.wholesalePrice || 0,
+      currency: (est.currency || supplier?.preferredCurrency || 'EUR').toUpperCase(),
       inInventory: true,
       imageUrl: firstImage(p),
       qtyAvailable: Number(p.quantity) || 0,
@@ -311,7 +336,7 @@ export async function getMergedItems(opts: {
       retailZAR: existing?.retailZAR || 0,
       priceSource:
         calculated > 0 ? 'catalogue' : existing && existing.estRetailZAR > 0 ? 'product' : 'unpriced',
-      wholesalePrice: item.wholesalePrice || 0,
+      wholesalePrice: item.wholesalePrice || existing?.wholesalePrice || 0,
       currency,
       inInventory: existing?.inInventory || false,
       // The catalogue is a price sheet — it never carries a photo or stock, so
