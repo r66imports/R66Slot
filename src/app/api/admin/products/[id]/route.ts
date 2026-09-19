@@ -222,13 +222,19 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const allowed = ['status']
+    // key in body -> [column, serializer]
+    const allowed: Record<string, [string, (v: any) => any]> = {
+      status: ['status', (v) => v],
+      brand: ['brand', (v) => v],
+      supplier: ['supplier', (v) => v],
+      categoryBrands: ['category_brands', (v) => JSON.stringify(Array.isArray(v) ? v : [])],
+    }
     const updates: string[] = []
     const values: any[] = []
-    for (const key of allowed) {
+    for (const [key, [column, serialize]] of Object.entries(allowed)) {
       if (key in body) {
-        updates.push(`${key} = $${values.length + 1}`)
-        values.push(body[key])
+        updates.push(`${column} = $${values.length + 1}`)
+        values.push(serialize(body[key]))
       }
     }
     if (updates.length === 0) {
@@ -238,7 +244,7 @@ export async function PATCH(
     values.push(new Date().toISOString())
     values.push(id)
     const result = await db.query(
-      `UPDATE products SET ${updates.join(', ')} WHERE id = $${values.length} RETURNING id, status`,
+      `UPDATE products SET ${updates.join(', ')} WHERE id = $${values.length} RETURNING id, status, brand, supplier, category_brands`,
       values
     )
     if (result.rowCount === 0) {

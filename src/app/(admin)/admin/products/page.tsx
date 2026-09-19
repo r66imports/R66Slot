@@ -472,6 +472,10 @@ export default function ProductsPage() {
   const [sortBy, setSortBy] = useState<string>('sku')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [showBrandModal, setShowBrandModal] = useState(false)
+  const [bulkBrand, setBulkBrand] = useState('')
+  const [bulkBranding, setBulkBranding] = useState(false)
+  const [bulkBrandDone, setBulkBrandDone] = useState(0)
   const [fixingDupes, setFixingDupes] = useState(false)
   const [viewMode, setViewMode] = useState<'brands' | 'products'>('brands')
   const [groupBy, setGroupBy] = useState<'brand' | 'supplier'>('brand')
@@ -655,6 +659,35 @@ export default function ProductsPage() {
       setSelectedIds(new Set())
     } catch (err) { console.error('Bulk delete error:', err) }
     finally { setBulkDeleting(false) }
+  }
+
+  const handleBulkBrand = async () => {
+    const brand = bulkBrand.trim()
+    if (!selectedIds.size || !brand) return
+    setBulkBranding(true)
+    setBulkBrandDone(0)
+    try {
+      const ids = Array.from(selectedIds)
+      // 10 at a time — a full brand can be 400+ rows
+      for (let i = 0; i < ids.length; i += 10) {
+        await Promise.all(ids.slice(i, i + 10).map((id) =>
+          fetch(`/api/admin/products/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ brand, categoryBrands: [brand] }),
+          })
+        ))
+        setBulkBrandDone(Math.min(i + 10, ids.length))
+      }
+      setProducts((prev) => prev.map((p) =>
+        selectedIds.has(p.id) ? { ...p, brand, categoryBrands: [brand] } : p
+      ))
+      setSelectedIds(new Set())
+      setShowBrandModal(false)
+      setBulkBrand('')
+      fetchBrandSummary()
+    } catch (err) { console.error('Bulk brand error:', err) }
+    finally { setBulkBranding(false) }
   }
 
   const exportCSV = (rows: Product[], profileKey = 'generic') => {
@@ -960,6 +993,7 @@ export default function ProductsPage() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean)))
+  const allBrandOptions = Array.from(new Set([...brandSummary.map((r) => (r.brand || '').trim()), ...brands])).filter(Boolean).sort()
   const allRevoParts = Array.from(new Set(products.flatMap((p) => p.itemCategories || []))).sort()
 
   // Brand/supplier grid groups — built from lightweight summary (not full product list)
@@ -1312,6 +1346,9 @@ export default function ProductsPage() {
           <span className="text-sm font-medium">{selectedIds.size} selected</span>
           <button onClick={() => exportCSV(products.filter((p) => selectedIds.has(p.id)), exportProfile)} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-900 rounded hover:bg-gray-100">
             Export Sage CSV
+          </button>
+          <button onClick={() => { setBulkBrand(''); setShowBrandModal(true) }} className="px-3 py-1.5 text-xs font-medium bg-white text-gray-900 rounded hover:bg-gray-100">
+            Change Brand
           </button>
           <button onClick={handleBulkDelete} disabled={bulkDeleting} className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
             {bulkDeleting ? 'Deleting…' : 'Delete Selected'}
@@ -1678,6 +1715,44 @@ export default function ProductsPage() {
       )}
 
       </> /* end viewMode === 'products' */}
+
+      {/* ── Bulk Change Brand Modal ── */}
+      {showBrandModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-1">Change Brand</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {selectedIds.size} product{selectedIds.size > 1 ? 's' : ''} selected. This sets the brand and replaces Category (Brand).
+            </p>
+
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Pick an existing brand</label>
+            <select
+              value={allBrandOptions.includes(bulkBrand) ? bulkBrand : ''}
+              onChange={(e) => setBulkBrand(e.target.value)}
+              className="w-full mb-3 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            >
+              <option value="">— Select brand —</option>
+              {allBrandOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Or type a new one</label>
+            <input
+              type="text"
+              value={bulkBrand}
+              onChange={(e) => setBulkBrand(e.target.value)}
+              placeholder="Brand name"
+              className="w-full mb-4 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowBrandModal(false)} disabled={bulkBranding}>Cancel</Button>
+              <Button onClick={handleBulkBrand} disabled={bulkBranding || !bulkBrand.trim()}>
+                {bulkBranding ? `Updating ${bulkBrandDone}/${selectedIds.size}…` : `Update ${selectedIds.size} Product${selectedIds.size > 1 ? 's' : ''}`}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Export Modal ── */}
       {showExportModal && (
