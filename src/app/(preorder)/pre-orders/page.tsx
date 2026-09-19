@@ -183,6 +183,53 @@ function Scanlines() {
   )
 }
 
+// ─── Sorting ──────────────────────────────────────────────────────────
+type SortKey =
+  | 'sku-desc'
+  | 'sku-asc'
+  | 'newest'
+  | 'oldest'
+  | 'price-desc'
+  | 'price-asc'
+  | 'name-asc'
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: 'sku-desc', label: 'SKU: High to Low' },
+  { key: 'sku-asc', label: 'SKU: Low to High' },
+  { key: 'newest', label: 'Newest First' },
+  { key: 'oldest', label: 'Oldest First' },
+  { key: 'price-desc', label: 'Price: High to Low' },
+  { key: 'price-asc', label: 'Price: Low to High' },
+  { key: 'name-asc', label: 'Name: A to Z' },
+]
+
+const DEFAULT_SORT: SortKey = 'sku-desc'
+
+const skuNum = (sku: string) => parseInt((sku || '').replace(/\D/g, ''), 10) || 0
+const itemPrice = (i: Item) => parseFloat(i.retailPrice || i.estimatedRetailPrice || '0') || 0
+const itemTime = (i: Item) => new Date(i.createdAt || 0).getTime() || 0
+
+function sortItems(list: Item[], key: SortKey): Item[] {
+  const out = list.slice()
+  switch (key) {
+    case 'sku-asc':
+      return out.sort((a, b) => skuNum(a.sku) - skuNum(b.sku) || (a.sku || '').localeCompare(b.sku || ''))
+    case 'newest':
+      return out.sort((a, b) => itemTime(b) - itemTime(a))
+    case 'oldest':
+      return out.sort((a, b) => itemTime(a) - itemTime(b))
+    case 'price-desc':
+      return out.sort((a, b) => itemPrice(b) - itemPrice(a))
+    case 'price-asc':
+      return out.sort((a, b) => itemPrice(a) - itemPrice(b))
+    case 'name-asc':
+      return out.sort((a, b) => (a.description || '').localeCompare(b.description || ''))
+    case 'sku-desc':
+    default:
+      return out.sort((a, b) => skuNum(b.sku) - skuNum(a.sku) || (b.sku || '').localeCompare(a.sku || ''))
+  }
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function PreOrdersListPage() {
   const [items, setItems] = useState<Item[]>([])
@@ -193,6 +240,7 @@ export default function PreOrdersListPage() {
   const [themeKey, setThemeKey] = useState<string>('dark')
   const [showThemePicker, setShowThemePicker] = useState(false)
   const [resellerBlocked, setResellerBlocked] = useState<boolean | null>(null)
+  const [sortKey, setSortKey] = useState<SortKey>(DEFAULT_SORT)
 
   useEffect(() => {
     fetch('/api/auth/reseller-check').then(async r => {
@@ -225,6 +273,8 @@ export default function PreOrdersListPage() {
       // Apply localStorage preference (overrides admin default)
       const saved = localStorage.getItem('preorders-theme')
       if (saved && THEMES[saved]) setThemeKey(saved)
+      const savedSort = localStorage.getItem('preorders-sort') as SortKey | null
+      if (savedSort && SORT_OPTIONS.some(o => o.key === savedSort)) setSortKey(savedSort)
     }).finally(() => setLoading(false))
   }, [resellerBlocked])
 
@@ -236,14 +286,17 @@ export default function PreOrdersListPage() {
     setShowThemePicker(false)
   }
 
-  const filtered = (activeBrand
-    ? items.filter(item => item.brand?.toLowerCase() === activeBrand.toLowerCase())
-    : items
-  ).slice().sort((a, b) => {
-    const na = parseInt(a.sku.replace(/\D/g, ''), 10) || 0
-    const nb = parseInt(b.sku.replace(/\D/g, ''), 10) || 0
-    return na - nb
-  })
+  const filtered = sortItems(
+    activeBrand
+      ? items.filter(item => item.brand?.toLowerCase() === activeBrand.toLowerCase())
+      : items,
+    sortKey,
+  )
+
+  const selectSort = (key: SortKey) => {
+    setSortKey(key)
+    localStorage.setItem('preorders-sort', key)
+  }
 
   const handleLogoClick = (name: string) => {
     setActiveBrand(prev => (prev?.toLowerCase() === name.toLowerCase() ? null : name))
@@ -405,19 +458,50 @@ export default function PreOrdersListPage() {
 
       {/* ── Main ── */}
       <main className="max-w-5xl mx-auto px-4 py-10 relative z-20">
-        <div className="mb-8">
-          <h1
-            className="text-3xl font-bold mb-2"
-            style={{
-              textShadow: isCyberpunk ? '0 0 20px rgba(255,0,255,0.5)' : 'none',
-              color: isCyberpunk ? '#e8e0ff' : t.text,
-            }}
-          >
-            {activeBrand ? `${activeBrand} Pre-Orders` : 'Pre-Order Items'}
-          </h1>
-          <p style={{ color: t.textMuted, fontSize: 14 }}>
-            Reserve your item before it arrives. Contact us via WhatsApp to confirm your order.
-          </p>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1
+              className="text-3xl font-bold mb-2"
+              style={{
+                textShadow: isCyberpunk ? '0 0 20px rgba(255,0,255,0.5)' : 'none',
+                color: isCyberpunk ? '#e8e0ff' : t.text,
+              }}
+            >
+              {activeBrand ? `${activeBrand} Pre-Orders` : 'Pre-Order Items'}
+            </h1>
+            <p style={{ color: t.textMuted, fontSize: 14 }}>
+              Reserve your item before it arrives. Contact us via WhatsApp to confirm your order.
+            </p>
+          </div>
+
+          {/* Sort picker */}
+          {!loading && items.length > 0 && (
+            <label className="flex items-center gap-2 shrink-0">
+              <span
+                className="text-xs font-bold uppercase tracking-widest"
+                style={{ color: t.textMuted }}
+              >
+                Sort
+              </span>
+              <select
+                value={sortKey}
+                onChange={e => selectSort(e.target.value as SortKey)}
+                className="text-sm font-semibold rounded-xl px-3 py-2 cursor-pointer outline-none"
+                style={{
+                  background: t.cardBg,
+                  color: t.text,
+                  border: `1px solid ${isCyberpunk ? 'rgba(255,0,255,0.5)' : t.border}`,
+                  boxShadow: isCyberpunk ? '0 0 10px rgba(255,0,255,0.25)' : 'none',
+                }}
+              >
+                {SORT_OPTIONS.map(o => (
+                  <option key={o.key} value={o.key} style={{ background: t.cardBg, color: t.text }}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
 
         {loading && (
