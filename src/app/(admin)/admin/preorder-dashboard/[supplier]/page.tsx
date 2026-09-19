@@ -210,7 +210,12 @@ async function generatePoster(form: FormState, sku: string): Promise<void> {
   if (hue !== null) { ACCENT = hslToHex(hue, 0.88, 0.48); DARK = hslToHex(hue, 0.45, 0.07); MID = hslToHex(hue, 0.30, 0.13) }
   else { ACCENT = '#C41230'; DARK = '#111111'; MID = '#1e1e1e' }
 
-  const BAND = 210, FOOT = 104
+  /* BAND is sized off the logo's VISIBLE artwork, not its box: logo.webp is
+     256x256 but the art only occupies 172 of that (letterboxed), so at
+     LOGO=220 the drawn artwork is ~148px tall. A 210 band left 31px of air
+     above and below it; 179 halves that to ~15px while keeping the logo and
+     the PRE ORDER type at their current sizes. */
+  const BAND = 179, FOOT = 104
   ctx.fillStyle = DARK; ctx.fillRect(0, 0, W, H)
 
   // ── Header band ──
