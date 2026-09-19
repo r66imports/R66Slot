@@ -21,6 +21,8 @@ interface CatalogueItem {
   estRetailZAR: number
   imageUrl: string
   qtyAvailable: number
+  /** This client's own qty already placed with the supplier. */
+  qtyOnOrder: number
 }
 
 interface CustomLine {
@@ -58,7 +60,7 @@ interface SubmittedOrder {
 /** Quantity plus enough of the item to render it once its brand is deselected. */
 type CartEntry = { item: CatalogueItem; qty: number }
 
-type SortKey = 'brand' | 'sku' | 'description' | 'stock' | 'price'
+type SortKey = 'brand' | 'sku' | 'description' | 'stock' | 'onorder' | 'price'
 
 const STATUS_STYLES: Record<string, string> = {
   submitted: 'bg-blue-100 text-blue-800',
@@ -93,6 +95,7 @@ export default function SupplierPreOrdersPage() {
   const [showOrder, setShowOrder] = useState(false)
 
   const [history, setHistory] = useState<SubmittedOrder[]>([])
+  const [pdfBusy, setPdfBusy] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const loadHistory = useCallback(async () => {
@@ -187,6 +190,7 @@ export default function SupplierPreOrdersPage() {
       else if (sortBy === 'description')
         cmp = (a.description || '').localeCompare(b.description || '')
       else if (sortBy === 'stock') cmp = a.qtyAvailable - b.qtyAvailable
+    else if (sortBy === 'onorder') cmp = a.qtyOnOrder - b.qtyOnOrder
       else if (sortBy === 'price') cmp = a.estRetailZAR - b.estRetailZAR
       if (cmp !== 0) return cmp * dir
       return a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku)
@@ -252,6 +256,144 @@ export default function SupplierPreOrdersPage() {
 
   const removeCustomLine = (key: string) =>
     setCustomLines((prev) => prev.filter((l) => l.key !== key))
+
+  /**
+   * A client's own copy of one request. Estimates only — the page's disclaimer
+   * is printed on it so a saved PDF can never be read back as a quote. Rejected
+   * lines stay visible but greyed and struck from the total, exactly as the
+   * expanded row shows them.
+   */
+  const downloadPdf = async (order: SubmittedOrder) => {
+    setPdfBusy(order.id)
+    try {
+      const { jsPDF } = await import('jspdf')
+      const autoTable = (await import('jspdf-autotable')).default
+
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = doc.internal.pageSize.getWidth()
+      const created = new Date(order.createdAt).toLocaleDateString('en-ZA', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+
+      doc.setFillColor(17, 24, 39)
+      doc.rect(0, 0, pageW, 28, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(18)
+      doc.setFont('helvetica', 'bold')
+      doc.text('R66SLOT', 14, 12)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Premium Slot Cars & Collectibles', 14, 18)
+      doc.text('r66slot.co.za', 14, 23)
+      doc.setFontSize(8)
+      doc.text(created, pageW - 14, 14, { align: 'right' })
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text('SUPPLIER PRE ORDER', pageW - 14, 21, { align: 'right' })
+
+      doc.setFillColor(243, 244, 246)
+      doc.rect(0, 28, pageW, 12, 'F')
+      doc.setTextColor(17, 24, 39)
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`${order.ref} · ${order.supplierName}`, 14, 37)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(107, 114, 128)
+      doc.text(
+        `${order.status.replace('-', ' ')}${order.quoteNumber ? ` · Quote ${order.quoteNumber}` : ''}`,
+        pageW - 14,
+        37,
+        { align: 'right' }
+      )
+
+      const live = order.lines.filter((l) => l.status !== 'rejected')
+      autoTable(doc, {
+        startY: 44,
+        head: [['SKU', 'Description', 'Qty', 'Est. Retail', 'Line Total']],
+        body: order.lines.map((l) => [
+          l.sku || '—',
+          `${l.description || l.brand}${l.status === 'rejected' ? '  (not available)' : ''}`,
+          String(l.qty),
+          l.estRetailZAR > 0 ? formatZAR(l.estRetailZAR) : 'To be priced',
+          l.status === 'rejected'
+            ? '—'
+            : l.estRetailZAR > 0
+              ? formatZAR(l.qty * l.estRetailZAR)
+              : 'To be priced',
+        ]),
+        styles: { fontSize: 8, cellPadding: 3, textColor: [17, 24, 39] },
+        headStyles: {
+          fillColor: [17, 24, 39],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: {
+          0: { cellWidth: 28, fontStyle: 'bold' },
+          1: { cellWidth: 'auto' },
+          2: { cellWidth: 14, halign: 'center' },
+          3: { cellWidth: 28, halign: 'right' },
+          4: { cellWidth: 30, halign: 'right' },
+        },
+        didParseCell: (data: any) => {
+          if (data.section === 'body' && order.lines[data.row.index]?.status === 'rejected') {
+            data.cell.styles.textColor = [156, 163, 175]
+          }
+        },
+        margin: { left: 14, right: 14 },
+        didDrawPage: (data: any) => {
+          const pageCount = (doc as any).internal.getNumberOfPages()
+          doc.setFontSize(7)
+          doc.setTextColor(156, 163, 175)
+          doc.text(
+            `Page ${data.pageNumber} of ${pageCount} · ${order.ref} · R66SLOT Supplier Pre Order`,
+            pageW / 2,
+            doc.internal.pageSize.getHeight() - 6,
+            { align: 'center' }
+          )
+        },
+      })
+
+      let y = ((doc as any).lastAutoTable?.finalY || 44) + 8
+      doc.setTextColor(17, 24, 39)
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Estimated total (${live.length} item${live.length !== 1 ? 's' : ''})`, pageW - 58, y, {
+        align: 'right',
+      })
+      doc.text(formatZAR(order.totalZAR), pageW - 14, y, { align: 'right' })
+
+      if (order.notes) {
+        y += 10
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Your notes', 14, y)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(75, 85, 99)
+        y += 5
+        doc.text(doc.splitTextToSize(order.notes, pageW - 28), 14, y)
+      }
+
+      if (disclaimer) {
+        doc.setFontSize(7)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(107, 114, 128)
+        const note = doc.splitTextToSize(disclaimer, pageW - 28)
+        doc.text(note, 14, doc.internal.pageSize.getHeight() - 14 - note.length * 3)
+      }
+
+      doc.save(`R66SLOT-${order.ref}.pdf`)
+    } catch (err) {
+      console.error('PDF error:', err)
+      window.alert('Could not build the PDF — please try again.')
+    } finally {
+      setPdfBusy(null)
+    }
+  }
 
   const submit = async () => {
     if (lineCount === 0) {
@@ -521,6 +663,7 @@ export default function SupplierPreOrdersPage() {
                     {sortTh('sku', 'SKU', 'py-2 pr-4')}
                     {sortTh('description', 'Description', 'py-2 pr-4')}
                     {sortTh('stock', 'In Stock', 'py-2 pr-4 text-center whitespace-nowrap')}
+                    {sortTh('onorder', 'Qty Ordered', 'py-2 pr-4 text-center whitespace-nowrap')}
                     {sortTh('price', 'Est. Retail', 'py-2 pr-4 text-right whitespace-nowrap')}
                     <th className="py-2 font-medium text-center">Qty</th>
                   </tr>
@@ -555,6 +698,16 @@ export default function SupplierPreOrdersPage() {
                         <td className="py-2 pr-4 text-center whitespace-nowrap">
                           {item.qtyAvailable > 0 ? (
                             <span className="text-green-700 font-semibold">{item.qtyAvailable}</span>
+                          ) : (
+                            <span className="text-gray-400">0</span>
+                          )}
+                        </td>
+                        <td
+                          className="py-2 pr-4 text-center whitespace-nowrap"
+                          title="Your qty already placed with the supplier — requests still being gathered are not counted"
+                        >
+                          {item.qtyOnOrder > 0 ? (
+                            <span className="text-amber-700 font-semibold">{item.qtyOnOrder}</span>
                           ) : (
                             <span className="text-gray-400">0</span>
                           )}
@@ -751,10 +904,11 @@ export default function SupplierPreOrdersPage() {
           <div className="divide-y divide-gray-100">
             {history.map((o) => (
               <div key={o.id} className="py-3">
+                <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setExpanded(expanded === o.id ? null : o.id)}
-                  className="w-full flex items-center justify-between gap-4 text-left"
+                  className="flex-1 min-w-0 flex items-center justify-between gap-4 text-left"
                 >
                   <div className="min-w-0">
                     <span className="font-semibold text-gray-900">{o.ref}</span>
@@ -775,6 +929,17 @@ export default function SupplierPreOrdersPage() {
                     <span className="text-gray-400 text-xs">{expanded === o.id ? '▲' : '▼'}</span>
                   </div>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => downloadPdf(o)}
+                  disabled={pdfBusy === o.id}
+                  title={`Download ${o.ref} as a PDF`}
+                  aria-label={`Download ${o.ref} as a PDF`}
+                  className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-60 whitespace-nowrap"
+                >
+                  {pdfBusy === o.id ? '…' : '⬇ PDF'}
+                </button>
+                </div>
 
                 {expanded === o.id && (
                   <div className="mt-3 pl-1 space-y-1">

@@ -35,7 +35,9 @@ export default function SupplierPreOrdersAdminPage() {
   const [binCount, setBinCount] = useState(0)
   const [accounts, setAccounts] = useState<CostingAccount[]>([])
   /** Photo + on-hand qty by SKU. Derived server-side, never written back. */
-  const [skuInfo, setSkuInfo] = useState<Record<string, { imageUrl: string; qtyAvailable: number }>>(
+  const [skuInfo, setSkuInfo] = useState<
+    Record<string, { imageUrl: string; qtyAvailable: number; qtyOnOrder: number }>
+  >(
     {}
   )
   const [preview, setPreview] = useState<SkuPreviewItem | null>(null)
@@ -770,6 +772,12 @@ export default function SupplierPreOrdersAdminPage() {
                                 <th className="py-2 pr-3 font-medium text-center whitespace-nowrap">
                                   In Stock
                                 </th>
+                                <th
+                                  className="py-2 pr-3 font-medium text-center whitespace-nowrap"
+                                  title="Qty already placed with the supplier, across every client"
+                                >
+                                  Qty Ordered
+                                </th>
                                 <th className="py-2 pr-3 font-medium text-center">Qty</th>
                                 <th className="py-2 pr-3 font-medium text-right">
                                   Wholesale ({order.currency})
@@ -835,6 +843,15 @@ export default function SupplierPreOrdersAdminPage() {
                                       {(skuInfo[l.sku.trim().toUpperCase()]?.qtyAvailable || 0) > 0 ? (
                                         <span className="text-green-700 font-semibold">
                                           {skuInfo[l.sku.trim().toUpperCase()].qtyAvailable}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400">0</span>
+                                      )}
+                                    </td>
+                                    <td className="py-2 pr-3 text-center whitespace-nowrap">
+                                      {(skuInfo[l.sku.trim().toUpperCase()]?.qtyOnOrder || 0) > 0 ? (
+                                        <span className="text-amber-700 font-semibold">
+                                          {skuInfo[l.sku.trim().toUpperCase()].qtyOnOrder}
                                         </span>
                                       ) : (
                                         <span className="text-gray-400">0</span>

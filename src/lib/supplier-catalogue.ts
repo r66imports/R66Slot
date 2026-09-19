@@ -8,7 +8,12 @@ import {
   isLocalSupplierCurrency,
 } from '@/lib/preorder-pricing'
 import { getRates, rateFor } from '@/lib/exchange-rates'
-import type { CostingAccount, SupplierCatalogueItem } from '@/types/supplier-preorder'
+import type {
+  CostingAccount,
+  SupplierCatalogueItem,
+  SupplierPreOrder,
+  SupplierPreOrderStatus,
+} from '@/types/supplier-preorder'
 import type { SupplierContact } from '@/app/api/admin/supplier-contacts/route'
 
 /**
@@ -322,19 +327,67 @@ export async function findBySkus(skus: string[]): Promise<Map<string, MergedItem
 export interface SkuInfo {
   imageUrl: string
   qtyAvailable: number
+  /** Qty already placed with the supplier — see getOnOrderQtyBySku. */
+  qtyOnOrder: number
   title: string
+}
+
+/**
+ * A request only counts as ordered once it has actually been placed with the
+ * supplier. Everything before that — submitted, reviewed, quoted — is still
+ * being gathered and may never be bought, so counting it would tell both sides
+ * stock is coming when nothing has been ordered.
+ */
+const ON_ORDER_STATUSES = new Set<SupplierPreOrderStatus>(['ordered', 'deposit-paid', 'paid'])
+
+/**
+ * Qty on order with the supplier, keyed by SKU.
+ *
+ * Unscoped (admin) this is the total across every client. Pass a customer and
+ * it narrows to that client's own lines: a client is shown what THEY have on
+ * order, never another client's demand.
+ *
+ * Like everything else here this is a read — an on-order qty is not stock and
+ * never touches products.quantity (Rule 59).
+ */
+export async function getOnOrderQtyBySku(scope?: {
+  customerId?: string
+  email?: string
+}): Promise<Record<string, number>> {
+  const orders = await blobRead<SupplierPreOrder[]>('data/supplier-preorders.json', [])
+  const email = (scope?.email || '').toLowerCase()
+  const mine = (o: SupplierPreOrder) =>
+    !scope?.customerId && !email
+      ? true
+      : (!!scope?.customerId && o.customerId === scope.customerId) ||
+        (!!email && (o.clientEmail || '').toLowerCase() === email)
+
+  const out: Record<string, number> = {}
+  for (const o of Array.isArray(orders) ? orders : []) {
+    if (o.deletedAt || !ON_ORDER_STATUSES.has(o.status) || !mine(o)) continue
+    for (const line of o.lines || []) {
+      if (line.status === 'rejected') continue
+      const sku = upper(line.sku)
+      if (!sku) continue
+      out[sku] = (out[sku] || 0) + (Number(line.qty) || 0)
+    }
+  }
+  return out
 }
 
 export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo>> {
   const wanted = [...new Set(skus.map(upper).filter(Boolean))]
   if (wanted.length === 0) return {}
 
-  const rows = await db.query(
-    `SELECT sku, title, image_url, images, quantity
-       FROM products
-      WHERE UPPER(TRIM(sku)) = ANY($1)`,
-    [wanted]
-  )
+  const [rows, onOrder] = await Promise.all([
+    db.query(
+      `SELECT sku, title, image_url, images, quantity
+         FROM products
+        WHERE UPPER(TRIM(sku)) = ANY($1)`,
+      [wanted]
+    ),
+    getOnOrderQtyBySku(),
+  ])
 
   const out: Record<string, SkuInfo> = {}
   for (const p of rows.rows as ProductRow[]) {
@@ -343,7 +396,15 @@ export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo
     out[sku] = {
       imageUrl: firstImage(p),
       qtyAvailable: Number(p.quantity) || 0,
+      qtyOnOrder: onOrder[sku] || 0,
       title: (p.title || '').trim(),
+    }
+  }
+  // A SKU we have never stocked has no product row, but it can still be on
+  // order — the request is exactly how such a SKU reaches us.
+  for (const sku of wanted) {
+    if (!out[sku] && onOrder[sku]) {
+      out[sku] = { imageUrl: '', qtyAvailable: 0, qtyOnOrder: onOrder[sku], title: '' }
     }
   }
   return out

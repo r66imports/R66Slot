@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { getRates } from '@/lib/exchange-rates'
-import { getBrandIndex, getMergedItems } from '@/lib/supplier-catalogue'
+import { getBrandIndex, getMergedItems, getOnOrderQtyBySku } from '@/lib/supplier-catalogue'
 import { PRICE_DISCLAIMER } from '@/types/supplier-preorder'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -23,14 +23,20 @@ export async function GET(request: NextRequest) {
   try {
     const token = (await cookies()).get('customer_token')?.value
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    jwt.verify(token, JWT_SECRET)
+    const decoded = jwt.verify(token, JWT_SECRET) as any
 
     const { searchParams } = new URL(request.url)
     const brandParam = (searchParams.get('brands') || '').trim()
     const brands = brandParam ? brandParam.split(',').map((b) => b.trim()).filter(Boolean) : []
     const q = (searchParams.get('q') || '').trim()
 
-    const [brandIndex, rateData] = await Promise.all([getBrandIndex(), getRates()])
+    // Scoped to this client: a client is shown what THEY have on order, never
+    // another client's demand.
+    const [brandIndex, rateData, onOrder] = await Promise.all([
+      getBrandIndex(),
+      getRates(),
+      getOnOrderQtyBySku({ customerId: decoded?.id, email: decoded?.email }),
+    ])
 
     const items =
       brands.length === 0 && !q
@@ -45,6 +51,7 @@ export async function GET(request: NextRequest) {
             estRetailZAR: i.estRetailZAR,
             imageUrl: i.imageUrl,
             qtyAvailable: i.qtyAvailable,
+            qtyOnOrder: onOrder[i.sku.trim().toUpperCase()] || 0,
           }))
 
     return NextResponse.json({
