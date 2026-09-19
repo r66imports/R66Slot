@@ -139,29 +139,103 @@ function ContactSearch({ contacts, onSelect, onAddManual }: {
   )
 }
 
-async function generatePoster(form: FormState, itemId: string): Promise<void> {
-  try {
-    const res = await fetch('/api/admin/preorder-poster', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: form.description, sku: form.sku, imageUrl: form.imageUrl, brand: form.brand, eta: form.eta,
-        estimatedRetailPrice: form.estimatedRetailPrice, retailPrice: form.retailPrice, cutoffDate: form.cutoffDate, notes: form.notes,
-      }),
-    })
-    if (!res.ok) {
-      const msg = await res.text().catch(()=>'')
-      alert(`Poster could not be generated (${res.status}). ${msg.slice(0,200)}`)
-      return
-    }
-    const blob = await res.blob()
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href=url; a.download=`preorder-${form.sku||itemId}.png`
-    document.body.appendChild(a); a.click(); a.remove()
-    setTimeout(()=>URL.revokeObjectURL(url),5000)
-  } catch (err:any) {
-    alert(`Poster could not be generated: ${err?.message||'network error'}`)
+/* ─── Pre-order poster ─────────────────────────────────────────────────────
+   Drawn on a canvas, client-side, and downloaded as a JPEG. This is the same
+   generator R66Emporium uses — the two must stay in step, so port changes both
+   ways rather than re-inventing one side.
+
+   The poster is COLOUR-MATCHED TO THE CAR: the dominant hue of the product
+   image drives the accent (header band, brand pill, price, footer), the page
+   background and the image panel. A car with no strong hue falls back to the
+   house red. This is the defining behaviour of the poster — see the
+   `preorder-poster` skill before changing it. */
+
+function wrapTextLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const words = (text || '').split(' '); const lines: string[] = []; let line = ''
+  for (const word of words) {
+    const test = line + word + ' '
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line.trim()); line = word + ' ' }
+    else line = test
   }
+  if (line.trim()) lines.push(line.trim()); return lines
+}
+function loadImage(src: string): Promise<HTMLImageElement | null> {
+  return new Promise(resolve => {
+    const img = new Image(); img.crossOrigin = 'anonymous'
+    img.onload = () => resolve(img); img.onerror = () => resolve(null); img.src = src
+  })
+}
+function hslToHex(h: number, s: number, l: number): string {
+  const a = s * Math.min(l, 1 - l)
+  const f = (n: number) => { const k = (n + h / 30) % 12; const c = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1); return Math.round(255 * c).toString(16).padStart(2, '0') }
+  return `#${f(0)}${f(8)}${f(4)}`
+}
+function extractDominantHue(img: HTMLImageElement): number | null {
+  const size = 80; const tmp = document.createElement('canvas'); tmp.width = size; tmp.height = size
+  const tc = tmp.getContext('2d')!; tc.drawImage(img, 0, 0, size, size)
+  const data = tc.getImageData(0, 0, size, size).data; const buckets = new Array(36).fill(0)
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255, a = data[i + 3]
+    if (a < 128) continue
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+    const l = (max + min) / 2
+    if (l < 0.1 || l > 0.88 || d < 0.18) continue
+    let hh = 0
+    if (max === r) hh = ((g - b) / d + (g < b ? 6 : 0)) / 6
+    else if (max === g) hh = ((b - r) / d + 2) / 6
+    else hh = ((r - g) / d + 4) / 6
+    buckets[Math.floor(hh * 36)]++
+  }
+  let best = -1, bestCount = 0
+  buckets.forEach((c, i) => { if (c > bestCount) { bestCount = c; best = i } })
+  return bestCount >= 8 ? best * 10 + 5 : null
+}
+
+async function generatePoster(form: FormState, sku: string): Promise<void> {
+  const W = 1080, H = 1920; const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  if (!document.fonts.check('30px "Play"')) {
+    try {
+      const css = await fetch('https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=block').then(r => r.text())
+      const urls = [...css.matchAll(/url\(([^)]+\.woff2)\)/g)].map(m => m[1].replace(/['"]/g, '').trim())
+      const loaded = await Promise.all([...new Set(urls)].map(url => new FontFace('Play', `url(${url})`).load()))
+      loaded.forEach(f => document.fonts.add(f))
+    } catch {}
+  }
+  const prod = form.imageUrl ? await loadImage(form.imageUrl) : null
+  const hue = prod ? extractDominantHue(prod) : null
+  let ACCENT: string, DARK: string, MID: string
+  if (hue !== null) { ACCENT = hslToHex(hue, 0.88, 0.48); DARK = hslToHex(hue, 0.45, 0.07); MID = hslToHex(hue, 0.30, 0.13) }
+  else { ACCENT = '#C41230'; DARK = '#111111'; MID = '#1e1e1e' }
+  ctx.fillStyle = DARK; ctx.fillRect(0, 0, W, H)
+  ctx.fillStyle = ACCENT; ctx.fillRect(0, 0, W, 130)
+  const logo = await loadImage('/logo.webp')
+  if (logo) { ctx.drawImage(logo, 14, 10, 110, 110) }
+  else { ctx.fillStyle = '#ffffff'; ctx.font = 'bold 30px Arial'; ctx.textAlign = 'left'; ctx.fillText('R66', 16, 60); ctx.font = 'bold 22px Arial'; ctx.fillText('SLOT', 16, 90) }
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 66px Arial'; ctx.textAlign = 'center'; ctx.fillText('PRE ORDER', W / 2 + 55, 90)
+  const imgTop = 142, imgH = 820
+  ctx.fillStyle = MID; ctx.fillRect(0, imgTop, W, imgH)
+  if (prod) { const scale = Math.min(980 / prod.naturalWidth, (imgH - 30) / prod.naturalHeight); const w = prod.naturalWidth * scale, h = prod.naturalHeight * scale; ctx.drawImage(prod, (W - w) / 2, imgTop + (imgH - h) / 2, w, h) }
+  const sepY = imgTop + imgH + 24; ctx.fillStyle = ACCENT; ctx.fillRect(40, sepY, W - 80, 8)
+  type Sec = { h: number; draw: (top: number) => void }
+  const secs: Sec[] = []
+  secs.push({ h: 46, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = '38px Arial'; ctx.textAlign = 'left'; ctx.fillText(`SKU: ${sku || form.sku || '—'}`, 60, top + 38) } })
+  if (form.brand) { secs.push({ h: 64, draw: (top) => { ctx.font = 'bold 38px Arial'; ctx.textAlign = 'left'; const bw = ctx.measureText(form.brand).width + 52; ctx.fillStyle = ACCENT; ctx.beginPath(); ctx.roundRect(60, top, bw, 64, 10); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.fillText(form.brand, 86, top + 50) } }) }
+  ctx.font = 'bold 46px Arial'
+  const descLines = wrapTextLines(ctx, form.description || '—', W - 120).slice(0, 3)
+  secs.push({ h: descLines.length * 72, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = 'bold 46px Arial'; ctx.textAlign = 'left'; descLines.forEach((ln, i) => ctx.fillText(ln, 60, top + 52 + i * 72)) } })
+  if (form.notes) { ctx.font = 'italic 40px Arial'; const noteLines = wrapTextLines(ctx, form.notes, W - 120).slice(0, 2); secs.push({ h: noteLines.length * 52, draw: (top) => { ctx.fillStyle = '#ffffff'; ctx.font = 'italic 40px Arial'; ctx.textAlign = 'left'; noteLines.forEach((ln, i) => ctx.fillText(ln, 60, top + 40 + i * 52)) } }) }
+  if (form.showRetail !== false) { const price = parseFloat(form.estimatedRetailPrice || form.retailPrice || '0'); const priceText = price > 0 ? `R ${price.toFixed(2)}` : 'POA'; secs.push({ h: 120, draw: (top) => { ctx.fillStyle = ACCENT; ctx.font = 'bold 104px Arial'; ctx.textAlign = 'left'; ctx.fillText(priceText, 60, top + 104) } }) }
+  secs.push({ h: 50, draw: (top) => { ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.font = '42px Arial'; ctx.fillText('ETA', 60, top + 42); ctx.font = 'bold 42px Arial'; ctx.fillText(form.eta || '—', 180, top + 42) } })
+  const totalQtyP = form.customers.reduce((s, c) => s + c.qty, 0); const moqP = form.minOrderQty ?? 0; const inStockP = moqP > 0 ? Math.max(0, moqP - totalQtyP) : (form.extraQty ?? 0); const isSoldOut = !!form.orderPlaced && inStockP === 0
+  if (isSoldOut) { ctx.font = '30px Play'; const stw = ctx.measureText('SOLD OUT').width; const sbw = stw + 48, sbh = 56; secs.push({ h: sbh, draw: (top) => { ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.roundRect(60, top, sbw, sbh, 8); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.font = '30px Play'; ctx.textAlign = 'left'; ctx.fillText('SOLD OUT', 84, top + 34) } }) }
+  else if (moqP > 0) { const labelText = 'Qty Available'; const qtyText = `${totalQtyP} of ${moqP} Reserved`; ctx.font = '30px Play'; const labelW = ctx.measureText(labelText).width; const qtyW = ctx.measureText(qtyText).width; const bPadX = 20, bh = 56, boxGap = 20; secs.push({ h: bh, draw: (top) => { ctx.font = '30px Play'; ctx.textAlign = 'left'; ctx.fillStyle = '#ffffff'; ctx.fillText(labelText, 60, top + 34); const bx = 60 + labelW + boxGap; ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.roundRect(bx, top, qtyW + bPadX * 2, bh, 8); ctx.fill(); ctx.fillStyle = '#000000'; ctx.fillText(qtyText, bx + bPadX, top + 34) } }) }
+  else { secs.push({ h: 50, draw: (top) => { ctx.fillStyle = '#22c55e'; ctx.font = 'bold 42px Arial'; ctx.textAlign = 'left'; ctx.fillText('Pre-Order Now', 60, top + 42) } }) }
+  const contentTop = sepY + 16, contentBottom = H - 90, totalH = secs.reduce((s, sec) => s + sec.h, 0)
+  const gap = Math.max(16, Math.floor((contentBottom - contentTop - totalH) / (secs.length + 1)))
+  let y = contentTop + gap; for (const sec of secs) { sec.draw(y); y += sec.h + gap }
+  ctx.fillStyle = ACCENT; ctx.fillRect(0, H - 90, W, 90); ctx.fillStyle = '#ffffff'; ctx.font = 'bold 40px Arial'; ctx.textAlign = 'center'; ctx.fillText('www.r66slot.co.za', W / 2, H - 28)
+  canvas.toBlob(blob => { if (!blob) return; const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sku || form.sku || 'preorder'}-poster.jpg`; a.click(); URL.revokeObjectURL(url) }, 'image/jpeg', 0.92)
 }
 
 function SendToDropdown({ customer, form, unitPrice, onLinked }: {
