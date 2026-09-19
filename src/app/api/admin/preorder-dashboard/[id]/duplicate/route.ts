@@ -30,6 +30,8 @@ export async function POST(
       customers: [],
       published: false,
       orderPlaced: false,
+      imageUrl: '',        // never copy the photo - duplicates polluted Inventory
+      seoImageUrl: '',
 
       createdAt: now,
       updatedAt: now,
