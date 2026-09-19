@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
             sku: i.sku,
             description: i.description,
             estRetailZAR: i.estRetailZAR,
+            imageUrl: i.imageUrl,
+            qtyAvailable: i.qtyAvailable,
           }))
 
     return NextResponse.json({

@@ -47,6 +47,11 @@ export interface MergedItem {
   wholesalePrice: number
   currency: string
   inInventory: boolean
+  /** Product photo when we carry the SKU; '' for a catalogue-only line. */
+  imageUrl: string
+  /** Inventory on hand. A request never touches it (Rule 59) — it is shown so
+   *  both sides can see the item is already on the shelf before ordering it. */
+  qtyAvailable: number
 }
 
 export interface BrandRow {
@@ -63,6 +68,17 @@ interface ProductRow {
   supplier: string | null
   price: string | number | null
   pre_order_price: string | number | null
+  image_url: string | null
+  images: string[] | null
+  quantity: number | null
+}
+
+/** First usable photo: the primary image, else the first of the gallery. */
+const firstImage = (p: { image_url: string | null; images: string[] | null }) => {
+  const primary = (p.image_url || '').trim()
+  if (primary) return primary
+  const gallery = Array.isArray(p.images) ? p.images : []
+  return (gallery.find((i) => typeof i === 'string' && i.trim()) || '').trim()
 }
 
 const upper = (s: string) => (s || '').trim().toUpperCase()
@@ -179,7 +195,7 @@ export async function getMergedItems(opts: {
   params.push(limit)
 
   const rows = await db.query(
-    `SELECT sku, title, brand, supplier, price, pre_order_price
+    `SELECT sku, title, brand, supplier, price, pre_order_price, image_url, images, quantity
        FROM products
       WHERE ${where.join(' AND ')}
       ORDER BY sku ASC
@@ -209,6 +225,8 @@ export async function getMergedItems(opts: {
       wholesalePrice: 0,
       currency: (supplier?.preferredCurrency || 'EUR').toUpperCase(),
       inInventory: true,
+      imageUrl: firstImage(p),
+      qtyAvailable: Number(p.quantity) || 0,
     })
   }
 
@@ -255,6 +273,10 @@ export async function getMergedItems(opts: {
       wholesalePrice: item.wholesalePrice || 0,
       currency,
       inInventory: existing?.inInventory || false,
+      // The catalogue is a price sheet — it never carries a photo or stock, so
+      // whatever Inventory knew about the SKU stands.
+      imageUrl: existing?.imageUrl || '',
+      qtyAvailable: existing?.qtyAvailable || 0,
     })
   }
 
@@ -269,4 +291,35 @@ export async function findBySkus(skus: string[]): Promise<Map<string, MergedItem
   if (wanted.length === 0) return new Map()
   const items = await getMergedItems({ skus: wanted, limit: 1000 })
   return new Map(items.map((i) => [i.sku, i]))
+}
+
+/** Photo and on-hand qty per SKU, for rendering lines that were stored without them. */
+export interface SkuInfo {
+  imageUrl: string
+  qtyAvailable: number
+  title: string
+}
+
+export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo>> {
+  const wanted = [...new Set(skus.map(upper).filter(Boolean))]
+  if (wanted.length === 0) return {}
+
+  const rows = await db.query(
+    `SELECT sku, title, image_url, images, quantity
+       FROM products
+      WHERE UPPER(TRIM(sku)) = ANY($1)`,
+    [wanted]
+  )
+
+  const out: Record<string, SkuInfo> = {}
+  for (const p of rows.rows as ProductRow[]) {
+    const sku = upper(p.sku)
+    if (!sku || out[sku]) continue
+    out[sku] = {
+      imageUrl: firstImage(p),
+      qtyAvailable: Number(p.quantity) || 0,
+      title: (p.title || '').trim(),
+    }
+  }
+  return out
 }

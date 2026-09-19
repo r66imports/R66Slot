@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { blobRead, blobWrite, blobReplaceArrayItem } from '@/lib/blob-storage'
 import { getRates, rateFor } from '@/lib/exchange-rates'
 import { accountById, lineEstRetailZAR, DEFAULT_COSTING_ACCOUNTS } from '@/lib/preorder-pricing'
+import { getSkuInfo } from '@/lib/supplier-catalogue'
 import type { CostingAccount, SupplierPreOrder } from '@/types/supplier-preorder'
 
 const KEY = 'data/supplier-preorders.json'
@@ -58,9 +59,15 @@ export async function GET(request: Request) {
       return { ...o, lines, totalZAR: Math.round(totalZAR * 100) / 100, exRate: rate }
     })
 
+    // Photo and on-hand qty keyed by SKU rather than folded into the lines —
+    // PATCH writes `lines` back verbatim, and derived data has no business
+    // being persisted into the request.
+    const skuInfo = await getSkuInfo(priced.flatMap((o) => o.lines.map((l) => l.sku)))
+
     return NextResponse.json({
       orders: priced,
       accounts,
+      skuInfo,
       rateFetchedAt: rateData.fetchedAt,
       binCount: binned.length,
     })
@@ -69,6 +76,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       orders: [],
       accounts: DEFAULT_COSTING_ACCOUNTS,
+      skuInfo: {},
       rateFetchedAt: '',
       binCount: 0,
     })

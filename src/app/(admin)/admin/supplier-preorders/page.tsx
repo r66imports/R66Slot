@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { compareSku, formatZAR } from '@/lib/preorder-pricing'
 import { documentTotal, settledAmount, balanceDue, MONEY_EPSILON } from '@/lib/payment-math'
+import { SkuPreviewModal, SkuThumb, type SkuPreviewItem } from '@/components/supplier/SkuPreview'
 import type { CostingAccount, SupplierPreOrder, SupplierPreOrderLine } from '@/types/supplier-preorder'
 
 type Order = SupplierPreOrder & { totalZAR: number; exRate: number }
@@ -33,6 +34,11 @@ export default function SupplierPreOrdersAdminPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [binCount, setBinCount] = useState(0)
   const [accounts, setAccounts] = useState<CostingAccount[]>([])
+  /** Photo + on-hand qty by SKU. Derived server-side, never written back. */
+  const [skuInfo, setSkuInfo] = useState<Record<string, { imageUrl: string; qtyAvailable: number }>>(
+    {}
+  )
+  const [preview, setPreview] = useState<SkuPreviewItem | null>(null)
   const [docs, setDocs] = useState<any[]>([])
   const [supplierOrders, setSupplierOrders] = useState<OpenSupplierOrder[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,6 +61,7 @@ export default function SupplierPreOrdersAdminPage() {
         const data = await poRes.json()
         setOrders(data.orders || [])
         setAccounts(data.accounts || [])
+        setSkuInfo(data.skuInfo || {})
         setBinCount(data.binCount || 0)
       }
       if (docRes.ok) setDocs(await docRes.json())
@@ -91,6 +98,19 @@ export default function SupplierPreOrdersAdminPage() {
   }, [load])
 
   const docById = useMemo(() => new Map(docs.map((d) => [d.id, d])), [docs])
+
+  /** A stored line plus whatever Inventory currently knows about that SKU. */
+  const previewFor = (l: SupplierPreOrderLine): SkuPreviewItem => {
+    const info = skuInfo[l.sku.trim().toUpperCase()]
+    return {
+      sku: l.sku,
+      brand: l.brand,
+      description: l.description,
+      imageUrl: info?.imageUrl || '',
+      qtyAvailable: info?.qtyAvailable || 0,
+      estRetailZAR: l.estRetailZAR,
+    }
+  }
 
   const patchOrder = async (id: string, patch: Partial<SupplierPreOrder>) => {
     const res = await fetch('/api/admin/supplier-preorders', {
@@ -744,8 +764,12 @@ export default function SupplierPreOrdersAdminPage() {
                             <thead>
                               <tr className="text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
                                 <th className="py-2 pr-3 font-medium">Brand</th>
+                                <th className="py-2 pr-2 font-medium sr-only">Photo</th>
                                 <th className="py-2 pr-3 font-medium">SKU</th>
                                 <th className="py-2 pr-3 font-medium">Description</th>
+                                <th className="py-2 pr-3 font-medium text-center whitespace-nowrap">
+                                  In Stock
+                                </th>
                                 <th className="py-2 pr-3 font-medium text-center">Qty</th>
                                 <th className="py-2 pr-3 font-medium text-right">
                                   Wholesale ({order.currency})
@@ -763,8 +787,21 @@ export default function SupplierPreOrdersAdminPage() {
                                     className={l.status === 'rejected' ? 'opacity-40' : undefined}
                                   >
                                     <td className="py-2 pr-3 text-gray-600">{l.brand}</td>
+                                    <td className="py-2 pr-2">
+                                      <SkuThumb
+                                        item={previewFor(l)}
+                                        onClick={() => setPreview(previewFor(l))}
+                                        size={36}
+                                      />
+                                    </td>
                                     <td className="py-2 pr-3 font-mono text-xs">
-                                      {l.sku}
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreview(previewFor(l))}
+                                        className="hover:underline"
+                                      >
+                                        {l.sku}
+                                      </button>
                                       {l.isNewSku && (
                                         <span className="ml-1 text-[10px] uppercase bg-yellow-100 text-yellow-800 px-1 rounded">
                                           new
@@ -772,6 +809,15 @@ export default function SupplierPreOrdersAdminPage() {
                                       )}
                                     </td>
                                     <td className="py-2 pr-3">
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreview(previewFor(l))}
+                                        className="mr-1 text-gray-400 hover:text-gray-700"
+                                        aria-label={`View ${l.sku}`}
+                                        title="View item"
+                                      >
+                                        🔍
+                                      </button>
                                       <input
                                         defaultValue={l.description}
                                         onBlur={(e) =>
@@ -782,8 +828,17 @@ export default function SupplierPreOrdersAdminPage() {
                                           )
                                         }
                                         disabled={tab === 'archived'}
-                                        className="w-full px-2 py-1 border border-transparent hover:border-gray-300 focus:border-gray-300 rounded text-sm"
+                                        className="w-[calc(100%-1.5rem)] px-2 py-1 border border-transparent hover:border-gray-300 focus:border-gray-300 rounded text-sm"
                                       />
+                                    </td>
+                                    <td className="py-2 pr-3 text-center whitespace-nowrap">
+                                      {(skuInfo[l.sku.trim().toUpperCase()]?.qtyAvailable || 0) > 0 ? (
+                                        <span className="text-green-700 font-semibold">
+                                          {skuInfo[l.sku.trim().toUpperCase()].qtyAvailable}
+                                        </span>
+                                      ) : (
+                                        <span className="text-gray-400">0</span>
+                                      )}
                                     </td>
                                     <td className="py-2 pr-3 text-center">
                                       <input
@@ -1001,6 +1056,8 @@ export default function SupplierPreOrdersAdminPage() {
           </div>
         ))
       )}
+
+      <SkuPreviewModal item={preview} onClose={() => setPreview(null)} />
     </div>
   )
 }

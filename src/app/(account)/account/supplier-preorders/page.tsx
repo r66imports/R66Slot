@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { compareSku, formatZAR } from '@/lib/preorder-pricing'
+import { SkuPreviewModal, SkuThumb, type SkuPreviewItem } from '@/components/supplier/SkuPreview'
 
 interface BrandRow {
   brand: string
@@ -18,6 +19,8 @@ interface CatalogueItem {
   sku: string
   description: string
   estRetailZAR: number
+  imageUrl: string
+  qtyAvailable: number
 }
 
 interface CustomLine {
@@ -75,6 +78,7 @@ export default function SupplierPreOrdersPage() {
   const [cart, setCart] = useState<Record<string, CartEntry>>({})
   const [customLines, setCustomLines] = useState<CustomLine[]>([])
   const [notes, setNotes] = useState('')
+  const [preview, setPreview] = useState<SkuPreviewItem | null>(null)
   const [disclaimer, setDisclaimer] = useState('')
   const [rateFetchedAt, setRateFetchedAt] = useState('')
 
@@ -467,8 +471,10 @@ export default function SupplierPreOrdersPage() {
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
                     <th className="py-2 pr-4 font-medium">Brand</th>
+                    <th className="py-2 pr-2 font-medium sr-only">Photo</th>
                     <th className="py-2 pr-4 font-medium">SKU</th>
                     <th className="py-2 pr-4 font-medium">Description</th>
+                    <th className="py-2 pr-4 font-medium text-center whitespace-nowrap">In Stock</th>
                     <th className="py-2 pr-4 font-medium text-right whitespace-nowrap">Est. Retail</th>
                     <th className="py-2 font-medium text-center">Qty</th>
                   </tr>
@@ -479,10 +485,34 @@ export default function SupplierPreOrdersPage() {
                     return (
                       <tr key={item.id} className={qty > 0 ? 'bg-primary/5' : undefined}>
                         <td className="py-2 pr-4 text-gray-600 whitespace-nowrap">{item.brand}</td>
-                        <td className="py-2 pr-4 font-mono text-xs text-gray-900 whitespace-nowrap">
-                          {item.sku}
+                        <td className="py-2 pr-2">
+                          <SkuThumb item={item} onClick={() => setPreview(item)} />
                         </td>
-                        <td className="py-2 pr-4 text-gray-700">{item.description || '—'}</td>
+                        <td className="py-2 pr-4 font-mono text-xs text-gray-900 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => setPreview(item)}
+                            className="hover:underline text-left"
+                          >
+                            {item.sku}
+                          </button>
+                        </td>
+                        <td className="py-2 pr-4 text-gray-700">
+                          <button
+                            type="button"
+                            onClick={() => setPreview(item)}
+                            className="hover:underline text-left"
+                          >
+                            {item.description || '—'}
+                          </button>
+                        </td>
+                        <td className="py-2 pr-4 text-center whitespace-nowrap">
+                          {item.qtyAvailable > 0 ? (
+                            <span className="text-green-700 font-semibold">{item.qtyAvailable}</span>
+                          ) : (
+                            <span className="text-gray-400">0</span>
+                          )}
+                        </td>
                         <td className="py-2 pr-4 text-right font-semibold whitespace-nowrap">
                           {item.estRetailZAR > 0 ? formatZAR(item.estRetailZAR) : 'On request'}
                         </td>
@@ -827,6 +857,8 @@ export default function SupplierPreOrdersPage() {
           </div>
         </div>
       )}
+
+      <SkuPreviewModal item={preview} onClose={() => setPreview(null)} />
     </div>
   )
 }
