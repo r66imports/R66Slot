@@ -41,8 +41,8 @@ export const FULL_PAGE_TEMPLATES: FullPageTemplate[] = [
         },
         settings: {
           logoText: 'R66SLOT',
-          menuItems: 'Products,Brands,New Arrivals,Slotify Pre-Orders,About,Contact',
-          menuLinks: '/products,/brands,/collections/new-arrivals,/slotify-preorders,/about,/contact',
+          menuItems: 'Products,Brands,New Arrivals,About,Contact',
+          menuLinks: '/products,/brands,/collections/new-arrivals,/about,/contact',
         },
       },
       {
