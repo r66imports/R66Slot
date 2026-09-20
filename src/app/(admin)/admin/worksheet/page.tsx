@@ -380,15 +380,21 @@ function WorksheetEditor({
     try {
       // Fresh fetch — avoids stale products state creating duplicates on repeated presses
       const freshById: Record<string, string> = {}
+      const freshBrandBySku: Record<string, string> = {}
       try {
         const res = await fetch('/api/admin/products', { cache: 'no-store' })
         if (res.ok) {
           const raw: any[] = await res.json()
           for (const p of raw) {
-            if (p.sku) freshById[p.sku.trim().toLowerCase()] = p.id
+            if (p.sku) {
+              freshById[p.sku.trim().toLowerCase()] = p.id
+              freshBrandBySku[p.sku.trim().toLowerCase()] = (p.brand || '').trim()
+            }
           }
         }
       } catch {}
+      // SKUs whose Inventory brand was kept over the sheet's Category column.
+      const brandKept: string[] = []
 
       // Deduplicate worksheet rows by SKU — process each SKU exactly once
       const seenSkus = new Set<string>()
@@ -448,7 +454,20 @@ function WorksheetEditor({
         else if (finalLanded > 0) patch.compareAtPrice = finalLanded
         if (retailZAR > 0) patch.price = retailZAR
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
-        if (it.category) { patch.brand = it.category; patch.categoryBrands = [it.category] }
+        if (it.category) {
+          // A worksheet's Category column is one coarse label for a whole
+          // shipment, while Inventory's brand is curated per product — a Revo
+          // sheet carrying cars, white kits and spares would otherwise stamp
+          // every line with the same brand and undo that. The sheet fills a
+          // blank brand and never overwrites one; SKUs it left alone are
+          // reported rather than silently skipped.
+          const currentBrand = freshBrandBySku[skuLower] || ''
+          if (!currentBrand) patch.brand = it.category
+          else if (currentBrand.toLowerCase() !== it.category.trim().toLowerCase()) {
+            brandKept.push(`${it.sku.toUpperCase()} — kept ${currentBrand}, sheet said ${it.category}`)
+          }
+          patch.categoryBrands = [it.category]
+        }
         if (it.unit) { patch.scale = it.unit; patch.itemCategories = [it.unit] }
         if (supplier) patch.supplier = supplier
         if (acct) { patch.salesAccount = acct; patch.purchaseAccount = acct }
@@ -469,9 +488,14 @@ function WorksheetEditor({
       await saveWorksheet()
       onRefresh()  // refresh products state so next press uses current DB
       if (duplicateSkus.length > 0) setDoubleSKUAlert(duplicateSkus)
+      const keptNote =
+        brandKept.length > 0
+          ? `\n\nBrand kept from Inventory — change it there if the sheet is right:\n${brandKept.join('\n')}`
+          : ''
       if (errors.length > 0) {
-        alert(`Updated ${updated}, created ${created}.\n\nFailed:\n${errors.join('\n')}`)
+        alert(`Updated ${updated}, created ${created}.\n\nFailed:\n${errors.join('\n')}${keptNote}`)
       } else {
+        if (keptNote) alert(`Updated ${updated}, created ${created}.${keptNote}`)
         setCostsUpdated(true)
         setTimeout(() => setCostsUpdated(false), 3000)
       }
