@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { slugify } from '@/lib/slugify'
 
 interface Brand {
   id: string
@@ -134,7 +135,7 @@ export default function CatalogueCategoriesPage() {
   }
 
   const handleAddCategory = async () => {
-    const slug = formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-')
+    const slug = formData.slug || slugify(formData.name)
     const payload = {
       name: formData.name,
       slug,
@@ -187,7 +188,9 @@ export default function CatalogueCategoriesPage() {
     const payload = {
       id: selectedCategory.id,
       name: formData.name,
-      slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, '-'),
+      // Only reached when the slug field was cleared; an existing slug is
+      // pre-filled by handleEditCategory and rides through untouched.
+      slug: formData.slug || slugify(formData.name),
       description: formData.description,
       parentId: formData.parentId || null,
       brandId: formData.brandId,

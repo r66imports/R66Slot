@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import { db } from '@/lib/db'
+import { slugify } from '@/lib/slugify'
 
 const CATEGORIES_KEY = 'data/product-categories.json'
 
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
     const newCategory = {
       id: `cat_${Date.now()}`,
       name: body.name,
-      slug: body.slug || body.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
+      slug: body.slug || slugify(body.name),
       description: body.description || '',
       parentId: body.parentId || null,
       productIds: body.productIds || [],
@@ -78,7 +79,7 @@ export async function POST(request: Request) {
       order: body.order || categories.length + 1,
       brandId: body.brandId || '',
       supplierId: body.supplierId || '',
-      pageUrl: body.pageUrl || `/products/${body.slug || body.name.toLowerCase().replace(/\s+/g, '-')}`,
+      pageUrl: body.pageUrl || `/products/${body.slug || slugify(body.name)}`,
       class: body.class || '',
     }
 

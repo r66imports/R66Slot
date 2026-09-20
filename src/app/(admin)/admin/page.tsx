@@ -97,7 +97,7 @@ export default function AdminDashboard() {
                 📦 Manage Products
               </Button>
             </Link>
-            <Link href="/admin/slotify-preorders">
+            <Link href="/admin/preorder-list">
               <Button variant="outline" className="w-full justify-start">
                 📋 Manage Pre Orders
               </Button>

@@ -12,8 +12,9 @@
     "start": "node scripts/railway-init.js && next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "test": "npm run lint && npm run type-check && npm run test:freeform",
+    "test": "npm run lint && npm run type-check && npm run test:freeform && npm run check:consistency",
     "test:freeform": "node scripts/test-freeform-positioning.js",
+    "check:consistency": "node scripts/consistency/check.js",
     "smoke:editor": "node scripts/smoke-editor.js",
     "deploy": "vercel --prod",
     "deploy:preview": "vercel"
