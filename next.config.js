@@ -18,6 +18,17 @@ const nextConfig = {
         destination: '/pre-orders',
         permanent: true,
       },
+      // /collections was the last Shopify-backed storefront route. Shopify is
+      // not used, so shopify/client.ts threw on every request and the page
+      // returned a 500 rather than a 404. The route is gone; this keeps old
+      // bookmarks, search results and shared links landing somewhere real.
+      // Only /collections is redirected - /products has real pages beneath it
+      // (cars, parts, select), and a wildcard there would hijack them.
+      {
+        source: '/collections/:path*',
+        destination: '/products',
+        permanent: true,
+      },
     ]
   },
   images: {
