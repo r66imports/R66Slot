@@ -9,6 +9,15 @@ const nextConfig = {
         destination: 'https://www.r66slot.co.za/:path*',
         permanent: true,
       },
+      // The /book booking pages were deleted in 41e1d51d (2 July 2026), but the
+      // URL is printed on every pre-order poster and was shared into WhatsApp
+      // and Facebook posts, so links already in customers' hands still point
+      // here. Catches /book, /book/<poster code> and /book/product/<id>.
+      {
+        source: '/book/:path*',
+        destination: '/pre-orders',
+        permanent: true,
+      },
     ]
   },
   images: {

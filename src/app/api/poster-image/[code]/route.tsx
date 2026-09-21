@@ -216,7 +216,7 @@ export async function GET(
               color: '#2563eb',
             }}
           >
-            r66slot.co.za/book/{code}
+            r66slot.co.za/pre-orders
           </div>
 
           {/* Footer */}

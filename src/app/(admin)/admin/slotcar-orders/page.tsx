@@ -329,7 +329,7 @@ export default function SlotCarOrdersPage() {
                     </Link>
                   </Button>
                   <Button variant="outline" size="sm" asChild className="font-play">
-                    <Link href={`/preorder/${poster.id}`} target="_blank">
+                    <Link href={`/pre-orders`} target="_blank">
                       View
                     </Link>
                   </Button>
