@@ -28,9 +28,6 @@ export function Footer() {
               <Link href="/brands" className="text-gray-400 hover:text-primary transition-colors">
                 Brands
               </Link>
-              <Link href="/collections/new-arrivals" className="text-gray-400 hover:text-primary transition-colors">
-                New Arrivals
-              </Link>
               <Link href="/pre-orders" className="text-gray-400 hover:text-primary transition-colors">
                 Book for Next Shipment
               </Link>
