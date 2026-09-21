@@ -150,7 +150,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 </div>
               )}
               {isPreOrder ? (
-                <a href={`/book/product/${product.id}`}
+                <a href={`/pre-orders`}
                   className="w-full text-center font-bold py-3 px-6 rounded-lg text-base bg-orange-500 text-white hover:bg-orange-600 transition-colors">
                   Book for Next Shipment
                 </a>

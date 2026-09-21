@@ -5,7 +5,7 @@ const SETTINGS_KEY = 'data/site-settings.json'
 
 const CURRENT_NAV = [
   { label: 'New Arrivals', href: '/collections/new-arrivals' },
-  { label: 'Book for Next Shipment', href: '/book' },
+  { label: 'Book for Next Shipment', href: '/pre-orders' },
 ]
 const STALE_NAV_LABELS = new Set(['Shop All', 'Brands', 'Blog', 'Pre-Orders', 'Pre Order'])
 

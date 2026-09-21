@@ -1019,7 +1019,7 @@ export default function EditProductPage({
     if (quantity && quantity !== '0') parts.push(`*Stock:* ${quantity} units`)
     if (description) { parts.push(''); parts.push(description) }
     if (isPreOrder) {
-      parts.push('', `📋 *Book Now:* https://r66slot.co.za/book`)
+      parts.push('', `📋 *Book Now:* https://r66slot.co.za/pre-orders`)
     } else if (pageUrl) {
       parts.push('', `🔗 ${pageUrl}`)
     }

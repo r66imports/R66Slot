@@ -492,7 +492,7 @@ export default function NewProductPage() {
     if (quantity && quantity !== '0') parts.push(`*Qty:* ${quantity}`)
     if (description) { parts.push(''); parts.push(description) }
     if (isPreOrder) {
-      parts.push('', `📋 *Book Now:* https://r66slot.co.za/book`)
+      parts.push('', `📋 *Book Now:* https://r66slot.co.za/pre-orders`)
     }
 
     const message = parts.join('\n')

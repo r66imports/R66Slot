@@ -76,7 +76,7 @@ interface PageItem {
   title: string
 }
 
-const BOOK_NOW_URL = 'https://r66slot.co.za/book'
+const BOOK_NOW_URL = 'https://r66slot.co.za/pre-orders'
 
 // ─── Pre-Order PDF builder ────────────────────────────────────────────────────
 function buildPreOrderPDF(product: Product): string {
@@ -150,7 +150,7 @@ function buildPreOrderPDF(product: Product): string {
     </div>
   </div>
   <div class="cta">
-    <a href="${BOOK_NOW_URL}"><span>BOOK NOW</span> → r66slot.co.za/book</a>
+    <a href="${BOOK_NOW_URL}"><span>BOOK NOW</span> → r66slot.co.za/pre-orders</a>
   </div>
   <div class="footer">R66SLOT • Premium Slot Cars &amp; Collectibles • r66slot.co.za</div>
 </body>

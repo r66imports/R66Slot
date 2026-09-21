@@ -115,7 +115,7 @@ export default function PreOrdersFlowPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
         <Node kind="neutral" icon="🌐" title="Customer books online" subtitle="Storefront, logged in" defaultOpen>
           <ul className="list-disc pl-5 space-y-1">
-            <li>Pre-order items route to <strong>/book</strong>, not the normal checkout &mdash; a mixed basket shows both buttons and asks the customer to check out separately. <Rule>Rule 8</Rule></li>
+            <li>Pre-order items route to <strong>/pre-orders</strong>, not the normal checkout &mdash; a mixed basket shows both buttons and asks the customer to check out separately. <Rule>Rule 8</Rule></li>
             <li>Login is required. The reservation lands on the item as a customer row: name, email, phone, qty.</li>
             <li>Booking again tops up the same row rather than creating a second one, and the row is flagged as new so it stands out on the dashboard.</li>
             <li>A customer <strong>cannot edit</strong> their qty afterwards &mdash; they can only cancel, and only while the item is unlocked. Changes go through you.</li>

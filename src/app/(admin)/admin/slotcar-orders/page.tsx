@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
-const BOOK_NOW_URL = 'https://r66slot.co.za/book'
+const BOOK_NOW_URL = 'https://r66slot.co.za/pre-orders'
 
 type PreOrderPoster = {
   id: string

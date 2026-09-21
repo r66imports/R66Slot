@@ -192,7 +192,7 @@ export default function CartPage() {
                         className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                         asChild
                       >
-                        <Link href="/book">Proceed to Book Now</Link>
+                        <Link href="/pre-orders">Proceed to Book Now</Link>
                       </Button>
                     ) : hasInStock && !hasPreOrder ? (
                       <Button
@@ -219,7 +219,7 @@ export default function CartPage() {
                           className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                           asChild
                         >
-                          <Link href="/book">Book Pre-Order Items</Link>
+                          <Link href="/pre-orders">Book Pre-Order Items</Link>
                         </Button>
                       </>
                     )}

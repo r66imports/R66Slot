@@ -108,7 +108,7 @@ const DEFAULT_RULES: SiteRule[] = [
   {
     id: 'preorder_checkout_separation',
     name: 'Rule 8 \u2014 In-Stock vs Pre-Order Checkout Routing',
-    description: 'Separates the checkout flow for in-stock items and pre-order items in the online store. In-stock items route to /checkout. Pre-order items route to /book. Mixed cart: both buttons shown with a notice to checkout separately. This ensures pre-order bookings are handled through the booking form while in-stock purchases go through standard checkout.',
+    description: 'Separates the checkout flow for in-stock items and pre-order items in the online store. In-stock items route to /checkout. Pre-order items route to /pre-orders. Mixed cart: both buttons shown with a notice to checkout separately. This ensures pre-order bookings are handled through the booking form while in-stock purchases go through standard checkout.',
     active: true,
     appliesTo: ['Online Store', 'Cart'],
     category: 'System',
@@ -291,7 +291,7 @@ const DEFAULT_RULES: SiteRule[] = [
   {
     id: 'auto_preorder_on_oos',
     name: 'Rule 30 \u2014 Sold Out at Zero Stock (Pre-Order is Manual)',
-    description: 'When a product\'s stock quantity reaches 0 (via invoice deduction, site checkout, POS sale, or direct inventory edit) the storefront shows it as Sold Out: QTY reads 0, the Add to Cart button is disabled, and it cannot be purchased. Selling out NEVER converts a product to Pre-Order. The Pre-Order flag is owned by the product record and is only ever set deliberately \u2014 it is not derived from the stock level, and restoring stock no longer clears it. Pre Order / Book Now is reserved for products genuinely offered as pre-orders \u2014 those show a "Book Now" button and route through /book instead of /checkout. IMPORTANT — Pre-Order checkout goes to Back Orders, NOT Invoices: when a customer books via /book, the submission is saved directly to the Back Orders list (/admin/backorders) so you can manage it like any other backorder (quote → sales order → invoice once stock arrives). You cannot invoice a client for stock you do not have — pre-orders sit in Back Orders until stock is received, then follow the normal fulfilment flow.',
+    description: 'When a product\'s stock quantity reaches 0 (via invoice deduction, site checkout, POS sale, or direct inventory edit) the storefront shows it as Sold Out: QTY reads 0, the Add to Cart button is disabled, and it cannot be purchased. Selling out NEVER converts a product to Pre-Order. The Pre-Order flag is owned by the product record and is only ever set deliberately \u2014 it is not derived from the stock level, and restoring stock no longer clears it. Pre Order / Book Now is reserved for products genuinely offered as pre-orders \u2014 those show a "Book Now" button and route through /pre-orders instead of /checkout. IMPORTANT — Pre-Order checkout goes to Back Orders, NOT Invoices: when a customer books via /pre-orders, the submission is saved directly to the Back Orders list (/admin/backorders) so you can manage it like any other backorder (quote → sales order → invoice once stock arrives). You cannot invoice a client for stock you do not have — pre-orders sit in Back Orders until stock is received, then follow the normal fulfilment flow.',
     active: true,
     appliesTo: ['Online Store', 'Admin Invoices', 'Sales Orders', 'POS / Scanner', 'Products'],
     category: 'Inventory',
@@ -315,7 +315,7 @@ const DEFAULT_RULES: SiteRule[] = [
   {
     id: 'booking_retail_price',
     name: 'Rule 37 — Booking Uses Retail Price',
-    description: 'All "Book for Next Shipment" booking pages display and submit the retail price (product.price) — never the cost price, pre-order price, or wholesale price. This applies to the booking confirmation page (/book/product/[id]) and any booking form across the site. The price shown to the customer when booking must always match the retail price displayed on the product page.',
+    description: 'All "Book for Next Shipment" booking pages display and submit the retail price (product.price) — never the cost price, pre-order price, or wholesale price. This applies to the booking confirmation page (/pre-orders) and any booking form across the site. The price shown to the customer when booking must always match the retail price displayed on the product page.',
     active: true,
     appliesTo: ['Online Store', 'Bookings', 'Products'],
     category: 'Pricing',

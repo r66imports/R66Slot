@@ -63,7 +63,7 @@ const DEFAULT_HEADER: HeaderConfig = {
   textColor: '#111827',
   navItems: [
     { label: 'New Arrivals', href: '/collections/new-arrivals' },
-    { label: 'Book for Next Shipment', href: '/book' },
+    { label: 'Book for Next Shipment', href: '/pre-orders' },
   ],
   showSearch: true,
   showAccount: true,

@@ -21,7 +21,7 @@ interface Product {
   carType: string
 }
 
-const BOOK_NOW_URL = 'https://r66slot.co.za/book'
+const BOOK_NOW_URL = 'https://r66slot.co.za/pre-orders'
 
 export default function ProductSelectPage() {
   const [products, setProducts] = useState<Product[]>([])

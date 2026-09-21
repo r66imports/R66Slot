@@ -17,7 +17,7 @@ const PART_TYPES = ['Guides', 'Braid', 'Lead Wire', 'Magnets', 'Weights', 'Screw
 const SCALES = ['1/32', '1/24', '1/43', '1/64']
 const SUPPLIERS = ['NSR', 'Revo', 'Pioneer', 'Sideways', 'Slot.it', 'Carrera', 'Other']
 
-const BOOK_NOW_URL = 'https://r66slot.co.za/book'
+const BOOK_NOW_URL = 'https://r66slot.co.za/pre-orders'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function generateShortCode(): string {
