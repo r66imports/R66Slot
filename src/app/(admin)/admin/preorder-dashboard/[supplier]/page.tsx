@@ -272,14 +272,16 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   customer: DashboardCustomer; form: FormState; unitPrice: number
   onLinked: (docNumber: string, docId: string) => void
 }) {
-  const [open,setOpen]=useState(false); const [mode,setMode]=useState<'new'|'existing'>('new')
-  const [docs,setDocs]=useState<any[]>([]); const [allDocs,setAllDocs]=useState<any[]>([]); const [loading,setLoading]=useState(false)
-  const [docSearch,setDocSearch]=useState('')
+  const [open,setOpen]=useState(false)
+  const [loading,setLoading]=useState(false)
+  const [existingDocs,setExistingDocs]=useState<any[]>([])
+  const [allOpenDocs,setAllOpenDocs]=useState<any[]>([])
+  const [existingDocsSearch,setExistingDocsSearch]=useState('')
   const [bankAccounts,setBankAccounts]=useState<any[]>([])
   const [pendingQuoteBank,setPendingQuoteBank]=useState(false)
   const [pendingConvertQuote,setPendingConvertQuote]=useState<any>(null)
   const [linkedDocNumber,setLinkedDocNumber]=useState(customer.linkedDocNumber||'')
-  const [sending,setSending]=useState(false); const ref=useRef<HTMLDivElement>(null)
+  const ref=useRef<HTMLDivElement>(null)
   useEffect(()=>{
     const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node)) setOpen(false)}
     document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h)
@@ -303,34 +305,40 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     return ()=>{window.removeEventListener('preorder-doc-relinked',h);window.removeEventListener('storage',s)}
   })
 
-
-
-  const openStatuses=['draft','sent','accepted','pending','processing','active']
-  const isOpenDoc=(d:any)=>d.type==='invoice'?d.status!=='archived':openStatuses.includes(d.status)
-
-  const loadDocs = async () => {
-    setLoading(true); setDocSearch(''); setMode('new')
+  const openDropdown=async()=>{
+    const next=!open; if(!next){setOpen(false);return}
+    setOpen(true); setPendingQuoteBank(false); setPendingConvertQuote(null); setLoading(true); setExistingDocsSearch('')
     try{
       const [all,banks]=await Promise.all([
         fetch('/api/admin/orders/documents').then(r=>r.ok?r.json():[]),
         fetch('/api/admin/bank-accounts').then(r=>r.ok?r.json():[]).catch(()=>[]),
       ])
-      const openDocs=(Array.isArray(all)?all:[]).filter(isOpenDoc)
-      setAllDocs(openDocs)
-      setDocs(openDocs.filter((d:any)=>
+      const docs=Array.isArray(all)?all:[]
+      const openStatuses=['draft','sent','accepted','pending','processing','active']
+      // Invoices: every non-archived one, so items can be added to an already-paid invoice too.
+      const isOpenDoc=(d:any)=>d.type==='invoice'?d.status!=='archived':openStatuses.includes(d.status)
+      const openDocs=docs.filter(isOpenDoc)
+      setAllOpenDocs(openDocs)
+      setExistingDocs(openDocs.filter((d:any)=>
         (customer.email&&d.clientEmail?.toLowerCase()===customer.email.toLowerCase())||
         d.clientName?.toLowerCase()===customer.name.toLowerCase()
       ))
       setBankAccounts(Array.isArray(banks)?banks:[])
-    }catch{setDocs([]);setAllDocs([])}
+      // The chip can be stale — the linked document may have been renumbered or converted
+      // from the Orders page since this card was last saved.
+      if(customer.linkedDocId){
+        const live=docs.find((d:any)=>d.id===customer.linkedDocId)
+        if(live&&live.docNumber!==linkedDocNumber){setLinkedDocNumber(live.docNumber);onLinked(live.docNumber,live.id)}
+      }
+    }catch{setExistingDocs([]);setAllOpenDocs([])}
     finally{setLoading(false)}
   }
 
-  const docSearchQ=docSearch.trim().toLowerCase()
+  const searchQ=existingDocsSearch.trim().toLowerCase()
   // Typing a search widens the list from just this customer's docs to every open Quote/SO/Invoice
-  const docsToShow=docSearchQ
-    ?allDocs.filter(d=>(d.docNumber||'').toLowerCase().includes(docSearchQ)||(d.clientName||'').toLowerCase().includes(docSearchQ))
-    :docs
+  const docsToShow=searchQ
+    ?allOpenDocs.filter((d:any)=>(d.docNumber||'').toLowerCase().includes(searchQ)||(d.clientName||'').toLowerCase().includes(searchQ))
+    :existingDocs
 
   const nextDocNumber=(existing:any[],type:'quote'|'salesorder'|'invoice')=>{
     if(type==='quote'){const nums=existing.map((d:any)=>{const m=/^QR66(\d+)$/i.exec(d.docNumber||'');return m?parseInt(m[1],10):0});return `QR66${Math.max(0,...nums)+1}`}
@@ -354,9 +362,6 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       // …and to every OTHER tab. A dashboard left open in a second window would otherwise
       // keep showing the Quote until it was reloaded, which reads as the send having failed.
       try{localStorage.setItem('preorder-doc-relinked',JSON.stringify({...detail,t:Date.now()}))}catch{}
-      // …and to every OTHER tab. A dashboard left open in a second window would otherwise
-      // keep showing the Quote until it was reloaded, which reads as the send having failed.
-      try{localStorage.setItem('preorder-doc-relinked',JSON.stringify({...detail,t:Date.now()}))}catch{}
     }catch{}
   }
 
@@ -373,12 +378,8 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   // used to deduct nothing at all, so the sale never came off inventory. The server enforces
   // this too; checking here names the offending SKU instead of showing a bare error. A failed
   // lookup blocks rather than waving the invoice through — guessing costs stock accuracy.
-  // products.quantity is ALREADY net of every Sales Order reservation — an SO deducts stock the
-  // moment it is created (Rule 3), so the shelf figure IS the available figure. Subtracting
-  // /api/admin/inventory-reserved on top counted the same SO a second time, which zeroed out
-  // every SKU covered by a supplier SO and blocked its pre-order customers from being invoiced.
-  // This now matches the server guard (findStockShortfalls) and the Inventory page, which shows
-  // Total Inventory as quantity + reserved rather than quantity − reserved.
+  // products.quantity is ALREADY net of every Sales Order reservation — an SO deducts stock
+  // the moment it is created (Rule 3), so the shelf figure IS the available figure.
   const stockBlockReasons=async(items:any[]):Promise<string[]>=>{
     try{
       const products:any[]=await fetch('/api/admin/products?fields=sku,quantity').then(r=>r.json())
@@ -402,12 +403,12 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     const reasons=await stockBlockReasons(items)
     if(reasons.length===0) return false
     window.alert(`Cannot create invoice:\n\n${reasons.join('\n')}`)
-    setSending(false)
+    setLoading(false)
     return true
   }
 
   const appendQuoteToInvoice=async(quoteDoc:any,invoiceDoc:any)=>{
-    setSending(true);setOpen(false);setPendingConvertQuote(null)
+    setLoading(true);setOpen(false);setPendingConvertQuote(null)
     try{
       // Re-read BOTH documents. This dropdown's copies were fetched when it opened, so the
       // invoice's notes and payment totals must not be written back from a stale snapshot —
@@ -424,8 +425,8 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       // A Quote with no lines has nothing to merge. Bail BEFORE any money moves — merging
       // the payments and archiving it would strand the goods with no way back.
       if(quoteLines.length===0){
-        alert(`Cannot merge ${quote.docNumber||'this Quote'} into ${inv.docNumber}: it has no line items.\n\nNothing has been changed.`)
-        setSending(false);return
+        window.alert(`Cannot merge ${quote.docNumber||'this Quote'} into ${inv.docNumber}: it has no line items.\n\nNothing has been changed.`)
+        setLoading(false);return
       }
       if(await blockedByStock(quoteLines)) return
       const before=(inv.lineItems||[]).length
@@ -444,16 +445,16 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
       })})
       if(!res.ok){
         const e=await res.json().catch(()=>({}))
-        alert(e.error||`Could not merge into ${inv.docNumber}. Nothing has been changed.`)
-        setSending(false);return
+        window.alert(e.error||`Could not merge into ${inv.docNumber}. Nothing has been changed.`)
+        setLoading(false);return
       }
       // A 200 is not proof the lines landed. Confirm against what the server actually saved
       // before archiving the Quote or re-badging any card — those two steps are what make a
       // dropped append permanent and invisible.
       const saved=await res.json().catch(()=>null)
       if((saved?.lineItems||[]).length<before+quoteLines.length){
-        alert(`${inv.docNumber} did not accept the ${quoteLines.length} line item(s) from ${quote.docNumber}.\n\nThe Quote has NOT been archived and no card has been re-linked, so nothing is lost — please try again.`)
-        setSending(false);return
+        window.alert(`${inv.docNumber} did not accept the ${quoteLines.length} line item(s) from ${quote.docNumber}.\n\nThe Quote has NOT been archived and no card has been re-linked, so nothing is lost — please try again.`)
+        setLoading(false);return
       }
       await fetch(`/api/admin/orders/documents/${quote.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
       await relinkQuoteEntries(quote,inv.docNumber,inv.id)
@@ -461,127 +462,140 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
     }catch(err:any){
       // This used to swallow everything, which is how a half-finished merge looked like a
       // clean one to the person clicking the button.
-      alert(`Merge failed: ${err?.message||'unknown error'}. Nothing has been changed.`)
+      window.alert(`Merge failed: ${err?.message||'unknown error'}. Nothing has been changed.`)
     }
-    setSending(false)
+    setLoading(false)
   }
 
-  const createNew = async (type:'quote'|'salesorder'|'invoice',bankAccountId?:string) => {
-    setSending(true);setOpen(false);setPendingQuoteBank(false)
+  // One entry point for every send: Create New, Add to Existing, and Quote → new Invoice.
+  const sendTo=async(type:'quote'|'salesorder'|'invoice',existingDoc?:any,bankAccountId?:string,convertToInvoice?:boolean)=>{
+    setLoading(true); setOpen(false); setPendingQuoteBank(false); setPendingConvertQuote(null)
     try{
-      const existingRaw=await fetch(`/api/admin/orders/documents?type=${type}`).then(r=>r.ok?r.json():[])
-      const docNumber=nextDocNumber(Array.isArray(existingRaw)?existingRaw:[],type)
-      const body:any={
-        type,docNumber,date:new Date().toISOString().slice(0,10),
-        clientName:customer.name,clientEmail:customer.email||'',clientPhone:customer.phone||'',clientAddress:'',
-        lineItems:[lineItem()],notes:`Pre-order: ${form.supplier||''} — ${form.description}`,terms:'',status:'draft',
-      }
-      if(bankAccountId) body.bankAccountId=bankAccountId
-      if(type==='invoice'&&await blockedByStock(body.lineItems)) return
-      const res=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      if(!res.ok){const e=await res.json().catch(()=>({}));window.alert(e.error||'Could not create document');return}
-      const doc=await res.json()
-      if(!doc.id){window.alert(doc.error||'Could not create document');return}
-      // A document that came back without the line is not something to badge the card
-      // against — an unlinked card can be retried, a wrongly-linked one strands the stock.
-      if((doc.lineItems||[]).length===0){
-        window.alert(`${doc.docNumber} was created without ${form.sku||'the item'}.
-
-The card has NOT been linked — please check the document.`)
-        return
-      }
-      notify(doc.docNumber,doc.id)
-    }catch{}
-    finally{setSending(false)}
-  }
-
-  // Converts a Quote straight into a new Invoice, blocking if Inventory can't cover the line items
-  const convertQuoteToInvoice = async (quoteDoc:any) => {
-    setSending(true);setOpen(false);setPendingConvertQuote(null)
-    try{
-      const invoiceItems:any[]=quoteDoc.lineItems||[]
-      if(await blockedByStock(invoiceItems)) return
-      const allDocs:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json())
-      const invDocNumber=nextDocNumber(allDocs,'invoice')
-      const depositNote=depositNoteFor(quoteDoc)
-      const newInvRes=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-        type:'invoice',docNumber:invDocNumber,date:new Date().toISOString().slice(0,10),
-        clientName:quoteDoc.clientName,clientEmail:quoteDoc.clientEmail||'',clientPhone:quoteDoc.clientPhone||'',clientAddress:quoteDoc.clientAddress||'',
-        lineItems:invoiceItems,notes:[quoteDoc.notes,depositNote].filter(Boolean).join('\n'),terms:quoteDoc.terms||'',status:'draft',
-        discountPct:quoteDoc.discountPct||0,sourceQuoteNumber:quoteDoc.docNumber,
-        amountPaid:quoteDoc.amountPaid||0,creditApplied:quoteDoc.creditApplied||0,payments:tagPaymentsFromQuote(quoteDoc.payments,quoteDoc.docNumber),
-      })})
-      if(newInvRes.ok){
+      const target=existingDoc??null
+      if(target&&convertToInvoice){
+        const allRaw:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json()).catch(()=>[])
+        const allDocs=Array.isArray(allRaw)?allRaw:[]
+        // Same rule as appendQuoteToInvoice — the lines must come from the server, not from
+        // the copy this dropdown is holding, and a Quote with none of them never gets
+        // converted. Creating an empty Invoice and archiving the Quote behind it loses the
+        // goods while keeping the deposit.
+        const freshTarget=allDocs.find((d:any)=>d.id===target.id)||target
+        const invoiceItems:any[]=freshTarget.lineItems||[]
+        if(invoiceItems.length===0){
+          window.alert(`Cannot convert ${freshTarget.docNumber||'this Quote'}: it has no line items.\n\nNothing has been changed.`)
+          setLoading(false);return
+        }
+        if(await blockedByStock(invoiceItems)) return
+        const invDocNumber=nextDocNumber(allDocs,'invoice')
+        const depositNote=depositNoteFor(freshTarget)
+        const newInvRes=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          type:'invoice',docNumber:invDocNumber,date:new Date().toISOString().slice(0,10),
+          clientName:freshTarget.clientName,clientEmail:freshTarget.clientEmail||'',clientPhone:freshTarget.clientPhone||'',clientAddress:freshTarget.clientAddress||'',
+          lineItems:invoiceItems,notes:[freshTarget.notes,depositNote].filter(Boolean).join('\n'),terms:freshTarget.terms||'',status:'draft',
+          // Deposit mode is a Quotes-only presentation — an Invoice raised off one bills in full.
+          discountPct:freshTarget.discountPct||0,depositMode:false,sourceQuoteNumber:freshTarget.docNumber,
+          amountPaid:freshTarget.amountPaid||0,creditApplied:freshTarget.creditApplied||0,payments:tagPaymentsFromQuote(freshTarget.payments,freshTarget.docNumber),
+        })})
+        if(!newInvRes.ok){
+          const e=await newInvRes.json().catch(()=>({}))
+          window.alert(e.error||`Could not create the Invoice. ${freshTarget.docNumber} has NOT been archived — nothing has been changed.`)
+          setLoading(false);return
+        }
         const newInv=await newInvRes.json()
-        await fetch(`/api/admin/orders/documents/${quoteDoc.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
-        await relinkQuoteEntries(quoteDoc,newInv.docNumber,newInv.id)
+        // Confirm the goods actually landed before archiving the Quote behind them.
+        if(!newInv?.id||(newInv.lineItems||[]).length<invoiceItems.length){
+          window.alert(`The new Invoice did not accept all ${invoiceItems.length} line item(s) from ${freshTarget.docNumber}.\n\nThe Quote has NOT been archived, so nothing is lost — please check the Invoice and try again.`)
+          setLoading(false);return
+        }
+        await fetch(`/api/admin/orders/documents/${freshTarget.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:'archived'})})
+        await relinkQuoteEntries(freshTarget,newInv.docNumber,newInv.id)
         notify(newInv.docNumber,newInv.id)
+      }else if(target){
+        const skuPrefix=form.sku?.trim()?`${form.sku.trim()} –`:null
+        // Only the newly added quantity is checked — what the invoice already holds was
+        // deducted when it was raised.
+        if(target.type==='invoice'&&await blockedByStock([lineItem()])) return
+        // Re-read the target: the copy this dropdown holds was fetched when it opened, and a
+        // send made from another card since would be wiped out by a whole-array write.
+        const freshList:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json()).catch(()=>[])
+        const fresh=(Array.isArray(freshList)?freshList:[]).find((d:any)=>d.id===target.id)||target
+        const existingItems:any[]=fresh.lineItems||[]
+        const existingIdx=skuPrefix?existingItems.findIndex((i:any)=>i.description?.startsWith(skuPrefix)):-1
+        // A line for this SKU already there gets topped up; anything new is appended
+        // server-side, where nothing can slip in between the read and the write.
+        const patchBody=existingIdx>=0
+          ?{lineItems:existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)}
+          :{appendLineItems:[lineItem()]}
+        const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patchBody)})
+        if(!res.ok){const e=await res.json().catch(()=>({}));window.alert(e.error||`Could not update ${target.docNumber}`);setLoading(false);return}
+        // Only badge the card once the line is provably on the document. Badging on res.ok
+        // alone is how a card ends up naming an Invoice that has no line for its SKU — and
+        // once a Quote it points at is later merged, the relink sweep carries that empty
+        // badge onto the Invoice, where nothing will ever deduct its stock.
+        const savedDoc=await res.json().catch(()=>null)
+        const landed=skuPrefix
+          ?(savedDoc?.lineItems||[]).some((i:any)=>i.description?.startsWith(skuPrefix))
+          :(savedDoc?.lineItems||[]).length>existingItems.length
+        if(!landed){
+          window.alert(`${target.docNumber} did not accept ${form.sku||'this item'}.\n\nThe card has NOT been linked, so nothing is lost — please try again.`)
+          setLoading(false);return
+        }
+        notify(target.docNumber,target.id)
+      }else{
+        if(type==='invoice'&&await blockedByStock([lineItem()])) return
+        const allRaw:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json()).catch(()=>[])
+        const docNumber=nextDocNumber(Array.isArray(allRaw)?allRaw:[],type)
+        const body:any={
+          type,docNumber,date:new Date().toISOString().slice(0,10),
+          clientName:customer.name,clientEmail:customer.email||'',clientPhone:customer.phone||'',clientAddress:'',
+          lineItems:[lineItem()],notes:`Pre-order: ${form.supplier||''} — ${form.description}`,terms:'',status:'draft',
+        }
+        if(type==='invoice') body.depositMode=false
+        if(bankAccountId) body.bankAccountId=bankAccountId
+        const res=await fetch('/api/admin/orders/documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+        const doc=await res.json().catch(()=>({}))
+        if(!doc.id){window.alert(doc.error||'Could not create document');setLoading(false);return}
+        // Same rule as the other paths — a document that came back without the line is not
+        // something to badge the card against.
+        if((doc.lineItems||[]).length===0){
+          window.alert(`${doc.docNumber} was created without ${form.sku||'the item'}.\n\nThe card has NOT been linked — please check the document.`)
+          setLoading(false);return
+        }
+        notify(doc.docNumber,doc.id)
       }
-    }catch{}
-    setSending(false)
-  }
-
-  const appendToExisting = async (target:any) => {
-    setSending(true);setOpen(false)
-    try{
-      const skuPrefix=form.sku?.trim()?`${form.sku.trim()} –`:null
-      // Only the newly added quantity is checked — what the invoice already holds was
-      // deducted when it was raised.
-      if(target.type==='invoice'&&await blockedByStock([lineItem()])) return
-      // Re-read the target: the copy this dropdown holds was fetched when it opened, and a
-      // send made from another card since would be wiped out by a whole-array write.
-      const freshList:any[]=await fetch('/api/admin/orders/documents').then(r=>r.json()).catch(()=>[])
-      const fresh=(Array.isArray(freshList)?freshList:[]).find((d:any)=>d.id===target.id)||target
-      const existingItems:any[]=fresh.lineItems||[]
-      const existingIdx=skuPrefix?existingItems.findIndex((i:any)=>i.description?.startsWith(skuPrefix)):-1
-      // A line for this SKU already there gets topped up; anything new is appended
-      // server-side, where nothing can slip in between the read and the write.
-      const patchBody=existingIdx>=0
-        ?{lineItems:existingItems.map((i:any,idx:number)=>idx===existingIdx?{...i,qty:(Number(i.qty)||0)+customer.qty}:i)}
-        :{appendLineItems:[lineItem()]}
-      const res=await fetch(`/api/admin/orders/documents/${target.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(patchBody)})
-      if(!res.ok){const e=await res.json().catch(()=>({}));window.alert(e.error||`Could not update ${target.docNumber}`);return}
-      // Only badge the card once the line is provably on the document. Badging on res.ok
-      // alone is how a card ends up naming an Invoice that has no line for its SKU — and
-      // once a Quote it points at is later merged, the relink sweep carries that empty
-      // badge onto the Invoice, where nothing will ever deduct its stock.
-      const savedDoc=await res.json().catch(()=>null)
-      const landed=skuPrefix
-        ?(savedDoc?.lineItems||[]).some((i:any)=>i.description?.startsWith(skuPrefix))
-        :(savedDoc?.lineItems||[]).length>existingItems.length
-      if(!landed){
-        window.alert(`${target.docNumber} did not accept ${form.sku||'this item'}.
-
-The card has NOT been linked, so nothing is lost — please try again.`)
-        return
-      }
-      notify(target.docNumber,target.id)
-    }catch{}
-    finally{setSending(false)}
+    }catch(err:any){
+      window.alert(`Send failed: ${err?.message||'unknown error'}.`)
+    }
+    setLoading(false)
   }
 
   return (
-    <div ref={ref} className="relative ml-auto">
-      {linkedDocNumber ? (()=>{
+    <div ref={ref} className="relative ml-auto inline-flex items-center gap-1">
+      {/* The Send to button STAYS once a document is linked (Rule 60 — the chip sits beside
+          Send to, it does not replace it). Hiding it is what made a linked Quote impossible
+          to convert from the dashboard: the card was badged, so the only route to an
+          Invoice disappeared with the button. */}
+      <button disabled={loading} onClick={e=>{e.stopPropagation();openDropdown()}}
+        className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50 whitespace-nowrap">{loading?'…':'→ Send to'}</button>
+      {linkedDocNumber&&(()=>{
         const docTab=/^INV/i.test(linkedDocNumber)?'invoices':/^SO/i.test(linkedDocNumber)?'salesorders':'quotes'
         return <a href={`/admin/orders?tab=${docTab}&open=${encodeURIComponent(linkedDocNumber)}`} target="_blank" rel="noreferrer"
-          className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-md px-2 py-0.5 hover:bg-indigo-100 whitespace-nowrap">{linkedDocNumber}</a>
-      })() : (
-        <button disabled={sending} onClick={e=>{e.stopPropagation();loadDocs();setOpen(o=>!o)}} className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 px-1.5 py-0.5 rounded border border-indigo-200 hover:bg-indigo-50 disabled:opacity-50 whitespace-nowrap">{sending?'Sending…':'→ Send to'}</button>
-      )}
+          className="text-[10px] font-mono font-bold text-green-700 bg-green-100 border border-green-300 px-1.5 py-0.5 rounded leading-none hover:bg-green-200 whitespace-nowrap" title={`Open ${linkedDocNumber}`}>✓ {linkedDocNumber}</a>
+      })()}
       {open&&(
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-56 overflow-hidden">
+        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-64 overflow-hidden">
           {pendingConvertQuote?(
             <div className="py-1.5">
               <div className="flex items-center gap-2 px-3 py-1 border-b border-gray-100 mb-1">
                 <button onClick={()=>setPendingConvertQuote(null)} className="text-[10px] text-gray-400 hover:text-gray-600">← Back</button>
                 <p className="text-[10px] font-bold text-gray-500 truncate">Convert {pendingConvertQuote.docNumber}</p>
               </div>
-              <button onClick={()=>convertQuoteToInvoice(pendingConvertQuote)}
+              <button onClick={()=>sendTo(pendingConvertQuote.type,pendingConvertQuote,undefined,true)}
                 className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium text-green-700">+ 🧾 New Invoice</button>
               <div className="border-t my-1"/>
               <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Add to Existing</p>
-              {docs.filter((d:any)=>d.type==='invoice').map((inv:any)=>(
+              {existingDocs.filter((d:any)=>d.type==='invoice').length===0&&<p className="px-3 py-2 text-xs text-gray-400">No open invoices for this client</p>}
+              {existingDocs.filter((d:any)=>d.type==='invoice').map((inv:any)=>(
                 <button key={inv.id} onClick={()=>appendQuoteToInvoice(pendingConvertQuote,inv)}
                   className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 font-medium">
                   <span className="font-semibold text-indigo-700">{inv.docNumber}</span>
@@ -594,7 +608,7 @@ The card has NOT been linked, so nothing is lost — please try again.`)
               <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Send funds to</p>
               {bankAccounts.length===0&&<p className="px-3 py-2 text-xs text-gray-400">No bank accounts found</p>}
               {bankAccounts.map((b:any)=>(
-                <button key={b.id} onClick={()=>createNew('quote',b.id)} className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium">
+                <button key={b.id} onClick={()=>sendTo('quote',undefined,b.id)} className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium">
                   <span className="text-green-800">🏦 {b.companyName||b.bankName}</span>
                   {b.companyName&&b.bankName&&<span className="text-gray-400 block text-[10px]">{b.bankName}</span>}
                 </button>
@@ -603,55 +617,59 @@ The card has NOT been linked, so nothing is lost — please try again.`)
               <button onClick={()=>setPendingQuoteBank(false)} className="w-full text-left px-3 py-1.5 text-[10px] text-gray-400 hover:text-gray-600">← Back</button>
             </div>
           ):(
-            <>
-              <div className="flex border-b border-gray-100">
-                <button onClick={()=>{setMode('new')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='new'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Create New</button>
-                <button onClick={()=>{setMode('existing')}} className={`flex-1 text-[11px] font-semibold px-2 py-1.5 transition-colors ${mode==='existing'?'bg-indigo-600 text-white':'text-gray-500 hover:bg-gray-50'}`}>Add to Existing</button>
-              </div>
-              {mode==='new'&&(
-                <div className="p-1.5 space-y-0.5">
-                  <button onClick={()=>{
-                    const unitLower=(form.unit||'').toLowerCase().trim()
-                    const autoBank=unitLower?bankAccounts.find((b:any)=>{const name=(b.companyName||'').toLowerCase();return name&&(name.includes(unitLower)||unitLower.includes(name))}):null
-                    if(autoBank) createNew('quote',autoBank.id); else setPendingQuoteBank(true)
-                  }} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📄 New Quote</button>
-                  <button onClick={()=>createNew('salesorder')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">📋 New Sales Order</button>
-                  <button onClick={()=>createNew('invoice')} className="w-full text-left text-[11px] px-3 py-1.5 rounded-lg hover:bg-indigo-50 text-gray-700 font-medium transition-colors">🧾 New Invoice</button>
-                </div>
-              )}
-              {mode==='existing'&&(
-                <div className="p-1.5">
-                  {!loading&&allDocs.length>0&&(
-                    <input type="text" value={docSearch} onChange={e=>setDocSearch(e.target.value)}
+            <div className="py-1.5">
+              <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">Create New</p>
+              {/* R66Slot keeps Sales Orders — unlike Emporium, where they are hidden. */}
+              {(['quote','salesorder','invoice'] as const).map(type=>{
+                const icon=type==='quote'?'📄':type==='salesorder'?'📋':'🧾'
+                const label=type==='quote'?'Quote':type==='salesorder'?'Sales Order':'Invoice'
+                return (
+                  <button key={type} onClick={()=>{
+                    if(type==='quote'){
+                      const unitLower=(form.unit||'').toLowerCase().trim()
+                      const autoBank=unitLower?bankAccounts.find((b:any)=>{const name=(b.companyName||'').toLowerCase();return name&&(name.includes(unitLower)||unitLower.includes(name))}):null
+                      if(autoBank) sendTo('quote',undefined,autoBank.id); else setPendingQuoteBank(true)
+                    }else sendTo(type,undefined)
+                  }} className="w-full text-left px-3 py-2 text-xs hover:bg-green-50 font-medium flex items-center gap-2">
+                    <span className="text-green-700">+ {icon} New {label}</span>
+                  </button>
+                )
+              })}
+              {loading&&<p className="px-3 py-1 text-[10px] text-gray-400">Loading…</p>}
+              {!loading&&allOpenDocs.length>0&&(
+                <>
+                  <div className="border-t my-1"/>
+                  <div className="px-3 py-1">
+                    <input type="text" value={existingDocsSearch} onChange={e=>setExistingDocsSearch(e.target.value)}
                       placeholder="Search any Quote/SO/Invoice…"
-                      className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1 mb-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-                  )}
-                  <div className="max-h-48 overflow-y-auto">
-                    {loading?<p className="text-[11px] text-gray-400 text-center py-3">Loading…</p>
-                      :allDocs.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No open documents</p>
-                      :docsToShow.length===0?<p className="text-[11px] text-gray-400 text-center py-3">No matches</p>
-                      :docsToShow.map(d=>(
-                        <div key={d.id} className="flex items-center gap-1 px-1 py-0.5 hover:bg-indigo-50 rounded-lg">
-                          <button onClick={()=>appendToExisting(d)} className="flex-1 text-left px-2 py-1 text-[11px] min-w-0">
-                            <span className="font-semibold text-gray-700">{d.docNumber}</span>
-                            <span className="text-gray-400 ml-1 capitalize">({d.type})</span>
-                            {d.clientName&&<span className="text-gray-500 block text-[10px] truncate">{d.clientName}</span>}
-                          </button>
-                          {d.type==='quote'&&(
-                            <button onClick={()=>{
-                              const clientInvoices=docs.filter((x:any)=>x.type==='invoice')
-                              if(clientInvoices.length>0) setPendingConvertQuote(d)
-                              else convertQuoteToInvoice(d)
-                            }}
-                              className="shrink-0 text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 border border-orange-300 rounded font-semibold hover:bg-orange-200 whitespace-nowrap">→ Invoice</button>
-                          )}
-                        </div>
-                      ))
-                    }
+                      className="w-full text-[11px] border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
                   </div>
-                </div>
+                  <p className="px-3 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                    {searchQ?`Search Results (${docsToShow.length})`:'Add to Existing'}
+                  </p>
+                  <div className="max-h-56 overflow-y-auto">
+                    {docsToShow.length===0&&<p className="px-3 py-2 text-xs text-gray-400">{searchQ?'No matches':'No open documents for this client — use the search above'}</p>}
+                    {docsToShow.map((d:any)=>(
+                      <div key={d.id} className="flex items-center gap-1 px-2 py-1 hover:bg-indigo-50">
+                        <button onClick={()=>sendTo(d.type,d)} className="flex-1 text-left py-1 text-[11px] min-w-0">
+                          <span className="font-semibold text-indigo-700">{d.docNumber}</span>
+                          <span className="text-gray-400 ml-1 capitalize">({d.type})</span>
+                          {d.clientName&&<span className="text-gray-500 block text-[10px] truncate">{d.clientName}</span>}
+                        </button>
+                        {d.type==='quote'&&(
+                          <button onClick={()=>{
+                            const clientInvoices=existingDocs.filter((x:any)=>x.type==='invoice')
+                            if(clientInvoices.length>0) setPendingConvertQuote(d)
+                            else sendTo(d.type,d,undefined,true)
+                          }}
+                            className="shrink-0 text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 border border-orange-300 rounded font-semibold hover:bg-orange-200 whitespace-nowrap">→ Invoice</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
-            </>
+            </div>
           )}
         </div>
       )}
