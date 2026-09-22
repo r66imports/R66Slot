@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { blobRead } from '@/lib/blob-storage'
+import { priceCards } from '@/lib/preorder-dashboard-price'
 
 const KEY = 'data/preorder-dashboard.json'
 
@@ -11,6 +12,13 @@ interface DashboardItem {
   description: string
   retailPrice: string
   estimatedRetailPrice: string
+  wholesalePrice?: string
+  wholesaleCurrency?: string
+  shipPct?: number
+  customsPct?: number
+  markupPct?: number
+  vatPct?: number
+  priceManual?: boolean
   eta: string
   cutoffDate?: string
   orderPlaced?: boolean
@@ -99,7 +107,25 @@ export async function GET(request: NextRequest) {
 
     published.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-    return NextResponse.json(published.map(item => buildPublicItem(item, isReseller)))
+    // Rule 63 — the advertised price is derived from the wholesale price times
+    // today's rate on every request, not read out of the blob. A card whose
+    // shipment has landed shows the settled figure from its product card.
+    const priced = await priceCards(published)
+
+    return NextResponse.json(
+      published.map(item => {
+        const pub = buildPublicItem(item, isReseller)
+        const p = priced.get(item)
+        if (!p) return pub
+        return {
+          ...pub,
+          estimatedRetailPrice: p.estimatedRetailPrice,
+          // Only overwrite tier 2 where it was exposed in the first place —
+          // buildPublicItem withholds it from non-resellers.
+          ...(pub.tier2Price !== undefined ? { tier2Price: p.estimatedRetailPrice2 } : {}),
+        }
+      })
+    )
   } catch (error) {
     console.error('[preorder-item] list error:', error)
     return NextResponse.json({ error: 'Failed to load' }, { status: 500 })

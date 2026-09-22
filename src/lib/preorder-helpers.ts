@@ -76,6 +76,14 @@ export interface PreOrderDashboardItem {
   wholesaleCurrency?: string
   supplierSRP?: string
   supplierDiscount?: string
+  // Per-item costing percentages. Absent means the 25/20/30/15 defaults, so
+  // cards saved before the calculator existed need no migration.
+  shipPct?: number
+  customsPct?: number
+  markupPct?: number
+  vatPct?: number
+  /** True once the admin switches Est. Retail to Manual — stops it floating. */
+  priceManual?: boolean
   eta: string
   cutoffDate?: string
   orderPlaced?: boolean
@@ -108,6 +116,10 @@ export interface PreOrderDashboardItem {
   salesTier2Discount?: number
   createdAt: string
   updatedAt?: string
+  // Derived on read by priceCards, never stored. Say how Est. Retail was
+  // arrived at so the card can show whether it is still moving.
+  priceSource?: 'live' | 'landed' | 'manual' | 'stored'
+  priceFloating?: boolean
 }
 
 export async function getItems(): Promise<PreOrderDashboardItem[]> {

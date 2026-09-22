@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import { uploadBase64Image, invalidateCache, syncImageToProduct } from '@/lib/preorder-helpers'
 import type { PreOrderDashboardItem } from '@/lib/preorder-helpers'
+import { priceCard } from '@/lib/preorder-dashboard-price'
 
 const KEY = 'data/preorder-dashboard.json'
 
@@ -69,7 +70,16 @@ export async function GET(
     const { id } = await params
     const item = await getItemById(id)
     if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    return NextResponse.json(item)
+    // Rule 63 — the card opens on today's figure, not the one stored when it
+    // was last saved.
+    const p = await priceCard(item)
+    return NextResponse.json({
+      ...item,
+      estimatedRetailPrice: p.estimatedRetailPrice,
+      ...(p.estimatedRetailPrice2 !== undefined ? { estimatedRetailPrice2: p.estimatedRetailPrice2 } : {}),
+      priceSource: p.priceSource,
+      priceFloating: p.priceFloating,
+    })
   } catch (error) {
     console.error('Error fetching preorder dashboard item:', error)
     return NextResponse.json({ error: 'Failed to fetch item' }, { status: 500 })
@@ -99,6 +109,9 @@ export async function PATCH(
     const allowedFields = [
       'sku', 'description', 'retailPrice', 'estimatedRetailPrice',
       'wholesalePrice', 'wholesaleCurrency', 'supplierSRP', 'supplierDiscount',
+      // Costing calculator — drop any of these and they save, then silently
+      // vanish on reload, leaving the card back on the defaults.
+      'shipPct', 'customsPct', 'markupPct', 'vatPct', 'priceManual',
       'eta', 'cutoffDate', 'orderPlaced', 'published',
       'supplier', 'brand', 'unit', 'imageUrl', 'customers',
       'minOrderQty', 'extraQty', 'resellerMoq', 'resellerOnly',

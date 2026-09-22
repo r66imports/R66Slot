@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead } from '@/lib/blob-storage'
+import { priceCard } from '@/lib/preorder-dashboard-price'
 
 const KEY = 'data/preorder-dashboard.json'
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -16,7 +17,11 @@ export async function GET(
     const item = items.find((i) => i.id === id)
     if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const { sku, description, retailPrice, estimatedRetailPrice, eta, cutoffDate, brand, unit, imageUrl, createdAt, seoTitle, seoDescription, seoImageUrl, resellerMoq } = item
+    const { sku, description, retailPrice, eta, cutoffDate, brand, unit, imageUrl, createdAt, seoTitle, seoDescription, seoImageUrl, resellerMoq } = item
+
+    // Rule 63 — derived at today's rate, not read from the blob. This is the
+    // page a customer actually books from, so it must agree with the listing.
+    const { estimatedRetailPrice } = await priceCard(item)
 
     // Calculate lock state
     let isLocked = !!item.orderPlaced

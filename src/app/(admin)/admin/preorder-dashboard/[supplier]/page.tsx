@@ -4,6 +4,11 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
+import {
+  calcCosting, calcRetailPrice,
+  DEFAULT_SHIP_PCT, DEFAULT_CUSTOMS_PCT, DEFAULT_MARKUP_PCT, DEFAULT_VAT_PCT,
+  isDefaultPcts, resolvePcts, type CostingPcts,
+} from '@/lib/preorder-dashboard-price'
 
 // Photos go up as files the moment they are chosen, and the card saves only the link that
 // comes back. They used to ride inside every autosave as base64 — a third bigger than the
@@ -51,12 +56,13 @@ interface DashboardItem {
   seoImageUrl?: string; shipmentStatus?: 'preorder' | 'shipping_soon' | 'shipping'; linkedWsId?: string
   customers: DashboardCustomer[]; extraQty?: number; minOrderQty?: number | null
   resellerMoq?: number; resellerOnly?: boolean
+  shipPct?: number; customsPct?: number; markupPct?: number; vatPct?: number; priceManual?: boolean
+  priceSource?: 'live' | 'landed' | 'manual' | 'stored'; priceFloating?: boolean
   notes?: string; createdAt: string; updatedAt?: string
   sentToLatestArrivals?: boolean; sentToLandingSoon?: boolean
 }
 type FormState = Omit<DashboardItem, 'id' | 'createdAt'>
 interface DashboardOptions { brands: string[]; units: string[]; etas: string[] }
-interface CostingSettings { shippingMarkup: number; markup: number; includeVAT: boolean }
 type SortBy = 'az' | 'sku' | 'brand' | 'price' | 'date' | 'cutoff' | 'new'
 
 const CURRENCIES = ['ZAR','USD','CNY','EUR','GBP','HKD','SGD','JPY','AUD','CAD']
@@ -75,16 +81,66 @@ function cutoffAlert(date?: string): { active: boolean; days: number } {
   return { active: days >= 0 && days <= 2, days }
 }
 
-function calcRetailPrice(wholesalePrice:string,currency:string,rates:Record<string,number>,settings:CostingSettings,supplier?:string): string {
-  const price = parsePrice(wholesalePrice)
-  if (!price||!currency) return ''
-  const toZAR = currency==='ZAR' ? 1 : (rates[currency]||0)
-  if (!toZAR) return ''
-  if (supplier?.toLowerCase()==='motorhelix' && currency==='USD') return (price*1.20*1.30*toZAR).toFixed(2)
-  const costZAR = price*toZAR
-  const withShipping = costZAR*(1+settings.shippingMarkup/100)
-  const withMarkup = withShipping*(1+settings.markup/100)
-  return (settings.includeVAT ? withMarkup*1.15 : withMarkup).toFixed(2)
+// Per-item costing calculator. The percentages default to 25/20/30/15 — the normal
+// calculation — but every one of them is editable on the item, so a supplier with
+// different freight is handled by typing a number rather than by adding a branch
+// in code. There are deliberately NO per-supplier formulas: Motorhelix used to have
+// a hard-coded x1.20 x1.30 USD branch here and it is gone.
+function CostingCalculator({ form, set, exchangeRates }: {
+  form: FormState; set: (k: keyof FormState, v: any) => void; exchangeRates: Record<string, number>
+}) {
+  const p = resolvePcts(form as CostingPcts)
+  const ccy = form.wholesaleCurrency || 'ZAR'
+  const c = calcCosting(form.wholesalePrice || '', ccy, exchangeRates, form as CostingPcts)
+  const isDefault = isDefaultPcts(p)
+  const money = (n: number) => n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const pctBox = (label: string, key: 'shipPct'|'customsPct'|'markupPct'|'vatPct', val: number) => (
+    <div className="flex items-center gap-1">
+      <label className="text-[10px] text-gray-500 whitespace-nowrap">{label}</label>
+      <div className="relative">
+        <input type="number" min={0} step={0.1} value={val}
+          onChange={e => { const v = parseFloat(e.target.value); set(key, isNaN(v) ? 0 : v) }}
+          className={`w-14 text-xs border rounded px-1 py-0.5 pr-4 text-center focus:outline-none focus:ring-1 focus:ring-indigo-400 ${isDefault ? 'border-gray-300' : 'border-amber-400 bg-amber-50 text-amber-800 font-semibold'}`}/>
+        <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">%</span>
+      </div>
+    </div>
+  )
+  return (
+    <div className="mt-1.5 border border-dashed border-gray-300 rounded-lg px-2 py-1.5 bg-gray-50/60 space-y-1">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wide">Costing</span>
+        {!isDefault && (
+          <button type="button"
+            onClick={() => { set('shipPct', DEFAULT_SHIP_PCT); set('customsPct', DEFAULT_CUSTOMS_PCT); set('markupPct', DEFAULT_MARKUP_PCT); set('vatPct', DEFAULT_VAT_PCT) }}
+            className="text-[9px] px-1.5 py-0.5 rounded font-semibold border border-amber-300 bg-amber-100 text-amber-700 hover:bg-amber-200">
+            &#8634; Reset {DEFAULT_SHIP_PCT}/{DEFAULT_CUSTOMS_PCT}/{DEFAULT_MARKUP_PCT}/{DEFAULT_VAT_PCT}
+          </button>
+        )}
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        {pctBox('Ship', 'shipPct', p.ship)}
+        {pctBox('Customs', 'customsPct', p.customs)}
+        {pctBox('Markup', 'markupPct', p.markup)}
+        {pctBox('VAT', 'vatPct', p.vat)}
+      </div>
+      {c ? (
+        <div className="space-y-0.5 pt-0.5 border-t border-gray-200">
+          <p className="text-[10px] text-gray-500">
+            {ccy} {parsePrice(form.wholesalePrice || '').toFixed(2)}
+            {ccy !== 'ZAR' && <> &times; R{c.rate.toFixed(2)}</>} = R{money(c.cost)}
+          </p>
+          <p className="text-[10px] text-gray-600">
+            + {p.ship}% ship + {p.customs}% customs = <strong className="text-gray-800">Landed R{money(c.landed)}</strong>
+          </p>
+          <p className="text-[11px] text-green-700">
+            + {p.markup}% markup + {p.vat}% VAT = <strong>Retail R{money(c.retail)}</strong>
+          </p>
+        </div>
+      ) : (
+        <p className="text-[10px] text-gray-400 pt-0.5 border-t border-gray-200">Enter a wholesale price to calculate.</p>
+      )}
+    </div>
+  )
 }
 
 function TagInputDropdown({ value, onChange, options, onAddOption, placeholder }: {
@@ -679,12 +735,12 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
 
 // ─── ItemCard ────────────────────────────────────────────────────────────────
 function ItemCard({
-  item, contacts, suppliers, options, exchangeRates, costingSettings,
+  item, contacts, suppliers, options, exchangeRates,
   onSave, onDelete, onDuplicate, onAddOption, onSendToWorksheet, isNew, onCancelNew, isSelected, onToggleSelect,
 }: {
   item: DashboardItem & { _draft?: boolean }
   contacts: Contact[]; suppliers: SupplierContact[]; options: DashboardOptions
-  exchangeRates: Record<string, number>; costingSettings: CostingSettings
+  exchangeRates: Record<string, number>
   onSave: (id: string, data: Partial<FormState>) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onDuplicate: (id: string) => Promise<void>
@@ -701,6 +757,10 @@ function ItemCard({
     supplier:item.supplier, brand:item.brand, unit:item.unit??'', imageUrl:item.imageUrl,
     customers:item.customers, extraQty:item.extraQty??0, minOrderQty:item.minOrderQty??0,
     resellerMoq:item.resellerMoq??1, resellerOnly:item.resellerOnly??false,
+    // Left as the stored value, NOT defaulted here — undefined means "use the
+    // standard percentages", so a card only carries them once they are changed.
+    shipPct:item.shipPct, customsPct:item.customsPct, markupPct:item.markupPct, vatPct:item.vatPct,
+    priceManual:item.priceManual??false,
     seoTitle:item.seoTitle??'', seoDescription:item.seoDescription??'', seoImageUrl:item.seoImageUrl,
     shipmentStatus:item.shipmentStatus, linkedWsId:item.linkedWsId, showRetail:item.showRetail!==false, notes:item.notes??'',
   } as FormState)
@@ -713,7 +773,7 @@ function ItemCard({
   const [imageSize,setImageSize]=useState<'sm'|'md'|'lg'>('sm')
   const [autoSaveStatus,setAutoSaveStatus]=useState<'idle'|'pending'|'saving'|'saved'|'error'>('idle')
   const [imageUploading,setImageUploading]=useState(false)
-  const [autoCalc,setAutoCalc]=useState(true); const [autoCalc2,setAutoCalc2]=useState(true)
+  const [autoCalc,setAutoCalc]=useState(!item.priceManual); const [autoCalc2,setAutoCalc2]=useState(true)
   const [copied,setCopied]=useState(false); const [showSeo,setShowSeo]=useState(false)
   const [showWsPicker,setShowWsPicker]=useState(false); const [wsList,setWsList]=useState<any[]>([]); const [loadingWsList,setLoadingWsList]=useState(false)
   const supplierRef=useRef<HTMLDivElement>(null); const imageInputRef=useRef<HTMLInputElement>(null)
@@ -726,9 +786,17 @@ function ItemCard({
   },[form.supplierSRP,form.supplierDiscount])
   useEffect(()=>{
     if(!autoCalc) return
-    const calc=calcRetailPrice(form.wholesalePrice||'',form.wholesaleCurrency||'ZAR',exchangeRates,costingSettings,form.supplier)
-    if(calc) setForm(f=>({...f,estimatedRetailPrice:calc}))
-  },[form.wholesalePrice,form.wholesaleCurrency,form.supplier,autoCalc])
+    const calc=calcRetailPrice(form.wholesalePrice||'',form.wholesaleCurrency||'ZAR',exchangeRates,form as CostingPcts)
+    if(calc&&calc!==form.estimatedRetailPrice) setForm(f=>({...f,estimatedRetailPrice:calc}))
+  },[form.wholesalePrice,form.wholesaleCurrency,form.shipPct,form.customsPct,form.markupPct,form.vatPct,autoCalc,exchangeRates])
+  // Tier 2 buys at a different price but carries the same cost structure, so it
+  // rides on this item's percentages rather than having its own. Guarded on value
+  // inequality because autosave fires on every form change and an unguarded write loops.
+  useEffect(()=>{
+    if(!autoCalc2) return
+    const calc=calcRetailPrice((form as any).wholesalePrice2||'',(form as any).wholesaleCurrency2||'ZAR',exchangeRates,form as CostingPcts)
+    if(calc&&calc!==(form as any).estimatedRetailPrice2) setForm(f=>({...f,estimatedRetailPrice2:calc}))
+  },[(form as any).wholesalePrice2,(form as any).wholesaleCurrency2,form.shipPct,form.customsPct,form.markupPct,form.vatPct,autoCalc2,exchangeRates])
   useEffect(()=>{
     if(!form.supplier) return
     const sup=suppliers.find(s=>s.name===form.supplier)
@@ -1003,9 +1071,11 @@ function ItemCard({
             <div>
               <div className="flex items-center justify-between mb-0.5">
                 <label className="text-xs text-gray-500">Est. Retail Price (R)</label>
-                <button type="button" onClick={()=>setAutoCalc(a=>!a)} className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-colors ${autoCalc?'bg-green-50 text-green-700 border-green-200':'bg-gray-100 text-gray-500 border-gray-200'}`}>{autoCalc?'⚡ Auto':'✏ Manual'}</button>
+                <button type="button" onClick={()=>{const next=!autoCalc;setAutoCalc(next);set('priceManual',!next)}} className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-colors ${autoCalc?'bg-green-50 text-green-700 border-green-200':'bg-gray-100 text-gray-500 border-gray-200'}`}>{autoCalc?'⚡ Auto':'✏ Manual'}</button>
               </div>
-              <input type="text" value={form.estimatedRetailPrice} onChange={e=>{setAutoCalc(false);set('estimatedRetailPrice',e.target.value)}} className={`w-full text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 ${autoCalc&&hasWholesale?'bg-green-50 border-green-300 text-green-800':'border-gray-300'}`} placeholder="0.00" readOnly={autoCalc&&hasWholesale}/>
+              <input type="text" value={form.estimatedRetailPrice} onChange={e=>{setAutoCalc(false);set('priceManual',true);set('estimatedRetailPrice',e.target.value)}} className={`w-full text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 ${autoCalc&&hasWholesale?'bg-green-50 border-green-300 text-green-800':'border-gray-300'}`} placeholder="0.00" readOnly={autoCalc&&hasWholesale}/>
+              {autoCalc&&hasWholesale&&<p className="text-[9px] text-green-700 mt-0.5">Floats with the rate until the Worksheet lands it.</p>}
+              <CostingCalculator form={form} set={set} exchangeRates={exchangeRates}/>
             </div>
             <div className="flex flex-col justify-end pb-1 gap-1">
               {(totalQty>0||minOrderQty>0)&&<span className="text-xs font-semibold text-indigo-600">{totalQty>0&&<span>Total Qty: {totalQty}</span>}{minOrderQty>0&&<span className={`font-semibold ml-1 ${inStock>0?'text-emerald-600':'text-red-500'}`}>({inStock} in stock)</span>}</span>}
@@ -1168,7 +1238,6 @@ export default function SupplierPreOrderPage() {
   const [suppliers, setSuppliers] = useState<SupplierContact[]>([])
   const [options, setOptions] = useState<DashboardOptions>({ brands: [], units: [], etas: [] })
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({})
-  const [costingSettings, setCostingSettings] = useState<CostingSettings>({ shippingMarkup: 20, markup: 30, includeVAT: true })
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [sortAsc, setSortAsc] = useState(false)
   const [search, setSearch] = useState('')
@@ -1225,7 +1294,6 @@ export default function SupplierPreOrderPage() {
       fetch('/api/admin/supplier-contacts').then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : [])).catch(() => {}),
       fetch('/api/admin/preorder-dashboard/options').then(r => r.json()).then(d => { if (d && !d.error) setOptions(d) }).catch(() => {}),
       fetch('/api/admin/exchange-rates').then(r => r.json()).then(d => { if (d?.rates) setExchangeRates(d.rates) }).catch(() => {}),
-      fetch('/api/admin/costing-settings').then(r => r.json()).then(d => { if (d && !d.error) setCostingSettings(d) }).catch(() => {}),
     ]).finally(() => setLoading(false))
   }, [supplierName])
 
@@ -1518,7 +1586,7 @@ export default function SupplierPreOrderPage() {
 
       {newItem && (
         <ItemCard key={newItem.id} item={newItem} contacts={contacts} suppliers={suppliers} options={options}
-          exchangeRates={exchangeRates} costingSettings={costingSettings}
+          exchangeRates={exchangeRates}
           onSave={handleSave} onDelete={handleDelete} onDuplicate={handleDuplicate}
           onAddOption={handleAddOption} onSendToWorksheet={handleSendToWorksheet}
           isNew onCancelNew={() => setNewItem(null)}
@@ -1535,7 +1603,7 @@ export default function SupplierPreOrderPage() {
             </div>
           ) : pagedItems.map(item => (
             <ItemCard key={item.id} item={item} contacts={contacts} suppliers={suppliers} options={options}
-              exchangeRates={exchangeRates} costingSettings={costingSettings}
+              exchangeRates={exchangeRates}
               onSave={handleSave} onDelete={handleDelete} onDuplicate={handleDuplicate}
               onAddOption={handleAddOption} onSendToWorksheet={handleSendToWorksheet}
               isSelected={selected.has(item.id)} onToggleSelect={toggleSelect}/>
