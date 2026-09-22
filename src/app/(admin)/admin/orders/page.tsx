@@ -1232,6 +1232,9 @@ function CreateDocumentModal({
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // preOrderPrice here is Estimate Retail Price from Worksheet, NOT the floating
+  // Pre-Order Dashboard estimate. An invoice is a real sale, so it prices off the
+  // settled figure a Worksheet produced, which does not move under it.
   const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>>([])
   const [enforceStockLimit, setEnforceStockLimit] = useState(false)
   const [priceMode, setPriceMode] = useState<'retail' | 'cost' | 'preorder'>('retail')
@@ -1323,7 +1326,7 @@ function CreateDocumentModal({
     fetch('/api/admin/products')
       .then((r) => r.ok ? r.json() : [])
       .then((data: any[]) => setModalProducts(
-        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0, costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0, preOrderPrice: Number(p.pre_order_price ?? p.preOrderPrice) || 0, quantity: Number(p.quantity) || 0, isPreOrder: Boolean(p.is_pre_order ?? p.isPreOrder) }))
+        data.filter((p) => p.sku || p.title).map((p) => ({ id: p.id, sku: p.sku || '', title: p.title || '', price: Number(p.price) || 0, costPerItem: Number(p.cost_per_item ?? p.costPerItem) || 0, preOrderPrice: Number(p.worksheet_est_retail ?? p.worksheetEstRetail) || 0, quantity: Number(p.quantity) || 0, isPreOrder: Boolean(p.is_pre_order ?? p.isPreOrder) }))
       ))
       .catch(() => {})
   }, [])
@@ -1340,18 +1343,22 @@ function CreateDocumentModal({
   useEffect(() => {
     if (modalProducts.length === 0) return
     setLineItems((prev) => prev.map((li) => {
-      if (li._stockQty !== undefined) return li // already enriched
       // Description format is "SKU – title" — extract SKU before the dash
       const sku = li.description.split(/\s*[–\-]\s*/)[0]?.trim()
       if (!sku) return li
       const prod = modalProducts.find((p) => p.sku && p.sku.toLowerCase() === sku.toLowerCase())
       if (!prod) return li
+      // These three are REFERENCE prices behind the chips, not money: unitPrice is
+      // what the client is actually charged and is never touched here. They used to
+      // be written once and then kept forever, so a line opened before a SKU had a
+      // Worksheet estimate showed no Pre Order chip for the life of the document.
+      // Always re-read them from the product instead.
       return {
         ...li,
         _stockQty: prod.quantity,
-        _retailPrice: li._retailPrice ?? (prod.price || undefined),
-        _costPrice: li._costPrice ?? (prod.costPerItem || undefined),
-        _preOrderPrice: li._preOrderPrice ?? (prod.preOrderPrice > 0 ? prod.preOrderPrice : undefined),
+        _retailPrice: prod.price || li._retailPrice,
+        _costPrice: prod.costPerItem || li._costPrice,
+        _preOrderPrice: prod.preOrderPrice > 0 ? prod.preOrderPrice : undefined,
       }
     }))
   }, [modalProducts])
@@ -1875,7 +1882,7 @@ function CreateDocumentModal({
                   {([
                     { key: 'retail', label: 'Retail' },
                     { key: 'cost', label: 'Cost' },
-                    { key: 'preorder', label: 'Book Now' },
+                    { key: 'preorder', label: 'Pre Order' },
                   ] as const).map(({ key, label }) => (
                     <button
                       key={key}
@@ -1985,7 +1992,7 @@ function CreateDocumentModal({
                             {(li._retailPrice || li._costPrice || li._preOrderPrice) && (
                               <div className="flex gap-1 mt-1 flex-wrap">
                                 {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
-                                {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Book Now R{li._preOrderPrice.toFixed(2)}</button> : null}
+                                {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Pre Order R{li._preOrderPrice.toFixed(2)}</button> : null}
                                 {li._costPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
                               </div>
                             )}
