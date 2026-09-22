@@ -436,6 +436,10 @@ function WorksheetEditor({
               worksheetEstRetail: preOrderZAR || null,
               worksheetExRate: exchangeRate || null,
               worksheetCurrency: currency || null,
+              // The SHEET's date, not today. The rate shown beside it is the
+              // sheet's rate, so dating it "today" on a re-import would pair
+              // today's date with a months-old rate and read as nonsense.
+              worksheetPricedAt: worksheetDate ? `${worksheetDate}T00:00:00.000Z` : null,
               quantity: 0,
               status: 'active',
               categoryBrands: it.category ? [it.category] : [],
@@ -466,6 +470,7 @@ function WorksheetEditor({
           patch.worksheetEstRetail = preOrderZAR
           patch.worksheetExRate = exchangeRate || null
           patch.worksheetCurrency = currency || null
+          patch.worksheetPricedAt = worksheetDate ? `${worksheetDate}T00:00:00.000Z` : null
         }
         if (it.category) {
           // A worksheet's Category column is one coarse label for a whole
