@@ -1293,7 +1293,7 @@ export default function SupplierPreOrderPage() {
       fetch('/api/admin/contacts').then(r => r.json()).then(d => setContacts(Array.isArray(d) ? d : [])).catch(() => {}),
       fetch('/api/admin/supplier-contacts').then(r => r.json()).then(d => setSuppliers(Array.isArray(d) ? d : [])).catch(() => {}),
       fetch('/api/admin/preorder-dashboard/options').then(r => r.json()).then(d => { if (d && !d.error) setOptions(d) }).catch(() => {}),
-      fetch('/api/admin/exchange-rates').then(r => r.json()).then(d => { if (d?.rates) setExchangeRates(d.rates) }).catch(() => {}),
+      fetch('/api/admin/exchange-rate').then(r => r.json()).then(d => { if (d?.rates) setExchangeRates(d.rates) }).catch(() => {}),
     ]).finally(() => setLoading(false))
   }, [supplierName])
 
