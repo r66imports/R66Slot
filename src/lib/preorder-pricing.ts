@@ -29,7 +29,17 @@ export const DEFAULT_COSTING_ACCOUNTS: CostingAccount[] = [
     customsPct: 20,
     handlingPct: 0,
     markupPct: 30,
-    vatPct: 15,
+    /**
+     * Zero. A pre-order estimate is quoted WITHOUT VAT on R66Slot (user,
+     * 22 Sept 2026), matching the Pre-Order Dashboard's own VAT default and the
+     * Worksheet, whose vatPct has always defaulted to 0. Kept as a field so it
+     * can be raised on the Costing Accounts panel without a deploy.
+     *
+     * NOTE: these accounts are stored in data/costing-accounts.json and the
+     * stored copy WINS over this default, so changing it here alone does
+     * nothing to a live site -- the blob must be PATCHed too.
+     */
+    vatPct: 0,
     landedMultiplier: 1,
   },
   {
@@ -39,7 +49,17 @@ export const DEFAULT_COSTING_ACCOUNTS: CostingAccount[] = [
     customsPct: 20,
     handlingPct: 0,
     markupPct: 30,
-    vatPct: 15,
+    /**
+     * Zero. A pre-order estimate is quoted WITHOUT VAT on R66Slot (user,
+     * 22 Sept 2026), matching the Pre-Order Dashboard's own VAT default and the
+     * Worksheet, whose vatPct has always defaulted to 0. Kept as a field so it
+     * can be raised on the Costing Accounts panel without a deploy.
+     *
+     * NOTE: these accounts are stored in data/costing-accounts.json and the
+     * stored copy WINS over this default, so changing it here alone does
+     * nothing to a live site -- the blob must be PATCHed too.
+     */
+    vatPct: 0,
     /**
      * 1, not 1.15. The Worksheet's calcEntityFinalLanded adds 15% on landed for
      * R66 as an internal inter-company figure, but the Business Calculator's

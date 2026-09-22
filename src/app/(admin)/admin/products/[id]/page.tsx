@@ -1394,7 +1394,7 @@ export default function EditProductPage({
               </div>
               <div className="mt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
-                  Book for Next Shipment Price
+                  Estimate Retail for Pre Order Dashboard
                   {liveEstimate?.floating && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
                       LIVE
@@ -1428,7 +1428,8 @@ export default function EditProductPage({
                     {liveEstimate.currency && liveEstimate.wholesalePrice > 0
                       ? `${CURRENCY_SYMBOLS[liveEstimate.currency] ?? `${liveEstimate.currency} `}${liveEstimate.wholesalePrice.toFixed(2)} × ${liveEstimate.exRate.toFixed(4)}`
                       : 'live rate'}{' '}
-                    → {liveEstimate.accountId} costing. Locks when the shipment lands.
+                    → {liveEstimate.accountId} costing, excl. VAT. Same figure as the
+                    Pre-Order Dashboard. Locks when the shipment lands.
                   </p>
                 ) : liveEstimate?.source === 'landed' ? (
                   <p className="mt-2 text-xs text-gray-500">
