@@ -218,9 +218,10 @@ export async function PUT(
       body.worksheetEstRetail != null ? body.worksheetEstRetail : null,
       body.worksheetExRate != null ? body.worksheetExRate : null,
       body.worksheetCurrency ?? null,
-      // Stamped by the server, not the client, so the date always reflects when
-      // the sheet actually wrote the figure.
-      body.worksheetEstRetail != null ? now : null,
+      // Normally stamped server-side. A backfill from an already-saved sheet
+      // passes that sheet's own date instead, because "when was this priced" is
+      // a question about the sheet, not about when the backfill ran.
+      body.worksheetEstRetail != null ? (body.worksheetPricedAt || now) : null,
     ])
 
     if (result.rowCount === 0) {
