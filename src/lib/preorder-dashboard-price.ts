@@ -7,8 +7,8 @@
  *   cost x (1 + (ship% + customs%)/100)     = landed (ZAR)
  *   landed x (1 + markup%) x (1 + vat%)     = Est. Retail
  *
- * Defaults are 25 shipping / 20 customs / 30 markup / 15 VAT — the normal
- * calculation. A supplier with genuinely different freight is handled by typing
+ * Defaults are 25 shipping / 20 customs / 30 markup / 0 VAT — the normal
+ * calculation. Pre-order estimates are quoted without VAT. A supplier with genuinely different freight is handled by typing
  * different percentages on that item, never by adding a per-supplier branch.
  *
  * This replaces a hard-coded 20% "shippingMarkup" that came from a useState
@@ -31,7 +31,14 @@
 export const DEFAULT_SHIP_PCT = 25
 export const DEFAULT_CUSTOMS_PCT = 20
 export const DEFAULT_MARKUP_PCT = 30
-export const DEFAULT_VAT_PCT = 15
+/**
+ * Zero, deliberately. A pre-order estimate on R66Slot is quoted WITHOUT VAT
+ * (user, 22 Sept 2026) — the same as R66Emporium, whose pre-order costing has
+ * no VAT step at all. The field is kept editable rather than removed so a one
+ * off item can carry VAT without a deploy, but the standard is 0 and an item
+ * with VAT on it renders amber like any other off-standard figure.
+ */
+export const DEFAULT_VAT_PCT = 0
 
 /** Per-item percentages. Absent means "use the default", so nothing needed migrating. */
 export interface CostingPcts {
