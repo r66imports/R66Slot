@@ -1435,10 +1435,12 @@ export default function EditProductPage({
                     }`}
                   />
                 </div>
-                {/* Rule 63 — while a SKU is still on order its Book Now price is an
-                    estimate and floats with the rate, so a typed figure would be
-                    stale by the next rate change. Once the shipment lands the price
-                    settles and the field is editable again. */}
+                {/* Rule 63 — this estimate floats with the rate for as long as a
+                    wholesale price exists, landed or not: it answers what the NEXT
+                    shipment would cost, so an arrival does not settle it. A typed
+                    figure would be stale by the next rate change, which is why the
+                    field is read-only while it floats. The historical number is not
+                    lost — the Worksheet writes it to the field below. */}
                 {liveEstimate?.floating ? (
                   <p className="mt-2 text-xs text-emerald-700">
                     Floats with the exchange rate:{' '}
@@ -1446,11 +1448,13 @@ export default function EditProductPage({
                       ? `${CURRENCY_SYMBOLS[liveEstimate.currency] ?? `${liveEstimate.currency} `}${liveEstimate.wholesalePrice.toFixed(2)} × ${liveEstimate.exRate.toFixed(4)}`
                       : 'live rate'}{' '}
                     → {liveEstimate.accountId} costing, excl. VAT. Same figure as the
-                    Pre-Order Dashboard. Locks when the shipment lands.
+                    Pre-Order Dashboard. Keeps floating after the shipment lands — the
+                    settled figure is kept below, from the Worksheet.
                   </p>
                 ) : liveEstimate?.source === 'landed' ? (
                   <p className="mt-2 text-xs text-gray-500">
-                    Shipment has landed — this price is settled and no longer floats.
+                    Shipment has landed and this SKU has no wholesale price on file, so there
+                    is nothing to float against. Add one to its supplier price list.
                   </p>
                 ) : (
                   <p className="mt-2 text-xs text-gray-500">

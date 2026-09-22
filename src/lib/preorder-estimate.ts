@@ -20,11 +20,12 @@ import type { PricelistEntry } from '@/app/api/admin/inventory-pricelists/route'
  *    wholesale price exists, because a typed figure stops floating the moment it
  *    is saved and is stale by the next rate change.
  *
- *  - It floats until the shipment lands, then locks. `costPerItem` is the real
- *    landed Rand cost and is only ever written by the Worksheet when goods
- *    actually arrive, so a SKU carrying one has landed: its price is a
- *    historical fact and must stop moving. Everything still on order keeps
- *    floating, including bookings already taken.
+ *  - It floats ALWAYS, landed or not. This estimate answers "what would the
+ *    next shipment cost", so an arrival does not settle it. The historical
+ *    figure is kept separately on the product as worksheet_est_retail, written
+ *    by the Worksheet and frozen at that sheet's rate, so nothing is lost by
+ *    letting this one keep moving. `source: 'landed'` now only means "landed
+ *    and we have no wholesale price to float on".
  */
 
 export type EstimateSource =
@@ -136,12 +137,11 @@ export function estimateFor(
     accountId: account.id,
   }
 
-  // Landed: the Worksheet has written a real Rand cost, so the goods are here
-  // and the price is settled. Stop moving it.
-  if (landedCost > 0) {
-    return { ...base, estimateZAR: stored, source: 'landed', floating: false }
-  }
-
+  // The rate always wins, landed or not. A SKU that has arrived still costs what
+  // today's rate says it costs to buy again, and that is the number a client is
+  // quoted for the NEXT shipment. The settled historical figure is not lost: the
+  // Worksheet writes it to worksheet_est_retail, which never floats, so there is
+  // no longer any reason to freeze this one.
   const live = calcEstRetailZAR(wholesale, rate, account)
   if (live > 0) {
     return {
@@ -150,6 +150,12 @@ export function estimateFor(
       source: 'live',
       floating: true,
     }
+  }
+
+  // Only when there is nothing to float on. A landed SKU with no wholesale price
+  // on file keeps the settled figure, because the alternative is showing nothing.
+  if (landedCost > 0) {
+    return { ...base, estimateZAR: stored, source: 'landed', floating: false }
   }
 
   // No wholesale price, or no rate for its currency. Fall back rather than

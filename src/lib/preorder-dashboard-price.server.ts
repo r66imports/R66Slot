@@ -108,17 +108,6 @@ export async function priceCards<T extends PriceableCard>(
     const live2 = calcRetailPrice(card.wholesalePrice2, card.wholesaleCurrency2, rates, card)
     const tier2 = (frozen: boolean) => (frozen || !live2 ? stored2 : live2)
 
-    const settled = landed.get(skuKey(card.sku))
-    if (settled && settled > 0) {
-      out.set(card, {
-        estimatedRetailPrice: settled.toFixed(2),
-        priceSource: 'landed',
-        priceFloating: false,
-        estimatedRetailPrice2: tier2(true),
-      })
-      continue
-    }
-
     if (card.priceManual) {
       out.set(card, {
         estimatedRetailPrice: stored,
@@ -136,6 +125,20 @@ export async function priceCards<T extends PriceableCard>(
         priceSource: 'live',
         priceFloating: true,
         estimatedRetailPrice2: tier2(false),
+      })
+      continue
+    }
+
+    // Only reached when there is no wholesale price to float on. A landed SKU
+    // then falls back to the settled figure the Worksheet wrote, because the
+    // alternative is showing nothing at all.
+    const settled = landed.get(skuKey(card.sku))
+    if (settled && settled > 0) {
+      out.set(card, {
+        estimatedRetailPrice: settled.toFixed(2),
+        priceSource: 'landed',
+        priceFloating: false,
+        estimatedRetailPrice2: tier2(true),
       })
       continue
     }

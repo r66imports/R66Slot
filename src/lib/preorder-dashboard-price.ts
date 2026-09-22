@@ -23,9 +23,10 @@
  * and `tls` in the browser bundle and failed the build with a green tsc.
  *
  * Site Rule 63: an estimate is never a stored number. It is derived on every
- * read from the wholesale price times the live rate, and it moves as the rate
- * moves — until the Worksheet lands the shipment, at which point the product
- * card's own pre-order price is the settled figure and stops moving.
+ * read from the wholesale price times the live rate, and it keeps moving as the
+ * rate moves — landed or not, because it answers "what would the next shipment
+ * cost". The settled historical figure lives separately on the product, as
+ * worksheet_est_retail, written by the Worksheet and frozen at that sheet's rate.
  */
 
 export const DEFAULT_SHIP_PCT = 25
