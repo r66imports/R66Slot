@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import { uploadBase64Image, invalidateCache, syncImageToProduct } from '@/lib/preorder-helpers'
 import type { PreOrderDashboardItem } from '@/lib/preorder-helpers'
-import { priceCard } from '@/lib/preorder-dashboard-price'
+import { priceCard } from '@/lib/preorder-dashboard-price.server'
 
 const KEY = 'data/preorder-dashboard.json'
 

@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { blobRead } from '@/lib/blob-storage'
-import { priceCard } from '@/lib/preorder-dashboard-price'
+import { priceCard } from '@/lib/preorder-dashboard-price.server'
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }

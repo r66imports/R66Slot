@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { blobRead } from '@/lib/blob-storage'
-import { priceCards } from '@/lib/preorder-dashboard-price'
+import { priceCards } from '@/lib/preorder-dashboard-price.server'
 
 const KEY = 'data/preorder-dashboard.json'
 

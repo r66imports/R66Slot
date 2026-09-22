@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead } from '@/lib/blob-storage'
-import { priceCard } from '@/lib/preorder-dashboard-price'
+import { priceCard } from '@/lib/preorder-dashboard-price.server'
 
 const KEY = 'data/preorder-dashboard.json'
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'

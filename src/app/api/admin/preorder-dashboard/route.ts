@@ -6,7 +6,7 @@ import {
   getItems,
   saveItems,
 } from '@/lib/preorder-helpers'
-import { priceCards } from '@/lib/preorder-dashboard-price'
+import { priceCards } from '@/lib/preorder-dashboard-price.server'
 
 /**
  * Rule 63 — Est. Retail is derived on read, never served from the blob. Without
