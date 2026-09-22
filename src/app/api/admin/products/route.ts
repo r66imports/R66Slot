@@ -12,6 +12,15 @@ export interface Product {
   compareAtPrice: number | null
   costPerItem: number | null
   preOrderPrice: number | null
+  /**
+   * Estimate Retail Price from Worksheet — written only by a Worksheet import
+   * and frozen at the exchange rate on that sheet, so unlike the pre-order
+   * estimate it never floats.
+   */
+  worksheetEstRetail?: number | null
+  worksheetExRate?: number | null
+  worksheetCurrency?: string | null
+  worksheetPricedAt?: string | null
   auctionReservePrice?: number | null
   /** Retail discount % — display-only on the Specials slider; price stays full retail. */
   discountPct?: number | null
@@ -70,6 +79,10 @@ function rowToProduct(row: any): Product {
     compareAtPrice: row.compare_at_price ? parseFloat(row.compare_at_price) : null,
     costPerItem: row.cost_per_item ? parseFloat(row.cost_per_item) : null,
     preOrderPrice: row.pre_order_price ? parseFloat(row.pre_order_price) : null,
+    worksheetEstRetail: row.worksheet_est_retail ? parseFloat(row.worksheet_est_retail) : null,
+    worksheetExRate: row.worksheet_ex_rate ? parseFloat(row.worksheet_ex_rate) : null,
+    worksheetCurrency: row.worksheet_currency || null,
+    worksheetPricedAt: row.worksheet_priced_at || null,
     discountPct: row.discount_pct ? parseFloat(row.discount_pct) : null,
     sku: row.sku,
     barcode: row.barcode,
@@ -536,11 +549,12 @@ export async function PUT(request: Request) {
           image_url, images, page_id, page_ids, page_url, seo,
           unit, sales_account, purchase_account,
           item_categories, category_brands, category_ids,
-          created_at, updated_at
+          created_at, updated_at,
+          worksheet_est_retail, worksheet_ex_rate, worksheet_currency, worksheet_priced_at
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,
-          $33,$34,$35,$36,$37,$38,$39,$40
+          $33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44
         )
       `, [
         id, p.title || p.name || '', p.description || '',
@@ -567,6 +581,12 @@ export async function PUT(request: Request) {
         JSON.stringify(Array.isArray(p.categoryBrands) ? p.categoryBrands : (p.categoryBrands ? [p.categoryBrands] : [])),
         JSON.stringify(insertCatIds),
         now, now,
+        // A Worksheet creating a brand-new SKU carries its estimate in on the
+        // same call, so the figure and the rate behind it are never lost.
+        parseNumOrNull(p.worksheetEstRetail),
+        parseNumOrNull(p.worksheetExRate),
+        p.worksheetCurrency || null,
+        p.worksheetEstRetail != null ? now : null,
       ])
       imported++
     }

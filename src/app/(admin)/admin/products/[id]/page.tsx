@@ -78,6 +78,10 @@ export default function EditProductPage({
   const [price, setPrice] = useState('')
   const [compareAtPrice, setCompareAtPrice] = useState('')
   const [preOrderPrice, setPreOrderPrice] = useState('')
+  // Read-only. Written only by a Worksheet import, frozen at that sheet's rate.
+  const [worksheetEst, setWorksheetEst] = useState<{
+    value: number; exRate: number; currency: string; pricedAt: string | null
+  } | null>(null)
   // Retail discount. price stays the full retail figure; discountPct derives the
   // discounted selling price, so the original retail is never overwritten.
   const [discountPct, setDiscountPct] = useState('')
@@ -390,6 +394,19 @@ export default function EditProductPage({
           setPrice(found.price?.toString() || '')
           setCompareAtPrice(found.compareAtPrice?.toString() || '')
           setPreOrderPrice((found as any).preOrderPrice?.toString() || '')
+          {
+            const w = found as any
+            setWorksheetEst(
+              w.worksheetEstRetail != null
+                ? {
+                    value: Number(w.worksheetEstRetail) || 0,
+                    exRate: Number(w.worksheetExRate) || 0,
+                    currency: (w.worksheetCurrency || '').toUpperCase(),
+                    pricedAt: w.worksheetPricedAt || null,
+                  }
+                : null
+            )
+          }
           // Derived server-side so this page cannot disagree with the storefront.
           const f = found as any
           setLiveEstimate(
@@ -1439,6 +1456,50 @@ export default function EditProductPage({
                   <p className="mt-2 text-xs text-gray-500">
                     Special price for pre-order invoices. Add a wholesale price to this SKU’s
                     supplier price list and it will float with the exchange rate.
+                  </p>
+                )}
+              </div>
+
+              {/* Estimate Retail Price from Worksheet — written only by a Worksheet
+                  import and deliberately read-only. Unlike the estimate above it does
+                  NOT float: it is a historical fact about one sheet, and it is kept
+                  with the exchange rate it was worked out at so the figure can always
+                  be explained months later. */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                  Estimate Retail Price from Worksheet
+                  {worksheetEst && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                      WORKSHEET
+                    </span>
+                  )}
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2 text-gray-500">R</span>
+                  <input
+                    type="text"
+                    readOnly
+                    value={worksheetEst ? worksheetEst.value.toFixed(2) : ''}
+                    placeholder="Set when a Worksheet is imported"
+                    title="Written by the Worksheet only — fixed at the exchange rate on that sheet"
+                    className={`w-full pl-7 pr-3 py-2 border rounded-lg cursor-not-allowed ${
+                      worksheetEst
+                        ? 'border-indigo-300 bg-indigo-50 text-gray-900 font-semibold'
+                        : 'border-gray-200 bg-gray-50 text-gray-400'
+                    }`}
+                  />
+                </div>
+                {worksheetEst ? (
+                  <p className="mt-2 text-xs text-indigo-700">
+                    Set{worksheetEst.pricedAt ? ` ${new Date(worksheetEst.pricedAt).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+                    {worksheetEst.exRate > 0
+                      ? ` at ${worksheetEst.currency || 'FC'} 1 = R${worksheetEst.exRate.toFixed(4)}`
+                      : ''}
+                    . Fixed at the rate on that sheet — it does not float.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Filled in automatically the next time this SKU comes through a Worksheet import.
                   </p>
                 )}
               </div>

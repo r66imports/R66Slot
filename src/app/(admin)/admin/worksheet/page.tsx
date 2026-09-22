@@ -428,6 +428,14 @@ function WorksheetEditor({
               cost_per_item: finalLanded,
               compareAtPrice: landedRetail || finalLanded,
               preOrderPrice: preOrderZAR,
+              // Estimate Retail Price from Worksheet — the same figure, kept
+              // alongside the rate it was worked out at so the product card can
+              // always show where it came from. preOrderPrice keeps floating
+              // until the shipment lands; this one is a fact about this sheet
+              // and never moves.
+              worksheetEstRetail: preOrderZAR || null,
+              worksheetExRate: exchangeRate || null,
+              worksheetCurrency: currency || null,
               quantity: 0,
               status: 'active',
               categoryBrands: it.category ? [it.category] : [],
@@ -454,6 +462,11 @@ function WorksheetEditor({
         else if (finalLanded > 0) patch.compareAtPrice = finalLanded
         if (retailZAR > 0) patch.price = retailZAR
         if (preOrderZAR > 0) patch.preOrderPrice = preOrderZAR
+        if (preOrderZAR > 0) {
+          patch.worksheetEstRetail = preOrderZAR
+          patch.worksheetExRate = exchangeRate || null
+          patch.worksheetCurrency = currency || null
+        }
         if (it.category) {
           // A worksheet's Category column is one coarse label for a whole
           // shipment, while Inventory's brand is curated per product — a Revo

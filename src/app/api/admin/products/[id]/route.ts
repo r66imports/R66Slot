@@ -15,6 +15,11 @@ function rowToProduct(row: any): Product {
     preOrderPrice: row.pre_order_price ? parseFloat(row.pre_order_price) : null,
     auctionReservePrice: row.auction_reserve_price ? parseFloat(row.auction_reserve_price) : null,
     discountPct: row.discount_pct ? parseFloat(row.discount_pct) : null,
+    // Written only by a Worksheet import, and frozen at the rate on that sheet.
+    worksheetEstRetail: row.worksheet_est_retail ? parseFloat(row.worksheet_est_retail) : null,
+    worksheetExRate: row.worksheet_ex_rate ? parseFloat(row.worksheet_ex_rate) : null,
+    worksheetCurrency: row.worksheet_currency || null,
+    worksheetPricedAt: row.worksheet_priced_at || null,
     sku: row.sku,
     barcode: row.barcode,
     brand: row.brand,
@@ -95,6 +100,14 @@ export async function PUT(
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS pre_order_price NUMERIC`).catch(() => {})
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS auction_reserve_price NUMERIC`).catch(() => {})
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS discount_pct NUMERIC`).catch(() => {})
+    // Estimate Retail Price from Worksheet — the estimate a Worksheet import
+    // produced, kept with the exchange rate it was worked out at so the figure
+    // can always be explained. Never derived on read: unlike the Pre-Order
+    // Dashboard estimate this one is a historical fact about a sheet.
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS worksheet_est_retail NUMERIC`).catch(() => {})
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS worksheet_ex_rate NUMERIC`).catch(() => {})
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS worksheet_currency TEXT`).catch(() => {})
+    await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS worksheet_priced_at TIMESTAMPTZ`).catch(() => {})
 
     const result = await db.query(`
       UPDATE products SET
@@ -145,6 +158,10 @@ export async function PUT(
         category_ids = COALESCE($46, category_ids),
         auction_reserve_price = COALESCE($48, auction_reserve_price),
         discount_pct = COALESCE($49, discount_pct),
+        worksheet_est_retail = COALESCE($50, worksheet_est_retail),
+        worksheet_ex_rate = COALESCE($51, worksheet_ex_rate),
+        worksheet_currency = COALESCE($52, worksheet_currency),
+        worksheet_priced_at = COALESCE($53, worksheet_priced_at),
         updated_at = $36
       WHERE id = $1
       RETURNING *
@@ -198,6 +215,12 @@ export async function PUT(
       body.preOrderPrice != null ? body.preOrderPrice : null,
       body.auctionReservePrice != null ? body.auctionReservePrice : null,
       body.discountPct != null ? Math.max(0, Math.min(100, Number(body.discountPct) || 0)) : null,
+      body.worksheetEstRetail != null ? body.worksheetEstRetail : null,
+      body.worksheetExRate != null ? body.worksheetExRate : null,
+      body.worksheetCurrency ?? null,
+      // Stamped by the server, not the client, so the date always reflects when
+      // the sheet actually wrote the figure.
+      body.worksheetEstRetail != null ? now : null,
     ])
 
     if (result.rowCount === 0) {
