@@ -1240,7 +1240,8 @@ export default function SupplierPreOrderPage() {
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({})
   const [sortBy, setSortBy] = useState<SortBy>('date')
   const [sortAsc, setSortAsc] = useState(false)
-  const [search, setSearch] = useState('')
+  // ?q= arrives from the Pre-Order Dashboard search so a result row lands pre-filtered
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [showArrived, setShowArrived] = useState(false)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
