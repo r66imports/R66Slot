@@ -5258,10 +5258,6 @@ function OrdersPageInner() {
                                 if (res.ok) {
                                   const updated = await res.json()
                                   setDocuments((prev) => prev.map((d) => d.id === doc.id ? updated : d))
-                                  if (doc.type === 'invoice' || doc.type === 'salesorder') {
-                                    setInventoryMsg(`↩ Stock restored for ${doc.docNumber}`)
-                                    setTimeout(() => setInventoryMsg(null), 4000)
-                                  }
                                 }
                               },
                             },

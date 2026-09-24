@@ -45,8 +45,16 @@ export async function PATCH(
     const newType = body.type ?? prev.type
     const newItems = body.lineItems ?? prev.lineItems
 
-    const wasCancelled = CANCELLED_STATUSES.has(prev.status)
     const isCancelled = CANCELLED_STATUSES.has(newStatus)
+    // Only a REJECTION undoes a sale. ARCHIVING IS FILING — it clears a spent quote or a
+    // finished invoice off the active list to keep the workflow fast, carries no business
+    // meaning, and must never move stock.
+    // `archived` deliberately STAYS in CANCELLED_STATUSES. That is what keeps an archived
+    // document INERT: isCancelled remains true for it, so no later save can deduct it back
+    // out either — including the on-open autosave of a legacy archived doc still carrying
+    // stockDeducted: false from the old restore. It also leaves the Rule 1 shortfall guard
+    // and sync-inventory reading 'archived' exactly as they always have.
+    const isRejecting = newStatus === 'rejected' && prev.status !== 'rejected'
     const wasStockable = isStockable(prev.type)
     const nowStockable = isStockable(newType)
 
@@ -84,22 +92,13 @@ export async function PATCH(
 
     // Rule 3 — Stock Deduction: only adjust stock if the rule is active
     if (!skipStockAdjust && stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {
-      if (prev.stockDeducted !== false && wasStockable && isCancelled && !wasCancelled) {
-        // Being cancelled/archived — restore stock UNLESS it's a fully-paid invoice being archived.
-        // A paid invoice means the sale completed; stock is legitimately gone and must stay deducted.
-        let shouldRestore = true
-        if (newStatus === 'archived' && prev.type === 'invoice') {
-          const lineTotal = prev.lineItems.reduce((s: number, li: any) => s + li.qty * (li.unitPrice || 0) * (1 - ((li.discountPct || 0) / 100)), 0)
-          const disc = lineTotal * ((prev as any).discountPct || 0) / 100
-          const ship = (prev as any).shippingCost || 0
-          const total = lineTotal - disc + ship
-          const paid = ((prev as any).amountPaid || 0) + ((prev as any).creditApplied || 0)
-          if (total > 0 && total - paid <= 0.005) shouldRestore = false
-        }
-        if (shouldRestore) {
-          await adjustStock(prev.lineItems, 'add')
-          body.stockDeducted = false
-        }
+      if (prev.stockDeducted !== false && wasStockable && isRejecting) {
+        // Rejected — the sale is undone, so the goods go back on the shelf. Rejection and
+        // DELETE are the only two deliberate restores; archiving is neither. This fires on a
+        // rejection from any prior status, so filing an invoice and rejecting it afterwards
+        // still returns the stock.
+        await adjustStock(prev.lineItems, 'add')
+        body.stockDeducted = false
       } else if (prev.stockDeducted !== false && wasStockable && !isCancelled && itemsChanged) {
         // Active invoice/SO with changed line items — reverse old qty, apply new qty (handles legacy undefined)
         await adjustStock(prev.lineItems, 'add')
