@@ -77,16 +77,19 @@ function NavLink({ item, hConfig, onClick }: {
     backgroundColor: (hovered || dropOpen) && navHoverEffect === 'background' ? `${hoverColor}22` : undefined,
     padding: navHoverEffect === 'background' ? '3px 8px' : undefined,
     borderRadius: navHoverEffect === 'background' ? '5px' : undefined,
-    transition: 'all 0.15s ease',
+    // Not `all` — a font-size transition makes the autofit measure a size
+    // that is still animating, so the row never converges on a fit
+    transition: 'color 0.15s ease, background-color 0.15s ease, text-decoration-color 0.15s ease',
     display: 'flex',
     alignItems: 'center',
     whiteSpace: 'nowrap',
+    flexShrink: 0,
     gap: hasDropdown ? 4 : undefined,
   }
 
   if (hasDropdown) {
     return (
-      <div ref={wrapRef} className="relative" onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+      <div ref={wrapRef} className="relative flex-shrink-0" onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
         <button
           style={linkStyle}
           // With a mouse, hover already opened it — a click must not toggle it shut.
@@ -268,50 +271,127 @@ export function DynamicHeader() {
   const headerHeight = headerConfig.headerHeight ?? 64
 
   // ─── Nav autofit ────────────────────────────────────────────────────────────
-  // Measure the row at the configured size, then scale the nav font and gaps down
-  // by exactly as much as it takes to fit the space left over by the logo and the
-  // account/cart icons. Never scales up past the size set in /admin/header.
+  // Fit the nav into whatever the logo and the account/cart icons leave behind,
+  // in order of what costs the least: spacing, then font size, then a second row.
+  // Item widths are summed directly — scrollWidth lies on a flex row whose
+  // children overflow — and every candidate is applied and re-measured, because
+  // glyph widths don't scale linearly with font-size.
   const rowRef = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLElement>(null)
   const baseNavFontSize = headerConfig.navFontSize || 14
   const BASE_NAV_GAP = 32
-  const MIN_NAV_FONT = 10
+  const MIN_NAV_GAP = 10
+  // Below this a single line stops being worth reading — wrap instead
+  const READABLE_FONT = 13
+  const MIN_WRAPPED_FONT = 11
+  // Slack for the padding the hover effect adds to one item, plus rounding
+  const FIT_SLACK = 20
 
   useEffect(() => {
+    let frame = 0
+
     const fit = () => {
       const nav = navRef.current
       const row = rowRef.current
       if (!nav || !row) return
-      if (window.getComputedStyle(nav).display === 'none') return // phones: menu handles it
+      if (window.getComputedStyle(nav).display === 'none') return // phones: the menu handles it
 
-      // Natural width at full size
-      nav.style.setProperty('--nav-fs', `${baseNavFontSize}px`)
-      nav.style.setProperty('--nav-gap', `${BASE_NAV_GAP}px`)
-      const natural = nav.scrollWidth
-      if (!natural) return
+      const items = Array.prototype.slice.call(nav.children) as HTMLElement[]
+      if (!items.length) return
 
+      // What the logo and the search/account/cart block leave for the nav
       let used = 0
       Array.prototype.forEach.call(row.children, (child: Element) => {
         if (child !== nav) used += (child as HTMLElement).offsetWidth
       })
-      // 16px of slack absorbs the padding the hover effect adds to one item
-      const available = row.clientWidth - used - 16
-      const scale = Math.min(1, available / natural)
+      const available = row.clientWidth - used - FIT_SLACK
+      if (available <= 0) return
+      const maxHeight = Math.max(40, row.clientHeight - 16)
 
-      nav.style.setProperty('--nav-fs', `${Math.max(MIN_NAV_FONT, baseNavFontSize * scale)}px`)
-      nav.style.setProperty('--nav-gap', `${Math.max(6, BASE_NAV_GAP * scale)}px`)
+      const apply = (fs: number, gap: number) => {
+        nav.style.setProperty('--nav-fs', `${fs}px`)
+        nav.style.setProperty('--nav-gap', `${gap}px`)
+      }
+      // Applies the candidate, then reports whether one line of it fits
+      const fitsOneLine = (fs: number, gap: number) => {
+        apply(fs, gap)
+        let w = 0
+        items.forEach((el) => { w += el.offsetWidth })
+        return w + gap * (items.length - 1) <= available
+      }
+      const setWrap = (on: boolean) => {
+        nav.style.flexWrap = on ? 'wrap' : 'nowrap'
+        nav.style.justifyContent = on ? 'center' : ''
+        nav.style.rowGap = on ? '2px' : ''
+        nav.style.maxWidth = on ? `${available}px` : ''
+      }
+
+      setWrap(false)
+
+      // 1. Everything at the size set in /admin/header
+      if (fitsOneLine(baseNavFontSize, BASE_NAV_GAP)) return
+
+      // 2. Keep the font, take it out of the spacing — largest gap that still fits
+      if (fitsOneLine(baseNavFontSize, MIN_NAV_GAP)) {
+        let lo = MIN_NAV_GAP, hi = BASE_NAV_GAP
+        for (let i = 0; i < 8; i++) {
+          const mid = (lo + hi) / 2
+          if (fitsOneLine(baseNavFontSize, mid)) lo = mid; else hi = mid
+        }
+        fitsOneLine(baseNavFontSize, lo)
+        return
+      }
+
+      // 3. Shrink the font on one line, but never past readable
+      if (fitsOneLine(READABLE_FONT, MIN_NAV_GAP)) {
+        let lo = READABLE_FONT, hi = baseNavFontSize
+        for (let i = 0; i < 10; i++) {
+          const mid = (lo + hi) / 2
+          if (fitsOneLine(mid, MIN_NAV_GAP)) lo = mid; else hi = mid
+        }
+        fitsOneLine(lo, MIN_NAV_GAP)
+        return
+      }
+
+      // 4. Too many items for one readable line — wrap, and take the largest font
+      //    whose wrapped block still fits the header's height
+      setWrap(true)
+      const wrappedFits = (fs: number) => {
+        apply(fs, MIN_NAV_GAP)
+        return nav.scrollHeight <= maxHeight
+      }
+      if (wrappedFits(baseNavFontSize)) return
+      let lo = MIN_WRAPPED_FONT, hi = baseNavFontSize
+      for (let i = 0; i < 10; i++) {
+        const mid = (lo + hi) / 2
+        if (wrappedFits(mid)) lo = mid; else hi = mid
+      }
+      wrappedFits(lo)
+    }
+
+    const schedule = () => {
+      if (frame) cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(fit)
     }
 
     fit()
     // Observe the row only — observing the nav would loop, since fit() resizes it
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null
     if (ro && rowRef.current) ro.observe(rowRef.current)
-    window.addEventListener('resize', fit)
-    // Web fonts land after first paint and change every label width
+    window.addEventListener('resize', schedule)
+    window.addEventListener('orientationchange', schedule)
+    // Web fonts and the logo image land after first paint and change the sums
     if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
-      ;(document as any).fonts.ready.then(fit).catch(() => {})
+      ;(document as any).fonts.ready.then(schedule).catch(() => {})
     }
-    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', fit) }
+    const t = setTimeout(fit, 300)
+    return () => {
+      clearTimeout(t)
+      if (frame) cancelAnimationFrame(frame)
+      if (ro) ro.disconnect()
+      window.removeEventListener('resize', schedule)
+      window.removeEventListener('orientationchange', schedule)
+    }
   }, [headerConfig.navItems, headerConfig.navFontFamily, baseNavFontSize, isLoading, logoPosition, editorEnabled, isAdmin])
 
   // Load Google Font when navFontFamily changes
