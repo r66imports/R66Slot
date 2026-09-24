@@ -267,6 +267,53 @@ export function DynamicHeader() {
   const logoPosition = headerConfig.logoPosition || 'left'
   const headerHeight = headerConfig.headerHeight ?? 64
 
+  // ─── Nav autofit ────────────────────────────────────────────────────────────
+  // Measure the row at the configured size, then scale the nav font and gaps down
+  // by exactly as much as it takes to fit the space left over by the logo and the
+  // account/cart icons. Never scales up past the size set in /admin/header.
+  const rowRef = useRef<HTMLDivElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+  const baseNavFontSize = headerConfig.navFontSize || 14
+  const BASE_NAV_GAP = 32
+  const MIN_NAV_FONT = 10
+
+  useEffect(() => {
+    const fit = () => {
+      const nav = navRef.current
+      const row = rowRef.current
+      if (!nav || !row) return
+      if (window.getComputedStyle(nav).display === 'none') return // phones: menu handles it
+
+      // Natural width at full size
+      nav.style.setProperty('--nav-fs', `${baseNavFontSize}px`)
+      nav.style.setProperty('--nav-gap', `${BASE_NAV_GAP}px`)
+      const natural = nav.scrollWidth
+      if (!natural) return
+
+      let used = 0
+      Array.prototype.forEach.call(row.children, (child: Element) => {
+        if (child !== nav) used += (child as HTMLElement).offsetWidth
+      })
+      // 16px of slack absorbs the padding the hover effect adds to one item
+      const available = row.clientWidth - used - 16
+      const scale = Math.min(1, available / natural)
+
+      nav.style.setProperty('--nav-fs', `${Math.max(MIN_NAV_FONT, baseNavFontSize * scale)}px`)
+      nav.style.setProperty('--nav-gap', `${Math.max(6, BASE_NAV_GAP * scale)}px`)
+    }
+
+    fit()
+    // Observe the row only — observing the nav would loop, since fit() resizes it
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(fit) : null
+    if (ro && rowRef.current) ro.observe(rowRef.current)
+    window.addEventListener('resize', fit)
+    // Web fonts land after first paint and change every label width
+    if (typeof document !== 'undefined' && (document as any).fonts?.ready) {
+      ;(document as any).fonts.ready.then(fit).catch(() => {})
+    }
+    return () => { if (ro) ro.disconnect(); window.removeEventListener('resize', fit) }
+  }, [headerConfig.navItems, headerConfig.navFontFamily, baseNavFontSize, isLoading, logoPosition, editorEnabled, isAdmin])
+
   // Load Google Font when navFontFamily changes
   useEffect(() => {
     if (headerConfig.navFontFamily) loadGoogleFont(headerConfig.navFontFamily)
@@ -445,7 +492,7 @@ export function DynamicHeader() {
         )}
 
         <div className="container mx-auto px-4">
-          <div className={`flex items-center ${logoPosition === 'center' ? 'relative justify-between' : 'justify-between'}`} style={{ height: headerHeight }}>
+          <div ref={rowRef} className={`flex items-center ${logoPosition === 'center' ? 'relative justify-between' : 'justify-between'}`} style={{ height: headerHeight }}>
             {/* Logo — left or center */}
             {logoPosition !== 'right' && (
               <Link
@@ -459,7 +506,7 @@ export function DynamicHeader() {
             {/* Desktop Navigation - Dynamic from settings */}
             {logoPosition === 'center' ? (
               /* Center layout: nav on left side */
-              <nav className="hidden md:flex items-center min-w-0 gap-2 lg:gap-4 xl:gap-6 2xl:gap-8" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${headerConfig.navFontSize || 14}px)` } as React.CSSProperties}>
+              <nav ref={navRef} className="hidden md:flex items-center min-w-0" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${baseNavFontSize}px)`, '--nav-gap': 'clamp(8px, 1.4vw, 32px)', gap: 'var(--nav-gap)' } as React.CSSProperties}>
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -469,7 +516,7 @@ export function DynamicHeader() {
               </nav>
             ) : logoPosition === 'right' ? (
               /* Right layout: nav on left side */
-              <nav className="hidden md:flex items-center min-w-0 gap-2 lg:gap-4 xl:gap-6 2xl:gap-8" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${headerConfig.navFontSize || 14}px)` } as React.CSSProperties}>
+              <nav ref={navRef} className="hidden md:flex items-center min-w-0" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${baseNavFontSize}px)`, '--nav-gap': 'clamp(8px, 1.4vw, 32px)', gap: 'var(--nav-gap)' } as React.CSSProperties}>
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -479,7 +526,7 @@ export function DynamicHeader() {
               </nav>
             ) : (
               /* Left layout (default): nav in center */
-              <nav className="hidden md:flex items-center min-w-0 gap-2 lg:gap-4 xl:gap-6 2xl:gap-8" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${headerConfig.navFontSize || 14}px)` } as React.CSSProperties}>
+              <nav ref={navRef} className="hidden md:flex items-center min-w-0" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${baseNavFontSize}px)`, '--nav-gap': 'clamp(8px, 1.4vw, 32px)', gap: 'var(--nav-gap)' } as React.CSSProperties}>
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
