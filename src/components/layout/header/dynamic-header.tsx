@@ -71,7 +71,7 @@ function NavLink({ item, hConfig, onClick }: {
   const linkStyle: React.CSSProperties = {
     color: (hovered || dropOpen) && (navHoverEffect === 'color' || navHoverEffect === 'background' || navHoverEffect === 'underline' || navHoverEffect === 'bold') ? hoverColor : textColor,
     fontFamily: navFontFamily || undefined,
-    fontSize: navFontSize,
+    fontSize: `var(--nav-fs, ${navFontSize}px)`,
     fontWeight: (hovered || dropOpen) && navHoverEffect === 'bold' ? 700 : navFontWeight,
     textDecoration: (hovered || dropOpen) && navHoverEffect === 'underline' ? `underline 2px ${hoverColor}` : 'none',
     backgroundColor: (hovered || dropOpen) && navHoverEffect === 'background' ? `${hoverColor}22` : undefined,
@@ -459,7 +459,7 @@ export function DynamicHeader() {
             {/* Desktop Navigation - Dynamic from settings */}
             {logoPosition === 'center' ? (
               /* Center layout: nav on left side */
-              <nav className="hidden xl:flex items-center gap-4 2xl:gap-8 min-w-0">
+              <nav className="hidden md:flex items-center min-w-0 gap-2 lg:gap-4 xl:gap-6 2xl:gap-8" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${headerConfig.navFontSize || 14}px)` } as React.CSSProperties}>
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -469,7 +469,7 @@ export function DynamicHeader() {
               </nav>
             ) : logoPosition === 'right' ? (
               /* Right layout: nav on left side */
-              <nav className="hidden xl:flex items-center gap-4 2xl:gap-8 min-w-0">
+              <nav className="hidden md:flex items-center min-w-0 gap-2 lg:gap-4 xl:gap-6 2xl:gap-8" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${headerConfig.navFontSize || 14}px)` } as React.CSSProperties}>
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -479,7 +479,7 @@ export function DynamicHeader() {
               </nav>
             ) : (
               /* Left layout (default): nav in center */
-              <nav className="hidden xl:flex items-center gap-4 2xl:gap-8 min-w-0">
+              <nav className="hidden md:flex items-center min-w-0 gap-2 lg:gap-4 xl:gap-6 2xl:gap-8" style={{ '--nav-fs': `clamp(11px, 1.35vw, ${headerConfig.navFontSize || 14}px)` } as React.CSSProperties}>
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -577,7 +577,7 @@ export function DynamicHeader() {
 
               {/* Mobile Menu Button */}
               <button
-                className="xl:hidden p-2 hover:bg-gray-100 rounded-md transition-colors"
+                className="md:hidden p-2 hover:bg-gray-100 rounded-md transition-colors"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 aria-label="Menu"
               >
@@ -601,7 +601,7 @@ export function DynamicHeader() {
 
           {/* Mobile Menu - Dynamic from settings */}
           {isMenuOpen && (
-            <nav className="xl:hidden py-4 border-t border-gray-200">
+            <nav className="md:hidden py-4 border-t border-gray-200">
               <div className="flex flex-col space-y-4">
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} onClick={() => setIsMenuOpen(false)} />
