@@ -80,6 +80,7 @@ function NavLink({ item, hConfig, onClick }: {
     transition: 'all 0.15s ease',
     display: 'flex',
     alignItems: 'center',
+    whiteSpace: 'nowrap',
     gap: hasDropdown ? 4 : undefined,
   }
 
@@ -458,7 +459,7 @@ export function DynamicHeader() {
             {/* Desktop Navigation - Dynamic from settings */}
             {logoPosition === 'center' ? (
               /* Center layout: nav on left side */
-              <nav className="hidden md:flex items-center space-x-8">
+              <nav className="hidden xl:flex items-center gap-4 2xl:gap-8 min-w-0">
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -468,7 +469,7 @@ export function DynamicHeader() {
               </nav>
             ) : logoPosition === 'right' ? (
               /* Right layout: nav on left side */
-              <nav className="hidden md:flex items-center space-x-8">
+              <nav className="hidden xl:flex items-center gap-4 2xl:gap-8 min-w-0">
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -478,7 +479,7 @@ export function DynamicHeader() {
               </nav>
             ) : (
               /* Left layout (default): nav in center */
-              <nav className="hidden md:flex items-center space-x-8">
+              <nav className="hidden xl:flex items-center gap-4 2xl:gap-8 min-w-0">
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} />
                 ))}
@@ -489,7 +490,7 @@ export function DynamicHeader() {
             )}
 
             {/* Right Actions (+ logo when position = right) */}
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 flex-shrink-0">
               {/* Search Icon */}
               {headerConfig.showSearch && (
                 <button
@@ -576,7 +577,7 @@ export function DynamicHeader() {
 
               {/* Mobile Menu Button */}
               <button
-                className="md:hidden p-2 hover:bg-gray-100 rounded-md transition-colors"
+                className="xl:hidden p-2 hover:bg-gray-100 rounded-md transition-colors"
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 aria-label="Menu"
               >
@@ -600,7 +601,7 @@ export function DynamicHeader() {
 
           {/* Mobile Menu - Dynamic from settings */}
           {isMenuOpen && (
-            <nav className="md:hidden py-4 border-t border-gray-200">
+            <nav className="xl:hidden py-4 border-t border-gray-200">
               <div className="flex flex-col space-y-4">
                 {headerConfig.navItems.map((item, index) => (
                   <NavLink key={index} item={item} hConfig={headerConfig as any} onClick={() => setIsMenuOpen(false)} />
