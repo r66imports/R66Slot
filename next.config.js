@@ -68,8 +68,9 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   typescript: {
-    // Allow builds with TypeScript errors (warnings treated as errors)
-    ignoreBuildErrors: true,
+    // A type error must fail the Railway build, not ship. tsc --noEmit is clean as
+    // of 26 Sept 2026; keep it that way. Matches R66Emporium (0258e1a).
+    ignoreBuildErrors: false,
   },
 }
 

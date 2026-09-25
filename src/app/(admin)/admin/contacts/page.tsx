@@ -194,7 +194,7 @@ function ContactModal({
     return () => { cancelled = true }
   }, [initialEmail])
 
-  function useSavedAddress(a: any) {
+  function applySavedAddress(a: any) {
     setForm(p => ({
       ...p,
       addressStreet:     [a.address1, a.address2].map((v: string) => v?.trim()).filter(Boolean).join(', '),
@@ -369,7 +369,7 @@ function ContactModal({
                         </div>
                         {inForm
                           ? <span className="text-[10px] font-semibold text-green-600 whitespace-nowrap mt-0.5">✓ In use</span>
-                          : <button type="button" onClick={() => useSavedAddress(a)} className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap">Use</button>}
+                          : <button type="button" onClick={() => applySavedAddress(a)} className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 whitespace-nowrap">Use</button>}
                       </div>
                     )
                   })}
