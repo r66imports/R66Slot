@@ -103,7 +103,7 @@ export default function PreferredShipping() {
           </span>
         </div>
         <p className="text-gray-600 text-sm mb-5">
-          Choose how you'd like your orders shipped. Your choice saves automatically and appears on your invoice.
+          Choose how you&apos;d like your orders shipped. Your choice saves automatically and appears on your invoice.
         </p>
 
         {!loaded ? (

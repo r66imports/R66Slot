@@ -351,7 +351,7 @@ export default function PreOrdersListPage() {
           >
             You are a Reseller
           </p>
-          <a
+          <Link
             href="/resellers-pre-orders"
             className="inline-block px-8 py-3 font-bold uppercase tracking-widest text-sm transition-all"
             style={{
@@ -363,7 +363,7 @@ export default function PreOrdersListPage() {
             }}
           >
             Go to Reseller Pre-Orders →
-          </a>
+          </Link>
         </div>
       </div>
     )

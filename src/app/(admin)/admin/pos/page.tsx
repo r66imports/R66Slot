@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -611,18 +612,18 @@ export default function POSPage() {
             >
               🆕 New Sale
             </button>
-            <a
+            <Link
               href="/admin/orders"
               className="text-sm text-gray-400 hover:text-white border border-gray-700 rounded px-3 py-1.5 transition-colors"
             >
               📋 Invoices
-            </a>
-            <a
+            </Link>
+            <Link
               href="/admin/products"
               className="text-sm text-gray-400 hover:text-white border border-gray-700 rounded px-3 py-1.5 transition-colors"
             >
               ← Products
-            </a>
+            </Link>
           </div>
         </div>
 

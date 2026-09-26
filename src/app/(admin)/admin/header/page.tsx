@@ -457,7 +457,7 @@ export default function HeaderEditorPage() {
                   </div>
                   {activeLetter !== null && activeLetter < letters.length && (
                     <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Letter <strong>"{letters[activeLetter]}"</strong> color:</span>
+                      <span className="text-sm text-gray-600">Letter <strong>&quot;{letters[activeLetter]}&quot;</strong> color:</span>
                       <input type="color" value={letterColors[activeLetter] || config.companyNameColor || '#111827'} onChange={(e) => setLetterColor(activeLetter, e.target.value)} className="w-10 h-8 border border-gray-300 rounded cursor-pointer" />
                       <input type="text" value={letterColors[activeLetter] || config.companyNameColor || '#111827'} onChange={(e) => setLetterColor(activeLetter, e.target.value)} className="w-24 text-sm font-mono border border-gray-300 rounded-lg px-2 py-1" />
                     </div>

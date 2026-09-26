@@ -186,7 +186,7 @@ export function PageSettingsPanel({ pageSettings, onUpdate, onClose }: PageSetti
                     onChange={(e) => onUpdate({ seoNoFollow: e.target.checked })}
                     className="rounded border-gray-300 text-blue-600"
                   />
-                  <span className="text-xs text-gray-600 font-play">No Follow (don't follow links)</span>
+                  <span className="text-xs text-gray-600 font-play">No Follow (don&apos;t follow links)</span>
                 </label>
               </div>
             </div>

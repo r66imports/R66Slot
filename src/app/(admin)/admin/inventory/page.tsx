@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useColumnResize } from '@/hooks/use-column-resize'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1444,12 +1445,12 @@ export default function InventoryPage() {
                 Download PDF
               </button>
               {orderSentDone && createdWsId ? (
-                <a
+                <Link
                   href="/admin/worksheet"
                   className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 flex items-center gap-1"
                 >
                   Open Worksheet →
-                </a>
+                </Link>
               ) : (
                 <button
                   onClick={handleSendToOrders}

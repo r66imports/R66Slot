@@ -1120,7 +1120,7 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
         <div style={{ position: 'fixed', ...(dropdownPos.dropUp ? { bottom: dropdownPos.bottom } : { top: dropdownPos.top }), left: dropdownPos.left, zIndex: 9999 }} className={`text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
           ⚠ {blockMsg.text}
           {blockMsg.type === 'preorder' && (
-            <a href="/admin/backorders" className="underline font-semibold hover:text-amber-200 ml-1">Open Back Orders →</a>
+            <Link href="/admin/backorders" className="underline font-semibold hover:text-amber-200 ml-1">Open Back Orders →</Link>
           )}
         </div>
       )}
@@ -1737,7 +1737,7 @@ function CreateDocumentModal({
               />
               <div>
                 <span className="text-sm font-semibold text-amber-700">Pre Order Deposit</span>
-                <span className="text-xs text-gray-500 ml-2">Renames this Quote to "Pre Order Deposit" and switches Discount → Deposit %</span>
+                <span className="text-xs text-gray-500 ml-2">Renames this Quote to &quot;Pre Order Deposit&quot; and switches Discount → Deposit %</span>
               </div>
             </label>
           )}
@@ -3112,7 +3112,7 @@ function PaymentModal({
           )}
           {overpayment > 0.005 && (
             <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-sm text-amber-700">
-              <p>R{overpayment.toFixed(2)} will be added to <strong>{doc.clientName}</strong>'s credit balance.</p>
+              <p>R{overpayment.toFixed(2)} will be added to <strong>{doc.clientName}</strong>&apos;s credit balance.</p>
               <label className="flex items-center gap-2 mt-2 cursor-pointer text-xs">
                 <input type="checkbox" checked={paymentForm.showCreditOnInvoice} onChange={e => set('showCreditOnInvoice', e.target.checked)} className="w-4 h-4 accent-amber-600" />
                 Show credit detail on invoice to customer

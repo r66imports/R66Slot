@@ -873,7 +873,7 @@ export default function CustomerPaymentsPage() {
                   className="w-full border border-green-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-300"
                   placeholder="0.00"
                 />
-                <p className="text-xs text-gray-400 mt-1">Adjusting credit will update this customer's credit balance automatically.</p>
+                <p className="text-xs text-gray-400 mt-1">Adjusting credit will update this customer&apos;s credit balance automatically.</p>
               </div>
 
               {/* Live balance preview */}

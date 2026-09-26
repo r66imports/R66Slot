@@ -114,7 +114,7 @@ export default function AuctionPaymentPage({ params }: { params: Promise<{ aucti
         </button>
 
         <p className="text-xs text-gray-400 font-play mt-3 text-center">
-          You'll be redirected to PayFast for secure payment
+          You&apos;ll be redirected to PayFast for secure payment
         </p>
       </div>
 

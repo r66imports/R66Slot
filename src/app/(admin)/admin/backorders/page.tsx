@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useColumnResize } from '@/hooks/use-column-resize'
+import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -517,7 +518,7 @@ function SkuSearchDropdown({
       {blockMsg && (
         <div className="absolute left-0 top-full z-50 mt-1 bg-green-700 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2">
           ✓ {blockMsg}
-          <a href="/admin/orders" className="underline font-semibold hover:text-green-200 ml-1">Open Orders →</a>
+          <Link href="/admin/orders" className="underline font-semibold hover:text-green-200 ml-1">Open Orders →</Link>
         </div>
       )}
       {!blockMsg && open && filtered.length > 0 && (

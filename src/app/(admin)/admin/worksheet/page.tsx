@@ -3211,7 +3211,7 @@ function ProductInfoModal({
     const failed: string[] = []
 
     // Re-fetch all products to resolve stale prodIds and find newly-created items
-    let freshById: Record<string, string> = {}
+    const freshById: Record<string, string> = {}
     try {
       const r = await fetch('/api/admin/products', { cache: 'no-store' })
       if (r.ok) {

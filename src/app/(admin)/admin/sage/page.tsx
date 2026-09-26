@@ -92,6 +92,8 @@ export default function SagePage() {
                     Token valid until {new Date(status.expiresAt).toLocaleString()}
                   </p>
                 )}
+                {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- OAuth start on an API route:
+                    this must be a real browser navigation, not a client-side Link. */}
                 <a href="/api/admin/sage/connect">
                   <Button variant="outline" size="sm">Reconnect</Button>
                 </a>
@@ -105,6 +107,8 @@ export default function SagePage() {
                 <p className="text-sm text-gray-600">
                   Connect your Sage Accounting account to sync products automatically.
                 </p>
+                {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- OAuth start on an API route:
+                    this must be a real browser navigation, not a client-side Link. */}
                 <a href="/api/admin/sage/connect">
                   <Button className="bg-green-600 hover:bg-green-700 text-white">
                     Connect Sage Accounting

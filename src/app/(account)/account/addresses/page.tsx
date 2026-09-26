@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import PreferredShipping from '@/components/account/preferred-shipping'
 import AddressAutocomplete, { type ParsedAddress } from '@/components/account/address-autocomplete'
+import Link from 'next/link'
 
 interface Address {
   id: string
@@ -371,7 +372,7 @@ export default function AddressesPage() {
                   {formError.startsWith('Your sign-in has expired') && (
                     <>
                       {' '}
-                      <a href="/account/login" className="font-semibold underline">Go to Login</a>
+                      <Link href="/account/login" className="font-semibold underline">Go to Login</Link>
                     </>
                   )}
                 </div>

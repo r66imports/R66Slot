@@ -1075,7 +1075,7 @@ export default function NewProductPage() {
                   }
                 }}
               />
-              <a href="/admin/categories" className="text-xs text-blue-500 hover:text-blue-700 inline-block">Manage Categories →</a>
+              <Link href="/admin/categories" className="text-xs text-blue-500 hover:text-blue-700 inline-block">Manage Categories →</Link>
             </div>
 
             {/* Sage Accounts */}

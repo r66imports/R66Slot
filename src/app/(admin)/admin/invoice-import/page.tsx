@@ -1145,10 +1145,10 @@ The worksheet it created is not affected.`)) return
           {truncatedSkus.length > 0 && (
             <div className="mx-5 mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-xs text-amber-800">
               <div className="font-semibold mb-1.5">
-                ⚠ {truncatedSkus.length} SKU{truncatedSkus.length === 1 ? ' was' : 's were'} cut short by the supplier's PDF — partial reference only
+                ⚠ {truncatedSkus.length} SKU{truncatedSkus.length === 1 ? ' was' : 's were'} cut short by the supplier&apos;s PDF — partial reference only
               </div>
               <div className="text-amber-700 mb-2">
-                Sage prints a narrow Référence column, so the rest of the code isn't in the file. Complete
+                Sage prints a narrow Référence column, so the rest of the code isn&apos;t in the file. Complete
                 them here or in the worksheet. Two products can share the same partial reference, so use
                 the description to tell them apart.
               </div>

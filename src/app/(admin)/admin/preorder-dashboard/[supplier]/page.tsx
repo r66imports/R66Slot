@@ -1501,7 +1501,7 @@ export default function SupplierPreOrderPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 text-sm text-gray-500">
-        <a href="/admin/preorder-dashboard" className="hover:text-indigo-600 font-medium transition-colors">← Pre-Order Dashboard</a>
+        <Link href="/admin/preorder-dashboard" className="hover:text-indigo-600 font-medium transition-colors">← Pre-Order Dashboard</Link>
         <span>/</span>
         <span className="text-gray-900 font-semibold">{supplierName}</span>
       </div>

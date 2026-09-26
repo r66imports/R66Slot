@@ -176,7 +176,7 @@ export default function PublicPreOrderItemPage() {
                 <div className="text-4xl mb-3">✅</div>
                 <p className="font-bold text-green-400 text-lg">Reserved Successfully!</p>
                 <p className="text-gray-300 mt-2">You now have <strong>{reserved.totalQty}</strong> unit{reserved.totalQty !== 1 ? 's' : ''} reserved for this item.</p>
-                <p className="text-gray-400 text-sm mt-3">We'll contact you to confirm your deposit. A 50% deposit is required to secure your order.</p>
+                <p className="text-gray-400 text-sm mt-3">We&apos;ll contact you to confirm your deposit. A 50% deposit is required to secure your order.</p>
                 <Link href={isReseller ? '/resellers-pre-orders' : '/pre-orders'} className="mt-4 inline-block text-primary hover:underline text-sm">← Browse more {isReseller ? 'reseller' : ''} pre-orders</Link>
               </div>
             ) : item?.isLocked && maxQty === 0 ? (
@@ -243,7 +243,7 @@ export default function PublicPreOrderItemPage() {
                   Sign In to Reserve
                 </Link>
                 <p className="text-gray-500 text-sm">
-                  Don't have an account?{' '}
+                  Don&apos;t have an account?{' '}
                   <Link href={`/account/register?returnUrl=/preorder/${id}`} className="text-primary hover:underline">Create one</Link>
                 </p>
               </div>

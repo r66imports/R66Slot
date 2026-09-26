@@ -32,7 +32,7 @@ export default function MyBidsPage() {
 
       {bids.length === 0 ? (
         <div className="bg-white rounded-lg border p-8 text-center">
-          <p className="text-gray-500 font-play mb-4">You haven't placed any bids yet.</p>
+          <p className="text-gray-500 font-play mb-4">You haven&apos;t placed any bids yet.</p>
           <Link
             href="/auctions"
             className="px-4 py-2 bg-primary text-secondary rounded-md font-play font-bold hover:bg-primary/90"

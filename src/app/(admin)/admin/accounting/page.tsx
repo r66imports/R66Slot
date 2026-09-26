@@ -780,7 +780,7 @@ export default function AccountingPage() {
       {activeTab === 'banks' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">Add company banking profiles. Each profile's details appear on Quotes, Sales Orders and Invoices when selected.</p>
+            <p className="text-sm text-gray-500">Add company banking profiles. Each profile&apos;s details appear on Quotes, Sales Orders and Invoices when selected.</p>
             <button
               onClick={() => { setShowForm(true); setEditId(null); setForm(EMPTY_ACCOUNT()) }}
               className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark"

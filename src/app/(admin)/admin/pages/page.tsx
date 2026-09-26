@@ -587,7 +587,7 @@ export default function PagesManagementPage() {
             {searchResults.length} page{searchResults.length !== 1 ? 's' : ''} found
           </div>
           {searchResults.length === 0 ? (
-            <div className="px-4 py-6 text-center text-sm text-gray-400">No pages found for "{searchQuery}"</div>
+            <div className="px-4 py-6 text-center text-sm text-gray-400">No pages found for &quot;{searchQuery}&quot;</div>
           ) : (
             searchResults.map(p => (
               <div key={`${p.type}-${p.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-blue-50 border-b border-gray-100">

@@ -193,7 +193,7 @@ export default function CategoriesPage() {
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-gray-400">
           <p className="text-lg font-semibold font-play mb-2">No categories yet</p>
-          <p className="text-sm font-play">Click "+ New Category" to create your first one.</p>
+          <p className="text-sm font-play">Click &quot;+ New Category&quot; to create your first one.</p>
         </div>
       ) : (
         <div className="grid grid-cols-6 gap-3">

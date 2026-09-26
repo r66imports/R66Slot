@@ -33,7 +33,7 @@ export async function GET() {
     const categories = await getCategories()
 
     // Compute live product counts from the DB — count active products per category_id
-    let liveCounts: Record<string, number> = {}
+    const liveCounts: Record<string, number> = {}
     try {
       const result = await db.query(
         `SELECT cat_id, COUNT(*) AS cnt

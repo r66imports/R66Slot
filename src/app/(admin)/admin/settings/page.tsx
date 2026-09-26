@@ -540,7 +540,7 @@ export default function SettingsPage() {
 
             {/* What's included */}
             <div className="bg-gray-50 rounded-lg p-4 text-xs text-gray-600 space-y-1">
-              <div className="font-semibold text-gray-700 mb-2">What's included in the backup:</div>
+              <div className="font-semibold text-gray-700 mb-2">What&apos;s included in the backup:</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 {[
                   'Invoices & Orders', 'Events & P&L data',
