@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import type { ShipmentEntry } from '@/app/api/admin/shipments-register/route'
 
 // ─── Contact / Invoice types ───────────────────────────────────────────────
@@ -66,11 +67,13 @@ interface DropdownItem {
 }
 
 function AutofillDropdown({ items, anchorRef }: { items: DropdownItem[]; anchorRef: React.RefObject<HTMLDivElement | null> }) {
+  const { menuRef, menuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(items.length > 0, { anchor: anchorRef, minWidth: 200, maxHeight: 192 })
   if (items.length === 0) return null
   return (
     <div
-      className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto min-w-[200px]"
-      style={{ top: '100%', left: 0 }}
+      ref={menuRef}
+      style={menuStyle}
+      className="z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto overscroll-contain"
     >
       {items.map((item, i) => (
         <button

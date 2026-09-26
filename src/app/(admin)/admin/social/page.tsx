@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 
 interface Product {
   id: string
@@ -41,6 +42,7 @@ export default function FlyerGeneratorPage() {
   const [showWebsite, setShowWebsite] = useState(true)
   const flyerRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLDivElement>(null)
+  const { menuRef: productMenuRef, menuStyle: productMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showDropdown, { anchor: searchRef, maxHeight: 256 })
 
   const tpl = TEMPLATES.find(t => t.id === templateId) || TEMPLATES[0]
 
@@ -138,7 +140,7 @@ export default function FlyerGeneratorPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               {showDropdown && filtered.length > 0 && (
-                <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                <div ref={productMenuRef} style={productMenuStyle} className="z-20 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto overscroll-contain">
                   {filtered.map(p => (
                     <button
                       key={p.id}

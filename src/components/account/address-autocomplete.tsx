@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { Input } from '@/components/ui/input'
 
 export interface ParsedAddress {
@@ -62,6 +63,7 @@ export default function AddressAutocomplete({
   // Set right after a pick so the resulting value change does not re-open the list.
   const justPicked = useRef(false)
   const boxRef = useRef<HTMLDivElement>(null)
+  const { menuRef: suggestRef, menuStyle: suggestStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(open && suggestions.length > 0, { anchor: boxRef, maxHeight: 288 })
 
   const close = useCallback(() => {
     setOpen(false)
@@ -186,12 +188,12 @@ export default function AddressAutocomplete({
       )}
 
       {open && suggestions.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
+        <div ref={suggestRef} style={suggestStyle} className="z-50 rounded-md border border-gray-200 bg-white shadow-lg overflow-y-auto overscroll-contain">
           <ul
             id={listId}
             role="listbox"
             aria-label="Address suggestions"
-            className="max-h-72 overflow-auto py-1"
+            className="py-1"
           >
             {suggestions.map((s, i) => (
               <li

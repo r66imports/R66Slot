@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import Link from 'next/link'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -165,6 +166,7 @@ export default function SuppliersNetworkPage() {
   const [selectedSupplierFilter, setSelectedSupplierFilter] = useState<string>('all')
   const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false)
   const supplierDropdownRef = useRef<HTMLDivElement>(null)
+  const supplierFilterMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(supplierDropdownOpen, { anchor: supplierDropdownRef, align: 'right', minWidth: 220 })
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set())
   const [showCreateOrder, setShowCreateOrder] = useState(false)
 
@@ -884,7 +886,7 @@ export default function SuppliersNetworkPage() {
                     </svg>
                   </button>
                   {supplierDropdownOpen && (
-                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 min-w-[220px] py-1">
+                    <div ref={supplierFilterMenu.menuRef} style={supplierFilterMenu.menuStyle} className="bg-white border border-gray-200 rounded-xl shadow-lg z-20 min-w-[220px] py-1 overflow-y-auto overscroll-contain">
                       <button
                         onClick={() => { setSelectedSupplierFilter('all'); setSupplierDropdownOpen(false) }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${selectedSupplierFilter === 'all' ? 'text-blue-600 font-medium' : 'text-gray-700'}`}

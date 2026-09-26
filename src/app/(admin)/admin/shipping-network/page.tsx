@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,6 +133,11 @@ export default function ShippingNetworkPage() {
   const [courierForm, setCourierForm] = useState<Omit<Courier, 'id'>>(EMPTY_COURIER)
   const [savingCourier, setSavingCourier] = useState(false)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
+  // Both tables sit in a horizontally scrolling card with a sticky Actions column -
+  // an absolute menu was clipped by it, and the lower rows pushed it off the window.
+  const courierBtnRef = useRef<HTMLButtonElement | null>(null)
+  const courierMenu = useAnchoredMenu<HTMLButtonElement, HTMLDivElement>(!!openActionId, { anchor: courierBtnRef, align: 'right' })
+  const shipmentBtnRef = useRef<HTMLButtonElement | null>(null)
   const actionsRef = useRef<HTMLTableSectionElement>(null)
 
   // Shipments
@@ -144,6 +150,7 @@ export default function ShippingNetworkPage() {
   const [shipmentForm, setShipmentForm] = useState<Omit<Shipment, 'id' | 'createdAt'>>(EMPTY_SHIPMENT)
   const [savingShipment, setSavingShipment] = useState(false)
   const [openShipmentActionId, setOpenShipmentActionId] = useState<string | null>(null)
+  const shipmentMenu = useAnchoredMenu<HTMLButtonElement, HTMLDivElement>(!!openShipmentActionId, { anchor: shipmentBtnRef, align: 'right' })
 
   // Live tracking
   const [trackingData, setTrackingData] = useState<Record<string, TrackingResult>>({})
@@ -370,11 +377,11 @@ export default function ShippingNetworkPage() {
                     </td>
                     <td className="py-3 px-4 text-center sticky right-0 bg-white shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)]" style={{ zIndex: openActionId === c.id ? 9999 : undefined }}>
                       <div className="relative inline-block">
-                        <button onClick={() => setOpenActionId(openActionId === c.id ? null : c.id)} className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1">
+                        <button onClick={(e) => { courierBtnRef.current = e.currentTarget; setOpenActionId(openActionId === c.id ? null : c.id) }} className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1">
                           Actions <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                         </button>
                         {openActionId === c.id && (
-                          <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1">
+                          <div ref={courierMenu.menuRef} style={courierMenu.menuStyle} className="w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1 overflow-y-auto overscroll-contain">
                             <button onClick={() => openEditCourier(c)} className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 w-full text-left">✏️ Edit</button>
                             <div className="border-t border-gray-100 my-1" />
                             <button onClick={() => handleDeleteCourier(c.id)} className="flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 w-full text-left">🗑️ Delete</button>
@@ -554,11 +561,11 @@ export default function ShippingNetworkPage() {
                       {/* Actions */}
                       <td className="py-3 px-4 text-center sticky right-0 bg-white shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)]" style={{ zIndex: openShipmentActionId === s.id ? 9999 : undefined }}>
                         <div className="relative inline-block">
-                          <button onClick={() => setOpenShipmentActionId(openShipmentActionId === s.id ? null : s.id)} className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1">
+                          <button onClick={(e) => { shipmentBtnRef.current = e.currentTarget; setOpenShipmentActionId(openShipmentActionId === s.id ? null : s.id) }} className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1">
                             Actions <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                           </button>
                           {openShipmentActionId === s.id && (
-                            <div className="absolute right-0 top-full mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1">
+                            <div ref={shipmentMenu.menuRef} style={shipmentMenu.menuStyle} className="w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1 overflow-y-auto overscroll-contain">
                               <button onClick={() => openEditShipment(s)} className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 w-full text-left">✏️ Edit</button>
                               <div className="border-t border-gray-100 my-1" />
                               <button onClick={() => handleDeleteShipment(s.id)} className="flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50 w-full text-left">🗑️ Remove</button>

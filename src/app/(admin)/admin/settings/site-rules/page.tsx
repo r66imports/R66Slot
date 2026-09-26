@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import Link from 'next/link'
 import {
   DndContext,
@@ -134,6 +135,7 @@ function SortableRuleRow({
 
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const ruleMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showMenu, { anchor: menuRef, align: 'right' })
   const enforced = ENFORCED_RULES.has(rule.id)
   const shortName = getShortName(rule.name)
 
@@ -216,7 +218,7 @@ function SortableRuleRow({
           </button>
 
           {showMenu && (
-            <div className="absolute right-6 top-0 z-50 bg-white rounded-xl border border-gray-200 shadow-xl w-52 py-1 text-sm">
+            <div ref={ruleMenu.menuRef} style={ruleMenu.menuStyle} className="z-50 bg-white rounded-xl border border-gray-200 shadow-xl w-52 py-1 text-sm overflow-y-auto overscroll-contain">
               <button
                 onClick={() => { onCopy(); setShowMenu(false) }}
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center gap-2 text-xs font-medium text-gray-700"

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -490,6 +491,12 @@ export default function ProductsPage() {
   const brandDropdownRef = useRef<HTMLDivElement>(null)
   const catDropdownRef = useRef<HTMLDivElement>(null)
   const unitDropdownRef = useRef<HTMLDivElement>(null)
+  // Every filter menu and row menu hangs off its own control, measured, so none of
+  // them can run past the bottom of the window or be clipped by the table.
+  const brandMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showBrandDropdown, { anchor: brandDropdownRef, align: 'left', minWidth: 180 })
+  const catMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showCatDropdown, { anchor: catDropdownRef, align: 'left', minWidth: 240, maxHeight: 288 })
+  const unitMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showUnitDropdown, { anchor: unitDropdownRef, align: 'left', minWidth: 240, maxHeight: 288 })
+  const colMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showColPicker, { anchor: colPickerRef, align: 'right', minWidth: 160 })
 
   useEffect(() => {
     if (!showColPicker) return
@@ -542,6 +549,8 @@ export default function ProductsPage() {
   // Task 3/4: inline page URL edit
   const [editingPageId, setEditingPageId] = useState<string | null>(null)
   const [openActionId, setOpenActionId] = useState<string | null>(null)
+  const rowActionBtnRef = useRef<HTMLButtonElement | null>(null)
+  const rowActionMenu = useAnchoredMenu<HTMLButtonElement, HTMLDivElement>(!!openActionId, { anchor: rowActionBtnRef, align: 'right' })
   useEffect(() => {
     if (!openActionId) return
     const close = () => setOpenActionId(null)
@@ -1250,7 +1259,7 @@ export default function ProductsPage() {
             </svg>
           </button>
           {showBrandDropdown && (
-            <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[180px] py-1">
+            <div ref={brandMenu.menuRef} style={brandMenu.menuStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[180px] py-1 overflow-y-auto overscroll-contain">
               <button
                 onClick={() => { setBrandFilter(''); setShowBrandDropdown(false) }}
                 className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between ${!brandFilter ? 'font-semibold text-gray-900' : 'text-gray-600'}`}
@@ -1285,7 +1294,7 @@ export default function ProductsPage() {
             </svg>
           </button>
           {showCatDropdown && (
-            <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[240px] py-2 max-h-72 overflow-y-auto">
+            <div ref={catMenu.menuRef} style={catMenu.menuStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[240px] py-2 overflow-y-auto overscroll-contain">
               <div className="flex items-center justify-between px-3 pb-1.5 border-b border-gray-100 mb-1">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Filter by Race Class</p>
                 {categoryFilters.length > 0 && (
@@ -1338,7 +1347,7 @@ export default function ProductsPage() {
               </svg>
             </button>
             {showUnitDropdown && (
-              <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[240px] py-2 max-h-72 overflow-y-auto">
+              <div ref={unitMenu.menuRef} style={unitMenu.menuStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg z-30 min-w-[240px] py-2 overflow-y-auto overscroll-contain">
                 <div className="flex items-center justify-between px-3 pb-1.5 border-b border-gray-100 mb-1">
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Filter by Item Category</p>
                   {revoFilters.length > 0 && (
@@ -1403,7 +1412,7 @@ export default function ProductsPage() {
             Columns
           </button>
           {showColPicker && (
-            <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 p-3 min-w-[160px]">
+            <div ref={colMenu.menuRef} style={colMenu.menuStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg z-30 p-3 min-w-[160px] overflow-y-auto overscroll-contain">
               <p className="text-[10px] font-semibold text-gray-400 uppercase mb-2">Show / Hide Columns</p>
               {Object.entries(COL_LABELS).map(([key, label]) => (
                 <label key={key} className="flex items-center gap-2 py-1 cursor-pointer hover:text-gray-900 text-sm text-gray-700">
@@ -1718,7 +1727,7 @@ export default function ProductsPage() {
                         <td className={`py-2 px-2 sticky right-0 shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.07)] ${selectedIds.has(product.id) ? 'bg-blue-50' : 'bg-white'}`} style={{ zIndex: openActionId === product.id ? 9999 : undefined }}>
                           <div className="relative flex items-center justify-center">
                             <button
-                              onClick={() => setOpenActionId(openActionId === product.id ? null : product.id)}
+                              onClick={(e) => { rowActionBtnRef.current = e.currentTarget; setOpenActionId(openActionId === product.id ? null : product.id) }}
                               className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1"
                             >
                               Actions
@@ -1727,7 +1736,7 @@ export default function ProductsPage() {
                               </svg>
                             </button>
                             {openActionId === product.id && (
-                              <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1">
+                              <div ref={rowActionMenu.menuRef} style={rowActionMenu.menuStyle} className="w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-[9999] py-1 overflow-y-auto overscroll-contain">
                                 <Link
                                   href={`/admin/products/${product.id}`}
                                   className="flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"

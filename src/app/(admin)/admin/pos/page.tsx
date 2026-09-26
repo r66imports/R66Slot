@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -129,6 +130,8 @@ function ClientAutofill({
     onSelect(c)
   }
 
+  const { menuRef, menuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(open && filtered.length > 0, { anchor: wrapperRef, maxHeight: 192 })
+
   return (
     <div ref={wrapperRef} className="relative">
       <div className="relative">
@@ -143,7 +146,7 @@ function ClientAutofill({
         />
       </div>
       {open && filtered.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto">
+        <ul ref={menuRef} style={menuStyle} className="z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-y-auto overscroll-contain">
           {filtered.map(c => (
             <li
               key={c.id}

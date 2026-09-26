@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 
@@ -337,6 +338,10 @@ function WorksheetEditor({
   // ── Dropdown row states ──
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [activeSkuRow, setActiveSkuRow] = useState<string | null>(null)
+  // The row input the SKU suggestions hang off - the sheet scrolls in both directions,
+  // and an absolute list was clipped by it on the lower rows.
+  const skuRowInputRef = useRef<HTMLInputElement | null>(null)
+  const skuRowMenu = useAnchoredMenu<HTMLInputElement, HTMLDivElement>(!!activeSkuRow, { anchor: skuRowInputRef, align: 'left', minWidth: 256, maxHeight: 192 })
   const [showNewMenu, setShowNewMenu] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
 
@@ -344,6 +349,8 @@ function WorksheetEditor({
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(new Set())
   const [showColMenu, setShowColMenu] = useState(false)
   const colMenuRef = useRef<HTMLDivElement>(null)
+  const newMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showNewMenu, { anchor: newMenuRef, align: 'right' })
+  const colMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(showColMenu, { anchor: colMenuRef, align: 'right' })
 
   async function syncWholesalePricelist(): Promise<boolean> {
     const sup = suppliers.find((s) => s.name === supplier)
@@ -1366,7 +1373,7 @@ function WorksheetEditor({
               <svg className="w-3.5 h-3.5 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {showNewMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-52 py-1">
+              <div ref={newMenu.menuRef} style={newMenu.menuStyle} className="bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-52 py-1 overflow-y-auto overscroll-contain">
                 <button onClick={() => { startNewWorksheet(); setShowNewMenu(false) }}
                   className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50">
                   <p className="font-medium text-gray-900">New Blank Worksheet</p>
@@ -2175,7 +2182,7 @@ function WorksheetEditor({
               Columns{hiddenCols.size > 0 ? ` (${hiddenCols.size} hidden)` : ''}
             </button>
             {showColMenu && (
-              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-40 py-2 w-52">
+              <div ref={colMenu.menuRef} style={colMenu.menuStyle} className="bg-white border border-gray-200 rounded-xl shadow-lg z-40 py-2 w-52 overflow-y-auto overscroll-contain">
                 {([
                   { key: 'retail_zar', label: 'Retail (ZAR)' },
                   { key: 'in_stock', label: 'In Stock' },
@@ -2272,14 +2279,14 @@ function WorksheetEditor({
                         />
                         <input
                           value={it.sku || it.skuSearch}
-                          onFocus={() => setActiveSkuRow(it.id)}
-                          onChange={(e) => { updateItem(it.id, { sku: '', skuSearch: e.target.value }); setActiveSkuRow(it.id) }}
+                          onFocus={(e) => { skuRowInputRef.current = e.currentTarget; setActiveSkuRow(it.id) }}
+                          onChange={(e) => { skuRowInputRef.current = e.currentTarget; updateItem(it.id, { sku: '', skuSearch: e.target.value }); setActiveSkuRow(it.id) }}
                           onBlur={() => { if (!it.sku && it.skuSearch) updateItem(it.id, { sku: it.skuSearch, skuSearch: '' }) }}
                           placeholder="SKU or name"
                           className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 ${it.skuChecked ? 'bg-green-100 border-green-400 text-green-800 font-semibold' : 'border-gray-200'}`}
                         />
                         {activeSkuRow === it.id && skuMatches.length > 0 && (
-                          <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-64 max-h-48 overflow-y-auto py-1">
+                          <div ref={skuRowMenu.menuRef} style={skuRowMenu.menuStyle} className="bg-white border border-gray-200 rounded-xl shadow-lg z-30 overflow-y-auto overscroll-contain py-1">
                             {skuMatches.map((p) => (
                               <button key={p.id} type="button"
                                 onMouseDown={(e) => e.preventDefault()}

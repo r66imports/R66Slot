@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import Link from 'next/link'
 import type { Page } from '@/lib/pages/schema'
 
@@ -134,6 +135,7 @@ function PageRow({
 }: PageRowProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const optionsMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(menuOpen, { anchor: menuRef, align: 'right', minWidth: 190 })
 
   useEffect(() => {
     if (!menuOpen) return
@@ -193,7 +195,7 @@ function PageRow({
           •••
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-7 z-50 bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[190px]">
+          <div ref={optionsMenu.menuRef} style={optionsMenu.menuStyle} className="z-50 bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[190px] overflow-y-auto overscroll-contain">
             <Link
               href={`/admin/pages/editor/${page.id}`}
               onClick={() => setMenuOpen(false)}

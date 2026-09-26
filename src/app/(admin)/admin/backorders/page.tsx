@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { useColumnResize } from '@/hooks/use-column-resize'
 import Link from 'next/link'
 
@@ -165,8 +166,8 @@ function ClientSearchDropdown({
   const [open, setOpen] = useState(false)
   const [highlighted, setHighlighted] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
-  const listRef = useRef<HTMLUListElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const { menuRef: listRef, menuStyle: listStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(open, { anchor: wrapperRef, maxHeight: 240 })
 
   const filtered = query.trim()
     ? clients.filter((c) => {
@@ -273,7 +274,8 @@ function ClientSearchDropdown({
       {open && (
         <ul
           ref={listRef}
-          className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-60 overflow-y-auto"
+          style={listStyle}
+          className="z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-y-auto overscroll-contain"
         >
           {filtered.length === 0 && (
             <li className="px-4 py-3 text-sm text-gray-400 italic">No clients found</li>
@@ -348,6 +350,7 @@ function SupplierDropdown({
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const { menuRef, menuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(open, { anchor: ref, maxHeight: 192 })
 
   useEffect(() => {
     function h(e: MouseEvent) {
@@ -374,7 +377,7 @@ function SupplierDropdown({
         </svg>
       </button>
       {open && (
-        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto">
+        <ul ref={menuRef} style={menuStyle} className="z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-y-auto overscroll-contain">
           <li
             onMouseDown={() => { onSelect(null); setOpen(false) }}
             className="px-4 py-2.5 text-sm text-gray-400 cursor-pointer hover:bg-gray-50 italic"
@@ -410,6 +413,7 @@ function BrandDropdown({
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const { menuRef, menuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(open, { anchor: ref, maxHeight: 192 })
 
   useEffect(() => {
     function h(e: MouseEvent) {
@@ -434,7 +438,7 @@ function BrandDropdown({
         </svg>
       </button>
       {open && (
-        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto">
+        <ul ref={menuRef} style={menuStyle} className="z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-y-auto overscroll-contain">
           <li
             onMouseDown={() => { onChange(''); setOpen(false) }}
             className="px-4 py-2.5 text-sm text-gray-400 cursor-pointer hover:bg-gray-50 italic"
@@ -475,6 +479,8 @@ function SkuSearchDropdown({
   const [open, setOpen] = useState(false)
   const [blockMsg, setBlockMsg] = useState('')
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const { menuRef: skuRef, menuStyle: skuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(open, { anchor: wrapperRef, maxHeight: 224 })
+  const { menuRef: noteRef, menuStyle: noteStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(!!blockMsg, { anchor: wrapperRef, align: 'left', minHeight: 0 })
 
   const q = value.trim().toLowerCase()
   const filtered = q.length > 0
@@ -516,13 +522,13 @@ function SkuSearchDropdown({
         autoComplete="off"
       />
       {blockMsg && (
-        <div className="absolute left-0 top-full z-50 mt-1 bg-green-700 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2">
+        <div ref={noteRef} style={noteStyle} className="z-50 bg-green-700 text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2">
           ✓ {blockMsg}
           <Link href="/admin/orders" className="underline font-semibold hover:text-green-200 ml-1">Open Orders →</Link>
         </div>
       )}
       {!blockMsg && open && filtered.length > 0 && (
-        <ul className="absolute z-50 w-full mt-1 bg-white rounded-xl border border-gray-200 shadow-xl max-h-56 overflow-y-auto">
+        <ul ref={skuRef} style={skuStyle} className="z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-y-auto overscroll-contain">
           {filtered.map((p) => {
             const inStock = p.quantity > 0 && !p.isPreOrder
             return (
@@ -1506,6 +1512,12 @@ export default function BackordersPage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [openActionsId, setOpenActionsId] = useState<string | null>(null)
+  // Row menus: anchored to the button that opened them, so the last rows in the
+  // table do not push their menu off the bottom of the window.
+  const actionsBtnRef = useRef<HTMLButtonElement | null>(null)
+  const { menuRef: rowActionsRef, menuStyle: rowActionsStyle } = useAnchoredMenu<HTMLButtonElement, HTMLDivElement>(
+    !!openActionsId, { anchor: actionsBtnRef, align: 'right' },
+  )
   const [completedConfirm, setCompletedConfirm] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [supplierPopup, setSupplierPopup] = useState<Supplier | null>(null)
@@ -2483,7 +2495,7 @@ export default function BackordersPage() {
                       <td className="px-4 py-4 relative">
                         <button
                           data-actions-menu
-                          onClick={() => setOpenActionsId(openActionsId === bo.id ? null : bo.id)}
+                          onClick={(e) => { actionsBtnRef.current = e.currentTarget; setOpenActionsId(openActionsId === bo.id ? null : bo.id) }}
                           className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                         >
                           Actions
@@ -2492,7 +2504,7 @@ export default function BackordersPage() {
                           </svg>
                         </button>
                         {openActionsId === bo.id && (
-                          <div data-actions-menu className="absolute right-2 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-xl w-40 py-1">
+                          <div data-actions-menu ref={rowActionsRef} style={rowActionsStyle} className="z-30 bg-white border border-gray-200 rounded-xl shadow-xl w-40 py-1 overflow-y-auto overscroll-contain">
                             <button
                               data-actions-menu
                               onClick={() => { setOpenActionsId(null); setEditItem(bo); setShowModal(true) }}

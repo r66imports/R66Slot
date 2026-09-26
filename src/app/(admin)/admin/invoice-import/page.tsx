@@ -3,6 +3,7 @@
 import { extractPdfRows, type PdfRow } from '@/lib/catalogue-import'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -637,7 +638,9 @@ export default function InvoiceImportPage() {
   const [savedImports, setSavedImports] = useState<SavedImport[]>([])
   const [products, setProducts] = useState<ProductRef[]>([])
   /** Which SKU cell has the picker open, and where to draw it (fixed, so the table can't clip it). */
-  const [skuPicker, setSkuPicker] = useState<{ id: string; top: number; left: number; width: number } | null>(null)
+  const [skuPicker, setSkuPicker] = useState<{ id: string } | null>(null)
+  // The row input the picker hangs off; the hook measures it, so no coordinates are stored.
+  const skuAnchorRef = useRef<HTMLInputElement | null>(null)
   const [loadingMeta, setLoadingMeta] = useState(true)
 
   const [supplier, setSupplier] = useState('')
@@ -899,21 +902,14 @@ The worksheet it created is not affected.`)) return
   }
 
   const openSkuPicker = (id: string, el: HTMLInputElement) => {
-    const r = el.getBoundingClientRect()
-    setSkuPicker({ id, top: r.bottom + 4, left: r.left, width: Math.max(r.width, 300) })
+    skuAnchorRef.current = el
+    setSkuPicker({ id })
   }
 
-  // The picker is fixed-positioned, so it has to close when the page moves under it.
-  useEffect(() => {
-    if (!skuPicker) return
-    const close = () => setSkuPicker(null)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    return () => {
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-    }
-  }, [skuPicker])
+  // Fixed-positioned, so it follows its row instead of being left behind by a scroll.
+  const { menuRef: skuPickerRef, menuStyle: skuPickerStyle } = useAnchoredMenu<HTMLInputElement, HTMLDivElement>(
+    !!skuPicker, { anchor: skuAnchorRef, minWidth: 300, maxHeight: 256 },
+  )
 
   // Sage prints a narrow Référence column and truncates long codes with an ellipsis
   // ("SWCR/GA162..."). The full code is not in the PDF at all — it has to be typed in.
@@ -1340,8 +1336,9 @@ The worksheet it created is not affected.`)) return
         const matches = skuMatches(row.sku)
         return (
           <div
-            style={{ top: skuPicker.top, left: skuPicker.left, width: skuPicker.width }}
-            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg max-h-64 overflow-y-auto py-1"
+            ref={skuPickerRef}
+            style={skuPickerStyle}
+            className="z-50 bg-white border border-gray-200 rounded-xl shadow-lg overflow-y-auto overscroll-contain py-1"
             onMouseDown={e => e.preventDefault()}
           >
             <div className="px-3 py-1.5 text-[11px] text-gray-400 border-b border-gray-100 truncate">

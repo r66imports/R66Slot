@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import Link from 'next/link'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
@@ -149,6 +150,7 @@ function TagInputDropdown({ value, onChange, options, onAddOption, placeholder }
   const [open,setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const filtered = value.trim() ? options.filter(o=>o.toLowerCase().includes(value.toLowerCase())) : options
+  const { menuRef, menuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(open, { anchor: ref, maxHeight: 160 })
   useEffect(()=>{
     const h=(e:MouseEvent)=>{ if(ref.current&&!ref.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h)
@@ -158,7 +160,7 @@ function TagInputDropdown({ value, onChange, options, onAddOption, placeholder }
       <input type="text" value={value} onChange={e=>{onChange(e.target.value);setOpen(true)}} onFocus={()=>setOpen(true)}
         placeholder={placeholder} className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
       {open&&(filtered.length>0||(value.trim()&&!options.includes(value.trim())))&&(
-        <ul className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto mt-0.5">
+        <ul ref={menuRef} style={menuStyle} className="z-50 bg-white border border-gray-200 rounded shadow-lg overflow-y-auto overscroll-contain">
           {filtered.map(o=><li key={o} onMouseDown={()=>{onChange(o);setOpen(false)}} className="px-3 py-1.5 cursor-pointer hover:bg-indigo-50 text-sm">{o}</li>)}
           {value.trim()&&!options.includes(value.trim())&&<li onMouseDown={async()=>{await onAddOption(value.trim());setOpen(false)}} className="px-3 py-1.5 cursor-pointer hover:bg-green-50 text-sm text-green-700 font-medium border-t border-gray-100">+ Add &ldquo;{value.trim()}&rdquo;</li>}
         </ul>
@@ -171,6 +173,7 @@ function ContactSearch({ contacts, onSelect, onAddManual }: {
   contacts:Contact[]; onSelect:(c:Contact)=>void; onAddManual:(name:string)=>void
 }) {
   const [q,setQ]=useState(''); const [open,setOpen]=useState(false); const ref=useRef<HTMLDivElement>(null)
+  const { menuRef, menuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(open&&q.trim().length>0, { anchor: ref, maxHeight: 192 })
   const results = q.trim().length>0 ? contacts.filter(c=>`${c.firstName} ${c.lastName} ${c.email||''} ${c.phone||''}`.toLowerCase().includes(q.toLowerCase())).slice(0,8) : []
   useEffect(()=>{
     const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node)) setOpen(false)}
@@ -181,7 +184,7 @@ function ContactSearch({ contacts, onSelect, onAddManual }: {
       <input type="text" value={q} onChange={e=>{setQ(e.target.value);setOpen(true)}} onFocus={()=>setOpen(true)}
         placeholder="Search customers…" className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400"/>
       {open&&q.trim().length>0&&(
-        <ul className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto mt-0.5">
+        <ul ref={menuRef} style={menuStyle} className="z-50 bg-white border border-gray-200 rounded shadow-lg overflow-y-auto overscroll-contain">
           {results.map(c=>(
             <li key={c.id} onMouseDown={()=>{onSelect(c);setQ('');setOpen(false)}} className="px-3 py-2 cursor-pointer hover:bg-indigo-50 flex items-center justify-between gap-2">
               <span className="text-sm font-medium">{c.firstName} {c.lastName}</span>
@@ -338,6 +341,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
   const [pendingConvertQuote,setPendingConvertQuote]=useState<any>(null)
   const [linkedDocNumber,setLinkedDocNumber]=useState(customer.linkedDocNumber||'')
   const ref=useRef<HTMLDivElement>(null)
+  const sendToMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(open, { anchor: ref, align: 'right', minWidth: 256 })
   useEffect(()=>{
     const h=(e:MouseEvent)=>{if(ref.current&&!ref.current.contains(e.target as Node)) setOpen(false)}
     document.addEventListener('mousedown',h); return()=>document.removeEventListener('mousedown',h)
@@ -639,7 +643,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
           className="text-[10px] font-mono font-bold text-green-700 bg-green-100 border border-green-300 px-1.5 py-0.5 rounded leading-none hover:bg-green-200 whitespace-nowrap" title={`Open ${linkedDocNumber}`}>✓ {linkedDocNumber}</a>
       })()}
       {open&&(
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-64 overflow-hidden">
+        <div ref={sendToMenu.menuRef} style={sendToMenu.menuStyle} className="z-50 bg-white border border-gray-200 rounded-xl shadow-xl w-64 overflow-y-auto overscroll-contain">
           {pendingConvertQuote?(
             <div className="py-1.5">
               <div className="flex items-center gap-2 px-3 py-1 border-b border-gray-100 mb-1">
@@ -777,6 +781,7 @@ function ItemCard({
   const [copied,setCopied]=useState(false); const [showSeo,setShowSeo]=useState(false)
   const [showWsPicker,setShowWsPicker]=useState(false); const [wsList,setWsList]=useState<any[]>([]); const [loadingWsList,setLoadingWsList]=useState(false)
   const supplierRef=useRef<HTMLDivElement>(null); const imageInputRef=useRef<HTMLInputElement>(null)
+  const { menuRef: supplierMenuRef, menuStyle: supplierMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(supplierOpen&&suppliers.length>0, { anchor: supplierRef, maxHeight: 160 })
   const imageZoneRef=useRef<HTMLDivElement>(null); const seoImageInputRef=useRef<HTMLInputElement>(null)
   const autoSaveTimer=useRef<ReturnType<typeof setTimeout>|null>(null); const isFirstRender=useRef(true)
 
@@ -1122,7 +1127,7 @@ function ItemCard({
               <label className="block text-xs text-gray-500 mb-0.5">Supplier</label>
               <input type="text" value={form.supplier} onChange={e=>{set('supplier',e.target.value);setSupplierOpen(true)}} onFocus={()=>setSupplierOpen(true)} className="w-full text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="Supplier name"/>
               {supplierOpen&&suppliers.length>0&&(
-                <ul className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto mt-0.5">
+                <ul ref={supplierMenuRef} style={supplierMenuStyle} className="z-50 bg-white border border-gray-200 rounded shadow-lg overflow-y-auto overscroll-contain">
                   {suppliers.filter(s=>!form.supplier||(s.name||'').toLowerCase().includes(form.supplier.toLowerCase())).map(s=>(
                     <li key={s.id} onMouseDown={()=>{set('supplier',s.name);setSupplierOpen(false)}} className="px-3 py-2 cursor-pointer hover:bg-indigo-50 text-sm flex items-center justify-between">
                       <span>{s.name}</span>{s.preferredCurrency&&<span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{s.preferredCurrency}</span>}

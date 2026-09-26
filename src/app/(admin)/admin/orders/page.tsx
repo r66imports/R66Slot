@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import type { Backorder } from '@/types/backorder'
 import { useColumnResize } from '@/hooks/use-column-resize'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import {
   settledAmount, balanceDue as calcBalanceDue, overpaymentFor,
   isFullySettled, depositAsSettled, paymentWarnings,
@@ -960,16 +961,9 @@ function ClientAutofill({
 }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
-  const [dropUp, setDropUp] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
-  // Flip the list above the input when it would otherwise run off the bottom of the viewport
   function openList() {
-    const r = wrapperRef.current?.getBoundingClientRect()
-    if (r) {
-      const spaceBelow = window.innerHeight - r.bottom - 8
-      setDropUp(spaceBelow < DROPDOWN_MAX_H && r.top - 8 > spaceBelow)
-    }
     setOpen(true)
   }
 
@@ -999,9 +993,12 @@ function ClientAutofill({
     onSelect(c)
   }
 
+  const listOpen = open && filtered.length > 0
+  const { anchorRef, menuRef, menuStyle } = useAnchoredMenu<HTMLDivElement, HTMLUListElement>(listOpen, { maxHeight: DROPDOWN_MAX_H })
+
   return (
     <div ref={wrapperRef} className="relative">
-      <div className="relative">
+      <div ref={anchorRef} className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm">🔍</span>
         <input
           value={query}
@@ -1012,8 +1009,8 @@ function ClientAutofill({
           autoComplete="off"
         />
       </div>
-      {open && filtered.length > 0 && (
-        <ul className={`absolute z-50 w-full bg-white rounded-xl border border-gray-200 shadow-xl max-h-48 overflow-y-auto ${dropUp ? 'bottom-full mb-1' : 'mt-1'}`}>
+      {listOpen && (
+        <ul ref={menuRef} style={menuStyle} className="z-50 bg-white rounded-xl border border-gray-200 shadow-xl overflow-y-auto overscroll-contain">
           {filtered.map((c) => (
             <li
               key={c.id}
@@ -1054,7 +1051,6 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
   const [open, setOpen] = useState(false)
   const [blockMsg, setBlockMsg] = useState<{ text: string; type: 'oos' | 'preorder' } | null>(null)
   const [searchQ, setSearchQ] = useState('')
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; bottom: number; left: number; width: number; dropUp: boolean; maxHeight: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const q = searchQ.toLowerCase()
   const filtered = q.length >= 1
@@ -1064,22 +1060,6 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
     : []
 
   function openDropdown() {
-    if (inputRef.current) {
-      const r = inputRef.current.getBoundingClientRect()
-      // Flip upward when the list won't fit below the input — line item rows sit low in the
-      // modal, so a fixed-position list anchored to r.bottom would run off the viewport.
-      const spaceBelow = window.innerHeight - r.bottom - 8
-      const spaceAbove = r.top - 8
-      const dropUp = spaceBelow < DROPDOWN_MAX_H && spaceAbove > spaceBelow
-      setDropdownPos({
-        top: r.bottom + 2,
-        bottom: window.innerHeight - r.top + 2,
-        left: r.left,
-        width: Math.max(r.width, 320),
-        dropUp,
-        maxHeight: Math.min(DROPDOWN_MAX_H, Math.max(dropUp ? spaceAbove : spaceBelow, 120)),
-      })
-    }
     setOpen(true)
   }
 
@@ -1097,8 +1077,16 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
     setOpen(false)
   }
 
-  const showDropdown = open && dropdownPos && (
+  const showDropdown = open && (
     isQuote ? (filtered.length > 0 || searchQ.length >= 1) : (filtered.length > 0 && !blockMsg)
+  )
+
+  // Both floaters hang off the same input: the suggestion list and the blocked-item warning.
+  const { menuRef: listRef, menuStyle: listStyle } = useAnchoredMenu<HTMLInputElement, HTMLDivElement>(
+    showDropdown, { anchor: inputRef, gap: 2, maxHeight: DROPDOWN_MAX_H, minWidth: 320 },
+  )
+  const { menuRef: warnRef, menuStyle: warnStyle } = useAnchoredMenu<HTMLInputElement, HTMLDivElement>(
+    !!blockMsg, { anchor: inputRef, gap: 2, align: 'left', minHeight: 0 },
   )
 
   return (
@@ -1116,8 +1104,8 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
         }}
         onBlur={() => setTimeout(() => { setOpen(false); setSearchQ('') }, 150)}
       />
-      {blockMsg && dropdownPos && (
-        <div style={{ position: 'fixed', ...(dropdownPos.dropUp ? { bottom: dropdownPos.bottom } : { top: dropdownPos.top }), left: dropdownPos.left, zIndex: 9999 }} className={`text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
+      {blockMsg && (
+        <div ref={warnRef} style={{ ...warnStyle, zIndex: 9999 }} className={`text-white text-xs font-medium px-3 py-2 rounded-lg shadow-lg whitespace-nowrap flex items-center gap-2 ${blockMsg.type === 'preorder' ? 'bg-amber-600' : 'bg-red-600'}`}>
           ⚠ {blockMsg.text}
           {blockMsg.type === 'preorder' && (
             <Link href="/admin/backorders" className="underline font-semibold hover:text-amber-200 ml-1">Open Back Orders →</Link>
@@ -1126,15 +1114,9 @@ function SkuLineInput({ value, onChange, products, onSelectProduct, isQuote = fa
       )}
       {showDropdown && (
         <div
-          style={{
-            position: 'fixed',
-            ...(dropdownPos!.dropUp ? { bottom: dropdownPos!.bottom } : { top: dropdownPos!.top }),
-            left: dropdownPos!.left,
-            width: dropdownPos!.width,
-            maxHeight: dropdownPos!.maxHeight,
-            zIndex: 9999,
-          }}
-          className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto"
+          ref={listRef}
+          style={{ ...listStyle, zIndex: 9999 }}
+          className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto overscroll-contain"
         >
           {filtered.map((p) => {
             const oos = p.quantity <= 0
@@ -3228,13 +3210,8 @@ type ActionItem =
 
 function ActionsDropdown({ items }: { items: ActionItem[] }) {
   const [open, setOpen] = useState(false)
-  // Null until the menu has been measured — the row's own height decides whether it
-  // drops down or up, and how tall it may be. A fixed 200px guess let a 13-item menu
-  // on the last rows open downwards and run off the bottom of the window, taking
-  // Red Flag and Delete with it.
-  const [pos, setPos] = useState<{ top: number; right: number; maxHeight: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const { menuRef, menuStyle } = useAnchoredMenu<HTMLButtonElement, HTMLDivElement>(open, { anchor: btnRef, align: 'right' })
   useEffect(() => {
     if (!open) return
     const handler = (e: MouseEvent) => {
@@ -3242,40 +3219,7 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-  const place = useCallback(() => {
-    const btn = btnRef.current
-    const menu = menuRef.current
-    if (!btn || !menu) return
-    const GAP = 4
-    const EDGE = 8
-    const r = btn.getBoundingClientRect()
-    const below = Math.max(0, window.innerHeight - r.bottom - GAP - EDGE)
-    const above = Math.max(0, r.top - GAP - EDGE)
-    const needed = menu.scrollHeight
-    // Only flip up when the menu genuinely does not fit below AND there is more room above.
-    const dropUp = needed > below && above > below
-    const space = dropUp ? above : below
-    const height = Math.min(needed, space)
-    setPos({
-      top: dropUp ? Math.max(EDGE, r.top - GAP - height) : r.bottom + GAP,
-      right: Math.max(EDGE, window.innerWidth - r.right),
-      maxHeight: space,
-    })
-  }, [])
-  useEffect(() => {
-    if (!open) { setPos(null); return }
-    place()
-    // The menu is position:fixed, so the button slides out from under it when the
-    // page or the table scrolls — follow it instead of leaving it stranded.
-    const onMove = () => place()
-    window.addEventListener('scroll', onMove, true)
-    window.addEventListener('resize', onMove)
-    return () => {
-      window.removeEventListener('scroll', onMove, true)
-      window.removeEventListener('resize', onMove)
-    }
-  }, [open, place])
+  }, [open, menuRef])
   function handleToggle() {
     setOpen((v) => !v)
   }
@@ -3285,11 +3229,7 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
         Actions <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div ref={menuRef} className="fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px] overflow-y-auto overscroll-contain"
-          style={pos
-            ? { top: pos.top, right: pos.right, maxHeight: pos.maxHeight }
-            : { top: 0, right: 0, visibility: 'hidden' as const }}
-        >
+        <div ref={menuRef} style={menuStyle} className="z-[200] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px] overflow-y-auto overscroll-contain">
           {items.map((item, i) =>
             item === 'separator' ? (
               <div key={i} className="border-t border-gray-100 my-1" />

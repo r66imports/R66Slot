@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
@@ -532,6 +533,8 @@ export default function MediaLibraryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [moveTarget, setMoveTarget] = useState<string | null>(null)
+  const moveBtnRef = useRef<HTMLButtonElement | null>(null)
+  const moveMenu = useAnchoredMenu<HTMLButtonElement, HTMLDivElement>(!!moveTarget, { anchor: moveBtnRef, align: 'left', minWidth: 192, maxHeight: 192 })
   const [uploadError, setUploadError] = useState('')
   const [draggedFileId, setDraggedFileId] = useState<string | null>(null)
   const [draggedFolderPath, setDraggedFolderPath] = useState<string | null>(null)
@@ -932,12 +935,12 @@ export default function MediaLibraryPage() {
               ) : null
             })()}
             <div className="relative">
-              <button onClick={() => setMoveTarget(moveTarget ? null : 'open')}
+              <button onClick={(e) => { moveBtnRef.current = e.currentTarget; setMoveTarget(moveTarget ? null : 'open') }}
                 className="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded border border-blue-200 hover:bg-blue-100 font-play">
                 Move to...
               </button>
               {moveTarget && (
-                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 w-48 max-h-48 overflow-y-auto">
+                <div ref={moveMenu.menuRef} style={moveMenu.menuStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-y-auto overscroll-contain">
                   <button onClick={() => handleBulkMove('')}
                     className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 font-play">📁 Root</button>
                   {library.folders.map(folder => (

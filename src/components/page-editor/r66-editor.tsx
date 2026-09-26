@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import type { PageComponent } from '@/lib/pages/schema'
@@ -134,6 +135,10 @@ export function R66Editor({ pageId }: R66EditorProps) {
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; componentId: string } | null>(null)
+  // Right-clicking near the bottom of the canvas used to push the menu off the window.
+  const { menuRef: contextMenuRef, menuStyle: contextMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(
+    !!contextMenu, { point: contextMenu, align: 'left', gap: 0, minHeight: 0 },
+  )
   const [propertiesInitialTab, setPropertiesInitialTab] = useState<'content' | 'style' | 'settings'>('content')
 
   // Copy-to-pages modal
@@ -786,8 +791,9 @@ ${canvasHTML}
         if (!comp) return null
         return (
           <div
-            className="fixed z-[100] bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[180px] font-play"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
+            ref={contextMenuRef}
+            style={contextMenuStyle}
+            className="z-[100] bg-white border border-gray-200 rounded-lg shadow-xl py-1 min-w-[180px] font-play overflow-y-auto overscroll-contain"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Edit Settings */}

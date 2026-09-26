@@ -1,6 +1,7 @@
 ﻿'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +53,7 @@ export default function CustomerDashboardPage() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [search, setSearch] = useState('')
   const [showDrop, setShowDrop] = useState(false)
+  const customerBoxRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected] = useState<Contact | null>(null)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
@@ -191,6 +193,10 @@ export default function CustomerDashboardPage() {
     return !q || `${c.firstName} ${c.lastName}`.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
   }).slice(0, 30)
 
+  const { menuRef: customerMenuRef, menuStyle: customerMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(
+    showDrop && filteredContacts.length > 0, { anchor: customerBoxRef, maxHeight: 224 },
+  )
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -205,7 +211,7 @@ export default function CustomerDashboardPage() {
       <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-6 space-y-4">
         <div className="flex flex-wrap gap-4 items-end">
           {/* Customer selector */}
-          <div className="flex-1 min-w-[240px] relative">
+          <div ref={customerBoxRef} className="flex-1 min-w-[240px] relative">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Customer</label>
             <input
               value={search}
@@ -216,7 +222,7 @@ export default function CustomerDashboardPage() {
               className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             {showDrop && filteredContacts.length > 0 && (
-              <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl z-20 max-h-56 overflow-y-auto">
+              <div ref={customerMenuRef} style={customerMenuStyle} className="bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-y-auto overscroll-contain">
                 {filteredContacts.map(c => (
                   <button key={c.id} onMouseDown={() => selectContact(c)}
                     className="w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0">

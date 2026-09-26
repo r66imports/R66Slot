@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, use, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { MediaLibraryPicker } from '@/components/page-editor/media-library-picker'
@@ -296,6 +297,10 @@ export default function EditProductPage({
   const itemCategoryRef = useRef<HTMLDivElement>(null)
   const salesAccountRef = useRef<HTMLDivElement>(null)
   const purchaseAccountRef = useRef<HTMLDivElement>(null)
+  const { menuRef: brandMenu, menuStyle: brandMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(brandDropdownOpen, { anchor: brandRef, maxHeight: 224 })
+  const { menuRef: itemCategoryMenu, menuStyle: itemCategoryMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(itemCategoryDropdownOpen, { anchor: itemCategoryRef, maxHeight: 224 })
+  const { menuRef: salesAccountMenu, menuStyle: salesAccountMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(salesAccountDropdownOpen, { anchor: salesAccountRef, maxHeight: 224 })
+  const { menuRef: purchaseAccountMenu, menuStyle: purchaseAccountMenuStyle } = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(purchaseAccountDropdownOpen, { anchor: purchaseAccountRef, maxHeight: 224 })
   const carClassRef = useRef<HTMLDivElement>(null)
   const revoPartRef = useRef<HTMLDivElement>(null)
   const sidewaysBrandRef = useRef<HTMLDivElement>(null)
@@ -1939,7 +1944,7 @@ export default function EditProductPage({
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${brandDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {brandDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      <div ref={brandMenu} style={brandMenuStyle} className="z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto overscroll-contain">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                           <input type="checkbox" checked={categoryBrands.length === 0} onChange={() => setCategoryBrands([])} className="rounded" />
                           <span className="text-sm text-gray-400 italic">— None —</span>
@@ -1985,7 +1990,7 @@ export default function EditProductPage({
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${itemCategoryDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {itemCategoryDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      <div ref={itemCategoryMenu} style={itemCategoryMenuStyle} className="z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto overscroll-contain">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                           <input type="checkbox" checked={itemCategories.length === 0} onChange={() => setItemCategories([])} className="rounded" />
                           <span className="text-sm text-gray-400 italic">— None —</span>
@@ -2052,7 +2057,7 @@ export default function EditProductPage({
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${salesAccountDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {salesAccountDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      <div ref={salesAccountMenu} style={salesAccountMenuStyle} className="z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto overscroll-contain">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                           <input type="checkbox" checked={salesAccount.length === 0} onChange={() => setSalesAccount([])} className="rounded" />
                           <span className="text-sm text-gray-400 italic">— None —</span>
@@ -2098,7 +2103,7 @@ export default function EditProductPage({
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${purchaseAccountDropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </button>
                     {purchaseAccountDropdownOpen && (
-                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                      <div ref={purchaseAccountMenu} style={purchaseAccountMenuStyle} className="z-50 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto overscroll-contain">
                         <label className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 cursor-pointer border-b border-gray-100">
                           <input type="checkbox" checked={purchaseAccount.length === 0} onChange={() => setPurchaseAccount([])} className="rounded" />
                           <span className="text-sm text-gray-400 italic">— None —</span>

@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/cn'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
 import { AdminAuthContext, type AdminAuthData } from '@/lib/admin-auth-context'
 import { ALWAYS_ALLOWED, canAccessPath } from '@/lib/admin-permissions'
@@ -58,6 +59,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [showCostingModal, setShowCostingModal] = useState(false)
   const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  // Only ever one nav menu open, so one anchored instance serves them all. gap 0 keeps
+  // the menu flush with the bar - a gap would break the hover, since crossing it leaves
+  // the group. A long menu on a short window now scrolls instead of running off it.
+  const navGroupRef = useRef<HTMLDivElement | null>(null)
+  const navMenu = useAnchoredMenu<HTMLDivElement, HTMLDivElement>(!!openMenu, { anchor: navGroupRef, align: 'left', gap: 0, minWidth: 190 })
   const [newSiteOrders, setNewSiteOrders] = useState(0)
 
   const checkSiteOrders = async () => {
@@ -268,7 +274,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div
                   key={group.label}
                   className="relative flex items-stretch flex-shrink-0"
-                  onMouseEnter={() => setOpenMenu(group.label)}
+                  onMouseEnter={(e) => { navGroupRef.current = e.currentTarget; setOpenMenu(group.label) }}
                   onMouseLeave={() => setOpenMenu(null)}
                 >
                   <button
@@ -294,7 +300,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </button>
 
                   {isOpen && (
-                    <div className="absolute top-full left-0 min-w-[190px] bg-white border border-gray-200 shadow-xl z-50 py-1 rounded-b-lg" onClick={() => setOpenMenu(null)}>
+                    <div ref={navMenu.menuRef} style={navMenu.menuStyle} className="min-w-[190px] bg-white border border-gray-200 shadow-xl z-50 py-1 rounded-b-lg overflow-y-auto overscroll-contain" onClick={() => setOpenMenu(null)}>
                       {(group.items ?? [])
                         .filter((i) => {
                           if (i.isModal) return true
