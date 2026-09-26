@@ -21,16 +21,18 @@ export interface SkuAuditRow {
   title: string
   supplier: string
   currentQty: number
-  impliedStarting: number   // stock booked in per the adjustment log, else derived
-  startingSource: 'log' | 'derived'
+  impliedStarting: number   // stock booked in per the adjustment log, else the worksheet, else derived
+  startingSource: 'log' | 'worksheet' | 'derived'
+  worksheetIntake: number | null   // what the worksheets say landed, shown even when the log wins
   totalSoldQty: number      // ALL invoice line items + un-invoiced site orders
   syncedSoldQty: number     // only stockDeducted=true invoices
   totalReservedQty: number  // ALL SO line items
   unsyncedDocs: string[]
   invoices: InvoiceLine[]
-  variance: number          // bookedIn - (current + sold + reserved); 0 = balances
+  variance: number | null   // bookedIn - (current + sold + reserved); 0 = balances, null = nothing to compare against
   historyPartial: boolean   // sales predate the log, so variance cannot be trusted
-  status: 'ok' | 'unsynced' | 'oversold'
+  noIntakeLogged: boolean   // no intake anywhere — the starting figure is sales worked backwards
+  status: 'ok' | 'unsynced' | 'oversold' | 'unaudited' | 'unaccounted'
 }
 
 export async function GET() {
@@ -113,6 +115,36 @@ export async function GET() {
       }
     } catch {
       // no stock_audit_log table on this site — every SKU falls back to the estimate
+    }
+
+    // ── What the worksheets say landed ──
+    // Stock reaches Inventory by one route: Pre-Order Dashboard -> Worksheet -> Update
+    // Qty's. The worksheet is where the landed quantity is established, so it is the
+    // birth certificate of on-hand stock. On this site nothing writes to stock_audit_log
+    // at all, so without this every SKU falls back to sales worked backwards — a figure
+    // then graded against the very sales it was built from, which can only read zero.
+    type WsAgg = { qty: number; firstDate: string | null }
+    const wsMap: Record<string, WsAgg> = {}
+    try {
+      const sheets = await blobRead<any[]>('data/worksheets.json', [])
+      for (const sheet of sheets || []) {
+        const sheetDate = String(sheet?.date || sheet?.createdAt || '').slice(0, 10)
+        const items: any[] = Array.isArray(sheet?.items) ? sheet.items : []
+        for (const it of items) {
+          // Only quantities actually pushed to Inventory are intake. An item still sitting
+          // on an open sheet has moved no stock yet, and counting it would book in goods
+          // that are still on a boat.
+          if (!it?.sentToInventory) continue
+          const sku = String(it.sku || '').trim().toLowerCase()
+          const qty = Number(it.qty) || 0
+          if (!sku || qty <= 0) continue
+          const agg = wsMap[sku] || (wsMap[sku] = { qty: 0, firstDate: null })
+          agg.qty += qty
+          if (sheetDate && (!agg.firstDate || sheetDate < agg.firstDate)) agg.firstDate = sheetDate
+        }
+      }
+    } catch {
+      // no worksheets blob — the ledger and the estimate carry it as before
     }
 
     // Aggregate per SKU
@@ -240,9 +272,23 @@ export async function GET() {
       // back to the estimate rather than reporting a starting figure that was never set.
       const log = logMap[k]
       const loggedStarting = log && log.intakeRows > 0 ? log.openingQty + log.intakeQty : null
-      const impliedStarting = loggedStarting ?? derivedStarting
-      const startingSource: SkuAuditRow['startingSource'] = loggedStarting === null ? 'derived' : 'log'
-      const variance = impliedStarting - derivedStarting
+      // Ranked, never summed. A SKU whose first worksheet went unlogged and whose later
+      // restock WAS logged would otherwise count some units twice. The ledger wins wherever
+      // it holds any intake, the worksheet fills the hole it leaves, and only when neither
+      // says anything does the figure fall back to sales worked backwards.
+      const ws = wsMap[k]
+      const worksheetStarting = ws && ws.qty > 0 ? ws.qty : null
+      const impliedStarting = loggedStarting ?? worksheetStarting ?? derivedStarting
+      const startingSource: SkuAuditRow['startingSource'] =
+        loggedStarting !== null ? 'log' : worksheetStarting !== null ? 'worksheet' : 'derived'
+
+      // ── A derived starting figure cannot be audited against itself ──
+      // With no intake anywhere, impliedStarting IS derivedStarting, so the subtraction
+      // below reads 21 - 21 for every such SKU and can only ever come out at zero. That
+      // reported a whole class of unauditable SKUs as balanced. Nothing to compare
+      // against is now reported as exactly that.
+      const noIntakeLogged = loggedStarting === null && worksheetStarting === null
+      const variance = noIntakeLogged ? null : impliedStarting - derivedStarting
 
       // ── Can the variance be trusted at all? ──
       // The log only starts recording movement partway through a SKU's life; anything
@@ -255,21 +301,32 @@ export async function GET() {
       // Only rows reporting a real shortfall need this. A SKU with no log at all already
       // derives its starting figure from sales, so it balances by construction and saying
       // "partial" over it would tag most of the table with a caveat that explains nothing.
+      // A worksheet-sourced figure has the same exposure: sales that predate the shipment
+      // mean earlier stock arrived that no sheet here covers.
       const firstMovement = log?.firstMovement ?? null
+      const intakeHorizon = startingSource === 'worksheet' ? (ws?.firstDate ?? null) : firstMovement
       const historyPartial =
-        variance !== 0 &&
-        loggedStarting !== null &&
+        variance !== null && variance !== 0 &&
+        !noIntakeLogged &&
         data.totalSoldQty > 0 &&
         !!data.earliestSale &&
-        (firstMovement === null || data.earliestSale < firstMovement)
+        (intakeHorizon === null || data.earliestSale < intakeHorizon)
 
       const unsyncedQty = data.totalSoldQty - data.syncedSoldQty
       // Oversold means more went out than came in. With a partial history that cannot be
       // established — the intake it would be measured against was never written down.
       const oversold =
-        !historyPartial && currentQty === 0 && data.totalSoldQty > 0 && impliedStarting < data.totalSoldQty
+        !noIntakeLogged && !historyPartial &&
+        currentQty === 0 && data.totalSoldQty > 0 && impliedStarting < data.totalSoldQty
 
+      // Ordered so each rung can only ever promote a row, never hide a state the table
+      // already showed. 'unaccounted' is new and claims rows that used to read a green OK;
+      // it must not swallow the unsynced documents workflow, so unsynced outranks it.
       let status: SkuAuditRow['status'] = 'ok'
+      if (noIntakeLogged) status = 'unaudited'
+      // A real gap between what came in and what can be accounted for. This used to live
+      // only in the detail modal, so a SKU 3 units short sat in the table as a green OK.
+      if (variance !== null && variance !== 0 && !historyPartial) status = 'unaccounted'
       if (unsyncedQty > 0) status = 'unsynced'
       if (oversold) status = 'oversold'
 
@@ -286,6 +343,7 @@ export async function GET() {
         currentQty,
         impliedStarting,
         startingSource,
+        worksheetIntake: worksheetStarting,
         totalSoldQty: data.totalSoldQty,
         syncedSoldQty: data.syncedSoldQty,
         totalReservedQty: data.totalReservedQty,
@@ -293,12 +351,15 @@ export async function GET() {
         invoices: sortedInvoices,
         variance,
         historyPartial,
+        noIntakeLogged,
         status,
       })
     }
 
     rows.sort((a, b) => {
-      const order = { unsynced: 0, oversold: 1, ok: 2 }
+      const order: Record<SkuAuditRow['status'], number> = {
+        oversold: 0, unsynced: 1, unaccounted: 2, unaudited: 3, ok: 4,
+      }
       if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status]
       return a.sku.localeCompare(b.sku)
     })

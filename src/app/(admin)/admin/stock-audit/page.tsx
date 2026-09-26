@@ -17,15 +17,17 @@ interface SkuAuditRow {
   supplier: string
   currentQty: number
   impliedStarting: number
-  startingSource: 'log' | 'derived'
+  startingSource: 'log' | 'worksheet' | 'derived'
+  worksheetIntake?: number | null
   totalSoldQty: number
   syncedSoldQty: number
   totalReservedQty: number
   unsyncedDocs: string[]
   invoices: InvoiceLine[]
-  variance: number
+  variance: number | null
   historyPartial?: boolean
-  status: 'ok' | 'unsynced' | 'oversold'
+  noIntakeLogged?: boolean
+  status: 'ok' | 'unsynced' | 'oversold' | 'unaudited' | 'unaccounted'
 }
 
 interface AuditData {
@@ -46,7 +48,7 @@ export default function StockAuditPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'unsynced' | 'oversold' | 'ok'>('all')
+  const [filter, setFilter] = useState<'all' | 'unsynced' | 'oversold' | 'unaccounted' | 'unaudited' | 'ok'>('all')
   const [supplierFilter, setSupplierFilter] = useState('all')
   const [detail, setDetail] = useState<SkuAuditRow | null>(null)
   const [supplierNames, setSupplierNames] = useState<string[]>([])
@@ -94,6 +96,8 @@ export default function StockAuditPage() {
     all: data?.rows.length ?? 0,
     unsynced: data?.rows.filter(r => r.status === 'unsynced').length ?? 0,
     oversold: data?.rows.filter(r => r.status === 'oversold').length ?? 0,
+    unaccounted: data?.rows.filter(r => r.status === 'unaccounted').length ?? 0,
+    unaudited: data?.rows.filter(r => r.status === 'unaudited').length ?? 0,
     ok: data?.rows.filter(r => r.status === 'ok').length ?? 0,
   }
 
@@ -145,7 +149,7 @@ export default function StockAuditPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between flex-wrap">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {(['all', 'unsynced', 'oversold', 'ok'] as const).map(f => (
+          {(['all', 'unsynced', 'oversold', 'unaccounted', 'unaudited', 'ok'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -157,6 +161,8 @@ export default function StockAuditPage() {
               <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${
                 f === 'unsynced' ? 'bg-amber-100 text-amber-700' :
                 f === 'oversold' ? 'bg-red-100 text-red-700' :
+                f === 'unaccounted' ? 'bg-orange-100 text-orange-700' :
+                f === 'unaudited' ? 'bg-slate-200 text-slate-700' :
                 f === 'ok' ? 'bg-green-100 text-green-700' :
                 'bg-gray-200 text-gray-600'
               }`}>{counts[f]}</span>
@@ -198,7 +204,7 @@ export default function StockAuditPage() {
                   <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">SKU</th>
                   <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Product</th>
                   <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Supplier</th>
-                  <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" title="Stock booked into the system — the worksheet import / inventory save that logged it in. Marked est. where there is no log history and it had to be worked back from sales.">Logged In</th>
+                  <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" title="Stock booked into the system — the worksheet push that put it there. Marked est. where nothing was ever booked in and the figure is only sales added back, which cannot be audited.">Logged In</th>
                   <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total Sold</th>
                   <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Synced</th>
                   <th className="text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reserved (SO)</th>
@@ -214,6 +220,7 @@ export default function StockAuditPage() {
                       onClick={() => setDetail(row)}
                       className={`cursor-pointer transition-colors ${
                         row.status === 'oversold' ? 'bg-red-50 hover:bg-red-100' :
+                        row.status === 'unaccounted' ? 'bg-orange-50 hover:bg-orange-100' :
                         row.status === 'unsynced' ? 'bg-amber-50 hover:bg-amber-100' :
                         'hover:bg-gray-50'
                       }`}
@@ -222,6 +229,8 @@ export default function StockAuditPage() {
                         {row.status === 'ok' && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">OK</span>}
                         {row.status === 'unsynced' && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Unsynced</span>}
                         {row.status === 'oversold' && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">Oversold</span>}
+                        {row.status === 'unaccounted' && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700" title="What was booked in does not match stock on hand plus everything sold and reserved">Unaccounted</span>}
+                        {row.status === 'unaudited' && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-200 text-slate-700" title="No intake was ever booked in for this SKU, so there is nothing to check the sales against">Unaudited</span>}
                       </td>
                       <td className="px-3 py-3 font-mono text-xs text-indigo-700 font-semibold">{row.sku.toUpperCase()}</td>
                       <td className="px-3 py-3 text-gray-900 max-w-[200px] truncate">{row.title}</td>
@@ -229,7 +238,10 @@ export default function StockAuditPage() {
                       <td className="px-3 py-3 text-right font-medium text-gray-700">
                         {row.impliedStarting}
                         {row.startingSource === 'derived' && (
-                          <span className="ml-1 text-[10px] font-normal text-gray-400" title="No stock log for this SKU — worked back from sales">est.</span>
+                          <span className="ml-1 text-[10px] font-normal text-gray-400" title="Nothing was booked in for this SKU — this is in stock + sold + reserved added back up, not a booking">est.</span>
+                        )}
+                        {row.startingSource === 'worksheet' && (
+                          <span className="ml-1 text-[10px] font-normal text-indigo-400" title="From the worksheet that pushed this SKU to Inventory — the ledger holds no intake for it">ws</span>
                         )}
                         {row.historyPartial && (
                           <span className="ml-1 text-[10px] font-normal text-gray-400" title="This SKU was already trading before the stock log recorded movement, so the intake figure is incomplete">partial</span>
@@ -258,7 +270,7 @@ export default function StockAuditPage() {
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-xs text-gray-400">
         <span><strong>Logged In</strong> = Stock booked into the system (worksheet import / inventory save)</span>
-        <span><strong>est.</strong> = No stock log for that SKU, so worked back from sales</span>
+        <span><strong>ws</strong> = taken from the worksheet that pushed it to Inventory. <strong>est.</strong> = nothing was booked in anywhere, so it is only sales added back and cannot be audited</span>
         <span><strong>Total Sold</strong> = Every invoice line item (synced or not), plus site orders not yet invoiced</span>
         <span><strong>Synced</strong> = Stock actually deducted in system</span>
         <span>Click any row for full invoice breakdown</span>
@@ -290,7 +302,7 @@ export default function StockAuditPage() {
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
                   <p className="text-xs text-gray-500">Logged In</p>
                   <p className="text-xl font-bold text-gray-900">{detail.impliedStarting}</p>
-                  <p className="text-xs text-gray-400">{detail.startingSource === 'log' ? 'from stock log' : 'estimated'}</p>
+                  <p className="text-xs text-gray-400">{detail.startingSource === 'log' ? 'from stock log' : detail.startingSource === 'worksheet' ? 'from worksheet' : 'nothing booked in'}</p>
                 </div>
                 <div className="bg-red-50 rounded-lg p-3 text-center">
                   <p className="text-xs text-red-600">Total Sold</p>
@@ -308,14 +320,24 @@ export default function StockAuditPage() {
               </div>
 
               {/* Does it add up? Logged in, less everything sold and reserved, should be what is on the shelf. */}
-              {detail.historyPartial ? (
+              {detail.noIntakeLogged ? (
+                <p className="mt-3 text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                  <strong>Nothing booked in — this cannot be audited.</strong> No worksheet pushed this
+                  SKU to Inventory and the stock log holds no intake for it. The {detail.impliedStarting}
+                  {' '}above is not a booking, it is {detail.currentQty} in stock + {detail.totalSoldQty} sold
+                  {detail.totalReservedQty ? ` + ${detail.totalReservedQty} reserved` : ''} added back up,
+                  so it matches the sales by construction and would do so whatever really arrived. Sales
+                  and stock on hand below are complete and can be trusted; the intake side has nothing to
+                  check them against until a worksheet or a physical count sets one.
+                </p>
+              ) : detail.historyPartial ? (
                 <p className="mt-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                   <strong>Partial history.</strong> This SKU was already selling before the stock log
                   started recording movement for it, so the {detail.impliedStarting} logged in only
                   covers part of what came through. Sales and stock on hand below are complete; the
                   intake figure is not, so the two are not expected to reconcile.
                 </p>
-              ) : detail.variance === 0 ? (
+              ) : (detail.variance ?? 0) === 0 ? (
                 <p className="mt-3 text-xs text-gray-500">
                   Balances: {detail.impliedStarting} logged in &minus; {detail.totalSoldQty} sold
                   {detail.totalReservedQty ? ` − ${detail.totalReservedQty} reserved` : ''}
@@ -323,12 +345,25 @@ export default function StockAuditPage() {
                 </p>
               ) : (
                 <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <strong>{Math.abs(detail.variance)} unit{Math.abs(detail.variance) === 1 ? '' : 's'} unaccounted for.</strong>{' '}
-                  {detail.impliedStarting} was logged in, but stock on hand plus everything sold and
-                  reserved comes to {detail.impliedStarting - detail.variance}.
-                  {detail.variance > 0
+                  <strong>{Math.abs(detail.variance ?? 0)} unit{Math.abs(detail.variance ?? 0) === 1 ? '' : 's'} unaccounted for.</strong>{' '}
+                  {detail.startingSource === 'worksheet'
+                    ? `The worksheet pushed ${detail.impliedStarting} to Inventory`
+                    : `${detail.impliedStarting} was booked in`}, but stock on hand plus everything
+                  sold and reserved comes to {detail.impliedStarting - (detail.variance ?? 0)}.
+                  {(detail.variance ?? 0) > 0
                     ? ' Stock left without a document behind it.'
                     : ' More went out than was ever booked in.'}
+                </p>
+              )}
+
+              {/* Cross-check: the ledger wins wherever it has intake, but a worksheet that
+                  disagrees with it is worth seeing rather than silently overruled. */}
+              {detail.startingSource === 'log' && detail.worksheetIntake != null && detail.worksheetIntake !== detail.impliedStarting && (
+                <p className="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                  <strong>Worksheet says {detail.worksheetIntake}.</strong> The stock log is used here
+                  because it has intake rows for this SKU, but the worksheets that pushed it to
+                  Inventory total {detail.worksheetIntake}. One of the two is incomplete — check the
+                  sheet before acting on the figure above.
                 </p>
               )}
             </div>
