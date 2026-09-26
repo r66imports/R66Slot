@@ -3228,7 +3228,11 @@ type ActionItem =
 
 function ActionsDropdown({ items }: { items: ActionItem[] }) {
   const [open, setOpen] = useState(false)
-  const [dropUp, setDropUp] = useState(false)
+  // Null until the menu has been measured — the row's own height decides whether it
+  // drops down or up, and how tall it may be. A fixed 200px guess let a 13-item menu
+  // on the last rows open downwards and run off the bottom of the window, taking
+  // Red Flag and Delete with it.
+  const [pos, setPos] = useState<{ top: number; right: number; maxHeight: number } | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -3239,11 +3243,40 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
-  function handleToggle() {
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect()
-      setDropUp(window.innerHeight - rect.bottom < 200)
+  const place = useCallback(() => {
+    const btn = btnRef.current
+    const menu = menuRef.current
+    if (!btn || !menu) return
+    const GAP = 4
+    const EDGE = 8
+    const r = btn.getBoundingClientRect()
+    const below = Math.max(0, window.innerHeight - r.bottom - GAP - EDGE)
+    const above = Math.max(0, r.top - GAP - EDGE)
+    const needed = menu.scrollHeight
+    // Only flip up when the menu genuinely does not fit below AND there is more room above.
+    const dropUp = needed > below && above > below
+    const space = dropUp ? above : below
+    const height = Math.min(needed, space)
+    setPos({
+      top: dropUp ? Math.max(EDGE, r.top - GAP - height) : r.bottom + GAP,
+      right: Math.max(EDGE, window.innerWidth - r.right),
+      maxHeight: space,
+    })
+  }, [])
+  useEffect(() => {
+    if (!open) { setPos(null); return }
+    place()
+    // The menu is position:fixed, so the button slides out from under it when the
+    // page or the table scrolls — follow it instead of leaving it stranded.
+    const onMove = () => place()
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => {
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
     }
+  }, [open, place])
+  function handleToggle() {
     setOpen((v) => !v)
   }
   return (
@@ -3252,14 +3285,10 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
         Actions <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div ref={menuRef} className={`fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px] max-h-80 overflow-y-auto`}
-          style={(() => {
-            if (!btnRef.current) return {}
-            const r = btnRef.current.getBoundingClientRect()
-            return dropUp
-              ? { bottom: window.innerHeight - r.top + 4, right: window.innerWidth - r.right }
-              : { top: r.bottom + 4, right: window.innerWidth - r.right }
-          })()}
+        <div ref={menuRef} className="fixed z-[200] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[170px] overflow-y-auto overscroll-contain"
+          style={pos
+            ? { top: pos.top, right: pos.right, maxHeight: pos.maxHeight }
+            : { top: 0, right: 0, visibility: 'hidden' as const }}
         >
           {items.map((item, i) =>
             item === 'separator' ? (
