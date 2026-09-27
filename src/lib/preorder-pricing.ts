@@ -105,24 +105,29 @@ export function isLocalSupplierCurrency(code: string): boolean {
 }
 
 /**
- * Suppliers whose shelf Retail is never shown to a client (user, 27 Sept 2026).
+ * The ONE price a client is quoted for a row, and which of the two columns it
+ * came from (user, 27 Sept 2026).
  *
- * Revo Spares parts are ordered in against an estimate rather than sold off a
- * shelf price, so printing products.price beside Est. Retail invites the two
- * being read as the same quantity when they are not (Rule 61). Matched on
- * SUPPLIER, not brand, so adding a second brand to the same supplier keeps the
- * rule instead of quietly reopening it.
+ * Stock on hand is sold at the shelf price we already set; only what we do NOT
+ * have is quoted as an estimate that floats with the exchange rate (Rule 63).
+ * So a row shows Retail or Est. Retail, never both — showing two different
+ * numbers for one item is what made the sheet confusing, and clearing one
+ * column for one supplier only hid the symptom.
  *
- * Compared on letters and digits only, so "Revo Spares/BRM", "Revo Spares /
- * BRM" and a later rename to plain "Revo Spares" all still match — a rule that
- * fails open on a punctuation change is worse than no rule. "Revo Slot", the
- * separate cars-and-kits supplier, does not match and keeps its Retail.
+ * A shelf price of 0 is not a price: an in-stock SKU nobody has priced falls
+ * back to the estimate rather than reading as free.
+ *
+ * This supersedes the Revo-Spares-only Retail clearing, which is now removed.
  */
-const RETAIL_HIDDEN_SUPPLIERS = new Set(['revosparesbrm', 'revospares'])
-
-export function hidesClientRetail(supplierName?: string): boolean {
-  const key = (supplierName || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-  return !!key && RETAIL_HIDDEN_SUPPLIERS.has(key)
+export function clientQuoteZAR(row: {
+  qtyAvailable?: number
+  retailZAR?: number
+  estRetailZAR?: number
+}): { amount: number; basis: 'retail' | 'estimate' } {
+  const qty = Number(row.qtyAvailable) || 0
+  const retail = Number(row.retailZAR) || 0
+  if (qty > 0 && retail > 0) return { amount: retail, basis: 'retail' }
+  return { amount: Number(row.estRetailZAR) || 0, basis: 'estimate' }
 }
 
 /** Estimated retail per unit in ZAR, incl. markup and VAT. */

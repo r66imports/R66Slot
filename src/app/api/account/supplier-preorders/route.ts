@@ -5,7 +5,7 @@ import { blobRead, blobAppendArrayItems } from '@/lib/blob-storage'
 import { getRates, rateFor } from '@/lib/exchange-rates'
 import {
   accountById,
-  hidesClientRetail,
+  clientQuoteZAR,
   calcEstRetailZAR,
   isLocalSupplierCurrency,
   lineEstRetailZAR,
@@ -72,10 +72,16 @@ export async function GET(_request: NextRequest) {
     const safe = mine.map((o) => {
       const account = accountById(accounts, o.account)
       const rate = rateFor(rateData.rates, o.currency)
-      // Same rule as the orderable sheet, applied to saved lines and the
-      // client's downloaded PDF, so Retail cannot reappear on the way out.
-      const noRetail = hidesClientRetail(o.supplierName)
-      const lines = o.lines.map((l) => ({
+      const lines = o.lines.map((l) => {
+        const inf = info[l.sku.trim().toUpperCase()]
+        const est = Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100
+        const retail = inf?.retailZAR || 0
+        // A line the Worksheet has locked keeps its locked price and is never
+        // re-quoted off the shelf; everything else follows the sheet's rule.
+        const quote = l.priceLocked
+          ? { amount: est, basis: 'estimate' as const }
+          : clientQuoteZAR({ qtyAvailable: inf?.qtyAvailable || 0, retailZAR: retail, estRetailZAR: est })
+        return {
         id: l.id,
         brand: l.brand,
         sku: l.sku,
@@ -84,12 +90,15 @@ export async function GET(_request: NextRequest) {
         status: l.status,
         isNewSku: l.isNewSku,
         priceLocked: l.priceLocked,
-        estRetailZAR: Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100,
-        retailZAR: noRetail ? 0 : info[l.sku.trim().toUpperCase()]?.retailZAR || 0,
-      }))
+        estRetailZAR: est,
+        retailZAR: retail,
+        quoteZAR: quote.amount,
+        quoteBasis: quote.basis,
+        }
+      })
       const total = lines
         .filter((l) => l.status !== 'rejected')
-        .reduce((s, l) => s + l.qty * l.estRetailZAR, 0)
+        .reduce((s, l) => s + l.qty * l.quoteZAR, 0)
       return {
         id: o.id,
         ref: o.ref,

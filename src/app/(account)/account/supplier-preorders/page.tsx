@@ -21,6 +21,9 @@ interface CatalogueItem {
   /** What it sells for on the site today; 0 when we have never carried it. */
   retailZAR: number
   estRetailZAR: number
+  /** The one price quoted: shelf price when we hold stock, else the estimate. */
+  quoteZAR: number
+  quoteBasis: 'retail' | 'estimate'
   imageUrl: string
   qtyAvailable: number
   /** This client's own qty already placed with the supplier. */
@@ -47,6 +50,8 @@ interface SubmittedLine {
   estRetailZAR: number
   /** Shelf price at download time; 0 for a SKU we have never carried. */
   retailZAR: number
+  quoteZAR: number
+  quoteBasis: 'retail' | 'estimate'
 }
 
 interface SubmittedOrder {
@@ -242,7 +247,7 @@ export default function SupplierPreOrdersPage() {
       else if (sortBy === 'stock') cmp = a.qtyAvailable - b.qtyAvailable
     else if (sortBy === 'onorder') cmp = a.qtyOnOrder - b.qtyOnOrder
     else if (sortBy === 'retail') cmp = a.retailZAR - b.retailZAR
-      else if (sortBy === 'price') cmp = a.estRetailZAR - b.estRetailZAR
+      else if (sortBy === 'price') cmp = a.quoteZAR - b.quoteZAR
       if (cmp !== 0) return cmp * dir
       return a.brand.localeCompare(b.brand) || compareSku(a.sku, b.sku)
     })
@@ -283,7 +288,7 @@ export default function SupplierPreOrdersPage() {
     [cart]
   )
 
-  const catalogueTotal = cartEntries.reduce((s, e) => s + e.qty * e.item.estRetailZAR, 0)
+  const catalogueTotal = cartEntries.reduce((s, e) => s + e.qty * e.item.quoteZAR, 0)
   const customCount = customLines.filter((l) => l.sku.trim()).length
   const lineCount = cartEntries.length + customCount
   const unitCount =
@@ -368,12 +373,16 @@ export default function SupplierPreOrdersPage() {
           l.sku || '—',
           `${l.description || l.brand}${l.status === 'rejected' ? '  (not available)' : ''}`,
           String(l.qty),
-          l.retailZAR > 0 ? formatZAR(l.retailZAR) : '—',
-          l.estRetailZAR > 0 ? formatZAR(l.estRetailZAR) : 'To be priced',
-          l.status === 'rejected'
+          l.quoteBasis === 'retail' ? formatZAR(l.retailZAR) : '—',
+          l.quoteBasis === 'retail'
             ? '—'
             : l.estRetailZAR > 0
-              ? formatZAR(l.qty * l.estRetailZAR)
+              ? formatZAR(l.estRetailZAR)
+              : 'To be priced',
+          l.status === 'rejected'
+            ? '—'
+            : l.quoteZAR > 0
+              ? formatZAR(l.qty * l.quoteZAR)
               : 'To be priced',
         ]),
         styles: { fontSize: 8, cellPadding: 3, textColor: [17, 24, 39] },
@@ -535,7 +544,7 @@ export default function SupplierPreOrdersPage() {
               </div>
             )}
             <span className="font-semibold w-28 text-right">
-              {e.item.estRetailZAR > 0 ? formatZAR(e.qty * e.item.estRetailZAR) : 'On request'}
+              {e.item.quoteZAR > 0 ? formatZAR(e.qty * e.item.quoteZAR) : 'On request'}
             </span>
             {!compact && (
               <button
@@ -793,10 +802,14 @@ export default function SupplierPreOrdersPage() {
                           className="py-2 pr-4 text-right text-gray-600 whitespace-nowrap"
                           title="What this sells for on the site today"
                         >
-                          {item.retailZAR > 0 ? formatZAR(item.retailZAR) : '—'}
+                          {item.quoteBasis === 'retail' ? formatZAR(item.retailZAR) : '—'}
                         </td>
                         <td className="py-2 pr-4 text-right font-semibold whitespace-nowrap">
-                          {item.estRetailZAR > 0 ? formatZAR(item.estRetailZAR) : 'On request'}
+                          {item.quoteBasis === 'retail'
+                            ? '—'
+                            : item.estRetailZAR > 0
+                              ? formatZAR(item.estRetailZAR)
+                              : 'On request'}
                         </td>
                         <td className="py-2">
                           <div className="flex items-center justify-center gap-1">
@@ -1045,7 +1058,7 @@ export default function SupplierPreOrdersPage() {
                         </span>
                         <span className="whitespace-nowrap">
                           <span className="text-gray-500 mr-3">× {l.qty}</span>
-                          {l.estRetailZAR > 0 ? formatZAR(l.qty * l.estRetailZAR) : 'To be priced'}
+                          {l.quoteZAR > 0 ? formatZAR(l.qty * l.quoteZAR) : 'To be priced'}
                           {l.priceLocked && (
                             <span className="ml-2 text-[10px] uppercase tracking-wide text-green-700">
                               confirmed

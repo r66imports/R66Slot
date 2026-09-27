@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { getRates } from '@/lib/exchange-rates'
-import { hidesClientRetail } from '@/lib/preorder-pricing'
+import { clientQuoteZAR } from '@/lib/preorder-pricing'
 import {
   getBrandIndex,
   getCatalogueVersion,
@@ -56,9 +56,16 @@ export async function GET(request: NextRequest) {
             sku: i.sku,
             description: i.description,
             estRetailZAR: i.estRetailZAR,
-            // Cleared, not hidden in the UI: a figure the client is not meant
-            // to read should not reach the browser at all.
-            retailZAR: hidesClientRetail(i.supplierName) ? 0 : i.retailZAR,
+            retailZAR: i.retailZAR,
+            // Which of the two the client is actually quoted, decided in one
+            // place so the column, the cart total and the PDF cannot disagree.
+            ...(({ amount, basis }) => ({ quoteZAR: amount, quoteBasis: basis }))(
+              clientQuoteZAR({
+                qtyAvailable: i.qtyAvailable,
+                retailZAR: i.retailZAR,
+                estRetailZAR: i.estRetailZAR,
+              })
+            ),
             imageUrl: i.imageUrl,
             qtyAvailable: i.qtyAvailable,
             qtyOnOrder: onOrder[i.sku.trim().toUpperCase()] || 0,
