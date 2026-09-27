@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { getRates } from '@/lib/exchange-rates'
-import { getBrandIndex, getMergedItems, getOnOrderQtyBySku } from '@/lib/supplier-catalogue'
+import { hidesClientRetail } from '@/lib/preorder-pricing'
+import {
+  getBrandIndex,
+  getCatalogueVersion,
+  getMergedItems,
+  getOnOrderQtyBySku,
+} from '@/lib/supplier-catalogue'
 import { PRICE_DISCLAIMER } from '@/types/supplier-preorder'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -32,10 +38,11 @@ export async function GET(request: NextRequest) {
 
     // Scoped to this client: a client is shown what THEY have on order, never
     // another client's demand.
-    const [brandIndex, rateData, onOrder] = await Promise.all([
+    const [brandIndex, rateData, onOrder, version] = await Promise.all([
       getBrandIndex(),
       getRates(),
       getOnOrderQtyBySku({ customerId: decoded?.id, email: decoded?.email }),
+      getCatalogueVersion(),
     ])
 
     const items =
@@ -49,7 +56,9 @@ export async function GET(request: NextRequest) {
             sku: i.sku,
             description: i.description,
             estRetailZAR: i.estRetailZAR,
-            retailZAR: i.retailZAR,
+            // Cleared, not hidden in the UI: a figure the client is not meant
+            // to read should not reach the browser at all.
+            retailZAR: hidesClientRetail(i.supplierName) ? 0 : i.retailZAR,
             imageUrl: i.imageUrl,
             qtyAvailable: i.qtyAvailable,
             qtyOnOrder: onOrder[i.sku.trim().toUpperCase()] || 0,
@@ -58,6 +67,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       brands: brandIndex,
       items,
+      version,
       rateFetchedAt: rateData.fetchedAt,
       disclaimer: PRICE_DISCLAIMER,
     })

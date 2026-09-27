@@ -5,6 +5,7 @@ import { blobRead, blobAppendArrayItems } from '@/lib/blob-storage'
 import { getRates, rateFor } from '@/lib/exchange-rates'
 import {
   accountById,
+  hidesClientRetail,
   calcEstRetailZAR,
   isLocalSupplierCurrency,
   lineEstRetailZAR,
@@ -71,6 +72,9 @@ export async function GET(_request: NextRequest) {
     const safe = mine.map((o) => {
       const account = accountById(accounts, o.account)
       const rate = rateFor(rateData.rates, o.currency)
+      // Same rule as the orderable sheet, applied to saved lines and the
+      // client's downloaded PDF, so Retail cannot reappear on the way out.
+      const noRetail = hidesClientRetail(o.supplierName)
       const lines = o.lines.map((l) => ({
         id: l.id,
         brand: l.brand,
@@ -81,7 +85,7 @@ export async function GET(_request: NextRequest) {
         isNewSku: l.isNewSku,
         priceLocked: l.priceLocked,
         estRetailZAR: Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100,
-        retailZAR: info[l.sku.trim().toUpperCase()]?.retailZAR || 0,
+        retailZAR: noRetail ? 0 : info[l.sku.trim().toUpperCase()]?.retailZAR || 0,
       }))
       const total = lines
         .filter((l) => l.status !== 'rejected')

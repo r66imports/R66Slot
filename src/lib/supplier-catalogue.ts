@@ -71,6 +71,7 @@ export interface BrandRow {
   brand: string
   supplierId: string
   supplierName: string
+  /** Distinct SKUs a client can ORDER under this brand — never a stock qty. */
   count: number
 }
 
@@ -130,43 +131,92 @@ function resolveSupplier(ctx: Ctx, brand: string, supplierId?: string, supplierN
 }
 
 /** Brands a client may choose from — Inventory and the wholesale sheet combined. */
+/**
+ * A cheap fingerprint of the orderable sheet: row count plus the latest
+ * updatedAt. It changes on any import, edit or delete, which is all the client
+ * page needs to know that what it is showing is no longer current. One blob
+ * read, so it is safe to poll.
+ */
+export async function getCatalogueVersion(): Promise<string> {
+  const catalogue = await blobRead<SupplierCatalogueItem[]>('data/supplier-catalogue.json', [])
+  const active = catalogue.filter((i) => i.active !== false)
+  let latest = ''
+  for (const i of active) {
+    const t = i.updatedAt || i.createdAt || ''
+    if (t > latest) latest = t
+  }
+  return `${active.length}:${latest}`
+}
+
+/**
+ * Distinct SKUs orderable under each brand — Inventory and the wholesale
+ * catalogue merged and de-duplicated, which is the same set getMergedItems
+ * returns. Pure, so it can be tested without a database.
+ *
+ * It is a SKU count, never a stock quantity: qty on hand reaches the client as
+ * the per-row "In Stock" column. Counting product rows alone told a client that
+ * Revo Spares — 319 orderable parts we have never stocked — was empty, which is
+ * backwards for a sheet whose whole purpose is taking pre-orders on things we
+ * do not carry (27 Sept 2026).
+ */
+export function tallyOrderableSkus(
+  products: { sku: string; brand: string }[],
+  catalogue: { sku: string; brand: string; active?: boolean }[]
+): { brand: string; count: number }[] {
+  const byBrand = new Map<string, { brand: string; skus: Set<string> }>()
+  const bucket = (brand: string | undefined) => {
+    const name = (brand || '').trim()
+    if (!name) return null
+    const key = name.toLowerCase()
+    let b = byBrand.get(key)
+    if (!b) {
+      b = { brand: name, skus: new Set<string>() }
+      byBrand.set(key, b)
+    }
+    return b
+  }
+
+  const brandBySku = new Map<string, string>()
+  for (const r of products) {
+    const sku = upper(r.sku)
+    if (!sku) continue
+    brandBySku.set(sku, (r.brand || '').trim())
+    bucket(r.brand)?.skus.add(sku)
+  }
+
+  // Inventory is the authority on which brand a stocked SKU belongs to, so a
+  // catalogue row for a SKU we carry counts under the PRODUCT's brand, exactly
+  // as getMergedItems lists it — otherwise a chip would promise a SKU that the
+  // brand's own list does not contain. A catalogue-only SKU uses its own brand.
+  for (const item of catalogue) {
+    if (item.active === false || !item.sku) continue
+    const sku = upper(item.sku)
+    bucket(brandBySku.get(sku) || item.brand)?.skus.add(sku)
+  }
+
+  return [...byBrand.values()].map(({ brand, skus }) => ({ brand, count: skus.size }))
+}
+
 export async function getBrandIndex(): Promise<BrandRow[]> {
   const ctx = await loadContext()
 
   const rows = await db.query(
-    `SELECT brand, COUNT(*)::int AS count
+    `SELECT sku, brand
        FROM products
-      WHERE status != 'archived' AND brand IS NOT NULL AND TRIM(brand) <> ''
-      GROUP BY brand`
+      WHERE status != 'archived' AND brand IS NOT NULL AND TRIM(brand) <> ''`
   )
 
-  const map = new Map<string, BrandRow>()
-  const add = (brand: string, count: number) => {
-    const key = brand.toLowerCase()
-    const existing = map.get(key)
-    if (existing) {
-      existing.count += count
-      return
-    }
-    const supplier = resolveSupplier(ctx, brand)
-    map.set(key, {
-      brand,
-      supplierId: supplier?.id || '',
-      supplierName: supplier?.name || '',
-      count,
+  return tallyOrderableSkus(rows.rows as { sku: string; brand: string }[], ctx.catalogue)
+    .map(({ brand, count }) => {
+      const supplier = resolveSupplier(ctx, brand)
+      return {
+        brand,
+        supplierId: supplier?.id || '',
+        supplierName: supplier?.name || '',
+        count,
+      }
     })
-  }
-
-  for (const r of rows.rows as { brand: string; count: number }[]) {
-    add((r.brand || '').trim(), Number(r.count) || 0)
-  }
-  // Catalogue-only brands — things we can order but have never stocked.
-  for (const item of ctx.catalogue) {
-    if (item.active === false || !item.brand) continue
-    if (!map.has(item.brand.toLowerCase())) add(item.brand, 0)
-  }
-
-  return [...map.values()].filter((b) => b.brand).sort((a, b) => a.brand.localeCompare(b.brand))
+    .sort((a, b) => a.brand.localeCompare(b.brand))
 }
 
 /**

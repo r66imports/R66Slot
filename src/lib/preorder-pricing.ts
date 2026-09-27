@@ -100,6 +100,27 @@ export function isLocalSupplierCurrency(code: string): boolean {
   return (code || '').trim().toUpperCase() === 'ZAR'
 }
 
+/**
+ * Suppliers whose shelf Retail is never shown to a client (user, 27 Sept 2026).
+ *
+ * Revo Spares parts are ordered in against an estimate rather than sold off a
+ * shelf price, so printing products.price beside Est. Retail invites the two
+ * being read as the same quantity when they are not (Rule 61). Matched on
+ * SUPPLIER, not brand, so adding a second brand to the same supplier keeps the
+ * rule instead of quietly reopening it.
+ *
+ * Compared on letters and digits only, so "Revo Spares/BRM", "Revo Spares /
+ * BRM" and a later rename to plain "Revo Spares" all still match — a rule that
+ * fails open on a punctuation change is worse than no rule. "Revo Slot", the
+ * separate cars-and-kits supplier, does not match and keeps its Retail.
+ */
+const RETAIL_HIDDEN_SUPPLIERS = new Set(['revosparesbrm', 'revospares'])
+
+export function hidesClientRetail(supplierName?: string): boolean {
+  const key = (supplierName || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return !!key && RETAIL_HIDDEN_SUPPLIERS.has(key)
+}
+
 /** Estimated retail per unit in ZAR, incl. markup and VAT. */
 export function calcEstRetailZAR(wholesale: number, exRate: number, account: CostingAccount): number {
   const landed = calcLandedZAR(wholesale, exRate, account)

@@ -93,6 +93,12 @@ export default function SupplierPreOrdersPage() {
   const [rateFetchedAt, setRateFetchedAt] = useState('')
 
   const [loadingBrands, setLoadingBrands] = useState(true)
+  /** Fingerprint the visible sheet was built from, vs what the server has now. */
+  const [loadedVersion, setLoadedVersion] = useState('')
+  const [latestVersion, setLatestVersion] = useState('')
+  const [dismissedVersion, setDismissedVersion] = useState('')
+  /** Bumped by Refresh to re-run both loads without a full page reload. */
+  const [reloadKey, setReloadKey] = useState(0)
   const [loadingItems, setLoadingItems] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
@@ -121,13 +127,17 @@ export default function SupplierPreOrdersPage() {
           setBrands(data.brands || [])
           setDisclaimer(data.disclaimer || '')
           setRateFetchedAt(data.rateFetchedAt || '')
+          if (data.version) {
+            setLoadedVersion(data.version)
+            setLatestVersion(data.version)
+          }
         }
       } finally {
         setLoadingBrands(false)
       }
     })()
     loadHistory()
-  }, [loadHistory])
+  }, [loadHistory, reloadKey])
 
   // Typing shouldn't fire a request per keystroke.
   useEffect(() => {
@@ -157,6 +167,7 @@ export default function SupplierPreOrdersPage() {
           const data = await res.json()
           setItems(data.items || [])
           setRateFetchedAt(data.rateFetchedAt || '')
+          if (data.version) setLoadedVersion(data.version)
         }
       } finally {
         if (!cancelled) setLoadingItems(false)
@@ -165,7 +176,42 @@ export default function SupplierPreOrdersPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedBrands, debouncedSearch])
+  }, [selectedBrands, debouncedSearch, reloadKey])
+
+  /**
+   * A price list imported while this page is open leaves it showing yesterday's
+   * sheet. Poll the cheap fingerprint endpoint and offer a refresh rather than
+   * swapping items underneath someone who is part way through a cart.
+   */
+  useEffect(() => {
+    let stopped = false
+    const check = async () => {
+      try {
+        const res = await fetch('/api/account/supplier-catalogue/version')
+        if (!res.ok || stopped) return
+        const data = await res.json()
+        if (data?.version) setLatestVersion(data.version)
+      } catch {
+        /* a failed poll is not worth surfacing — the next one will do */
+      }
+    }
+    const id = setInterval(check, 60000)
+    const onFocus = () => check()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      stopped = true
+      clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
+
+  const importAvailable =
+    !!latestVersion && !!loadedVersion && latestVersion !== loadedVersion && latestVersion !== dismissedVersion
+
+  const refreshSheet = () => {
+    setDismissedVersion('')
+    setReloadKey((k) => k + 1)
+  }
 
   const toggleBrand = (brand: string) =>
     setSelectedBrands((prev) =>
@@ -527,6 +573,29 @@ export default function SupplierPreOrdersPage() {
 
   return (
     <div className="space-y-6 pb-24">
+      {importAvailable && (
+        <div className="flex flex-wrap items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+          <span className="text-sm text-blue-900 flex-1 min-w-[12rem]">
+            A new price list has been imported — this page is showing the previous one.
+          </span>
+          <button
+            type="button"
+            onClick={refreshSheet}
+            className="px-3 py-1.5 text-sm font-semibold rounded-md bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Refresh
+          </button>
+          <button
+            type="button"
+            onClick={() => setDismissedVersion(latestVersion)}
+            className="text-blue-400 hover:text-blue-700 text-lg leading-none px-1"
+            aria-label="Dismiss"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-bold text-gray-900">Supplier Pre Orders</h2>
         <p className="text-sm text-gray-600 mt-1">
