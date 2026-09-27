@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import { db } from '@/lib/db'
+import { logStockChange } from '@/lib/stock-log'
 
 const KEY = 'data/checkout-orders.json'
 
@@ -121,9 +122,19 @@ export async function POST(request: Request) {
       try {
         const res = await db.query(
           `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3
-           WHERE id = $1 RETURNING id`,
+           FROM (SELECT sku, COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+           WHERE products.id = $1 RETURNING products.id, products.quantity, prev.sku, prev.q AS prev_quantity`,
           [item.id, item.quantity, now]
         )
+        const r = res.rows[0]
+        if (r?.sku && r.prev_quantity != null && Number(r.quantity) !== Number(r.prev_quantity)) {
+          await logStockChange({
+            sku: String(r.sku).trim(),
+            changeQty: Number(r.quantity) - Number(r.prev_quantity),
+            qtyBefore: Number(r.prev_quantity), qtyAfter: Number(r.quantity),
+            source: 'site_order', reference: orderNumber,
+          })
+        }
         if (!res.rows.length) {
           console.error('[checkout] stock deduction matched no product', { id: item.id, orderNumber })
         }
@@ -160,9 +171,20 @@ export async function PATCH(request: Request) {
         if (!item.id || !item.quantity) continue
         try {
           const res = await db.query(
-            `UPDATE products SET quantity = COALESCE(quantity, 0) + $2, updated_at = $3 WHERE id = $1 RETURNING id, quantity`,
+            `UPDATE products SET quantity = COALESCE(quantity, 0) + $2, updated_at = $3
+           FROM (SELECT sku, COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+           WHERE products.id = $1 RETURNING products.id, products.quantity, prev.sku, prev.q AS prev_quantity`,
             [item.id, item.quantity, now]
           )
+          const r = res.rows[0]
+          if (r?.sku && r.prev_quantity != null && Number(r.quantity) !== Number(r.prev_quantity)) {
+            await logStockChange({
+              sku: String(r.sku).trim(),
+              changeQty: Number(r.quantity) - Number(r.prev_quantity),
+              qtyBefore: Number(r.prev_quantity), qtyAfter: Number(r.quantity),
+              source: 'site_order_restore', reference: order.orderNumber,
+            })
+          }
           if (!res.rowCount) allOk = false
         } catch {
           allOk = false
@@ -207,11 +229,21 @@ export async function PATCH(request: Request) {
       for (const item of order.items) {
         if (!item.id || !item.quantity) continue
         try {
-          await db.query(
+          const res = await db.query(
             `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3
-             WHERE id = $1 RETURNING id`,
+           FROM (SELECT sku, COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+           WHERE products.id = $1 RETURNING products.id, products.quantity, prev.sku, prev.q AS prev_quantity`,
             [item.id, item.quantity, deductedAt]
           )
+          const r = res.rows[0]
+          if (r?.sku && r.prev_quantity != null && Number(r.quantity) !== Number(r.prev_quantity)) {
+            await logStockChange({
+              sku: String(r.sku).trim(),
+              changeQty: Number(r.quantity) - Number(r.prev_quantity),
+              qtyBefore: Number(r.prev_quantity), qtyAfter: Number(r.quantity),
+              source: 'site_order', reference: order.orderNumber,
+            })
+          }
         } catch (err: any) {
           console.error('[checkout] re-deduction failed', { id: item.id, orderNumber: order.orderNumber, err: err?.message })
         }

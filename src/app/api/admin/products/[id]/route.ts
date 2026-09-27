@@ -3,6 +3,7 @@ import { hasAdminSession, stripPrivateFields } from '@/lib/product-privacy'
 import { db } from '@/lib/db'
 import { isRuleActive } from '@/lib/site-rules'
 import type { Product } from '../route'
+import { logStockChange } from '@/lib/stock-log'
 
 function rowToProduct(row: any): Product {
   return {
@@ -95,6 +96,15 @@ export async function PUT(
     const body = await request.json()
     const now = new Date().toISOString()
 
+    // The SKU is read up front; the BEFORE quantity deliberately is not. Reading it here
+    // opens a window where two saves a second apart both log the same "before" value and
+    // break the ledger chain. It comes out of the write itself instead.
+    let skuForLog: string | null = null
+    if (body.quantity != null) {
+      const pre = await db.query(`SELECT sku FROM products WHERE id=$1`, [id])
+      skuForLog = pre.rows[0]?.sku ?? null
+    }
+
     const pageIds: string[] = Array.isArray(body.pageIds) ? body.pageIds : (body.pageId ? [body.pageId] : [])
 
     await db.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS pre_order_price NUMERIC`).catch(() => {})
@@ -163,8 +173,16 @@ export async function PUT(
         worksheet_currency = COALESCE($52, worksheet_currency),
         worksheet_priced_at = COALESCE($53, worksheet_priced_at),
         updated_at = $36
-      WHERE id = $1
-      RETURNING *
+      -- prev is a plain snapshot read, deliberately WITHOUT "FOR UPDATE". Row locking
+      -- follows the row's update chain to the newest version, so a locking read of the
+      -- row this same statement is updating hands back the value AFTER the write. That
+      -- would make prev_quantity equal the new quantity and the "did it change?" test
+      -- below always false, silently unlogging every movement through this route — it
+      -- cost R66Emporium six days of ledger in Sept 2026. Unlocked, it reads the
+      -- statement snapshot: the value before the update, which is the whole point.
+      FROM (SELECT COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+      WHERE products.id = $1
+      RETURNING products.*, prev.q AS prev_quantity
     `, [
       id,
       body.title ?? null,
@@ -228,6 +246,23 @@ export async function PUT(
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
+    // Every admin screen that can move stock writes through this one route, so a flat
+    // "Admin" reference could not say WHICH one did it — a Product Edit autosave reverting
+    // a Worksheet import would be indistinguishable from a deliberate Inventory correction.
+    // Callers name themselves in X-Stock-Origin; anything that does not reads as "Admin".
+    if (body.quantity != null && skuForLog && result.rows[0].prev_quantity != null) {
+      const qtyBefore: number = Number(result.rows[0].prev_quantity)
+      const qtyAfter: number = result.rows[0].quantity ?? body.quantity
+      if (qtyAfter !== qtyBefore) {
+        const origin = (request.headers.get('x-stock-origin') || '').trim().slice(0, 60) || 'Admin'
+        // A shelf count reconciles the book to reality — nothing arrived and nothing sold,
+        // so the audit must not read it as intake. Counting 3 onto a SKU whose worksheet
+        // booked 24 would otherwise overwrite the 24 and report 21 units oversold.
+        const source = /^stocktake/i.test(origin) ? 'stocktake' : 'inventory_save'
+        await logStockChange({ sku: skuForLog, changeQty: qtyAfter - qtyBefore, qtyBefore, qtyAfter, source, reference: origin })
+      }
+    }
+
     // Rule 30: the pre-order flag is owned by the product, not derived from stock.
     // Editing quantity no longer sets or clears it — a sold-out product reads Sold Out.
 
@@ -288,9 +323,22 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
-    const result = await db.query(`DELETE FROM products WHERE id = $1`, [id])
+    // RETURNING so the stock leaving with the record can be logged. Without this a
+    // delete is the one way stock can vanish with no ledger row at all.
+    const result = await db.query(
+      `DELETE FROM products WHERE id = $1 RETURNING sku, COALESCE(quantity, 0) AS quantity`,
+      [id]
+    )
     if (result.rowCount === 0) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    }
+    const gone = result.rows[0]
+    const qty = Number(gone.quantity) || 0
+    if (gone.sku && qty !== 0) {
+      await logStockChange({
+        sku: String(gone.sku).trim(), changeQty: -qty, qtyBefore: qty, qtyAfter: 0,
+        source: 'product_delete', reference: `Product ${id} deleted`,
+      })
     }
     return NextResponse.json({ success: true })
   } catch (error: any) {

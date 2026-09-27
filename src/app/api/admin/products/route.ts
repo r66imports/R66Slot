@@ -3,6 +3,7 @@ import { hasAdminSession, stripPrivateFields, stripPrivateColumns } from '@/lib/
 import { db } from '@/lib/db'
 import { blobRead } from '@/lib/blob-storage'
 import { estimateFor, loadEstimateContext } from '@/lib/preorder-estimate'
+import { logStockChange } from '@/lib/stock-log'
 
 export interface Product {
   id: string
@@ -297,6 +298,22 @@ export async function POST(request: Request) {
     ])
 
     const result = await db.query(`SELECT * FROM products WHERE id = $1`, [id])
+    // Opening stock on a create IS intake — this is how a new SKU off a Worksheet
+    // Update Qty's push gets its birth certificate. Without it the SKU reads Unaudited
+    // forever and Stock Audit falls back to working the figure backwards out of sales.
+    {
+      const created = result.rows[0]
+      const openingQty = Number(created?.quantity) || 0
+      if (created?.sku && openingQty !== 0) {
+        const origin = (request.headers.get('x-stock-origin') || '').trim().slice(0, 60) || 'Admin'
+        await logStockChange({
+          sku: String(created.sku).trim(),
+          changeQty: openingQty, qtyBefore: 0, qtyAfter: openingQty,
+          source: 'product_create', reference: origin,
+        })
+      }
+    }
+
     return NextResponse.json(rowToProduct(result.rows[0]), { status: 201 })
   } catch (error: any) {
     console.error('Error creating product:', error)

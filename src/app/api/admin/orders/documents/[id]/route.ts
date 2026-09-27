@@ -97,20 +97,20 @@ export async function PATCH(
         // DELETE are the only two deliberate restores; archiving is neither. This fires on a
         // rejection from any prior status, so filing an invoice and rejecting it afterwards
         // still returns the stock.
-        await adjustStock(prev.lineItems, 'add')
+        await adjustStock(prev.lineItems, 'add', { source: prev.type === 'salesorder' ? 'salesorder_restore' : 'invoice_restore', reference: prev.docNumber })
         body.stockDeducted = false
       } else if (prev.stockDeducted !== false && wasStockable && !isCancelled && itemsChanged) {
         // Active invoice/SO with changed line items — reverse old qty, apply new qty (handles legacy undefined)
-        await adjustStock(prev.lineItems, 'add')
-        await adjustStock(newItems, 'subtract')
+        await adjustStock(prev.lineItems, 'add', { source: prev.type === 'salesorder' ? 'salesorder_restore' : 'invoice_restore', reference: prev.docNumber })
+        await adjustStock(newItems, 'subtract', { source: newType === 'salesorder' ? 'salesorder' : 'invoice', reference: prev.docNumber })
         body.stockDeducted = true
       } else if (!prev.stockDeducted && nowStockable && !isCancelled) {
         // Wasn't deducted (quote→SO/invoice upgrade, or old record) — deduct now
-        await adjustStock(newItems, 'subtract')
+        await adjustStock(newItems, 'subtract', { source: newType === 'salesorder' ? 'salesorder' : 'invoice', reference: prev.docNumber })
         body.stockDeducted = true
       } else if (prev.stockDeducted && !nowStockable) {
         // Type downgraded to quote — restore stock
-        await adjustStock(prev.lineItems, 'add')
+        await adjustStock(prev.lineItems, 'add', { source: prev.type === 'salesorder' ? 'salesorder_restore' : 'invoice_restore', reference: prev.docNumber })
         body.stockDeducted = false
       }
       // If type changes from salesorder→invoice and stockDeducted is already true: no action needed
@@ -152,7 +152,10 @@ export async function DELETE(
 
     // Restore stock on delete (handles both stockDeducted:true and legacy undefined)
     if (doc.stockDeducted !== false && isStockable(doc.type)) {
-      await adjustStock(doc.lineItems, 'add')
+      await adjustStock(doc.lineItems, 'add', {
+        source: doc.type === 'salesorder' ? 'salesorder_restore' : 'invoice_restore',
+        reference: `${doc.docNumber} deleted`,
+      })
     }
 
     if (doc.type === 'invoice') {

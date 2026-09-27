@@ -36,7 +36,10 @@ export async function POST() {
 
     for (const doc of pending) {
       try {
-        await adjustStock(doc.lineItems, 'subtract')
+        await adjustStock(doc.lineItems, 'subtract', {
+          source: doc.type === 'salesorder' ? 'salesorder' : 'invoice',
+          reference: `${doc.docNumber} (Sync Inventory)`,
+        })
         const idx = docs.findIndex((d) => d.id === doc.id)
         if (idx !== -1) {
           docs[idx] = { ...docs[idx], stockDeducted: true, updatedAt: new Date().toISOString() }

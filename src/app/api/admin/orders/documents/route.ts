@@ -93,7 +93,10 @@ export async function POST(request: Request) {
     // Rule 3 — Stock Deduction: deduct inventory when creating Sales Orders or Invoices
     const deductStock = !stockAlreadyReserved && stockable && await isRuleActive('invoice_stock_deduction', true)
     if (deductStock) {
-      await adjustStock(lineItems, 'subtract')
+      await adjustStock(lineItems, 'subtract', {
+        source: body.type === 'salesorder' ? 'salesorder' : 'invoice',
+        reference: body.docNumber,
+      })
     }
 
     const doc: OrderDocument = {

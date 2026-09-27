@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { logStockChange } from '@/lib/stock-log'
 
 export interface LineItem {
   id: string
@@ -216,8 +217,16 @@ export function shortfallMessage(shortfalls: StockShortfall[]): string {
  * stock the shelf never had. Invoices are blocked before they get here (see
  * `findStockShortfalls`); Sales Orders may legitimately reserve stock that has not landed.
  */
-export async function adjustStock(items: LineItem[], direction: 'subtract' | 'add'): Promise<void> {
+export async function adjustStock(
+  items: LineItem[],
+  direction: 'subtract' | 'add',
+  opts?: {
+    source?: 'invoice' | 'invoice_restore' | 'salesorder' | 'salesorder_restore'
+    reference?: string
+  }
+): Promise<void> {
   const now = new Date().toISOString()
+  const source = opts?.source ?? (direction === 'subtract' ? 'invoice' : 'invoice_restore')
   for (const li of items) {
     if (!isStockLine(li)) continue
     const sku = extractSku(li.description)
@@ -229,10 +238,23 @@ export async function adjustStock(items: LineItem[], direction: 'subtract' | 'ad
       const row = await resolveStockRow(sku)
       if (!row) continue
       const delta = direction === 'subtract' ? -li.qty : li.qty
-      await db.query(
-        `UPDATE products SET quantity = COALESCE(quantity, 0) + $1, updated_at = $2 WHERE id = $3`,
+      const upd = await db.query(
+        `UPDATE products SET quantity = COALESCE(quantity, 0) + $1, updated_at = $2 WHERE id = $3
+         RETURNING quantity`,
         [delta, now, row.id]
       )
+      // Read the new quantity back off the UPDATE rather than recomputing it, so a SKU
+      // split across duplicate records cannot make the ledger disagree with the shelf.
+      const qtyAfter = Number(upd.rows[0]?.quantity ?? row.quantity + delta)
+      await logStockChange({
+        sku,
+        changeQty: delta,
+        qtyBefore: row.quantity,
+        qtyAfter,
+        source,
+        reference: opts?.reference,
+        notes: qtyAfter < 0 ? 'Oversold — stock went negative' : undefined,
+      })
       // Rule 30: selling out does not flip the product to Pre-Order, and restoring
       // stock does not clear a deliberately-set pre-order flag. The flag is owned
       // by the product, not by the stock level.

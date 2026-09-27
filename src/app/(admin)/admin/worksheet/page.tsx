@@ -660,7 +660,10 @@ function WorksheetEditor({
           for (const prod of matches) {
             const res = await fetch(`/api/admin/products/${prod.id}`, {
               method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
+              // Names this push in the stock ledger. Without it the intake is logged as a
+              // bare "Admin" save, indistinguishable from a Product Edit autosave writing
+              // an old quantity back over it.
+              headers: { 'Content-Type': 'application/json', 'X-Stock-Origin': "Worksheet Update Qty's" },
               body: JSON.stringify(patchBody),
             })
             if (!res.ok) {
@@ -711,7 +714,10 @@ function WorksheetEditor({
         }
         const res = await fetch('/api/admin/products', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // A new SKU's opening quantity is its intake. Naming the worksheet here is what
+          // stops the SKU reading Unaudited forever with its starting figure worked
+          // backwards out of its own sales.
+          headers: { 'Content-Type': 'application/json', 'X-Stock-Origin': "Worksheet Update Qty's (new SKU)" },
           body: JSON.stringify(body),
         })
         if (!res.ok) { errors.push(row.sku); continue }

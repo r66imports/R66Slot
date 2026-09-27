@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { logStockChange } from '@/lib/stock-log'
 
 // PATCH /api/admin/pos/stock
 // Body: { id: string, mode: 'add' | 'subtract' | 'set', qty: number }
@@ -16,14 +17,20 @@ export async function PATCH(request: Request) {
     let params: any[]
 
     if (mode === 'set') {
-      sql = `UPDATE products SET quantity = $2, updated_at = $3 WHERE id = $1 RETURNING id, quantity`
+      sql = `UPDATE products SET quantity = $2, updated_at = $3
+      FROM (SELECT sku, COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+      WHERE products.id = $1 RETURNING products.id, products.quantity, prev.sku, prev.q AS prev_quantity`
       params = [id, qty, new Date().toISOString()]
     } else if (mode === 'add') {
-      sql = `UPDATE products SET quantity = COALESCE(quantity, 0) + $2, updated_at = $3 WHERE id = $1 RETURNING id, quantity`
+      sql = `UPDATE products SET quantity = COALESCE(quantity, 0) + $2, updated_at = $3
+      FROM (SELECT sku, COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+      WHERE products.id = $1 RETURNING products.id, products.quantity, prev.sku, prev.q AS prev_quantity`
       params = [id, qty, new Date().toISOString()]
     } else {
       // subtract — floor at 0
-      sql = `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3 WHERE id = $1 RETURNING id, quantity`
+      sql = `UPDATE products SET quantity = GREATEST(COALESCE(quantity, 0) - $2, 0), updated_at = $3
+      FROM (SELECT sku, COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+      WHERE products.id = $1 RETURNING products.id, products.quantity, prev.sku, prev.q AS prev_quantity`
       params = [id, qty, new Date().toISOString()]
     }
 
@@ -33,6 +40,18 @@ export async function PATCH(request: Request) {
     }
 
     const newQty: number = result.rows[0].quantity
+    // prev.q is read WITHOUT "FOR UPDATE" on purpose — a locking read of the row this
+    // statement is updating returns the value AFTER the write. See the products PUT.
+    const prevQty = result.rows[0].prev_quantity
+    const posSku = result.rows[0].sku
+    if (posSku && prevQty != null && Number(prevQty) !== newQty) {
+      await logStockChange({
+        sku: String(posSku).trim(),
+        changeQty: newQty - Number(prevQty),
+        qtyBefore: Number(prevQty), qtyAfter: newQty,
+        source: 'pos', reference: `POS ${mode}`,
+      })
+    }
     // Rule 30: a POS sale that empties stock no longer flips the product to Pre-Order —
     // it reads Sold Out on the storefront instead.
 
