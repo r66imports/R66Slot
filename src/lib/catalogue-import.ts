@@ -114,12 +114,14 @@ export function looksLikeSku(token: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9\-_./]*$/.test(t)
 }
 
-const SKU_HEADERS = ['sku', 'code', 'ref', 'reference', 'article', 'art', 'part', 'item', 'model', 'codigo', 'référence', 'referencia']
+const SKU_HEADERS = ['sku', 'code', 'cod', 'codice', 'ref', 'reference', 'article', 'art', 'part', 'item', 'model', 'codigo', 'référence', 'referencia']
 const DESC_HEADERS = ['description', 'desc', 'name', 'title', 'product', 'designation', 'désignation', 'descripcion', 'descrizione', 'artikel']
 const PRICE_HEADERS = ['wholesale', 'price', 'cost', 'net', 'trade', 'dealer', 'pvp', 'prix', 'precio', 'prezzo', 'tarif', 'unit price', 'list']
 
 const matches = (header: string, candidates: string[]) => {
-  const h = header.trim().toLowerCase()
+  // Supplier sheets abbreviate with a full stop — "COD.", "REF.", "ART.". Strip
+  // trailing punctuation so the abbreviation is compared on its letters alone.
+  const h = header.trim().toLowerCase().replace(/[.:,;]+$/, '').trim()
   if (!h) return false
   return candidates.some((c) => h === c || h.includes(c))
 }
@@ -210,6 +212,12 @@ export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
   const out: ParsedRow[] = []
   const start = map.headerRow >= 0 ? map.headerRow + 1 : 0
 
+  // Shape inference (headerRow < 0) means no header was recognised, so the sheet's
+  // own header row is still sitting at the top of the data and would import as a
+  // junk SKU. Drop the first row only when it reads like a header rather than a
+  // product: its SKU cell is not SKU-shaped and its price cell is not a number.
+  let dropLeadingHeader = map.headerRow < 0
+
   for (let r = start; r < rows.length; r++) {
     const row = rows[r] || []
     const sku = map.sku >= 0 ? String(row[map.sku] ?? '').trim() : ''
@@ -218,6 +226,11 @@ export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
     const description = map.description >= 0 ? String(row[map.description] ?? '').trim() : ''
     const priceRaw = map.wholesalePrice >= 0 ? String(row[map.wholesalePrice] ?? '') : ''
     const price = parseMoney(priceRaw)
+
+    if (dropLeadingHeader) {
+      dropLeadingHeader = false
+      if (!looksLikeSku(sku) && !Number.isFinite(price)) continue
+    }
 
     // Skip anything that reads as a section heading or a totals line rather
     // than a product — they are common mid-table and import as junk SKUs.

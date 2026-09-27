@@ -614,6 +614,8 @@ export default function SupplierCataloguePage() {
           supplierName={supplier.name}
           supplierCurrency={currency}
           brands={supplier.brands || []}
+          rates={rates}
+          account={account}
           onClose={() => setShowImport(false)}
           onImported={(added, updated) => {
             setShowImport(false)

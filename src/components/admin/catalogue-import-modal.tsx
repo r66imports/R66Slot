@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import {
   detectColumns,
   extractPdfRows,
@@ -11,6 +11,13 @@ import {
   type ColumnMap,
   type ParsedRow,
 } from '@/lib/catalogue-import'
+import {
+  calcEstRetailZAR,
+  calcLandedZAR,
+  formatZAR,
+  isLocalSupplierCurrency,
+} from '@/lib/preorder-pricing'
+import type { CostingAccount } from '@/types/supplier-preorder'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'ZAR', 'CHF', 'JPY', 'AUD', 'CAD', 'HKD', 'CNY']
 
@@ -20,11 +27,25 @@ interface Props {
   /** The supplier's own currency — the default, overridable below. */
   supplierCurrency: string
   brands: string[]
+  /** Live rates by currency code, so the estimate follows a currency override. */
+  rates: Record<string, number>
+  /** The supplier's costing account — the Spare Parts calculator's percentages. */
+  account: CostingAccount
   onClose: () => void
   onImported: (added: number, updated: number) => void
 }
 
 type Stage = 'pick' | 'map' | 'preview'
+
+/** One line of the costing breakdown: what was applied, and the running figure. */
+function Step({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-6">
+      <span className="text-gray-500">{label}</span>
+      <span className="font-mono tabular-nums">{value}</span>
+    </div>
+  )
+}
 
 interface EditableRow extends ParsedRow {
   key: string
@@ -36,6 +57,8 @@ export default function CatalogueImportModal({
   supplierName,
   supplierCurrency,
   brands,
+  rates,
+  account,
   onClose,
   onImported,
 }: Props) {
@@ -52,6 +75,21 @@ export default function CatalogueImportModal({
 
   const [brand, setBrand] = useState(brands[0] || '')
   const [currency, setCurrency] = useState((supplierCurrency || 'EUR').toUpperCase())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [maximised, setMaximised] = useState(false)
+
+  // Follows the currency override, not just the supplier's default, so changing
+  // the dropdown re-prices the preview against the right rate.
+  const rate = currency === 'ZAR' ? 1 : rates[currency] || 0
+  const isLocal = isLocalSupplierCurrency(currency)
+
+  const toggleRow = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
 
   const toRows = (parsed: ParsedRow[]): EditableRow[] =>
     parsed.map((r, i) => ({
@@ -209,7 +247,11 @@ export default function CatalogueImportModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-5xl rounded-lg shadow-xl max-h-[90vh] flex flex-col">
+      <div
+        className={`bg-white w-full rounded-lg shadow-xl flex flex-col ${
+          maximised ? 'max-w-none h-full max-h-full' : 'max-w-5xl max-h-[90vh]'
+        }`}
+      >
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h3 className="font-bold text-gray-900">Import price list — {supplierName}</h3>
@@ -218,14 +260,25 @@ export default function CatalogueImportModal({
               unless you change it below.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 text-xl leading-none px-2"
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setMaximised((m) => !m)}
+              className="text-gray-400 hover:text-gray-700 text-lg leading-none px-2"
+              aria-label={maximised ? 'Restore size' : 'Maximise'}
+              title={maximised ? 'Restore size' : 'Maximise'}
+            >
+              {maximised ? '⤡' : '⤢'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-700 text-xl leading-none px-2"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex-1 space-y-4">
@@ -422,7 +475,17 @@ export default function CatalogueImportModal({
                 </p>
               )}
 
-              <div className="border border-gray-200 rounded overflow-x-auto max-h-[45vh]">
+              <p className="text-xs text-gray-500">
+                Est. Retail is worked out by the Spare Parts calculator ({account.name}) at the
+                live {currency} rate. It is shown for review only — it is never stored, and it
+                keeps moving with the rate after import (Rule 63).
+              </p>
+
+              <div
+                className={`border border-gray-200 rounded overflow-x-auto ${
+                  maximised ? 'max-h-[70vh]' : 'max-h-[45vh]'
+                }`}
+              >
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 sticky top-0">
                     <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
@@ -430,13 +493,31 @@ export default function CatalogueImportModal({
                       <th className="px-2 py-2">SKU</th>
                       <th className="px-2 py-2">Description</th>
                       <th className="px-2 py-2 text-right">Wholesale ({currency})</th>
+                      <th className="px-2 py-2 text-right">Est. Retail (ZAR)</th>
+                      <th className="px-2 py-2 w-8"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {rows.map((r) => {
                       const dupe = duplicates.has(r.sku.trim().toUpperCase())
+                      const open = expanded.has(r.key)
+                      // Rule 65: a ZAR supplier is local, so the import
+                      // percentages are never applied and the estimate comes
+                      // from Inventory instead — which this sheet cannot know.
+                      const estimate =
+                        isLocal || !rate || r.wholesalePrice <= 0
+                          ? 0
+                          : calcEstRetailZAR(r.wholesalePrice, rate, account)
+                      // Landed comes from the real function, never a local copy
+                      // of the formula, so the breakdown cannot drift from the
+                      // number the rest of the site quotes (Rule 60).
+                      const landed = calcLandedZAR(r.wholesalePrice, rate, account)
+                      const afterMarkup = landed * (1 + (account.markupPct || 0) / 100)
+                      const importPct =
+                        (account.shippingPct || 0) + (account.customsPct || 0) + (account.handlingPct || 0)
                       return (
-                        <tr key={r.key} className={r.include ? undefined : 'opacity-40'}>
+                        <Fragment key={r.key}>
+                        <tr className={r.include ? undefined : 'opacity-40'}>
                           <td className="px-2 py-1">
                             <input
                               type="checkbox"
@@ -503,7 +584,67 @@ export default function CatalogueImportModal({
                               title={r.warning || ''}
                             />
                           </td>
+                          <td className="px-2 py-1 text-right whitespace-nowrap">
+                            {estimate > 0 ? (
+                              <span className="font-semibold text-gray-900">{formatZAR(estimate)}</span>
+                            ) : (
+                              <span className="text-xs text-gray-400">
+                                {isLocal
+                                  ? 'From Inventory'
+                                  : !rate
+                                    ? 'No rate'
+                                    : 'On request'}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1 text-center">
+                            <button
+                              type="button"
+                              onClick={() => toggleRow(r.key)}
+                              className="text-gray-400 hover:text-gray-800 text-xs px-1"
+                              aria-expanded={open}
+                              aria-label={`${open ? 'Hide' : 'Show'} costing for ${r.sku}`}
+                            >
+                              {open ? '▾' : '▸'}
+                            </button>
+                          </td>
                         </tr>
+                        {open && (
+                          <tr className="bg-gray-50">
+                            <td colSpan={6} className="px-8 py-3">
+                              {estimate > 0 ? (
+                                <div className="text-xs text-gray-700 max-w-md space-y-1">
+                                  <Step label={`Wholesale (${currency})`} value={r.wholesalePrice.toFixed(2)} />
+                                  <Step label={`× exchange rate ${rate.toFixed(4)}`} value={formatZAR(r.wholesalePrice * rate)} />
+                                  <Step
+                                    label={`+ shipping ${account.shippingPct || 0}% + customs ${account.customsPct || 0}%${
+                                      account.handlingPct ? ` + handling ${account.handlingPct}%` : ''
+                                    } = ${importPct}%`}
+                                    value={formatZAR(landed)}
+                                  />
+                                  <Step label={`× markup ${account.markupPct || 0}%`} value={formatZAR(afterMarkup)} />
+                                  <Step label={`× VAT ${account.vatPct || 0}%`} value={formatZAR(estimate)} />
+                                  <div className="flex justify-between border-t border-gray-300 pt-1 mt-1 font-semibold text-gray-900">
+                                    <span>Est. Retail</span>
+                                    <span>{formatZAR(estimate)}</span>
+                                  </div>
+                                  <p className="text-[11px] text-gray-500 pt-1">
+                                    {account.name} · Spare Parts calculator · live rate, not stored
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-500">
+                                  {isLocal
+                                    ? `${currency} is a local currency — the import percentages are never applied and the estimate comes from Inventory instead (Rule 65).`
+                                    : !rate
+                                      ? `No live ${currency} exchange rate, so no estimate can be worked out.`
+                                      : 'No wholesale price on this row — clients see “On request” until it is priced.'}
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                        </Fragment>
                       )
                     })}
                   </tbody>
