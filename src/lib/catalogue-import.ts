@@ -207,6 +207,25 @@ export function detectColumns(rows: string[][]): ColumnMap {
   return { sku: skuCol, description: descCol, wholesalePrice: priceCol, headerRow: -1 }
 }
 
+/**
+ * A section heading rather than a product.
+ *
+ * Supplier sheets group their parts under lines like "REVO SLOT F40 SPARE
+ * PARTS" or "GTU IMSA SPARE PARTS (934 / RX-7/MUSTANG GTO)", with the price
+ * column left empty. A product code never contains a space, so prose in the
+ * SKU cell with NO price is a heading — 23 of them were imported as SKUs from
+ * the Revo sheet before this existed (27 Sept 2026).
+ *
+ * A real code with no price is NOT a heading and still imports: 90 such rows
+ * are legitimately unpriced and show clients "On request" until someone prices
+ * them by hand (Rule 61), among them Sideways codes like SWB/BM and SWFE/A
+ * that carry no digit at all. Requiring a price would delete those.
+ */
+export function isSectionHeading(sku: string, price: number): boolean {
+  if (Number.isFinite(price) && price > 0) return false
+  return /\s/.test((sku || '').trim())
+}
+
 /** Apply a column map to raw grid rows. */
 export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
   const out: ParsedRow[] = []
@@ -235,6 +254,7 @@ export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
     // Skip anything that reads as a section heading or a totals line rather
     // than a product — they are common mid-table and import as junk SKUs.
     if (/^(total|subtotal|sous-total|sum|page)\b/i.test(sku)) continue
+    if (isSectionHeading(sku, price)) continue
 
     out.push({
       sku: sku.toUpperCase(),
