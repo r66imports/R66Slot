@@ -117,6 +117,25 @@ function findProductForText(text: string, index: Map<string, ProductLite>) {
   return null
 }
 
+/** Browser spell check language for the free-text task fields.
+ *  Chrome only has a dictionary for a language the user has switched on under
+ *  Settings -> Languages -> Spell check, so this is a hint, not an install. */
+type SpellLang = 'af' | 'en-ZA' | 'off'
+
+const SPELL_KEY = 'r66-task-list-spell-lang'
+
+const SPELL_OPTIONS: { value: SpellLang; label: string }[] = [
+  { value: 'af', label: 'Spelling: Afrikaans' },
+  { value: 'en-ZA', label: 'Spelling: English' },
+  { value: 'off', label: 'Spelling: Off' },
+]
+
+function spellProps(lang: SpellLang) {
+  return lang === 'off'
+    ? { spellCheck: false, lang: undefined }
+    : { spellCheck: true, lang }
+}
+
 function sortTasks(list: Task[]) {
   return [...list].sort((a, b) => {
     if (!!a.completedAt !== !!b.completedAt) return a.completedAt ? 1 : -1
@@ -152,6 +171,20 @@ export default function TaskListView({
   const [productIndex, setProductIndex] = useState<Map<string, ProductLite>>(new Map())
   const [selectedSupplier, setSelectedSupplier] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<'' | TaskPriority>('')
+  const [spellLang, setSpellLang] = useState<SpellLang>('af')
+
+  // Spell check language is remembered per browser
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SPELL_KEY)
+      if (saved === 'af' || saved === 'en-ZA' || saved === 'off') setSpellLang(saved)
+    } catch {}
+  }, [])
+
+  function changeSpellLang(value: SpellLang) {
+    setSpellLang(value)
+    try { localStorage.setItem(SPELL_KEY, value) } catch {}
+  }
 
   // Whole task list is a drop down
   const [listOpen, setListOpen] = useState(true)
@@ -442,6 +475,7 @@ export default function TaskListView({
               onChange={e => setNewTitle(e.target.value)}
               placeholder="What needs doing?"
               autoFocus
+              {...spellProps(spellLang)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
             />
           </div>
@@ -507,6 +541,16 @@ export default function TaskListView({
             ))}
           </select>
         )}
+        <select
+          value={spellLang}
+          onChange={e => changeSpellLang(e.target.value as SpellLang)}
+          title="Which dictionary the browser uses to underline misspelt words in task titles and notes"
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-black bg-white focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+        >
+          {SPELL_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
       </div>
 
       {loading ? (
@@ -584,6 +628,7 @@ export default function TaskListView({
                               onChange={e => setLineTitle(e.target.value)}
                               placeholder={`Add a line item for ${formatDateLabel(line.date)}…`}
                               autoFocus
+                              {...spellProps(spellLang)}
                               className="flex-1 min-w-[200px] px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                             />
                             <select
@@ -609,6 +654,7 @@ export default function TaskListView({
                             key={task.id}
                             task={task}
                             productIndex={productIndex}
+                            spellLang={spellLang}
                             toggling={togglingId === task.id}
                             onToggle={() => toggleComplete(task)}
                             onSetPriority={p => setPriority(task.id, p)}
@@ -647,6 +693,7 @@ function Chevron({ open }: { open: boolean }) {
 function TaskRow({
   task,
   productIndex,
+  spellLang,
   toggling,
   onToggle,
   onSetPriority,
@@ -656,6 +703,7 @@ function TaskRow({
 }: {
   task: Task
   productIndex: Map<string, ProductLite>
+  spellLang: SpellLang
   toggling: boolean
   onToggle: () => void
   onSetPriority: (priority: TaskPriority) => void
@@ -805,6 +853,7 @@ function TaskRow({
               value={titleValue}
               onChange={e => handleTitleChange(e.target.value)}
               placeholder="Task…"
+              {...spellProps(spellLang)}
               className={`w-full text-sm font-semibold mt-0.5 px-2 py-1 border border-transparent rounded-md bg-transparent text-black placeholder-gray-500 hover:border-gray-300 focus:outline-none focus:border-gray-900 focus:bg-white transition-colors ${isComplete ? 'line-through' : ''}`}
             />
           )}
@@ -815,6 +864,7 @@ function TaskRow({
               value={noteValue}
               onChange={e => handleNoteChange(e.target.value)}
               placeholder="Add a note…"
+              {...spellProps(spellLang)}
               className="flex-1 min-w-0 text-xs px-2 py-1 border border-gray-300 rounded-md bg-white text-black placeholder-gray-500 focus:outline-none focus:border-gray-900 focus:ring-1 focus:ring-gray-900 transition-colors"
             />
             {savedIndicator && (
