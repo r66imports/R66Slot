@@ -67,7 +67,9 @@ export default function SupplierCataloguePage() {
       if (sRes.ok) {
         const list: Supplier[] = await sRes.json()
         setSuppliers(list)
-        if (list.length > 0) setSelectedId((cur) => cur || list[0].id)
+        // Deliberately NOT list[0]: auto-selecting the first supplier opened the
+        // page on NSR and invited edits to whichever sheet happened to sort
+        // first. Nothing is selected until an admin picks one.
       }
       if (aRes.ok) setAccounts(await aRes.json())
       if (rRes.ok) setRates((await rRes.json()).rates || {})
@@ -262,6 +264,7 @@ export default function SupplierCataloguePage() {
               onChange={(e) => setSelectedId(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md text-sm min-w-56"
             >
+              <option value="">Select supplier…</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -272,10 +275,12 @@ export default function SupplierCataloguePage() {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Currency</label>
             <select
-              value={currency}
+              value={supplier ? currency : ''}
+              disabled={!supplier}
               onChange={(e) => saveSupplier({ preferredCurrency: e.target.value })}
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-100 disabled:text-gray-400"
             >
+              <option value="">—</option>
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -286,16 +291,22 @@ export default function SupplierCataloguePage() {
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Costing account</label>
             <select
-              value={supplier?.defaultAccount || 'JDM'}
+              value={supplier ? supplier.defaultAccount || 'JDM' : ''}
+              disabled={!supplier}
               onChange={(e) => saveSupplier({ defaultAccount: e.target.value as 'JDM' | 'R66' })}
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm disabled:bg-gray-100 disabled:text-gray-400"
             >
+              <option value="">—</option>
               <option value="JDM">JDM Garage — standard</option>
               <option value="R66">Route 66 Imports — spare parts</option>
             </select>
           </div>
           <div className="text-sm text-gray-500 pb-2">
-            Rate: {rate > 0 ? `1 ${currency} = ${formatZAR(rate)}` : `no rate for ${currency}`}
+            {!supplier
+              ? 'Pick a supplier to load its sheet.'
+              : rate > 0
+                ? `Rate: 1 ${currency} = ${formatZAR(rate)}`
+                : `Rate: no rate for ${currency}`}
           </div>
         </div>
 

@@ -50,14 +50,18 @@ export const DEFAULT_COSTING_ACCOUNTS: CostingAccount[] = [
     handlingPct: 0,
     markupPct: 30,
     /**
-     * Zero. A pre-order estimate is quoted WITHOUT VAT on R66Slot (user,
-     * 22 Sept 2026), matching the Pre-Order Dashboard's own VAT default and the
-     * Worksheet, whose vatPct has always defaulted to 0. Kept as a field so it
-     * can be raised on the Costing Accounts panel without a deploy.
+     * Zero here, but LIVE R66 RUNS AT 15 (user, 27 Sept 2026). Spares are
+     * quoted inclusive of VAT so the estimate matches the admin Spare Parts
+     * Calculator, which is fixed at 45% + 30% + 15% — 13.90 EUR at R18.5874
+     * reads R560.07 in both. This reverses the 22 Sept "no VAT" decision for
+     * SPARES ONLY: Revo Spares/BRM is the sole supplier on R66, and JDM (every
+     * other supplier) stays at 0.
      *
      * NOTE: these accounts are stored in data/costing-accounts.json and the
      * stored copy WINS over this default, so changing it here alone does
-     * nothing to a live site -- the blob must be PATCHed too.
+     * nothing to a live site -- the blob must be PUT too. The live blob was
+     * set to 15 on 27 Sept; this seed is left at 0 so a fresh install starts
+     * ex-VAT rather than silently charging it.
      */
     vatPct: 0,
     /**

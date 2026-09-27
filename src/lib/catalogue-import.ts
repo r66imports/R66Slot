@@ -223,13 +223,23 @@ export function detectColumns(rows: string[][]): ColumnMap {
  */
 export function isSectionHeading(sku: string, price: number): boolean {
   if (Number.isFinite(price) && price > 0) return false
-  return /\s/.test((sku || '').trim())
+  const s = (sku || '').trim()
+  // Prose: "REVO SLOT F40 SPARE PARTS".
+  if (/\s/.test(s)) return true
+  // The sheet's own header, repeated at the top of every page or section, which
+  // carries no space and so is not prose: "COD.", "SKU", "REF.".
+  return SKU_HEADERS.includes(s.toLowerCase().replace(/[.:,;]+$/, ''))
 }
 
 /** Apply a column map to raw grid rows. */
 export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
   const out: ParsedRow[] = []
   const start = map.headerRow >= 0 ? map.headerRow + 1 : 0
+  /** The sheet's own SKU header text, so a repeat of it mid-table is skipped. */
+  const headerSku =
+    map.headerRow >= 0 && map.sku >= 0
+      ? String(rows[map.headerRow]?.[map.sku] ?? '').trim().toLowerCase()
+      : ''
 
   // Shape inference (headerRow < 0) means no header was recognised, so the sheet's
   // own header row is still sitting at the top of the data and would import as a
@@ -255,6 +265,7 @@ export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
     // than a product — they are common mid-table and import as junk SKUs.
     if (/^(total|subtotal|sous-total|sum|page)\b/i.test(sku)) continue
     if (isSectionHeading(sku, price)) continue
+    if (headerSku && sku.trim().toLowerCase() === headerSku) continue
 
     out.push({
       sku: sku.toUpperCase(),
