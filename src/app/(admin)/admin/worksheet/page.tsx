@@ -568,7 +568,10 @@ function WorksheetEditor({
   // Both sliders take the same worksheet rows; only the blob differs. Chasecars are kept
   // off both (Rules 55 & 57) - a pre-arrival reveal is exactly what they exist to prevent.
   // compareAtPrice is never sent: on R66Slot it holds the internal Average Cost.
-  // Sending an array REPLACES the blob, so the slider always shows this worksheet's batch.
+  // ?mode=merge upserts each row by SKU and leaves the rest of the slider alone, so a send
+  // never wipes cards added one at a time from the Pre-Order Dashboard or a product toggle.
+  // Latest Arrivals additionally clears each SKU from Landing Soon, server side: it has
+  // landed, so it is no longer on its way.
   async function sendToSlider(kind: 'latest-arrivals' | 'landing-soon') {
     const label = kind === 'latest-arrivals' ? 'Latest Arrivals' : 'Landing Soon'
     const skuItems = items.filter(
@@ -610,7 +613,7 @@ function WorksheetEditor({
           productId: prod?.id || undefined,
         }
       })
-      const res = await fetch(`/api/admin/${kind}`, {
+      const res = await fetch(`/api/admin/${kind}?mode=merge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -2166,7 +2169,7 @@ function WorksheetEditor({
             <button
               onClick={() => sendToSlider('latest-arrivals')}
               disabled={sendingArrivals || !items.some((it) => it.sku)}
-              title="Replaces the Latest Arrivals slider with this worksheet's SKUs (Chasecars excluded)"
+              title="Adds this worksheet's SKUs to the Latest Arrivals slider and takes them off Landing Soon (Chasecars excluded)"
               className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 ${
                 sentToArrivals ? 'bg-green-600 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'
               }`}
@@ -2177,7 +2180,7 @@ function WorksheetEditor({
             <button
               onClick={() => sendToSlider('landing-soon')}
               disabled={sendingLanding || !items.some((it) => it.sku)}
-              title="Replaces the Landing Soon slider with this worksheet's SKUs (Chasecars excluded)"
+              title="Adds this worksheet's SKUs to the Landing Soon slider (Chasecars excluded)"
               className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 ${
                 sentToLanding ? 'bg-green-600 text-white' : 'bg-sky-600 text-white hover:bg-sky-700'
               }`}

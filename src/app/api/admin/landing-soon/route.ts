@@ -32,10 +32,14 @@ export async function POST(req: NextRequest) {
     const isArray = Array.isArray(body)
     const incoming: any[] = isArray ? body : [body]
 
-    // When an array is sent, REPLACE the entire blob so stale entries are always removed.
-    // When a single item is sent (the Landing Soon toggle), upsert into the existing list.
+    // An array REPLACES the entire blob so stale entries are always removed - unless
+    // ?mode=merge, which upserts each row and leaves the rest of the list alone, so a
+    // Worksheet send cannot wipe cards added one at a time from the Pre-Order Dashboard
+    // or a Product Edit toggle.
+    // A single item always upserts into the existing list.
+    const merge = new URL(req.url).searchParams.get('mode') === 'merge'
     let arr: LandingSoonItem[] = []
-    if (!isArray) {
+    if (!isArray || merge) {
       const existing = await blobRead<LandingSoonItem[]>(KEY, [])
       arr = Array.isArray(existing) ? existing : []
     }
