@@ -135,6 +135,31 @@ export function isFullySettled(
   return settledAmount(doc, overrides) >= documentTotal(doc) - MONEY_EPSILON
 }
 
+/**
+ * What a pre-order customer's linked document says about payment — read from the money
+ * recorded on it, never from a hand-ticked box. "Invoice Paid" once an invoice is settled;
+ * "Deposit Paid" once any payment is recorded against the Quote (or an Invoice still owing);
+ * otherwise nothing. A deposit-mode figure is only the deposit DUE, so it does not count.
+ *
+ * Rule 44 — this is money, so it reads `amountPaid`, not `status`. A fully settled invoice
+ * still sitting on Accepted is money received awaiting its bank check, and it reads as paid
+ * here; `status === 'paid'` only adds documents Mark as Paid has already verified. Nothing in
+ * this function writes status, so the Admin-only Mark as Paid gate is untouched.
+ *
+ * The test is `type === 'invoice'`, never the document number: Slot numbers invoices INV0026
+ * where Emporium uses R66INV, so any prefix check ported between the sites falls through and
+ * calls every Slot invoice a quote.
+ */
+export function preorderPaymentLabel(
+  doc: (PaymentDoc & { type?: string; status?: string }) | null | undefined,
+): 'Invoice Paid' | 'Deposit Paid' | null {
+  if (!doc) return null
+  if (doc.type === 'invoice' && documentTotal(doc) > MONEY_EPSILON && (doc.status === 'paid' || isFullySettled(doc))) {
+    return 'Invoice Paid'
+  }
+  return settledAmount(doc) > MONEY_EPSILON ? 'Deposit Paid' : null
+}
+
 // ─── Entry-error guards ──────────────────────────────────────────────────────
 // Two payments of R66 110.00 and R66 137.00 were once recorded against quotes QR66110 and
 // QR66137 — the amount was the document's own number, pasted or autofilled into the amount

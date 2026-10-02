@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import Link from 'next/link'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
+import { preorderPaymentLabel } from '@/lib/payment-math'
 import {
   calcCosting, calcRetailPrice,
   DEFAULT_SHIP_PCT, DEFAULT_CUSTOMS_PCT, DEFAULT_MARKUP_PCT, DEFAULT_VAT_PCT,
@@ -741,6 +742,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
 function ItemCard({
   item, contacts, suppliers, options, exchangeRates,
   onSave, onDelete, onDuplicate, onAddOption, onSendToWorksheet, isNew, onCancelNew, isSelected, onToggleSelect,
+  docIndex = {},
 }: {
   item: DashboardItem & { _draft?: boolean }
   contacts: Contact[]; suppliers: SupplierContact[]; options: DashboardOptions
@@ -751,6 +753,7 @@ function ItemCard({
   onAddOption: (type: 'brand' | 'unit' | 'eta', value: string) => Promise<void>
   onSendToWorksheet: (id: string, form: FormState) => Promise<void>
   isNew?: boolean; onCancelNew?: () => void; isSelected?: boolean; onToggleSelect?: (id: string) => void
+  docIndex?: Record<string, any>
 }) {
   const [form, setForm] = useState<FormState>({
     sku:item.sku, description:item.description, retailPrice:item.retailPrice??'', estimatedRetailPrice:item.estimatedRetailPrice,
@@ -846,6 +849,27 @@ function ItemCard({
     if(url?.startsWith('data:image')){fetch(url).then(r=>r.blob()).then(b=>handleImageFile(b,'dropped.png')).catch(()=>{});return}
     if(url&&url.startsWith('http')) set('imageUrl',url)
   }
+  // Ctrl+V onto the photo box: the zone the mouse is over, or the one with focus, wins.
+  const imageFileRef=useRef(handleImageFile); imageFileRef.current=handleImageFile
+  useEffect(()=>{
+    const onPaste=(e:ClipboardEvent)=>{
+      const zone=imageZoneRef.current
+      if(!zone) return
+      const active=document.activeElement
+      const focused=!!active&&(zone===active||zone.contains(active))
+      if(!focused&&!zone.matches(':hover')) return
+      const items=Array.from(e.clipboardData?.items||[])
+      const img=items.find(i=>i.type.startsWith('image/'))
+      if(img){const f=img.getAsFile();if(f){e.preventDefault();imageFileRef.current(f,`pasted-${Date.now()}.png`)}return}
+      const tag=(active as HTMLElement|null)?.tagName
+      if(tag==='INPUT'||tag==='TEXTAREA'||(active as HTMLElement|null)?.isContentEditable) return
+      const url=e.clipboardData?.getData('text/plain')?.trim()
+      if(url?.startsWith('data:image')){e.preventDefault();fetch(url).then(r=>r.blob()).then(b=>imageFileRef.current(b,'pasted.png')).catch(()=>{});return}
+      if(url&&/^https?:\/\//.test(url)&&/\.(png|jpe?g|webp|gif|avif)(\?|$)/i.test(url)){e.preventDefault();set('imageUrl',url)}
+    }
+    document.addEventListener('paste',onPaste)
+    return()=>document.removeEventListener('paste',onPaste)
+  },[])
   const isPastCutoff=!!form.cutoffDate&&daysUntilCutoff(form.cutoffDate)<=0
   const addCustomer=(c:Contact)=>{
     customersDirty.current=true
@@ -1048,7 +1072,7 @@ function ItemCard({
               ):(
                 <div className="text-center text-gray-400 text-xs select-none pointer-events-none">
                   {isDragging?<><div className="text-2xl mb-1">⬇️</div><div className="font-medium text-indigo-600">Drop image here</div></>
-                  :<><div className="text-2xl mb-1">📷</div><div className="font-medium">Click to browse</div><div className="mt-0.5 text-gray-300">or drag &amp; drop</div></>}
+                  :<><div className="text-2xl mb-1">📷</div><div className="font-medium">Click to browse</div><div className="mt-0.5 text-gray-300">drag &amp; drop, or paste</div></>}
                 </div>
               )}
             </div>
@@ -1202,11 +1226,15 @@ function ItemCard({
                       <input type="number" min={1} value={c.qty} onChange={e=>updateCustomer(c.id,{qty:Math.max(1,parseInt(e.target.value)||1)})} className="w-12 text-xs border rounded px-1 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white border-gray-300"/>
                     </div>
                     {deposit>0&&<span className="text-xs text-indigo-700 font-medium">Deposit: R{deposit.toFixed(2)}</span>}
-                    <label className="flex items-center gap-1 cursor-pointer ml-auto">
-                      <input type="checkbox" checked={!!c.depositPaid} onChange={e=>updateCustomer(c.id,{depositPaid:e.target.checked,depositPaidDate:e.target.checked?(c.depositPaidDate||new Date().toISOString().slice(0,10)):undefined})} className="w-3.5 h-3.5 accent-indigo-600"/>
-                      <span className="text-xs text-gray-600">Paid</span>
-                    </label>
-                    {c.depositPaid&&<input type="date" value={c.depositPaidDate||''} onChange={e=>updateCustomer(c.id,{depositPaidDate:e.target.value})} className="text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"/>}
+                    {/* Paid status is read from the money recorded on the linked Quote / Invoice — no
+                        hand-ticked box. A deposit ticked by hand before the box went still shows. */}
+                    {(()=>{
+                      const doc=(c.linkedDocId&&docIndex[c.linkedDocId])||(c.linkedDocNumber&&docIndex[c.linkedDocNumber])||null
+                      const label=preorderPaymentLabel(doc)||(c.depositPaid?'Deposit Paid':null)
+                      return label
+                        ?<span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap ${label==='Invoice Paid'?'bg-emerald-600 text-white':'bg-green-100 text-green-800 border border-green-300'}`}>✓ {label}</span>
+                        :<span className="ml-auto"/>
+                    })()}
                     <SendToDropdown customer={c} form={form} unitPrice={unitPrice} onLinked={(docNumber,docId)=>updateCustomer(c.id,{linkedDocNumber:docNumber,linkedDocId:docId})}/>
                   </div>
                 </div>
@@ -1248,6 +1276,7 @@ export default function SupplierPreOrderPage() {
   // ?q= arrives from the Pre-Order Dashboard search so a result row lands pre-filtered
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [showArrived, setShowArrived] = useState(false)
+  const [showPaidInvoices, setShowPaidInvoices] = useState(false)
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
@@ -1257,6 +1286,24 @@ export default function SupplierPreOrderPage() {
   const [newItem, setNewItem] = useState<(DashboardItem & { _draft?: boolean }) | null>(null)
   const [showViewAll, setShowViewAll] = useState(false)
   const [viewAllSearch, setViewAllSearch] = useState('')
+
+  // Every Quote / Invoice by id and number, so each customer row can show whether its linked
+  // document has a deposit or full payment recorded. Re-read when the tab regains focus —
+  // payments are recorded on the Orders page, usually in another tab.
+  const [docIndex, setDocIndex] = useState<Record<string, any>>({})
+  const loadDocIndex = useCallback(async () => {
+    try {
+      const docs = await fetch('/api/admin/orders/documents').then(r => r.json())
+      const m: Record<string, any> = {}
+      for (const d of Array.isArray(docs) ? docs : []) { m[d.id] = d; if (d.docNumber) m[d.docNumber] = d }
+      setDocIndex(m)
+    } catch {}
+  }, [])
+  useEffect(() => {
+    loadDocIndex()
+    window.addEventListener('focus', loadDocIndex)
+    return () => window.removeEventListener('focus', loadDocIndex)
+  }, [loadDocIndex])
 
   const loadItems = async () => {
     const res = await fetch(`/api/admin/preorder-dashboard?supplier=${encodeURIComponent(supplierName)}`)
@@ -1334,7 +1381,21 @@ export default function SupplierPreOrderPage() {
   // dashboard. Hidden, not deleted: its customers and document links stay, "Show arrived"
   // brings it back, and a search still finds it.
   const arrivedCount = items.filter(i => i.sentToLatestArrivals).length
-  const current = showArrived || search.trim() ? sorted : sorted.filter(i => !i.sentToLatestArrivals)
+
+  // An item is "paid" when one of its customers' linked documents is a settled invoice. Read
+  // from the money recorded on the document (same source as the ✓ Invoice Paid chip on the
+  // card), never from the old hand-ticked box — a deposit is not a paid invoice.
+  const hasPaidInvoice = (i: DashboardItem) => i.customers.some(c => {
+    const doc = (c.linkedDocId && docIndex[c.linkedDocId]) || (c.linkedDocNumber && docIndex[c.linkedDocNumber]) || null
+    return preorderPaymentLabel(doc) === 'Invoice Paid'
+  })
+  const paidCount = items.filter(hasPaidInvoice).length
+
+  // Show Paid Invoices is a filter, not a reveal: it narrows to every paid item there is, so it
+  // looks past the arrived hide as well — a landed item can still be the one you are chasing.
+  const current = showPaidInvoices
+    ? sorted.filter(hasPaidInvoice)
+    : showArrived || search.trim() ? sorted : sorted.filter(i => !i.sentToLatestArrivals)
 
   // "New Orders" filters the list down to items with at least one not-yet-seen reservation
   const newFiltered = sortBy === 'new' ? current.filter(i => i.customers.some(c => (c as any).isNew)) : current
@@ -1565,6 +1626,13 @@ export default function SupplierPreOrderPage() {
               <button onClick={() => { setSearch(''); setPage(1) }} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">✕</button>
             )}
           </div>
+          {paidCount > 0 && (
+            <button onClick={() => { setShowPaidInvoices(v => !v); setPage(1) }}
+              className={`text-sm px-3 py-1.5 rounded-lg border font-medium transition-colors whitespace-nowrap ${showPaidInvoices ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'}`}
+              title="Only items with a customer whose linked invoice is paid in full">
+              💰 {showPaidInvoices ? 'Hide' : 'Show'} Paid Invoices ({paidCount})
+            </button>
+          )}
           {arrivedCount > 0 && (
             <button onClick={() => { setShowArrived(v => !v); setPage(1) }}
               className={`text-sm px-3 py-1.5 rounded-lg border font-medium transition-colors whitespace-nowrap ${showArrived ? 'bg-purple-700 text-white border-purple-700' : 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100'}`}
@@ -1596,7 +1664,7 @@ export default function SupplierPreOrderPage() {
           onSave={handleSave} onDelete={handleDelete} onDuplicate={handleDuplicate}
           onAddOption={handleAddOption} onSendToWorksheet={handleSendToWorksheet}
           isNew onCancelNew={() => setNewItem(null)}
-          isSelected={false} onToggleSelect={toggleSelect}/>
+          isSelected={false} onToggleSelect={toggleSelect} docIndex={docIndex}/>
       )}
 
       {!loading && (
@@ -1604,15 +1672,15 @@ export default function SupplierPreOrderPage() {
           {pagedItems.length === 0 && !newItem ? (
             <div className="text-center py-20 text-gray-400">
               <div className="text-4xl mb-3">📦</div>
-              <p className="font-medium">No items for {supplierName}</p>
-              <p className="text-sm mt-1">Click &quot;+ New Item&quot; to add the first one.</p>
+              <p className="font-medium">{showPaidInvoices ? 'No paid invoices in this view' : `No items for ${supplierName}`}</p>
+              <p className="text-sm mt-1">{showPaidInvoices ? 'Turn off Show Paid Invoices to see every item.' : <>Click &quot;+ New Item&quot; to add the first one.</>}</p>
             </div>
           ) : pagedItems.map(item => (
             <ItemCard key={item.id} item={item} contacts={contacts} suppliers={suppliers} options={options}
               exchangeRates={exchangeRates}
               onSave={handleSave} onDelete={handleDelete} onDuplicate={handleDuplicate}
               onAddOption={handleAddOption} onSendToWorksheet={handleSendToWorksheet}
-              isSelected={selected.has(item.id)} onToggleSelect={toggleSelect}/>
+              isSelected={selected.has(item.id)} onToggleSelect={toggleSelect} docIndex={docIndex}/>
           ))}
         </div>
       )}
