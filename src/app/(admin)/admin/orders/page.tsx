@@ -9,7 +9,7 @@ import { useColumnResize } from '@/hooks/use-column-resize'
 import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import {
   settledAmount, balanceDue as calcBalanceDue, overpaymentFor,
-  isFullySettled, depositAsSettled, paymentWarnings,
+  depositAsSettled, paymentWarnings,
 } from '@/lib/payment-math'
 import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
 
@@ -3791,7 +3791,6 @@ function OrdersPageInner() {
     const newAmountPaid = ((paymentModal as any).amountPaid || 0) + result.amountPaid
     const newCreditApplied = ((paymentModal as any).creditApplied || 0) + result.creditApplied
     const newOverpaymentCredit = ((paymentModal as any).overpaymentCredit || 0) + result.overpaymentCredit
-    const fullySettled = isFullySettled(paymentModal as any, { amountPaid: newAmountPaid, creditApplied: newCreditApplied })
     const payments = [
       ...((paymentModal as any).payments || []),
       { date: new Date().toISOString(), amountPaid: result.amountPaid, creditApplied: result.creditApplied, paymentMethod: result.paymentMethod, notes: result.notes },
@@ -3807,7 +3806,10 @@ function OrdersPageInner() {
         paymentMethod: result.paymentMethod,
         notes: result.notes || (paymentModal as any).notes || '',
         payments,
-        ...(fullySettled ? { status: 'paid' } : {}),
+        // Status is NOT written here, for the same reason the inline panel does not write it:
+        // recording money and declaring a document Paid are two separate decisions. Paid is
+        // set in exactly one place — Actions → Mark as Paid. Balance Due and the green
+        // "Paid R…" figure come from amountPaid (Rule 44), so they update either way.
         ...((paymentModal as any).status === 'complete' ? { autoArchiveAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() } : {}),
       }),
     })

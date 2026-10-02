@@ -30,7 +30,7 @@ const FIELDS: { field: string; meaning: React.ReactNode; writer: string }[] = [
   { field: 'depositMode', meaning: 'Switches the meaning of depositPaid. Quotes only', writer: 'Edit modal' },
   { field: 'overpaymentCredit', meaning: 'Credit this document created. Mirrors a ledger transaction', writer: 'Record Payment · inline panel' },
   { field: 'showCreditOnInvoice', meaning: 'Whether the customer sees the credit line on their copy', writer: 'Record Payment' },
-  { field: 'status', meaning: 'Flips to paid once settled reaches the document total', writer: 'Record Payment · inline panel' },
+  { field: 'status', meaning: 'Never moved by recording money. Paid is set by hand', writer: 'Actions → Mark as Paid' },
   { field: 'balance', meaning: 'Customer credit balance — sum of their ledger transactions', writer: 'customer-credits API' },
 ]
 
@@ -182,7 +182,7 @@ export default function PaymentMappingPage() {
             <text x="250" y="552" fontSize="13.5" fontWeight="650" fill="#1f2937" textAnchor="middle">Document</text>
             <text x="250" y="574" fontSize="11.5" fontFamily="ui-monospace, monospace" fill="#374151" textAnchor="middle">amountPaid · payments[]</text>
             <text x="250" y="594" fontSize="11.5" fontFamily="ui-monospace, monospace" fill="#374151" textAnchor="middle">overpaymentCredit</text>
-            <text x="250" y="616" fontSize="11.5" fill="#6b7280" textAnchor="middle">status → paid once fully settled</text>
+            <text x="250" y="616" fontSize="11.5" fill="#6b7280" textAnchor="middle">status untouched — Paid is set by hand</text>
 
             <rect x="490" y="528" width="320" height="104" rx="6" fill="#f9fafb" stroke="#e5e7eb" strokeWidth="1.5" />
             <text x="650" y="552" fontSize="13.5" fontWeight="650" fill="#1f2937" textAnchor="middle">Credit ledger</text>
