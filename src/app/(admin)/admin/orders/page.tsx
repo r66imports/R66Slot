@@ -1206,8 +1206,9 @@ function CreateDocumentModal({
     // Record Payment only. Keeping them here made every "Update Invoice" write back the
     // stale value the modal opened with, wiping a method recorded while the modal was open.
   })
-  // The status the modal opened with. Recording a payment in here can move the doc to Paid,
-  // which this form's Status list cannot show — so an untouched Status is never written back.
+  // The status the modal opened with. A doc that is already Paid or Archived holds a status
+  // this form's Status list cannot show, so the select renders blank — writing an untouched
+  // Status back would silently downgrade it. An untouched Status is therefore never written.
   const openedStatus = useRef(editDoc?.status)
   const [lineItems, setLineItems] = useState<LineItem[]>(
     editDoc?.lineItems?.length ? editDoc.lineItems : prefilledItems?.length ? prefilledItems : [newLine()]
@@ -3835,7 +3836,6 @@ function OrdersPageInner() {
     const newAmountPaid = prevAmountPaid + amountPaid
     const effectivePaid = Math.max(newAmountPaid, prevDeposit)
     const newOverpayment = Math.max(0, effectivePaid + prevCredit - invoiceTotal)
-    const fullySettled = effectivePaid + prevCredit >= invoiceTotal - 0.005
     const payments = [
       ...((doc as any).payments || []),
       { date: new Date().toISOString(), amountPaid, creditApplied: 0, paymentMethod, notes },
@@ -3846,7 +3846,15 @@ function OrdersPageInner() {
     }).catch(() => {})
     const patchRes = await fetch(`/api/admin/orders/documents/${doc.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amountPaid: newAmountPaid, overpaymentCredit: newOverpayment, paymentMethod, payments, ...(fullySettled ? { status: 'paid' } : {}) }),
+      // Status is NOT written here. Recording the money and declaring the document Paid are
+      // two separate decisions: an EFT is logged the moment it is seen, but it is only Paid
+      // once it has cleared. This panel used to flip a fully-settled document to 'paid' by
+      // itself, and because the method defaults to EFT that happened silently on the method
+      // nobody had to click. Paid now comes from one place only — Actions → Mark as Paid —
+      // so EFT, Cash and Card all leave the status exactly as the admin set it. The balance
+      // still updates: the green "Paid R…" figure and the red "Due R…" badge are computed
+      // from amountPaid (Rule 44), never from status.
+      body: JSON.stringify({ amountPaid: newAmountPaid, overpaymentCredit: newOverpayment, paymentMethod, payments }),
     })
     if (patchRes.ok) {
       const updated = await patchRes.json()
