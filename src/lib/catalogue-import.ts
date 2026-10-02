@@ -221,6 +221,11 @@ export function detectColumns(rows: string[][]): ColumnMap {
  * them by hand (Rule 61), among them Sideways codes like SWB/BM and SWFE/A
  * that carry no digit at all. Requiring a price would delete those.
  */
+/** An exact header word, case and trailing punctuation ignored — never a loose substring. */
+function isHeaderWord(value: string, words: string[]): boolean {
+  return words.includes((value || '').trim().toLowerCase().replace(/[.:,;]+$/, ''))
+}
+
 export function isSectionHeading(sku: string, price: number): boolean {
   if (Number.isFinite(price) && price > 0) return false
   const s = (sku || '').trim()
@@ -241,10 +246,9 @@ export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
       ? String(rows[map.headerRow]?.[map.sku] ?? '').trim().toLowerCase()
       : ''
 
-  // Shape inference (headerRow < 0) means no header was recognised, so the sheet's
-  // own header row is still sitting at the top of the data and would import as a
-  // junk SKU. Drop the first row only when it reads like a header rather than a
-  // product: its SKU cell is not SKU-shaped and its price cell is not a number.
+  // Shape inference (headerRow < 0) means no header was recognised, so the
+  // sheet's own header row may still be sitting at the top of the data and
+  // would import as a junk SKU.
   let dropLeadingHeader = map.headerRow < 0
 
   for (let r = start; r < rows.length; r++) {
@@ -258,7 +262,13 @@ export function rowsToParsed(rows: string[][], map: ColumnMap): ParsedRow[] {
 
     if (dropLeadingHeader) {
       dropLeadingHeader = false
-      if (!looksLikeSku(sku) && !Number.isFinite(price)) continue
+      // isSectionHeading below already drops a prose or header-token SKU on
+      // every row; this adds the case where only the DESCRIPTION cell gives
+      // the header away. Deliberately NOT !looksLikeSku, which requires a
+      // digit and so threw away real codes like SWB/BM and SWFE/A on a
+      // headerless sheet. A junk row that slips through is visible in the
+      // preview and can be unticked; a swallowed product cannot.
+      if (!Number.isFinite(price) && isHeaderWord(description, DESC_HEADERS)) continue
     }
 
     // Skip anything that reads as a section heading or a totals line rather

@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite, blobReplaceArrayItem } from '@/lib/blob-storage'
 import { getRates, rateFor } from '@/lib/exchange-rates'
-import { accountById, lineEstRetailZAR, DEFAULT_COSTING_ACCOUNTS } from '@/lib/preorder-pricing'
+import {
+  accountById,
+  clientQuoteZAR,
+  lineEstRetailZAR,
+  DEFAULT_COSTING_ACCOUNTS,
+} from '@/lib/preorder-pricing'
 import { getSkuInfo } from '@/lib/supplier-catalogue'
 import type { CostingAccount, SupplierPreOrder } from '@/types/supplier-preorder'
 
@@ -44,25 +49,36 @@ export async function GET(request: Request) {
         : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )
 
+    // Photo and on-hand qty keyed by SKU rather than folded into the lines —
+    // PATCH writes `lines` back verbatim, and derived data has no business
+    // being persisted into the request. Fetched BEFORE pricing because the
+    // quoted price depends on stock on hand.
+    const skuInfo = await getSkuInfo(orders.flatMap((o) => o.lines.map((l) => l.sku)))
+
     // Re-price every unlocked line against the live rate so the admin sees the
-    // same number the client is currently being shown.
+    // same number the client is currently being shown. That means the SAME
+    // rule the client route applies — stock on hand quotes the shelf price,
+    // everything else the floating estimate — or the two disagree on money.
     const priced = orders.map((o) => {
       const account = accountById(accounts, o.account)
       const rate = rateFor(rateData.rates, o.currency)
-      const lines = o.lines.map((l) => ({
-        ...l,
-        estRetailZAR: Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100,
-      }))
+      const lines = o.lines.map((l) => {
+        const inf = skuInfo[l.sku.trim().toUpperCase()]
+        const est = Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100
+        const quote = l.priceLocked
+          ? { amount: est, basis: 'estimate' as const }
+          : clientQuoteZAR({
+              qtyAvailable: inf?.qtyAvailable || 0,
+              retailZAR: inf?.retailZAR || 0,
+              estRetailZAR: est,
+            })
+        return { ...l, estRetailZAR: est, quoteZAR: quote.amount, quoteBasis: quote.basis }
+      })
       const totalZAR = lines
         .filter((l) => l.status !== 'rejected')
-        .reduce((s, l) => s + l.qty * l.estRetailZAR, 0)
+        .reduce((s, l) => s + l.qty * l.quoteZAR, 0)
       return { ...o, lines, totalZAR: Math.round(totalZAR * 100) / 100, exRate: rate }
     })
-
-    // Photo and on-hand qty keyed by SKU rather than folded into the lines —
-    // PATCH writes `lines` back verbatim, and derived data has no business
-    // being persisted into the request.
-    const skuInfo = await getSkuInfo(priced.flatMap((o) => o.lines.map((l) => l.sku)))
 
     return NextResponse.json({
       orders: priced,

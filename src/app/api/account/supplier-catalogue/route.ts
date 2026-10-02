@@ -38,8 +38,14 @@ export async function GET(request: NextRequest) {
 
     // Scoped to this client: a client is shown what THEY have on order, never
     // another client's demand.
+    // The brand index scans every product that carries a brand, and the page
+    // only reads it on mount — the items fetch fires again on every brand
+    // toggle and every debounced keystroke and ignores `brands` entirely. So
+    // build it only for the index call, not for each search.
+    const wantsBrandIndex = brands.length === 0 && !q
+
     const [brandIndex, rateData, onOrder, version] = await Promise.all([
-      getBrandIndex(),
+      wantsBrandIndex ? getBrandIndex() : Promise.resolve([]),
       getRates(),
       getOnOrderQtyBySku({ customerId: decoded?.id, email: decoded?.email }),
       getCatalogueVersion(),
