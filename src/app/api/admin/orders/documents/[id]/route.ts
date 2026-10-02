@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { blobRead, blobAppendArrayItem, blobReplaceArrayItem, blobRemoveArrayItem } from '@/lib/blob-storage'
+import { verifyAdminSession } from '@/lib/admin-session'
 import type { OrderDocument } from '../route'
 import { adjustStock, findStockShortfalls, shortfallMessage, sameStockFootprint } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
@@ -19,6 +21,21 @@ async function getDocs(): Promise<OrderDocument[]> {
   return await blobRead<OrderDocument[]>(KEY, [])
 }
 
+/**
+ * Marking a document Paid is the main Admin's signature: it says the bank account has been
+ * checked and the funds are really there, which is what makes the document safe to archive.
+ * It is reserved to the single built-in Admin account — hiding the menu item from staff is
+ * not enough on its own, because this route is reachable directly.
+ *
+ * Only an incoming status of 'paid' is gated. Staff keep every other write, including
+ * recording payments: logging money that arrived is bookkeeping, declaring it verified is
+ * not. The route's own fallback to 'accepted' is unaffected — that is a demotion.
+ */
+async function isMainAdmin(): Promise<boolean> {
+  const token = (await cookies()).get('admin-session')?.value
+  return verifyAdminSession(token)?.username === 'Admin'
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -26,6 +43,12 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
+    if (body.status === 'paid' && !(await isMainAdmin())) {
+      return NextResponse.json(
+        { error: 'Only the main Admin can mark a document Paid' },
+        { status: 403 }
+      )
+    }
     const docs = await getDocs()
     const idx = docs.findIndex((d) => d.id === id)
     if (idx === -1) return NextResponse.json({ error: 'Not found' }, { status: 404 })

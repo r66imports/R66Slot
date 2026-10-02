@@ -12,6 +12,7 @@ import {
   depositAsSettled, paymentWarnings,
 } from '@/lib/payment-math'
 import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
+import { useAdminAuth } from '@/lib/admin-auth-context'
 
 // ─── Service types ────────────────────────────────────────────────────────────
 const SERVICE_TYPES = [
@@ -3283,6 +3284,14 @@ function ConfirmDeleteModal({ label, onConfirm, onClose }: { label: string; onCo
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 function OrdersPageInner() {
+  // Mark as Paid is the main Admin's signature: it means the bank account has been checked
+  // and the funds are really there, which is what makes the document safe to archive. Nobody
+  // else gets to make that call, so the item is hidden from staff. role is 'admin' only for
+  // the single built-in Admin account — every account created in User Accounts is 'staff' by
+  // type, so there is no second admin to leak through. The API enforces the same rule; this
+  // only keeps staff from being offered something the server would refuse.
+  const { role } = useAdminAuth()
+  const isMainAdmin = role === 'admin'
   const searchParams = useSearchParams()
   const [backorders, setBackorders] = useState<Backorder[]>([])
   const [documents, setDocuments] = useState<OrderDocument[]>([])
@@ -5144,7 +5153,7 @@ function OrdersPageInner() {
                               className: isPartiallyPaid ? 'text-red-600 font-semibold' : (amtPaid > 0 || doc.status === 'paid' ? 'text-green-600 font-semibold' : 'text-blue-600'),
                               onClick: () => handleRecordPayment(doc),
                             },
-                            ...(doc.status !== 'paid' && doc.status !== 'archived' ? [{
+                            ...(isMainAdmin && doc.status !== 'paid' && doc.status !== 'archived' ? [{
                               label: 'Mark as Paid',
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
                               className: 'text-green-600',
