@@ -61,7 +61,16 @@ export default function CategoryEditPage() {
         setCategory(cat)
         setName(cat.name)
         setImageUrl(cat.imageUrl || '')
-        setProductIds(cat.productIds || [])
+        // The categories GET deliberately strips productIds ("don't send stale productIds —
+        // count is live now"), so cat.productIds was always undefined here and this page
+        // listed EVERY category as empty while the list page showed a non-zero count beside
+        // it. Membership is read from the products' own categoryIds instead — the same field
+        // that live count is computed from. The stored list stays as the fallback.
+        const list = Array.isArray(prods) ? prods : []
+        const fromProducts = list
+          .filter((p: any) => Array.isArray(p.categoryIds) && p.categoryIds.includes(cat.id))
+          .map((p: any) => p.id)
+        setProductIds(fromProducts.length ? fromProducts : (cat.productIds || []))
       }
       setAllProducts(Array.isArray(prods) ? prods : [])
     }).catch(() => {}).finally(() => setLoading(false))
