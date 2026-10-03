@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
+import { documentTotal, settledAmount, MONEY_EPSILON } from '@/lib/payment-math'
 
 const KEY = 'data/customer-credits.json'
 
@@ -55,16 +56,36 @@ export async function DELETE(request: Request) {
       record.balance = Math.max(0, record.transactions.reduce((s, t) => s + t.amount, 0))
       await blobWrite(KEY, store)
 
-      // Clear the stale overpaymentCredit on the source document too, or the field survives
-      // on the doc, keeps rendering a Credit badge, and can resurrect the balance.
-      if (removed && removed.type === 'overpayment' && removed.invoiceNumber) {
+      // Take the deleted credit off the invoice it sits on too. A ledger row with no matching
+      // invoice line is a phantom credit; an invoice line with no ledger row is the same bug
+      // the other way round. Only that row's amount comes off, so a duplicate can be deleted
+      // without wiping the genuine credit beside it.
+      if (removed && removed.invoiceNumber) {
         try {
           const docs: any[] = await blobRead<any[]>('data/order-documents.json', [])
+          const amt = Math.abs(removed.amount || 0)
           let changed = false
           for (const doc of docs) {
-            if (doc.docNumber === removed.invoiceNumber && (doc.overpaymentCredit || 0) > 0) {
-              doc.overpaymentCredit = 0
-              doc.showCreditOnInvoice = false
+            if (doc.docNumber !== removed.invoiceNumber || clientKey(doc.clientName || '') !== key) continue
+            if (removed.type === 'overpayment' && (doc.overpaymentCredit || 0) > 0) {
+              doc.overpaymentCredit = Math.max(0, Math.round(((doc.overpaymentCredit || 0) - amt) * 100) / 100)
+              if (doc.overpaymentCredit < 0.005) doc.showCreditOnInvoice = false
+              doc.updatedAt = new Date().toISOString()
+              changed = true
+            } else if (removed.type === 'credit_applied' && (doc.creditApplied || 0) > 0) {
+              doc.creditApplied = Math.max(0, Math.round(((doc.creditApplied || 0) - amt) * 100) / 100)
+              // Drop the payment-history entry that carried this credit (closest amount first).
+              if (Array.isArray(doc.payments)) {
+                const idx = doc.payments.findIndex((p: any) =>
+                  Math.abs((p.creditApplied || 0) - amt) < 0.005 && !((p.amountPaid || 0) > 0.005))
+                if (idx >= 0) doc.payments.splice(idx, 1)
+                else {
+                  const j = doc.payments.findIndex((p: any) => Math.abs((p.creditApplied || 0) - amt) < 0.005)
+                  if (j >= 0) doc.payments[j] = { ...doc.payments[j], creditApplied: 0 }
+                }
+              }
+              // Same downgrade Remove Payment makes — a paid invoice that is now short isn't paid.
+              if (doc.status === 'paid' && settledAmount(doc) < documentTotal(doc) - MONEY_EPSILON) doc.status = 'accepted'
               doc.updatedAt = new Date().toISOString()
               changed = true
             }
@@ -133,12 +154,12 @@ export async function POST(request: Request) {
       if (creditApplied <= 0 && overpayment <= 0) {
         return NextResponse.json(record)
       }
+      // Net the two before clamping — subtracting first could floor at 0 and lose the add.
+      record.balance = Math.max(0, record.balance + Math.max(0, overpayment) - Math.max(0, creditApplied))
       if (creditApplied > 0) {
-        record.balance = Math.max(0, record.balance - creditApplied)
         record.transactions.push({ id: mkId(), type: 'credit_applied', invoiceNumber, amount: -creditApplied, notes, date: now })
       }
       if (overpayment > 0) {
-        record.balance += overpayment
         record.transactions.push({ id: mkId(), type: 'overpayment', invoiceNumber, amount: overpayment, notes: notes ?? `Overpayment on ${invoiceNumber}`, date: now })
       }
     } else if (action === 'apply_credit' || action === 'refund') {

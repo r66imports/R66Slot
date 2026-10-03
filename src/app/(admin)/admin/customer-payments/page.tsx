@@ -198,8 +198,11 @@ export default function CustomerPaymentsPage() {
           payments: [],
         }),
       })
-      // Return any previously applied credit back to the customer's balance
-      if (prevCredit > 0.005) {
+      // Return any previously applied credit back to the customer's balance, and take back
+      // the overpayment this invoice put on it — the invoice no longer holds that money, so
+      // leaving it on the ledger is a phantom credit.
+      const prevOverpayment = (doc as any).overpaymentCredit || 0
+      if (prevCredit > 0.005 || prevOverpayment > 0.005) {
         await fetch('/api/admin/customer-credits', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -208,7 +211,7 @@ export default function CustomerPaymentsPage() {
             clientName: doc.clientName,
             invoiceNumber: doc.docNumber,
             amountPaid: 0,
-            creditApplied: 0,
+            creditApplied: prevOverpayment,
             overpayment: prevCredit,
           }),
         }).catch(() => {})
@@ -680,6 +683,23 @@ export default function CustomerPaymentsPage() {
                           {txn.amount > 0 ? '+' : ''}{fmtPrice(Math.abs(txn.amount))}
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-400">{fmtDate(txn.date)}</td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            onClick={async () => {
+                              const onInvoice = txn.type === 'overpayment'
+                                ? `the overpayment credit line on ${txn.invoiceNumber}`
+                                : txn.type === 'credit_applied'
+                                  ? `the Credit Applied line on ${txn.invoiceNumber}`
+                                  : null
+                              if (!confirm(`Delete this ${txn.type.replace(/_/g, ' ')} of ${fmtPrice(Math.abs(txn.amount))} (${txn.invoiceNumber}) for ${record.clientName}?${onInvoice ? `\n\nThis also removes ${onInvoice}.` : ''}`)) return
+                              await fetch(`/api/admin/customer-credits?clientName=${encodeURIComponent(record.clientName)}&transactionId=${encodeURIComponent(txn.id)}`, { method: 'DELETE' })
+                              await load()
+                            }}
+                            className="px-2 py-0.5 text-[11px] bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 font-semibold"
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </React.Fragment>
