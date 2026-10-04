@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useState, useEffect } from 'react'
+import { computeProfit, SUSPECT_COST_RATIO, type ProfitProduct } from '@/lib/profit'
 
 const SERVICE_TYPES = [
   { id: 'setup',      label: 'Services - Setup' },
@@ -70,7 +71,7 @@ interface OrderDoc {
   docNumber: string
   date: string
   clientName: string
-  lineItems: { id: string; qty: number; unitPrice: number; description: string; _service?: boolean; _serviceType?: string; _serviceCost?: number; _staffMember?: string }[]
+  lineItems: { id: string; qty: number; unitPrice: number; description: string; _costPrice?: number; _service?: boolean; _serviceType?: string; _serviceCost?: number; _staffMember?: string }[]
   status: string
   discountPct?: number
   shippingCost?: number
@@ -206,7 +207,7 @@ export default function AccountingPage() {
   const [form, setForm] = useState(EMPTY_ACCOUNT())
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'stats' | 'banks' | 'petty' | 'services'>('stats')
+  const [activeTab, setActiveTab] = useState<'stats' | 'profit' | 'banks' | 'petty' | 'services'>('stats')
   const [statPeriod, setStatPeriod] = useState<'all' | '30' | '90' | 'year'>('all')
 
   // Petty Cash tab state
@@ -233,6 +234,11 @@ export default function AccountingPage() {
   const [savingSvc, setSavingSvc] = useState(false)
   const [svcFilter, setSvcFilter] = useState<'all' | string>('all')
   const [svcPaidFilter, setSvcPaidFilter] = useState<'all' | 'unpaid' | 'paid'>('all')
+
+  // Profit tab state
+  const [profitProducts, setProfitProducts] = useState<ProfitProduct[]>([])
+  const [profitLoaded, setProfitLoaded] = useState(false)
+  const [showCostGaps, setShowCostGaps] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -262,6 +268,22 @@ export default function AccountingPage() {
       setSvcLoaded(true)
     }).catch(() => setSvcLoaded(true))
   }, [activeTab, svcLoaded])
+
+  // Load products (landed cost + stock) the first time the profit tab is opened
+  useEffect(() => {
+    if (activeTab !== 'profit' || profitLoaded) return
+    fetch('/api/admin/products?fields=id,sku,title,price,cost_per_item,quantity,status')
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: any[]) => {
+        setProfitProducts((Array.isArray(rows) ? rows : []).map(r => ({
+          id: r.id, sku: r.sku, title: r.title, status: r.status,
+          price: Number(r.price) || 0,
+          costPerItem: Number(r.cost_per_item) || 0,
+          quantity: Number(r.quantity) || 0,
+        })))
+        setProfitLoaded(true)
+      }).catch(() => setProfitLoaded(true))
+  }, [activeTab, profitLoaded])
 
   const save = async () => {
     setSaving(true)
@@ -419,6 +441,7 @@ export default function AccountingPage() {
   }
 
   const periodInvoices = filterByPeriod(invoices)
+  const profit = profitLoaded ? computeProfit(periodInvoices, profitProducts) : null
 
   const totalInvoiced = periodInvoices.reduce((s, d) => s + docSubtotal(d), 0)
   const totalPaid = periodInvoices.reduce((s, d) => s + (d.amountPaid ?? (d.status === 'paid' ? docSubtotal(d) : 0)), 0)
@@ -607,6 +630,10 @@ export default function AccountingPage() {
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'stats' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             📊 Statistics
           </button>
+          <button onClick={() => setActiveTab('profit')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'profit' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+            📈 Profit
+          </button>
           <button onClick={() => setActiveTab('banks')}
             className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === 'banks' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
             🏦 Bank Accounts
@@ -782,6 +809,160 @@ export default function AccountingPage() {
       )}
 
       {/* ── BANK ACCOUNTS TAB ── */}
+      {/* ── PROFIT TAB ── */}
+      {activeTab === 'profit' && (
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-2">
+            {([['all','All Time'],['30','Last 30 Days'],['90','Last 90 Days'],['year','This Year']] as const).map(([v,l]) => (
+              <button key={v} onClick={() => setStatPeriod(v)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${statPeriod === v ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {!profit ? (
+            <div className="text-center py-16 text-gray-400 text-sm">Loading stock and landed costs…</div>
+          ) : (
+            <>
+              {/* Sold */}
+              <div>
+                <h2 className="text-sm font-semibold text-gray-700 mb-2">Sold — at landed cost</h2>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Sales</p>
+                    <p className="text-2xl font-bold text-gray-900">{fmt(profit.sales)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{profit.units} unit{profit.units !== 1 ? 's' : ''} with a landed cost</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Cost of Sales</p>
+                    <p className="text-2xl font-bold text-gray-900">{fmt(profit.cogs)}</p>
+                    <p className="text-xs text-gray-400 mt-1">landed cost of those units</p>
+                  </div>
+                  <div className={`bg-white rounded-2xl border p-5 ${profit.grossProfit >= 0 ? 'border-green-200' : 'border-red-200'}`}>
+                    <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${profit.grossProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      Gross {profit.grossProfit >= 0 ? 'Profit' : 'Loss'}
+                    </p>
+                    <p className={`text-2xl font-bold ${profit.grossProfit >= 0 ? 'text-green-700' : 'text-red-600'}`}>{fmt(profit.grossProfit)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{(profit.margin * 100).toFixed(1)}% margin</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-amber-200 p-5">
+                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">Uncosted Sales</p>
+                    <p className="text-2xl font-bold text-amber-700">{fmt(profit.uncostedSales)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{profit.uncostedUnits} unit{profit.uncostedUnits !== 1 ? 's' : ''} — no reliable cost, no profit claimed</p>
+                  </div>
+                </div>
+                {profit.serviceSales > 0 && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Services billed {fmt(profit.serviceSales)} — labour, not stock; staff costs are on the ⚙ Services tab.
+                  </p>
+                )}
+              </div>
+
+              {/* In stock */}
+              <div>
+                <h2 className="text-sm font-semibold text-gray-700 mb-2">In stock — at landed cost <span className="font-normal text-gray-400">(today, not affected by the period)</span></h2>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-2xl border border-blue-200 p-5">
+                    <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">Stock On Hand</p>
+                    <p className="text-2xl font-bold text-blue-600">{fmt(profit.stockValue)}</p>
+                    <p className="text-xs text-gray-400 mt-1">{profit.stockUnits} units · {profit.stockSkus} SKUs</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Stock at Retail</p>
+                    <p className="text-2xl font-bold text-gray-900">{fmt(profit.stockRetail)}</p>
+                    <p className="text-xs text-gray-400 mt-1">selling price of the same units</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Profit In Stock</p>
+                    <p className="text-2xl font-bold text-gray-900">{fmt(profit.stockRetail - profit.stockValue)}</p>
+                    <p className="text-xs text-gray-400 mt-1">if it all sells at full price</p>
+                  </div>
+                  <div className="bg-white rounded-2xl border border-amber-200 p-5">
+                    <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide mb-1">Uncosted Stock</p>
+                    <p className="text-2xl font-bold text-amber-700">{profit.uncostedStockUnits} units</p>
+                    <p className="text-xs text-gray-400 mt-1">{fmt(profit.uncostedStockRetail)} at retail — landed cost unknown</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bought vs sold */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                <h2 className="text-sm font-semibold text-gray-700 mb-3">Stock bought vs sold <span className="font-normal text-gray-400">(costed goods only)</span></h2>
+                <div className="space-y-1.5 text-sm max-w-md">
+                  <div className="flex justify-between"><span className="text-gray-500">Landed cost of goods sold</span><span className="font-semibold">{fmt(profit.cogs)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">+ Landed cost of stock on hand</span><span className="font-semibold">{fmt(profit.stockValue)}</span></div>
+                  <div className="flex justify-between border-t border-gray-100 pt-1.5"><span className="text-gray-700 font-semibold">= Stock bought</span><span className="font-bold">{fmt(profit.cogs + profit.stockValue)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-500">Sales</span><span className="font-semibold">{fmt(profit.sales)}</span></div>
+                  <div className={`flex justify-between border-t border-gray-100 pt-1.5 ${profit.sales - profit.cogs - profit.stockValue >= 0 ? 'text-green-700' : 'text-red-600'}`}>
+                    <span className="font-semibold">Sales − stock bought</span><span className="font-bold">{fmt(profit.sales - profit.cogs - profit.stockValue)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 mt-3">
+                  Cash view: what the sales have paid back of everything bought, with the unsold stock still on the shelf.
+                  {statPeriod !== 'all' && ' Stock on hand is today’s figure — this line reads best on All Time.'}
+                </p>
+              </div>
+
+              {/* Cost gaps */}
+              {profit.gaps.length > 0 && (
+                <div className="bg-white rounded-2xl border border-amber-200 overflow-hidden">
+                  <button onClick={() => setShowCostGaps(v => !v)} className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-amber-50">
+                    <span className="text-sm font-semibold text-amber-700">
+                      ⚠ {profit.gaps.length} SKU{profit.gaps.length !== 1 ? 's' : ''} need a landed cost
+                      <span className="font-normal text-gray-500"> — missing, or under {Math.round(SUSPECT_COST_RATIO * 100)}% of the selling price (usually a EUR/USD price saved as Rand)</span>
+                    </span>
+                    <span className="text-xs text-gray-400">{showCostGaps ? 'Hide' : 'Show'}</span>
+                  </button>
+                  {showCostGaps && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-y border-gray-100 text-xs text-gray-400 uppercase tracking-wide">
+                            <th className="text-left px-5 py-2">SKU</th>
+                            <th className="text-left px-3 py-2">Issue</th>
+                            <th className="text-right px-3 py-2">Cost</th>
+                            <th className="text-right px-3 py-2">Price</th>
+                            <th className="text-right px-3 py-2">In Stock</th>
+                            <th className="text-right px-3 py-2">Sold</th>
+                            <th className="text-right px-5 py-2">Sales</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {profit.gaps.map(g => (
+                            <tr key={g.sku} className="border-b border-gray-50 hover:bg-gray-50">
+                              <td className="px-5 py-2">
+                                <span className="font-mono text-xs font-semibold text-primary">{g.sku}</span>
+                                {g.title && <span className="block text-xs text-gray-400 truncate max-w-[260px]">{g.title}</span>}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${g.issue === 'suspect' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                                  {g.issue === 'suspect' ? 'Suspect' : 'Missing'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2 text-right text-gray-600">{g.cost > 0 ? fmt(g.cost) : '—'}</td>
+                              <td className="px-3 py-2 text-right text-gray-600">{g.price > 0 ? fmt(g.price) : '—'}</td>
+                              <td className="px-3 py-2 text-right">{g.stockQty || '—'}</td>
+                              <td className="px-3 py-2 text-right">{g.soldQty || '—'}</td>
+                              <td className="px-5 py-2 text-right font-semibold text-gray-800">{g.soldRevenue > 0 ? fmt(g.soldRevenue) : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="text-xs text-gray-400">
+                Sold = every invoice that is not cancelled (archived included). Shipping charged to clients is excluded.
+                Landed cost is the cost captured on the invoice line when it was added, else the product’s current Final Landed cost.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       {activeTab === 'banks' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
