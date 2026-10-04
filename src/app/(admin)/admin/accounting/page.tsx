@@ -403,7 +403,11 @@ export default function AccountingPage() {
 
   // ── Profit Statistics ──────────────────────────────────────────────────────
 
-  const invoices = docs.filter(d => d.type === 'invoice' && !['cancelled', 'archived'].includes(d.status))
+  // Archived invoices count: archiving is filing, never cancelling — the sale and the money
+  // received stand. Only a cancelled invoice drops out of the statistics.
+  const invoices = docs.filter(d => d.type === 'invoice' && d.status !== 'cancelled')
+  const docPaid = (d: OrderDoc) => d.amountPaid ?? (d.status === 'paid' ? docSubtotal(d) : 0)
+  const hasBalance = (d: OrderDoc) => docSubtotal(d) - docPaid(d) > 0.005
   const quotes = docs.filter(d => d.type === 'quote')
   const salesOrders = docs.filter(d => d.type === 'salesorder')
 
@@ -646,7 +650,7 @@ export default function AccountingPage() {
             <div className="bg-white rounded-2xl border border-red-200 p-5">
               <p className="text-xs font-semibold text-red-500 uppercase tracking-wide mb-1">Outstanding</p>
               <p className="text-2xl font-bold text-red-600">{fmt(totalOutstanding)}</p>
-              <p className="text-xs text-gray-400 mt-1">{periodInvoices.filter(d => d.status !== 'paid' && d.status !== 'complete').length} unpaid</p>
+              <p className="text-xs text-gray-400 mt-1">{periodInvoices.filter(hasBalance).length} unpaid</p>
             </div>
             <div className="bg-white rounded-2xl border border-blue-200 p-5">
               <p className="text-xs font-semibold text-blue-500 uppercase tracking-wide mb-1">Deposits Held</p>
@@ -753,6 +757,7 @@ export default function AccountingPage() {
                 {filterByPeriod(invoices).slice(0, 10).map(inv => {
                   const amt = docSubtotal(inv)
                   const isPaid = inv.status === 'paid' || inv.status === 'complete'
+                  const isArchived = inv.status === 'archived'
                   return (
                     <tr key={inv.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="px-5 py-2 font-mono text-xs font-semibold text-primary">{inv.docNumber}</td>
@@ -760,8 +765,8 @@ export default function AccountingPage() {
                       <td className="px-3 py-2 text-gray-400 text-xs">{new Date(inv.createdAt).toLocaleDateString('en-ZA')}</td>
                       <td className="px-3 py-2 text-right font-semibold text-gray-800">{fmt(amt)}</td>
                       <td className="px-5 py-2 text-right">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {isPaid ? 'Paid' : inv.status}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid ? 'bg-green-100 text-green-700' : isArchived ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-700'}`}>
+                          {isPaid ? 'Paid' : isArchived ? 'Archived' : inv.status}
                         </span>
                       </td>
                     </tr>
