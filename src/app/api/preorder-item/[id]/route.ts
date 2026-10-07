@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { blobRead } from '@/lib/blob-storage'
 import { priceCard } from '@/lib/preorder-dashboard-price.server'
+import { getRates, rateFor } from '@/lib/exchange-rates'
 
 const KEY = 'data/preorder-dashboard.json'
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -22,6 +23,15 @@ export async function GET(
     // Rule 63 — derived at today's rate, not read from the blob. This is the
     // page a customer actually books from, so it must agree with the listing.
     const { estimatedRetailPrice } = await priceCard(item)
+
+    // Supplier currency + today's rate so the page can show the Rand retail in
+    // the supplier's currency. Only the currency code and public FX rate leave
+    // the server — never the wholesale figure.
+    const supplierCurrency = (item.wholesaleCurrency || '').trim().toUpperCase()
+    let supplierRate = 0
+    if (supplierCurrency && supplierCurrency !== 'ZAR') {
+      try { supplierRate = rateFor((await getRates()).rates, supplierCurrency) } catch { /* no rate → no conversion */ }
+    }
 
     // Calculate lock state
     let isLocked = !!item.orderPlaced
@@ -52,7 +62,7 @@ export async function GET(
       } catch { /* not signed in / invalid token */ }
     }
 
-    return NextResponse.json({ id, sku, description, retailPrice, estimatedRetailPrice, eta, cutoffDate, brand, unit, imageUrl, createdAt, isLocked, availableQty, seoTitle, seoDescription, seoImageUrl, resellerMoq: resellerMoq ?? 1, myReservedQty })
+    return NextResponse.json({ id, sku, description, retailPrice, estimatedRetailPrice, eta, cutoffDate, brand, unit, imageUrl, createdAt, isLocked, availableQty, seoTitle, seoDescription, seoImageUrl, resellerMoq: resellerMoq ?? 1, myReservedQty, supplierCurrency: supplierRate > 0 ? supplierCurrency : null, supplierRate: supplierRate > 0 ? supplierRate : null })
   } catch (error) {
     console.error('[preorder-item] GET error:', error)
     return NextResponse.json({ error: 'Failed to load' }, { status: 500 })

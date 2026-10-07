@@ -9,6 +9,9 @@ type Item = {
   sku: string
   description: string
   retailPrice: string
+  supplierCurrency?: string | null
+  /** ZAR per 1 unit of supplierCurrency */
+  supplierRate?: number | null
   estimatedRetailPrice: string
   eta: string
   cutoffDate?: string
@@ -151,7 +154,12 @@ export default function PublicPreOrderItemPage() {
 
             <div>
               <p className="text-gray-400 text-sm mb-1">{isReseller ? 'Reseller Price (Est. Retail)' : 'Retail Price'}</p>
-              <p className="text-4xl font-bold text-primary">{price > 0 ? `R ${price.toFixed(2)}` : 'POA'}</p>
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <p className="text-4xl font-bold text-primary">{price > 0 ? `R ${price.toFixed(2)}` : 'POA'}</p>
+                {price > 0 && item.supplierCurrency && item.supplierRate ? (
+                  <p className="text-xl font-semibold text-gray-400">≈ {item.supplierCurrency} {(price / item.supplierRate).toFixed(2)}</p>
+                ) : null}
+              </div>
             </div>
 
             {/* ETA + cutoff */}
