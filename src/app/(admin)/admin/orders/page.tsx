@@ -5079,8 +5079,9 @@ function OrdersPageInner() {
                     const ship = (doc as any).shippingCost || 0
                     const docTotal = sub - disc + ship
                     const amtPaid = (doc as any).amountPaid || 0
-                    const docBalance = Math.max(0, docTotal - amtPaid - ((doc as any).creditApplied || 0))
-                    const isPartiallyPaid = doc.type === 'invoice' && amtPaid > 0 && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
+                    const docCredit = (doc as any).creditApplied || 0
+                    const docBalance = Math.max(0, docTotal - amtPaid - docCredit)
+                    const isPartiallyPaid = doc.type === 'invoice' && (amtPaid > 0 || docCredit > 0.005) && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
                     const hasOutstanding = doc.type === 'invoice' && docBalance > 0.005 && doc.status !== 'paid' && doc.status !== 'archived'
                     const payMethods = docPaymentMethods(doc)
                     const firstDesc = doc.lineItems?.[0]?.description || '—'
@@ -5097,6 +5098,7 @@ function OrdersPageInner() {
                         <td className="py-3 px-4 text-xs font-bold text-gray-600 break-words">{firstDesc}</td>
                         <td className="py-3 px-4 text-xs text-right">
                           <div className="font-bold">{fmtPrice(docTotal)}</div>
+                          {docCredit > 0.005 && doc.status !== 'archived' && <div className="text-xs font-bold text-green-600 mt-0.5" title="Customer credit applied to this invoice">Credit -{fmtPrice(docCredit)}</div>}
                           {isPartiallyPaid && <div className="text-xs text-red-600 font-bold mt-0.5">Due {fmtPrice(docBalance)}</div>}
                           {amtPaid > 0 && !isPartiallyPaid && doc.status !== 'paid' && doc.status !== 'archived' && <div className="text-xs font-bold text-green-600 mt-0.5">Paid {fmtPrice(amtPaid)}</div>}
                           {/* Pre Order Deposit quotes: show the deposit due/received even before a formal Record Payment */}
@@ -5132,6 +5134,11 @@ function OrdersPageInner() {
                             {isPartiallyPaid && (
                               <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                                 Partial · Due {fmtPrice(docBalance)}
+                              </span>
+                            )}
+                            {doc.type === 'invoice' && docCredit > 0.005 && (
+                              <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full" title="Customer credit applied to this invoice">
+                                Credit Applied {fmtPrice(docCredit)}
                               </span>
                             )}
                             {doc.type === 'invoice' && (() => {
