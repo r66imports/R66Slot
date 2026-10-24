@@ -84,3 +84,42 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: e.message }, { status: e.message === 'Unauthorized' ? 401 : 500 })
   }
 }
+
+// DELETE — remove a customer account by email, plus the CRM contact registration
+// created alongside it. Identified by email because that is the one field shared
+// between the customer record and its contact (register writes both).
+//   DELETE /api/admin/customer-accounts?email=<address>
+export async function DELETE(request: NextRequest) {
+  try {
+    await requireAdmin()
+    const email = (new URL(request.url).searchParams.get('email') || '').trim().toLowerCase()
+    if (!email) {
+      return NextResponse.json({ error: 'email query param required' }, { status: 400 })
+    }
+
+    const customers = await getCustomers()
+    const remaining = customers.filter((c: any) => c.email?.toLowerCase() !== email)
+    const removedCustomer = customers.length - remaining.length
+    if (removedCustomer === 0) {
+      return NextResponse.json({ error: 'No customer with that email' }, { status: 404 })
+    }
+    await saveCustomers(remaining)
+
+    // The matching CRM contact is best-effort: the account is the thing being
+    // deleted, and a left-behind contact should not fail the whole operation.
+    let removedContact = 0
+    try {
+      const CONTACTS_KEY = 'data/contacts.json'
+      const contacts = await blobRead<any[]>(CONTACTS_KEY, [])
+      const keep = contacts.filter((c: any) => c.email?.toLowerCase() !== email)
+      removedContact = contacts.length - keep.length
+      if (removedContact > 0) await blobWrite(CONTACTS_KEY, keep)
+    } catch {
+      /* contact cleanup is non-critical */
+    }
+
+    return NextResponse.json({ ok: true, removedCustomer, removedContact })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: e.message === 'Unauthorized' ? 401 : 500 })
+  }
+}
