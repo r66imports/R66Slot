@@ -100,20 +100,9 @@ export interface PreOrderDashboardItem {
   sentToLatestArrivals?: boolean
   sentToLandingSoon?: boolean
   customers: { id: string; name: string; email?: string; phone?: string; qty: number; depositPaid?: boolean; depositPaidDate?: string }[]
-  // Pricing Tier 2
-  wholesalePrice2?: string
-  wholesaleCurrency2?: string
-  supplierSRP2?: string
-  supplierDiscount2?: string
-  estimatedRetailPrice2?: string
-  moq2Qty?: number
-  moq2Enabled?: boolean
-  moq2ResellerOnly?: boolean
   showRetail?: boolean
   // Resellers Sales Page
   onSalesPage?: boolean
-  salesTier1Discount?: number
-  salesTier2Discount?: number
   createdAt: string
   updatedAt?: string
   // Derived on read by priceCards, never stored. Say how Est. Retail was

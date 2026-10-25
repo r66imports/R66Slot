@@ -101,7 +101,7 @@ export default function PreOrdersFlowPage() {
       <Node kind="source" icon="🗂️" title="Pre-Order Dashboard item" subtitle="The record everything else hangs off" defaultOpen>
         <ul className="list-disc pl-5 space-y-1">
           <li><strong>What it holds:</strong> SKU, description, brand, supplier, ETA, cut-off date, images.</li>
-          <li><strong>Pricing:</strong> wholesale price and currency, supplier SRP and discount, estimated retail. A second pricing tier can be set for larger quantities.</li>
+          <li><strong>Pricing:</strong> wholesale price and currency, supplier SRP and discount, estimated retail.</li>
           <li><strong>Supplier Order qty</strong> &mdash; the number that must be booked before you place the order with the supplier. This one field drives the auto-unpublish in stage 2, so leaving it at 0 means the item never closes itself off.</li>
           <li><strong>Published</strong> &mdash; the toggle that puts it in front of customers on the storefront.</li>
           <li>Creating an item touches no product and no inventory. It is a plan to buy, nothing more.</li>

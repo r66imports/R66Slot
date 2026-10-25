@@ -27,11 +27,6 @@ export interface PricedCard {
   estimatedRetailPrice: string
   priceSource: PriceSource
   priceFloating: boolean
-  /**
-   * Tier 2, where the card has one. The buy price differs, the cost structure
-   * does not, so it floats on the same percentages as tier 1.
-   */
-  estimatedRetailPrice2?: string
 }
 
 export interface PriceableCard extends CostingPcts {
@@ -40,9 +35,6 @@ export interface PriceableCard extends CostingPcts {
   wholesaleCurrency?: string | null
   estimatedRetailPrice?: string | null
   priceManual?: boolean | null
-  wholesalePrice2?: string | null
-  wholesaleCurrency2?: string | null
-  estimatedRetailPrice2?: string | null
 }
 
 const skuKey = (s: string | null | undefined) => (s || '').trim().toUpperCase()
@@ -102,18 +94,12 @@ export async function priceCards<T extends PriceableCard>(
 
   for (const card of cards) {
     const stored = (card.estimatedRetailPrice || '').trim()
-    const stored2 = (card.estimatedRetailPrice2 || '').trim()
-
-    // Tier 2 rides on the same percentages; only a frozen tier 1 freezes it.
-    const live2 = calcRetailPrice(card.wholesalePrice2, card.wholesaleCurrency2, rates, card)
-    const tier2 = (frozen: boolean) => (frozen || !live2 ? stored2 : live2)
 
     if (card.priceManual) {
       out.set(card, {
         estimatedRetailPrice: stored,
         priceSource: 'manual',
         priceFloating: false,
-        estimatedRetailPrice2: tier2(true),
       })
       continue
     }
@@ -124,7 +110,6 @@ export async function priceCards<T extends PriceableCard>(
         estimatedRetailPrice: live,
         priceSource: 'live',
         priceFloating: true,
-        estimatedRetailPrice2: tier2(false),
       })
       continue
     }
@@ -138,7 +123,6 @@ export async function priceCards<T extends PriceableCard>(
         estimatedRetailPrice: settled.toFixed(2),
         priceSource: 'landed',
         priceFloating: false,
-        estimatedRetailPrice2: tier2(true),
       })
       continue
     }
@@ -147,7 +131,6 @@ export async function priceCards<T extends PriceableCard>(
       estimatedRetailPrice: stored,
       priceSource: 'stored',
       priceFloating: false,
-      estimatedRetailPrice2: tier2(false),
     })
   }
 

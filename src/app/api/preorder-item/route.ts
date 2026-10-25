@@ -33,19 +33,12 @@ interface DashboardItem {
   resellerOnly?: boolean
   customers?: DashboardCustomer[]
   shipmentStatus?: string
-  moq2Enabled?: boolean
-  moq2ResellerOnly?: boolean
-  moq2Qty?: number
-  estimatedRetailPrice2?: string
 }
 
 function buildPublicItem(item: DashboardItem, includeResellerOnly: boolean) {
   const totalReserved = (item.customers ?? []).reduce((s, c) => s + (c.qty || 0), 0)
   const moq = item.minOrderQty ?? 0
   const moqGap = moq > 0 ? moq - totalReserved : 0
-
-  // Tier 2: only expose when enabled + reseller-only flag set + viewing as reseller
-  const tier2Visible = includeResellerOnly && item.moq2Enabled && item.moq2ResellerOnly && !!item.estimatedRetailPrice2
 
   // Only expose availableQty when extraQty is a positive number.
   // extraQty=0 (default/unset) must NOT show "Sold Out" — it just means no qty limit was entered.
@@ -74,10 +67,6 @@ function buildPublicItem(item: DashboardItem, includeResellerOnly: boolean) {
     shipmentStatus: (item as any).shipmentStatus || undefined,
     resellerMoq: includeResellerOnly ? (item.resellerMoq ?? 1) : undefined,
     resellerOnly: item.resellerOnly || false,
-    // Tier 2
-    tier2Price: tier2Visible ? item.estimatedRetailPrice2 : undefined,
-    tier2Moq: tier2Visible ? (item.moq2Qty ?? 0) : undefined,
-    tier2Reached: tier2Visible ? totalReserved >= (item.moq2Qty ?? 0) : undefined,
   }
 }
 
@@ -117,13 +106,7 @@ export async function GET(request: NextRequest) {
         const pub = buildPublicItem(item, isReseller)
         const p = priced.get(item)
         if (!p) return pub
-        return {
-          ...pub,
-          estimatedRetailPrice: p.estimatedRetailPrice,
-          // Only overwrite tier 2 where it was exposed in the first place —
-          // buildPublicItem withholds it from non-resellers.
-          ...(pub.tier2Price !== undefined ? { tier2Price: p.estimatedRetailPrice2 } : {}),
-        }
+        return { ...pub, estimatedRetailPrice: p.estimatedRetailPrice }
       })
     )
   } catch (error) {

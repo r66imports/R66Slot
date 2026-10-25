@@ -78,15 +78,6 @@ export async function POST(request: Request) {
       seoDescription: body.seoDescription?.trim() || undefined,
       seoImageUrl: await uploadBase64Image(body.seoImageUrl) || undefined,
       customers: body.customers || [],
-      // Pricing Tier 2
-      wholesalePrice2: body.wholesalePrice2?.trim() || undefined,
-      wholesaleCurrency2: body.wholesaleCurrency2?.trim() || undefined,
-      supplierSRP2: body.supplierSRP2?.trim() || undefined,
-      supplierDiscount2: body.supplierDiscount2?.trim() || undefined,
-      estimatedRetailPrice2: body.estimatedRetailPrice2?.trim() || undefined,
-      moq2Qty: body.moq2Qty ? Number(body.moq2Qty) : undefined,
-      moq2Enabled: body.moq2Enabled ?? false,
-      moq2ResellerOnly: body.moq2ResellerOnly ?? false,
       createdAt: now,
     }
 

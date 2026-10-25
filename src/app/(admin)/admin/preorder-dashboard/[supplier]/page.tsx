@@ -51,8 +51,6 @@ interface DashboardCustomer {
 interface DashboardItem {
   id: string; sku: string; description: string; retailPrice: string; estimatedRetailPrice: string
   wholesalePrice?: string; wholesaleCurrency?: string; supplierSRP?: string; supplierDiscount?: string
-  wholesalePrice2?: string; wholesaleCurrency2?: string; supplierSRP2?: string; supplierDiscount2?: string
-  estimatedRetailPrice2?: string; moq2Qty?: number; moq2Enabled?: boolean; moq2ResellerOnly?: boolean
   showRetail?: boolean; eta: string; cutoffDate?: string; orderPlaced?: boolean; published?: boolean
   supplier: string; brand: string; unit: string; imageUrl?: string; seoTitle?: string; seoDescription?: string
   seoImageUrl?: string; shipmentStatus?: 'preorder' | 'shipping_soon' | 'shipping'; linkedWsId?: string
@@ -758,8 +756,6 @@ function ItemCard({
   const [form, setForm] = useState<FormState>({
     sku:item.sku, description:item.description, retailPrice:item.retailPrice??'', estimatedRetailPrice:item.estimatedRetailPrice,
     wholesalePrice:item.wholesalePrice??'', wholesaleCurrency:item.wholesaleCurrency??'ZAR', supplierSRP:item.supplierSRP??'', supplierDiscount:item.supplierDiscount??'',
-    wholesalePrice2:item.wholesalePrice2??'', wholesaleCurrency2:item.wholesaleCurrency2??'CNY', supplierSRP2:item.supplierSRP2??'', supplierDiscount2:item.supplierDiscount2??'',
-    estimatedRetailPrice2:item.estimatedRetailPrice2??'', moq2Qty:item.moq2Qty??0, moq2Enabled:item.moq2Enabled??false, moq2ResellerOnly:item.moq2ResellerOnly??false,
     eta:item.eta, cutoffDate:item.cutoffDate??'', orderPlaced:item.orderPlaced??false, published:item.published??false,
     supplier:item.supplier, brand:item.brand, unit:item.unit??'', imageUrl:item.imageUrl,
     customers:item.customers, extraQty:item.extraQty??0, minOrderQty:item.minOrderQty??0,
@@ -780,7 +776,7 @@ function ItemCard({
   const [imageSize,setImageSize]=useState<'sm'|'md'|'lg'>('sm')
   const [autoSaveStatus,setAutoSaveStatus]=useState<'idle'|'pending'|'saving'|'saved'|'error'>('idle')
   const [imageUploading,setImageUploading]=useState(false)
-  const [autoCalc,setAutoCalc]=useState(!item.priceManual); const [autoCalc2,setAutoCalc2]=useState(true)
+  const [autoCalc,setAutoCalc]=useState(!item.priceManual)
   const [copied,setCopied]=useState(false); const [showSeo,setShowSeo]=useState(false)
   const [showWsPicker,setShowWsPicker]=useState(false); const [wsList,setWsList]=useState<any[]>([]); const [loadingWsList,setLoadingWsList]=useState(false)
   const supplierRef=useRef<HTMLDivElement>(null); const imageInputRef=useRef<HTMLInputElement>(null)
@@ -797,14 +793,6 @@ function ItemCard({
     const calc=calcRetailPrice(form.wholesalePrice||'',form.wholesaleCurrency||'ZAR',exchangeRates,form as CostingPcts)
     if(calc&&calc!==form.estimatedRetailPrice) setForm(f=>({...f,estimatedRetailPrice:calc}))
   },[form.wholesalePrice,form.wholesaleCurrency,form.shipPct,form.customsPct,form.markupPct,form.vatPct,autoCalc,exchangeRates])
-  // Tier 2 buys at a different price but carries the same cost structure, so it
-  // rides on this item's percentages rather than having its own. Guarded on value
-  // inequality because autosave fires on every form change and an unguarded write loops.
-  useEffect(()=>{
-    if(!autoCalc2) return
-    const calc=calcRetailPrice((form as any).wholesalePrice2||'',(form as any).wholesaleCurrency2||'ZAR',exchangeRates,form as CostingPcts)
-    if(calc&&calc!==(form as any).estimatedRetailPrice2) setForm(f=>({...f,estimatedRetailPrice2:calc}))
-  },[(form as any).wholesalePrice2,(form as any).wholesaleCurrency2,form.shipPct,form.customsPct,form.markupPct,form.vatPct,autoCalc2,exchangeRates])
   useEffect(()=>{
     if(!form.supplier) return
     const sup=suppliers.find(s=>s.name===form.supplier)
@@ -1110,32 +1098,6 @@ function ItemCard({
               {(totalQty>0||minOrderQty>0)&&<span className="text-xs font-semibold text-indigo-600">{totalQty>0&&<span>Total Qty: {totalQty}</span>}{minOrderQty>0&&<span className={`font-semibold ml-1 ${inStock>0?'text-emerald-600':'text-red-500'}`}>({inStock} in stock)</span>}</span>}
               {minOrderQty>0&&<span className={`text-xs font-semibold ${moqMet?'text-green-600':'text-orange-600'}`}>{moqMet?`✓ MOQ met`:`Need ${moqGap} more`}</span>}
               <div className="flex items-center gap-1"><label className="text-xs text-gray-500 whitespace-nowrap">Supplier Order:</label><input type="number" min={0} value={form.minOrderQty||''} placeholder="0" onChange={e=>{const v=parseInt(e.target.value);set('minOrderQty',(!isNaN(v)&&v>0)?v:null)}} className="w-16 text-xs border border-gray-300 rounded px-1 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"/></div>
-            </div>
-          </div>
-
-          <div className="border border-dashed border-indigo-200 rounded-xl p-3 space-y-2 bg-indigo-50/30">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-1.5"><input type="checkbox" id={`moq2-${item.id}`} checked={!!(form as any).moq2Enabled} onChange={e=>set('moq2Enabled',e.target.checked)} className="w-3.5 h-3.5 accent-indigo-600"/><label htmlFor={`moq2-${item.id}`} className="text-xs font-bold text-indigo-700 cursor-pointer">Pricing Tier 2</label></div>
-            </div>
-            <div className="space-y-1">
-              <div className="grid gap-2" style={{gridTemplateColumns:'64px 1fr 1fr 1fr'}}>
-                <span className="text-[11px] text-indigo-500">CCY</span><span className="text-[11px] text-indigo-500">Wholesale 2</span><span className="text-[11px] text-indigo-500">SRP 2</span><span className="text-[11px] text-indigo-500">Disc. %</span>
-              </div>
-              <div className="grid gap-2" style={{gridTemplateColumns:'64px 1fr 1fr 1fr'}}>
-                <select value={(form as any).wholesaleCurrency2||'CNY'} onChange={e=>set('wholesaleCurrency2',e.target.value)} className="w-full text-sm border border-indigo-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white">{CURRENCIES.map(c=><option key={c} value={c}>{c}</option>)}</select>
-                <input type="text" value={(form as any).wholesalePrice2||''} onChange={e=>set('wholesalePrice2',e.target.value)} className="w-full text-sm border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="0.00"/>
-                <input type="number" value={(form as any).supplierSRP2||''} onChange={e=>set('supplierSRP2',e.target.value)} className="w-full text-sm border border-indigo-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="0.00" min="0" step="0.01"/>
-                <div className="relative"><input type="number" value={(form as any).supplierDiscount2||''} onChange={e=>set('supplierDiscount2',e.target.value)} className="w-full text-sm border border-indigo-200 rounded px-2 py-1 pr-6 focus:outline-none focus:ring-1 focus:ring-indigo-400" placeholder="0" min="0" max="99" step="0.1"/><span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">%</span></div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <div className="flex items-center justify-between mb-0.5"><label className="text-xs text-indigo-600 font-medium">Est. Retail 2 (R)</label><button type="button" onClick={()=>setAutoCalc2(a=>!a)} className={`text-[10px] px-1.5 py-0.5 rounded font-semibold border transition-colors ${autoCalc2?'bg-green-50 text-green-700 border-green-200':'bg-gray-100 text-gray-500 border-gray-200'}`}>{autoCalc2?'⚡ Auto':'✏ Manual'}</button></div>
-                <input type="text" value={(form as any).estimatedRetailPrice2||''} onChange={e=>{setAutoCalc2(false);set('estimatedRetailPrice2',e.target.value)}} className={`w-full text-sm border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-400 ${autoCalc2&&(form as any).wholesalePrice2?'bg-green-50 border-green-300 text-green-800':'border-indigo-200'}`} placeholder="0.00" readOnly={autoCalc2&&!!(form as any).wholesalePrice2}/>
-              </div>
-              <div className="flex flex-col justify-start gap-1 pt-4">
-                <div className="flex items-center gap-1"><label className="text-xs text-indigo-600 whitespace-nowrap font-medium">MOQ 2:</label><input type="number" min={0} value={(form as any).moq2Qty??0} onChange={e=>set('moq2Qty',Math.max(0,parseInt(e.target.value)||0))} className="w-14 text-xs border border-indigo-300 rounded px-1 py-0.5 text-center focus:outline-none focus:ring-1 focus:ring-indigo-400"/></div>
-              </div>
             </div>
           </div>
 

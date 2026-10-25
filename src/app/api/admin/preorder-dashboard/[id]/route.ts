@@ -76,7 +76,6 @@ export async function GET(
     return NextResponse.json({
       ...item,
       estimatedRetailPrice: p.estimatedRetailPrice,
-      ...(p.estimatedRetailPrice2 !== undefined ? { estimatedRetailPrice2: p.estimatedRetailPrice2 } : {}),
       priceSource: p.priceSource,
       priceFloating: p.priceFloating,
     })
@@ -116,11 +115,8 @@ export async function PATCH(
       'supplier', 'brand', 'unit', 'imageUrl', 'customers',
       'minOrderQty', 'extraQty', 'resellerMoq', 'resellerOnly',
       'seoTitle', 'seoDescription', 'seoImageUrl', 'shipmentStatus', 'linkedWsId',
-      // Pricing Tier 2
-      'wholesalePrice2', 'wholesaleCurrency2', 'supplierSRP2', 'supplierDiscount2',
-      'estimatedRetailPrice2', 'moq2Qty', 'moq2Enabled', 'moq2ResellerOnly',
       'showRetail',
-      'onSalesPage', 'salesTier1Discount', 'salesTier2Discount',
+      'onSalesPage',
       // Home Page sliders — drop either and the button re-reads "Send" after a reload
       'sentToLatestArrivals', 'sentToLandingSoon',
       'notes',
