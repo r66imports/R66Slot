@@ -8,6 +8,9 @@ import {
   DEFAULT_COSTING_ACCOUNTS,
 } from '@/lib/preorder-pricing'
 import { getSkuInfo } from '@/lib/supplier-catalogue'
+import { db } from '@/lib/db'
+import { resolveStockRow } from '@/lib/order-helpers'
+import { logStockChange } from '@/lib/stock-log'
 import type { CostingAccount, SupplierPreOrder } from '@/types/supplier-preorder'
 
 const KEY = 'data/supplier-preorders.json'
@@ -17,8 +20,9 @@ const KEY = 'data/supplier-preorders.json'
  * returns wholesale prices and the costing account, because this is where they
  * get reviewed and re-priced.
  *
- * Still a request list, not stock — see Rule 59. Nothing in this file writes to
- * products, quantity or the stock log.
+ * Still a request list, not stock — see Rule 59. The one exception is the
+ * POST setStock action: an admin correcting a wrong In Stock figure by hand,
+ * which is a shelf count and is logged as one.
  */
 
 // GET — ?status=open (default) | archived | bin | all
@@ -211,7 +215,8 @@ export async function DELETE(request: Request) {
 }
 
 /**
- * POST — Bin actions. { action: 'restore' | 'empty', ids?: string[] }
+ * POST — { action: 'restore' | 'empty', ids?: string[] }
+ *        { action: 'setStock', sku, quantity }
  *
  * restore puts a binned request back to the status it held when it was binned,
  * so restoring something archived returns it to Archive rather than to Open.
@@ -224,6 +229,44 @@ export async function POST(request: Request) {
     const action = body.action
     const ids: string[] = Array.isArray(body.ids) ? body.ids : []
     const all = await blobRead<SupplierPreOrder[]>(KEY, [])
+
+    // A corrected In Stock figure is a shelf count, not intake and not a sale, so
+    // it is logged as 'stocktake' and the Stock Audit keeps the worksheet as the
+    // intake figure. Only quantity is written — the product PUT would also
+    // overwrite weight, which is not COALESCEd there. Same row the stock path
+    // moves (resolveStockRow), and the before-value comes out of the write itself.
+    if (action === 'setStock') {
+      const sku = String(body.sku || '').trim()
+      const quantity = Number(body.quantity)
+      if (!sku) return NextResponse.json({ error: 'Missing SKU' }, { status: 400 })
+      if (!Number.isInteger(quantity) || quantity < 0) {
+        return NextResponse.json({ error: 'In Stock must be a whole number, 0 or more' }, { status: 400 })
+      }
+      const row = await resolveStockRow(sku)
+      if (!row) {
+        return NextResponse.json({ error: `${sku} is not in Inventory` }, { status: 404 })
+      }
+      const res = await db.query(
+        `UPDATE products SET quantity = $2, updated_at = $3
+           FROM (SELECT COALESCE(quantity, 0) AS q FROM products WHERE id = $1) AS prev
+          WHERE products.id = $1
+          RETURNING products.quantity, prev.q AS prev_quantity`,
+        [row.id, quantity, new Date().toISOString()]
+      )
+      const before = Number(res.rows[0]?.prev_quantity) || 0
+      const after = Number(res.rows[0]?.quantity) || 0
+      if (after !== before) {
+        await logStockChange({
+          sku,
+          changeQty: after - before,
+          qtyBefore: before,
+          qtyAfter: after,
+          source: 'stocktake',
+          reference: `Stocktake ${new Date().toISOString().slice(0, 10)} - Supplier Pre Orders`,
+        })
+      }
+      return NextResponse.json({ success: true, sku, before, after })
+    }
 
     if (action === 'empty') {
       const binned = all.filter((o) => !!o.deletedAt)

@@ -126,7 +126,7 @@ export interface StockShortfall {
  * choice is stable between two calls rather than whatever Postgres returns
  * first. TRIM guards against whitespace inside a SKU.
  */
-async function resolveStockRow(
+export async function resolveStockRow(
   sku: string
 ): Promise<{ id: string; quantity: number; trackQuantity: boolean; duplicates: number } | null> {
   const res = await db.query(

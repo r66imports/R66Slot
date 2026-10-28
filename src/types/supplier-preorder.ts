@@ -93,6 +93,17 @@ export interface SupplierPreOrderLine {
   isNewSku: boolean
 }
 
+export interface SupplierPreOrderFulfilledLine {
+  sku: string
+  description: string
+  qty: number
+  unitPrice: number
+  docId: string
+  docNumber: string
+  docType: 'invoice' | 'salesorder'
+  at: string
+}
+
 export interface SupplierPreOrder {
   id: string
   ref: string
@@ -115,6 +126,12 @@ export interface SupplierPreOrder {
   mergedIntoRef?: string
   quoteId?: string
   quoteNumber?: string
+  /**
+   * Lines that were in stock and went straight onto an invoice or sales order.
+   * They leave `lines` — only the shortfall stays on the request for the
+   * supplier — and are kept here as the record of where they went.
+   */
+  fulfilled?: SupplierPreOrderFulfilledLine[]
   createdAt: string
   updatedAt: string
   submittedAt?: string

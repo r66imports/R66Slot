@@ -6,9 +6,30 @@ import { documentTotal, settledAmount, balanceDue, MONEY_EPSILON } from '@/lib/p
 import { SkuPreviewModal, SkuThumb, type SkuPreviewItem } from '@/components/supplier/SkuPreview'
 import type { CostingAccount, SupplierPreOrder, SupplierPreOrderLine } from '@/types/supplier-preorder'
 
-type Order = SupplierPreOrder & { totalZAR: number; exRate: number }
+/** Lines as the GET returns them — priced against the live rate and stock on hand. */
+type PricedLine = SupplierPreOrderLine & { quoteZAR: number; quoteBasis: 'retail' | 'estimate' }
+type Order = Omit<SupplierPreOrder, 'lines'> & {
+  lines: PricedLine[]
+  totalZAR: number
+  exRate: number
+}
 
 type Tab = 'open' | 'archived' | 'bin'
+
+const OPEN_DOC_STATUSES = ['draft', 'sent', 'accepted', 'pending', 'processing', 'active']
+
+const DOC_LABEL: Record<string, string> = {
+  quote: 'Quote',
+  invoice: 'Invoice',
+  salesorder: 'Sales Order',
+}
+
+/** Same split as extractSku in order-helpers (server-only, so not importable here). */
+const skuOf = (description: string) =>
+  (description || '').split(/\s*–\s*|\s+-\s+/)[0]?.trim().toUpperCase() || ''
+
+/** The one price a line is charged at — what the client is shown (clientQuoteZAR). */
+const unitPriceOf = (l: PricedLine) => l.quoteZAR || l.estRetailZAR || 0
 
 interface OpenSupplierOrder {
   ref: string
@@ -38,7 +59,13 @@ export default function SupplierPreOrdersAdminPage() {
   const [skuInfo, setSkuInfo] = useState<
     Record<
       string,
-      { imageUrl: string; qtyAvailable: number; retailZAR: number; qtyOnOrder: number }
+      {
+        imageUrl: string
+        qtyAvailable: number
+        retailZAR: number
+        qtyOnOrder: number
+        inInventory: boolean
+      }
     >
   >(
     {}
@@ -54,8 +81,10 @@ export default function SupplierPreOrdersAdminPage() {
   const [mergeRef, setMergeRef] = useState('')
   const [quoteTarget, setQuoteTarget] = useState<Record<string, string>>({})
 
-  const load = useCallback(async () => {
+  /** Returns the freshly priced orders so a caller can act on them straight away. */
+  const load = useCallback(async (): Promise<Order[] | null> => {
     setLoading(true)
+    let fresh: Order[] | null = null
     try {
       const [poRes, docRes, soRes] = await Promise.all([
         fetch(`/api/admin/supplier-preorders?status=${tab}`),
@@ -64,7 +93,8 @@ export default function SupplierPreOrdersAdminPage() {
       ])
       if (poRes.ok) {
         const data = await poRes.json()
-        setOrders(data.orders || [])
+        fresh = data.orders || []
+        setOrders(fresh || [])
         setAccounts(data.accounts || [])
         setSkuInfo(data.skuInfo || {})
         setBinCount(data.binCount || 0)
@@ -96,6 +126,7 @@ export default function SupplierPreOrdersAdminPage() {
     } finally {
       setLoading(false)
     }
+    return fresh
   }, [tab])
 
   useEffect(() => {
@@ -117,6 +148,7 @@ export default function SupplierPreOrdersAdminPage() {
     }
   }
 
+  /** Saves, reloads, and hands back the fresh orders — null if the save failed. */
   const patchOrder = async (id: string, patch: Partial<SupplierPreOrder>) => {
     const res = await fetch('/api/admin/supplier-preorders', {
       method: 'PATCH',
@@ -126,10 +158,9 @@ export default function SupplierPreOrdersAdminPage() {
     if (!res.ok) {
       const e = await res.json().catch(() => ({}))
       setNote({ kind: 'err', text: e?.error || 'Could not save' })
-      return false
+      return null
     }
-    await load()
-    return true
+    return (await load()) || []
   }
 
   const patchLine = (order: Order, lineId: string, patch: Partial<SupplierPreOrderLine>) => {
@@ -138,8 +169,138 @@ export default function SupplierPreOrdersAdminPage() {
     return lines
   }
 
-  const saveLines = (order: Order, lines: SupplierPreOrderLine[]) =>
-    patchOrder(order.id, { lines })
+  /** Strips the derived price fields so they are never persisted into the request. */
+  const toStored = (lines: SupplierPreOrderLine[]): SupplierPreOrderLine[] =>
+    lines.map(({ quoteZAR, quoteBasis, ...l }: any) => l)
+
+  /**
+   * Keeps the linked quote in step with the request: every quote line whose SKU
+   * belongs to this pre order is replaced, in place, by the request's current
+   * qty and price, or dropped if that line is now rejected, deleted or invoiced.
+   * Lines on the quote from anywhere else are left alone.
+   *
+   * Quotes only. Once the linked document has become an invoice or sales order
+   * it holds stock, and is edited from Orders, never from here.
+   */
+  const resyncQuote = async (order: Order, goneSkus: string[] = []): Promise<string> => {
+    if (!order.quoteId) return ''
+    const all: any[] = await fetch('/api/admin/orders/documents')
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => [])
+    const doc = all.find((d) => d.id === order.quoteId)
+    if (!doc) return ` ${order.quoteNumber || 'The linked quote'} was not found — not updated.`
+    if (doc.type !== 'quote' || !OPEN_DOC_STATUSES.includes(doc.status)) {
+      return ` ${doc.docNumber} is no longer an open quote — not updated.`
+    }
+
+    const mine = new Set([...order.lines.map((l) => l.sku.trim().toUpperCase()), ...goneSkus])
+    const wanted = new Map<string, PricedLine>()
+    for (const l of order.lines) {
+      const k = l.sku.trim().toUpperCase()
+      if (l.status !== 'rejected' && !wanted.has(k)) wanted.set(k, l)
+    }
+    const used = new Set<string>()
+    const next: any[] = []
+    for (const li of doc.lineItems || []) {
+      const k = skuOf(li.description)
+      if (!mine.has(k)) {
+        next.push(li)
+        continue
+      }
+      const l = wanted.get(k)
+      if (!l || used.has(k)) continue
+      used.add(k)
+      next.push({
+        ...li,
+        description: `${l.sku} – ${l.description || l.brand}`,
+        qty: l.qty,
+        unitPrice: unitPriceOf(l),
+      })
+    }
+    for (const [k, l] of wanted) {
+      if (used.has(k)) continue
+      next.push({
+        id: `li_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        description: `${l.sku} – ${l.description || l.brand}`,
+        qty: l.qty,
+        unitPrice: unitPriceOf(l),
+      })
+    }
+
+    const res = await fetch(`/api/admin/orders/documents/${doc.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      // A quote never moves stock; both flags make sure it cannot (Rule 59).
+      body: JSON.stringify({ lineItems: next, stockAlreadyReserved: true, skipStockAdjust: true }),
+    })
+    if (!res.ok) return ` Could not update ${doc.docNumber}.`
+    await load()
+    return ` ${doc.docNumber} updated to match.`
+  }
+
+  /** Any save that can move a price or qty — the linked quote follows it. */
+  const saveAndResync = async (
+    order: Order,
+    patch: Partial<SupplierPreOrder>,
+    goneSkus: string[] = []
+  ) => {
+    const fresh = await patchOrder(order.id, patch)
+    if (!fresh) return
+    const updated = fresh.find((o) => o.id === order.id)
+    if (updated?.quoteId) {
+      const msg = await resyncQuote(updated, goneSkus)
+      setNote({ kind: msg.includes('updated to match') ? 'ok' : 'err', text: `Saved.${msg}` })
+    }
+  }
+
+  const saveLines = (order: Order, lines: SupplierPreOrderLine[], goneSkus: string[] = []) =>
+    saveAndResync(order, { lines: toStored(lines) }, goneSkus)
+
+  const deleteLine = (order: Order, l: PricedLine) => {
+    if (
+      !confirm(
+        `Remove ${l.sku} from ${order.ref}?${order.quoteNumber ? `\n\nIt comes off ${order.quoteNumber} too.` : ''}`
+      )
+    )
+      return
+    const lines = order.lines.filter((x) => x.id !== l.id)
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, lines } : o)))
+    saveLines(order, lines, [l.sku.trim().toUpperCase()])
+  }
+
+  /**
+   * Corrects Inventory's on-hand qty for a SKU. A shelf count, logged as
+   * 'stocktake' server-side — never intake, never a sale.
+   */
+  const correctStock = async (sku: string, current: number, raw: string) => {
+    const q = parseInt(raw, 10)
+    if (!Number.isInteger(q) || q < 0 || q === current) return false
+    if (
+      !confirm(
+        `Change In Stock for ${sku} from ${current} to ${q}?\n\nThis changes Inventory and is logged as a stocktake.`
+      )
+    )
+      return false
+    setBusy(true)
+    setNote(null)
+    try {
+      const res = await fetch('/api/admin/supplier-preorders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setStock', sku, quantity: q }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not update stock')
+      setNote({ kind: 'ok', text: `${sku} In Stock ${data.before} → ${data.after}.` })
+      await load()
+      return true
+    } catch (e: any) {
+      setNote({ kind: 'err', text: e?.message || 'Could not update stock' })
+      return false
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const toggleSelect = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -330,7 +491,7 @@ export default function SupplierPreOrdersAdminPage() {
       setNote({ kind: 'err', text: 'Every line on that pre order is rejected.' })
       return
     }
-    const unpriced = active.filter((l) => l.estRetailZAR <= 0)
+    const unpriced = active.filter((l) => unitPriceOf(l) <= 0)
     if (unpriced.length > 0) {
       setNote({ kind: 'err', text: `Price these first: ${unpriced.map((l) => l.sku).join(', ')}` })
       return
@@ -343,13 +504,15 @@ export default function SupplierPreOrdersAdminPage() {
         id: `li_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
         description: `${l.sku} – ${l.description || l.brand}`,
         qty: l.qty,
-        unitPrice: l.estRetailZAR,
+        // What the client is shown: shelf price for stock on hand, else the estimate.
+        unitPrice: unitPriceOf(l),
       }))
 
       if (mode === 'existing') {
         const targetId = quoteTarget[order.id]
         if (!targetId) throw new Error('Pick a document to add to.')
         const target = docById.get(targetId)
+        if (target?.type !== 'quote') throw new Error('That document is not a quote.')
         // appendLineItems merges against the document as it stands on the server.
         // Building the array here from a stale copy is what used to drop lines
         // when two sends raced each other.
@@ -417,6 +580,152 @@ export default function SupplierPreOrdersAdminPage() {
     }
   }
 
+  /** Kept lines the shelf can cover in full — the only ones that may be invoiced. */
+  const stockSplit = (order: Order) => {
+    const active = order.lines.filter((l) => l.status !== 'rejected')
+    const inStock: PricedLine[] = []
+    const short: PricedLine[] = []
+    for (const l of active) {
+      const inf = skuInfo[l.sku.trim().toUpperCase()]
+      if (inf?.inInventory && inf.qtyAvailable >= l.qty && l.qty > 0) inStock.push(l)
+      else short.push(l)
+    }
+    return { inStock, short }
+  }
+
+  /**
+   * Invoice or Sales Order, straight from the request — for what is ON THE SHELF
+   * only. Lines short of stock stay on the request to go to the supplier.
+   *
+   * No stock flags are sent, deliberately: these are real sales of goods we
+   * hold, so the documents API takes the stock (and refuses an invoice the shelf
+   * cannot cover). The lines that went leave the request and are recorded in
+   * `fulfilled`; a linked quote is re-synced so they are not billed twice.
+   */
+  const sendToStockDoc = async (
+    order: Order,
+    type: 'invoice' | 'salesorder',
+    targetId?: string
+  ) => {
+    const { inStock, short } = stockSplit(order)
+    if (inStock.length === 0) {
+      setNote({
+        kind: 'err',
+        text: `Nothing on ${order.ref} is in stock — a ${DOC_LABEL[type]} cannot be raised. Send it to the supplier or a quote instead.`,
+      })
+      return
+    }
+    const target = targetId ? docById.get(targetId) : null
+    const what = target ? target.docNumber : `a new ${DOC_LABEL[type]}`
+    const list = (ls: PricedLine[]) => ls.map((l) => `• ${l.sku} × ${l.qty}`).join('\n')
+    if (
+      !confirm(
+        `Put these in-stock lines on ${what}?\n\n${list(inStock)}${
+          short.length ? `\n\nNot in stock — staying on ${order.ref}:\n${list(short)}` : ''
+        }\n\nStock is deducted from Inventory.`
+      )
+    )
+      return
+
+    setBusy(true)
+    setNote(null)
+    try {
+      const lineItems = inStock.map((l, i) => ({
+        id: `li_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+        description: `${l.sku} – ${l.description || l.brand}`,
+        qty: l.qty,
+        unitPrice: unitPriceOf(l),
+      }))
+
+      let doc: any
+      if (target) {
+        const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ appendLineItems: lineItems }),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || 'Could not update')
+        doc = await res.json()
+      } else {
+        const re = type === 'invoice' ? /^INV(\d+)$/ : /^SO(\d+)$/
+        const nums = docs
+          .filter((d) => d.type === type)
+          .map((d) => {
+            const m = re.exec(d?.docNumber || '')
+            return m ? parseInt(m[1], 10) : 0
+          })
+        // Same numbering as Orders: INV0026 onwards, SO001 onwards.
+        const docNumber =
+          type === 'invoice'
+            ? `INV${String(Math.max(25, ...nums) + 1).padStart(4, '0')}`
+            : `SO${String(Math.max(0, ...nums) + 1).padStart(3, '0')}`
+        const res = await fetch('/api/admin/orders/documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type,
+            docNumber,
+            date: new Date().toISOString().slice(0, 10),
+            clientName: order.clientName,
+            clientEmail: order.clientEmail || '',
+            clientPhone: order.clientPhone || '',
+            lineItems,
+            notes: [`Supplier Pre Order ${order.ref} — ${order.supplierName}`, order.notes]
+              .filter(Boolean)
+              .join('\n'),
+            status: 'draft',
+            depositMode: false,
+          }),
+        })
+        if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || 'Could not create')
+        doc = await res.json()
+        if (!doc?.id || (doc.lineItems || []).length === 0) {
+          throw new Error(`${doc?.docNumber || 'The document'} was created without lines — check it.`)
+        }
+      }
+
+      const now = new Date().toISOString()
+      const movedIds = new Set(inStock.map((l) => l.id))
+      const fulfilled = [
+        ...(order.fulfilled || []),
+        ...inStock.map((l) => ({
+          sku: l.sku,
+          description: l.description,
+          qty: l.qty,
+          unitPrice: unitPriceOf(l),
+          docId: doc.id,
+          docNumber: doc.docNumber,
+          docType: doc.type as 'invoice' | 'salesorder',
+          at: now,
+        })),
+      ]
+      const fresh = await patchOrder(order.id, {
+        lines: toStored(order.lines.filter((l) => !movedIds.has(l.id))),
+        fulfilled,
+      })
+      if (!fresh) {
+        throw new Error(
+          `${doc.docNumber} has the lines, but ${order.ref} could not be updated — remove them from it by hand.`
+        )
+      }
+      let msg = ''
+      const updated = fresh.find((o) => o.id === order.id)
+      if (updated?.quoteId) {
+        msg = await resyncQuote(updated, inStock.map((l) => l.sku.trim().toUpperCase()))
+      }
+      setNote({
+        kind: 'ok',
+        text: `${inStock.length} line${inStock.length === 1 ? '' : 's'} on ${doc.docNumber}.${
+          short.length ? ` ${short.length} not in stock — still on ${order.ref}.` : ''
+        }${msg}`,
+      })
+    } catch (e: any) {
+      setNote({ kind: 'err', text: e?.message || 'Could not send' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   /** Payment state read off the linked document — never hand-rolled (payment-math.ts). */
   const paymentState = (order: Order) => {
     const doc = order.quoteId ? docById.get(order.quoteId) : null
@@ -432,23 +741,19 @@ export default function SupplierPreOrdersAdminPage() {
   }
 
   /**
-   * Open QUOTES for this client, and deliberately nothing else.
+   * Open quotes, invoices and sales orders for this client.
    *
-   * Invoices and sales orders are stockable, so appending to one runs the PATCH
-   * route's adjustStock and deducts inventory for goods that have not been
-   * ordered from the supplier yet, let alone landed — exactly what Rule 59
-   * forbids. (stockAlreadyReserved does NOT prevent that on PATCH; it only
-   * skips the shortfall check. skipStockAdjust is the flag that stops the
-   * movement.) Restricting the target to quotes keeps this off the stock path
-   * altogether, and matches what the feature is for: Send to Quote.
+   * A quote takes every kept line and never moves stock. An invoice or sales
+   * order is stockable, so it is only ever handed the lines the shelf can cover
+   * (sendToStockDoc) — appending a not-yet-ordered line to one would deduct
+   * inventory for goods that do not exist, which Rule 59 forbids.
    */
   const openDocsFor = (order: Order) => {
     const email = (order.clientEmail || '').toLowerCase()
-    const openStatuses = ['draft', 'sent', 'accepted', 'pending', 'processing', 'active']
     return docs.filter(
       (d) =>
-        d.type === 'quote' &&
-        openStatuses.includes(d.status) &&
+        ['quote', 'invoice', 'salesorder'].includes(d.type) &&
+        OPEN_DOC_STATUSES.includes(d.status) &&
         (d.clientEmail?.toLowerCase() === email ||
           d.clientName?.toLowerCase() === order.clientName?.toLowerCase())
     )
@@ -471,8 +776,9 @@ export default function SupplierPreOrdersAdminPage() {
         <h1 className="text-2xl font-bold text-gray-900">Supplier Pre Orders</h1>
         <p className="text-sm text-gray-600 mt-1">
           What clients have asked us to order. Gathered separately from our own supplier orders and
-          merged into one only when you send them. <strong>Requests, not stock</strong> — nothing
-          here touches Inventory.
+          merged into one only when you send them. <strong>Requests, not stock</strong> — only
+          New Invoice / New Sales Order (in-stock lines only) and correcting In Stock touch
+          Inventory.
         </p>
         <p className="text-xs text-gray-500 mt-2">
           <strong>Archived</strong> is history — requests that were created and sent to a supplier
@@ -724,7 +1030,7 @@ export default function SupplierPreOrdersAdminPage() {
                             <label className="block text-xs text-gray-500 mb-1">Costing account</label>
                             <select
                               value={order.account}
-                              onChange={(e) => patchOrder(order.id, { account: e.target.value as any })}
+                              onChange={(e) => saveAndResync(order, { account: e.target.value as any })}
                               disabled={tab === 'archived'}
                               className="px-2 py-1.5 border border-gray-300 rounded text-sm"
                             >
@@ -741,7 +1047,7 @@ export default function SupplierPreOrdersAdminPage() {
                               defaultValue={order.currency}
                               onBlur={(e) =>
                                 e.target.value.toUpperCase() !== order.currency &&
-                                patchOrder(order.id, { currency: e.target.value.toUpperCase() })
+                                saveAndResync(order, { currency: e.target.value.toUpperCase() })
                               }
                               disabled={tab === 'archived'}
                               className="w-20 px-2 py-1.5 border border-gray-300 rounded text-sm"
@@ -792,7 +1098,14 @@ export default function SupplierPreOrdersAdminPage() {
                                   Retail
                                 </th>
                                 <th className="py-2 pr-3 font-medium text-right">Est. Retail</th>
-                                <th className="py-2 font-medium text-center">Keep</th>
+                                <th
+                                  className="py-2 pr-3 font-medium text-right whitespace-nowrap"
+                                  title="Qty × the price the client is quoted"
+                                >
+                                  Line Total
+                                </th>
+                                <th className="py-2 pr-3 font-medium text-center">Keep</th>
+                                <th className="py-2 font-medium sr-only">Remove</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -849,12 +1162,34 @@ export default function SupplierPreOrdersAdminPage() {
                                       />
                                     </td>
                                     <td className="py-2 pr-3 text-center whitespace-nowrap">
-                                      {(skuInfo[l.sku.trim().toUpperCase()]?.qtyAvailable || 0) > 0 ? (
+                                      {tab === 'open' &&
+                                      skuInfo[l.sku.trim().toUpperCase()]?.inInventory ? (
+                                        <input
+                                          // Re-keyed on the stored figure so a cancelled or
+                                          // refused change snaps back to what Inventory holds.
+                                          key={`${l.id}-${skuInfo[l.sku.trim().toUpperCase()].qtyAvailable}`}
+                                          type="number"
+                                          min={0}
+                                          defaultValue={skuInfo[l.sku.trim().toUpperCase()].qtyAvailable}
+                                          onBlur={async (e) => {
+                                            const cur = skuInfo[l.sku.trim().toUpperCase()].qtyAvailable
+                                            const ok = await correctStock(l.sku, cur, e.target.value)
+                                            if (!ok) e.target.value = String(cur)
+                                          }}
+                                          disabled={busy}
+                                          title="Correct the Inventory count — logged as a stocktake"
+                                          className={`w-14 px-1 py-1 border border-transparent hover:border-gray-300 focus:border-gray-300 rounded text-sm text-center font-semibold ${
+                                            skuInfo[l.sku.trim().toUpperCase()].qtyAvailable > 0
+                                              ? 'text-green-700'
+                                              : 'text-gray-400'
+                                          }`}
+                                        />
+                                      ) : (skuInfo[l.sku.trim().toUpperCase()]?.qtyAvailable || 0) > 0 ? (
                                         <span className="text-green-700 font-semibold">
                                           {skuInfo[l.sku.trim().toUpperCase()].qtyAvailable}
                                         </span>
                                       ) : (
-                                        <span className="text-gray-400">0</span>
+                                        <span className="text-gray-400" title="Not in Inventory">0</span>
                                       )}
                                     </td>
                                     <td className="py-2 pr-3 text-center whitespace-nowrap">
@@ -911,7 +1246,14 @@ export default function SupplierPreOrdersAdminPage() {
                                         </span>
                                       )}
                                     </td>
-                                    <td className="py-2 text-center">
+                                    <td className="py-2 pr-3 text-right whitespace-nowrap">
+                                      {l.status === 'rejected'
+                                        ? '—'
+                                        : unitPriceOf(l) > 0
+                                          ? formatZAR(l.qty * unitPriceOf(l))
+                                          : '—'}
+                                    </td>
+                                    <td className="py-2 pr-3 text-center">
                                       <input
                                         type="checkbox"
                                         checked={l.status !== 'rejected'}
@@ -928,11 +1270,34 @@ export default function SupplierPreOrdersAdminPage() {
                                         aria-label={`Keep ${l.sku}`}
                                       />
                                     </td>
+                                    <td className="py-2 text-center">
+                                      {tab === 'open' && (
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteLine(order, l)}
+                                          disabled={busy}
+                                          title={`Remove ${l.sku} from this pre order`}
+                                          aria-label={`Remove ${l.sku}`}
+                                          className="text-gray-400 hover:text-red-600 disabled:opacity-40"
+                                        >
+                                          🗑
+                                        </button>
+                                      )}
+                                    </td>
                                   </tr>
                                 ))}
                             </tbody>
                           </table>
                         </div>
+
+                        {(order.fulfilled || []).length > 0 && (
+                          <div className="text-xs bg-green-50 border border-green-200 rounded px-3 py-2 text-green-900">
+                            <span className="font-medium">Supplied from stock: </span>
+                            {(order.fulfilled || [])
+                              .map((f) => `${f.sku} × ${f.qty} → ${f.docNumber}`)
+                              .join(' · ')}
+                          </div>
+                        )}
 
                         {order.notes && (
                           <p className="text-xs text-gray-600 italic">Client note: {order.notes}</p>
@@ -966,6 +1331,32 @@ export default function SupplierPreOrdersAdminPage() {
                             >
                               New Quote
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => sendToStockDoc(order, 'invoice')}
+                              disabled={busy || stockSplit(order).inStock.length === 0}
+                              title={
+                                stockSplit(order).inStock.length === 0
+                                  ? 'Nothing on this pre order is in stock'
+                                  : 'In-stock lines only — the rest stay here for the supplier'
+                              }
+                              className="px-3 py-2 text-sm font-medium rounded-md bg-blue-600 text-white disabled:opacity-40"
+                            >
+                              New Invoice
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => sendToStockDoc(order, 'salesorder')}
+                              disabled={busy || stockSplit(order).inStock.length === 0}
+                              title={
+                                stockSplit(order).inStock.length === 0
+                                  ? 'Nothing on this pre order is in stock'
+                                  : 'In-stock lines only — the rest stay here for the supplier'
+                              }
+                              className="px-3 py-2 text-sm font-medium rounded-md bg-indigo-600 text-white disabled:opacity-40"
+                            >
+                              New Sales Order
+                            </button>
                             <select
                               value={quoteTarget[order.id] || ''}
                               onChange={(e) =>
@@ -973,16 +1364,33 @@ export default function SupplierPreOrdersAdminPage() {
                               }
                               className="px-2 py-2 border border-gray-300 rounded-md text-sm"
                             >
-                              <option value="">Add to existing quote…</option>
-                              {openDocsFor(order).map((d) => (
-                                <option key={d.id} value={d.id}>
-                                  {d.docNumber} ({d.type})
-                                </option>
-                              ))}
+                              <option value="">Add to existing…</option>
+                              {(['quote', 'invoice', 'salesorder'] as const).map((t) => {
+                                const list = openDocsFor(order).filter((d) => d.type === t)
+                                if (list.length === 0) return null
+                                const noStock = t !== 'quote' && stockSplit(order).inStock.length === 0
+                                return (
+                                  <optgroup
+                                    key={t}
+                                    label={`${DOC_LABEL[t]}s${t === 'quote' ? '' : ' — in-stock lines only'}`}
+                                  >
+                                    {list.map((d) => (
+                                      <option key={d.id} value={d.id} disabled={noStock}>
+                                        {d.docNumber}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )
+                              })}
                             </select>
                             <button
                               type="button"
-                              onClick={() => sendToQuote(order, 'existing')}
+                              onClick={() => {
+                                const t = docById.get(quoteTarget[order.id])
+                                if (t?.type === 'invoice' || t?.type === 'salesorder')
+                                  sendToStockDoc(order, t.type, t.id)
+                                else sendToQuote(order, 'existing')
+                              }}
                               disabled={busy || !quoteTarget[order.id]}
                               className="px-3 py-2 text-sm font-medium rounded-md border border-purple-300 text-purple-700 disabled:opacity-40"
                             >

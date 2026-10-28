@@ -418,6 +418,8 @@ export interface SkuInfo {
   /** Qty already placed with the supplier — see getOnOrderQtyBySku. */
   qtyOnOrder: number
   title: string
+  /** A product row exists — only then can In Stock be corrected or the SKU invoiced. */
+  inInventory: boolean
 }
 
 /**
@@ -471,7 +473,10 @@ export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo
     db.query(
       `SELECT sku, title, image_url, images, quantity, price
          FROM products
-        WHERE UPPER(TRIM(sku)) = ANY($1)`,
+        WHERE UPPER(TRIM(sku)) = ANY($1)
+        -- Same pick as resolveStockRow in order-helpers, so the In Stock shown
+        -- is the row a correction or an invoice actually moves.
+        ORDER BY (status = 'active') DESC, updated_at DESC NULLS LAST, id`,
       [wanted]
     ),
     getOnOrderQtyBySku(),
@@ -487,13 +492,14 @@ export async function getSkuInfo(skus: string[]): Promise<Record<string, SkuInfo
       retailZAR: Math.round((Number(p.price) || 0) * 100) / 100,
       qtyOnOrder: onOrder[sku] || 0,
       title: (p.title || '').trim(),
+      inInventory: true,
     }
   }
   // A SKU we have never stocked has no product row, but it can still be on
   // order — the request is exactly how such a SKU reaches us.
   for (const sku of wanted) {
     if (!out[sku] && onOrder[sku]) {
-      out[sku] = { imageUrl: '', qtyAvailable: 0, retailZAR: 0, qtyOnOrder: onOrder[sku], title: '' }
+      out[sku] = { imageUrl: '', qtyAvailable: 0, retailZAR: 0, qtyOnOrder: onOrder[sku], title: '', inInventory: false }
     }
   }
   return out
