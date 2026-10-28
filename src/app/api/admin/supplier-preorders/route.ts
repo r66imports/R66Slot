@@ -11,7 +11,12 @@ import { getSkuInfo } from '@/lib/supplier-catalogue'
 import { db } from '@/lib/db'
 import { resolveStockRow } from '@/lib/order-helpers'
 import { logStockChange } from '@/lib/stock-log'
-import type { CostingAccount, SupplierPreOrder } from '@/types/supplier-preorder'
+import { withLinesReturned } from '@/lib/supplier-preorder-links'
+import type {
+  CostingAccount,
+  SupplierCatalogueItem,
+  SupplierPreOrder,
+} from '@/types/supplier-preorder'
 
 const KEY = 'data/supplier-preorders.json'
 
@@ -217,6 +222,7 @@ export async function DELETE(request: Request) {
 /**
  * POST — { action: 'restore' | 'empty', ids?: string[] }
  *        { action: 'setStock', sku, quantity }
+ *        { action: 'returnLines', id, docId }
  *
  * restore puts a binned request back to the status it held when it was binned,
  * so restoring something archived returns it to Archive rather than to Open.
@@ -266,6 +272,22 @@ export async function POST(request: Request) {
         })
       }
       return NextResponse.json({ success: true, sku, before, after })
+    }
+
+    // Lines supplied from stock onto docId go back on the request. The caller
+    // has already taken them off that document (which returned their stock) —
+    // this only moves the request's own record, so it never touches Inventory.
+    if (action === 'returnLines') {
+      const order = all.find((o) => o.id === body.id)
+      if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      if (order.status === 'archived' || order.deletedAt) {
+        return NextResponse.json({ error: `${order.ref} is archived or in the Bin` }, { status: 409 })
+      }
+      const catalogue = await blobRead<SupplierCatalogueItem[]>('data/supplier-catalogue.json', [])
+      const next = withLinesReturned(order, String(body.docId || ''), catalogue)
+      if (next === order) return NextResponse.json({ error: 'Nothing to return' }, { status: 404 })
+      await blobReplaceArrayItem(KEY, order.id, next)
+      return NextResponse.json({ success: true, returned: next.lines.length - order.lines.length })
     }
 
     if (action === 'empty') {

@@ -616,7 +616,9 @@ export default function SupplierPreOrdersAdminPage() {
       return
     }
     const target = targetId ? docById.get(targetId) : null
-    const what = target ? target.docNumber : `a new ${DOC_LABEL[type]}`
+    const what = target
+      ? `${DOC_LABEL[target.type]} ${target.docNumber} (${target.clientName || target.clientEmail || 'no client'})`
+      : `a new ${DOC_LABEL[type]} for ${order.clientName}`
     const list = (ls: PricedLine[]) => ls.map((l) => `• ${l.sku} × ${l.qty}`).join('\n')
     if (
       !confirm(
@@ -697,6 +699,7 @@ export default function SupplierPreOrdersAdminPage() {
           docNumber: doc.docNumber,
           docType: doc.type as 'invoice' | 'salesorder',
           at: now,
+          line: toStored([l])[0],
         })),
       ]
       const fresh = await patchOrder(order.id, {
@@ -722,6 +725,85 @@ export default function SupplierPreOrdersAdminPage() {
     } catch (e: any) {
       setNote({ kind: 'err', text: e?.message || 'Could not send' })
     } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Undo a send to the wrong invoice / sales order: the request's lines come off
+   * that document — the documents API returns their stock — and go back on the
+   * request. The document itself stays, with anything else on it.
+   *
+   * Only while the document is open: a paid or archived one is a record and is
+   * corrected from Orders. If the document is already gone its stock went back
+   * when it was deleted, so only the request is put right.
+   */
+  const returnFromDoc = async (order: Order, docId: string, docNumber: string) => {
+    const entries = (order.fulfilled || []).filter((f) => f.docId === docId)
+    if (entries.length === 0) return
+    const doc = docById.get(docId)
+    if (doc && !OPEN_DOC_STATUSES.includes(doc.status)) {
+      setNote({
+        kind: 'err',
+        text: `${docNumber} is ${doc.status} — correct it from Orders, not from here.`,
+      })
+      return
+    }
+    if (
+      !confirm(
+        `Return ${entries.length} line${entries.length === 1 ? '' : 's'} from ${docNumber} to ${order.ref}?\n\n${entries
+          .map((f) => `• ${f.sku} × ${f.qty}`)
+          .join('\n')}${doc ? `\n\nThey come off ${docNumber} and their stock goes back into Inventory.` : ''}`
+      )
+    )
+      return
+
+    setBusy(true)
+    setNote(null)
+    try {
+      if (doc) {
+        // Take back exactly what was sent: per SKU, the qty this request put on
+        // the document, from that SKU's lines. Anything else on it is untouched.
+        const owed = new Map<string, number>()
+        for (const f of entries) {
+          const k = f.sku.trim().toUpperCase()
+          owed.set(k, (owed.get(k) || 0) + f.qty)
+        }
+        const next: any[] = []
+        for (const li of doc.lineItems || []) {
+          const k = skuOf(li.description)
+          const take = Math.min(owed.get(k) || 0, Number(li.qty) || 0)
+          if (take > 0) owed.set(k, (owed.get(k) || 0) - take)
+          const left = (Number(li.qty) || 0) - take
+          if (left > 0) next.push(take > 0 ? { ...li, qty: left } : li)
+        }
+        const res = await fetch(`/api/admin/orders/documents/${docId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          // No stock flags: the route must restore the stock for what came off.
+          body: JSON.stringify({ lineItems: next }),
+        })
+        if (!res.ok) {
+          throw new Error((await res.json().catch(() => ({})))?.error || `Could not update ${docNumber}`)
+        }
+      }
+      const res = await fetch('/api/admin/supplier-preorders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'returnLines', id: order.id, docId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || 'Could not return the lines')
+      setNote({
+        kind: 'ok',
+        text: `${data.returned} line${data.returned === 1 ? '' : 's'} back on ${order.ref}${
+          doc ? `, off ${docNumber}, stock returned` : ''
+        }.`,
+      })
+    } catch (e: any) {
+      setNote({ kind: 'err', text: e?.message || 'Could not return the lines' })
+    } finally {
+      await load()
       setBusy(false)
     }
   }
@@ -1290,14 +1372,36 @@ export default function SupplierPreOrdersAdminPage() {
                           </table>
                         </div>
 
-                        {(order.fulfilled || []).length > 0 && (
-                          <div className="text-xs bg-green-50 border border-green-200 rounded px-3 py-2 text-green-900">
-                            <span className="font-medium">Supplied from stock: </span>
-                            {(order.fulfilled || [])
-                              .map((f) => `${f.sku} × ${f.qty} → ${f.docNumber}`)
-                              .join(' · ')}
-                          </div>
-                        )}
+                        {[...new Set((order.fulfilled || []).map((f) => f.docId))].map((docId) => {
+                          const entries = (order.fulfilled || []).filter((f) => f.docId === docId)
+                          const docNumber = entries[0].docNumber
+                          const doc = docById.get(docId)
+                          return (
+                            <div
+                              key={docId}
+                              className="text-xs bg-green-50 border border-green-200 rounded px-3 py-2 text-green-900 flex items-start gap-3"
+                            >
+                              <div className="flex-1">
+                                <span className="font-medium">
+                                  Supplied from stock → {DOC_LABEL[entries[0].docType]} {docNumber}
+                                  {!doc && ' (deleted)'}:{' '}
+                                </span>
+                                {entries.map((f) => `${f.sku} × ${f.qty}`).join(' · ')}
+                              </div>
+                              {tab === 'open' && (
+                                <button
+                                  type="button"
+                                  onClick={() => returnFromDoc(order, docId, docNumber)}
+                                  disabled={busy}
+                                  title={`Take these off ${docNumber} and put them back on ${order.ref}`}
+                                  className="whitespace-nowrap px-2 py-1 rounded border border-green-300 bg-white text-green-800 hover:bg-green-100 disabled:opacity-40"
+                                >
+                                  ↩ Return to pre order
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
 
                         {order.notes && (
                           <p className="text-xs text-gray-600 italic">Client note: {order.notes}</p>
@@ -1376,7 +1480,7 @@ export default function SupplierPreOrdersAdminPage() {
                                   >
                                     {list.map((d) => (
                                       <option key={d.id} value={d.id} disabled={noStock}>
-                                        {d.docNumber}
+                                        {d.docNumber} · {d.date} · {d.lineItems?.length || 0} lines
                                       </option>
                                     ))}
                                   </optgroup>

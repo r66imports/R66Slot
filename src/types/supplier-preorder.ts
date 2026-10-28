@@ -102,6 +102,8 @@ export interface SupplierPreOrderFulfilledLine {
   docNumber: string
   docType: 'invoice' | 'salesorder'
   at: string
+  /** The request line as it was, so Return to pre order puts it back exactly. */
+  line?: SupplierPreOrderLine
 }
 
 export interface SupplierPreOrder {
