@@ -6,6 +6,7 @@ import type { OrderDocument } from '../route'
 import { adjustStock, findStockShortfalls, shortfallMessage, sameStockFootprint } from '@/lib/order-helpers'
 import { isRuleActive } from '@/lib/site-rules'
 import { documentTotal, isFullySettled, MONEY_EPSILON } from '@/lib/payment-math'
+import { unlinkSupplierPreOrdersFromDoc } from '@/lib/supplier-preorder-links'
 
 const KEY = 'data/order-documents.json'
 const BIN_KEY = 'data/invoices-bin.json'
@@ -186,7 +187,9 @@ export async function DELETE(
     }
 
     await blobRemoveArrayItem(KEY, id)
-    return NextResponse.json({ success: true })
+    // A Supplier Pre Order quoted onto this document must not keep pointing at it.
+    const unlinked = await unlinkSupplierPreOrdersFromDoc(id).catch(() => [] as string[])
+    return NextResponse.json({ success: true, unlinkedSupplierPreOrders: unlinked })
   } catch (error) {
     console.error('Error deleting document:', error)
     return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 })
