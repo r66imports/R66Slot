@@ -1,18 +1,24 @@
 'use client'
 
-import { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 /**
  * Live admin: when someone saves on a page, everyone else on that page (or on a
- * page that loaded the same data) sees it without reloading.
+ * page that loaded the same data) sees it on its own — no reload, no button.
  *
  * No page has to opt in. A fetch hook notes which /api resources the page reads
- * and announces every successful write to /api/admin/live; when another user's
- * write touches what this page shows, the page is remounted so its own loaders
- * run again. A remount throws away anything typed and not saved, so a page the
- * user has been working on is never refreshed under them; they get a banner
- * and choose when to load the other person's changes.
+ * and announces every successful write to /api/admin/live. When another user's
+ * write touches what this page shows, a second copy of the page is mounted
+ * hidden, runs its own loaders, and once its data is in it is swapped in place
+ * of the visible copy. Before the swap, anything the user typed and has not yet
+ * saved is copied into the new copy, and the scroll position and cursor are put
+ * back, so the swap is invisible apart from the other person's changes.
+ *
+ * The swap waits while the user is mid-keystroke or has a modal open, and while
+ * an unsaved field can't be matched in the new copy (their typing would be lost);
+ * it goes ahead by itself as soon as that clears. Tab, sort and expand state that
+ * lives only in page memory does reset on a swap.
  *
  * See src/lib/admin-live.ts for the server side.
  */
@@ -22,11 +28,19 @@ type Change = { clientId: string; user: string; page: string; resource: string; 
 
 const HEARTBEAT_MS = 20_000
 const EDITING_WINDOW_MS = 8_000
-const REFRESH_DEBOUNCE_MS = 1_200
 // A write only counts as a save if the user clicked or typed shortly before it.
 // Writes a page makes by itself on load would otherwise ping-pong: A's mount
 // POST refreshes B, whose remount POST refreshes A, and so on.
 const SAVE_AFTER_INPUT_MS = 60_000
+// Swap timing: let the hidden copy start its loads, then wait for the network to go quiet.
+const PRELOAD_MIN_MS = 500
+const QUIET_MS = 300
+const PRELOAD_MAX_MS = 8_000
+// Don't swap under someone who is still typing.
+const TYPING_PAUSE_MS = 2_500
+
+const FIELD = 'input, textarea, select'
+const MODAL = '[role="dialog"], [aria-modal="true"], .fixed.inset-0'
 
 /** "/api/admin/products/123" → "admin/products"; "/api/checkout" → "checkout". */
 function resourceOf(pathname: string): string | null {
@@ -46,29 +60,73 @@ function ago(at: number) {
   return `${Math.floor(s / 3600)}h ago`
 }
 
+// ── matching a field in the old copy to the same field in the new copy ───────
+type Field = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+
+function sigOf(el: Element) {
+  const key = el.getAttribute('name') || el.id || el.getAttribute('aria-label') || el.getAttribute('placeholder') || ''
+  return `${el.tagName}|${(el as HTMLInputElement).type || ''}|${key}`
+}
+
+/** Fields with the same signature are told apart by position — only trusted when both copies have the same number of them. */
+function counterpart(el: Element, from: Element, to: Element): Field | null {
+  const sig = sigOf(el)
+  const a = [...from.querySelectorAll(FIELD)].filter((f) => sigOf(f) === sig)
+  const b = [...to.querySelectorAll(FIELD)].filter((f) => sigOf(f) === sig)
+  if (a.length !== b.length) return null
+  return (b[a.indexOf(el)] as Field) ?? null
+}
+
+const isToggle = (el: Element) => el instanceof HTMLInputElement && (el.type === 'checkbox' || el.type === 'radio')
+
+/** Set a value the way typing would, so the page's React state takes it. */
+function writeValue(target: Field, source: Field) {
+  if (isToggle(target)) {
+    if ((target as HTMLInputElement).checked !== (source as HTMLInputElement).checked) (target as HTMLInputElement).click()
+    return
+  }
+  if (target.value === source.value) return
+  const proto = Object.getPrototypeOf(target)
+  Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(target, source.value)
+  target.dispatchEvent(new Event('input', { bubbles: true }))
+  target.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
 // ── fetch hook (installed once per tab) ──────────────────────────────────────
 let ignoreReads = new Set<string>()
 type Hooks = { onRead: (resource: string) => void; onWrite: (resource: string, method: string) => void }
 let hooks: Hooks | null = null
 let originalFetch: typeof fetch | null = null
+let inflight = 0
+let lastFetchAt = 0
 
 function installFetchHook() {
   if (originalFetch || typeof window === 'undefined') return
   originalFetch = window.fetch.bind(window)
   const base = originalFetch
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const res = await base(input, init)
+    let resource: string | null = null
+    let method = 'GET'
     try {
       const raw = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
       const url = new URL(raw, window.location.origin)
-      const method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
-      const resource = url.origin === window.location.origin ? resourceOf(url.pathname) : null
-      if (resource && hooks && window.location.pathname.startsWith('/admin')) {
-        if (method === 'GET') { if (!ignoreReads.has(resource)) hooks.onRead(resource) }
-        else if (res.ok) hooks.onWrite(resource, method)
-      }
+      method = (init?.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+      if (url.origin === window.location.origin) resource = resourceOf(url.pathname)
     } catch { /* never let the hook break the page's own fetch */ }
-    return res
+
+    if (resource) { inflight++; lastFetchAt = Date.now() }
+    try {
+      const res = await base(input, init)
+      try {
+        if (resource && hooks && window.location.pathname.startsWith('/admin')) {
+          if (method === 'GET') { if (!ignoreReads.has(resource)) hooks.onRead(resource) }
+          else if (res.ok) hooks.onWrite(resource, method)
+        }
+      } catch { /* as above */ }
+      return res
+    } finally {
+      if (resource) { inflight--; lastFetchAt = Date.now() }
+    }
   }
 }
 
@@ -91,11 +149,12 @@ function post(body: unknown, beacon = false) {
 export default function LiveSync({ children, layoutReads = [] }: { children: React.ReactNode; layoutReads?: string[] }) {
   const pathname = usePathname()
   ignoreReads = new Set(layoutReads)
-  const [mountKey, setMountKey] = useState(0)
+  // Two copies of the page: `cur` is shown, `next` (when set) loads hidden.
+  const [cur, setCur] = useState(0)
+  const [next, setNext] = useState<number | null>(null)
   const [connected, setConnected] = useState(false)
   const [presence, setPresence] = useState<Presence[]>([])
   const [activity, setActivity] = useState<Change[]>([])
-  const [pending, setPending] = useState<Change | null>(null)
   const [open, setOpen] = useState(false)
   const [, tick] = useState(0)
 
@@ -105,80 +164,132 @@ export default function LiveSync({ children, layoutReads = [] }: { children: Rea
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2) + Date.now().toString(36)
   }
-  const anchorRef = useRef<HTMLSpanElement | null>(null)
+  const curRef = useRef<HTMLDivElement | null>(null)
+  const nextRef = useRef<HTMLDivElement | null>(null)
+  const keySeq = useRef(0)
+  const nextKey = useRef<number | null>(null)
+  const preloadAt = useRef(0)
   const pathRef = useRef(pathname)
   const loaded = useRef(new Set<string>())
-  // Has the user touched this page since it (re)mounted? Then don't refresh under them.
-  const engaged = useRef(false)
-  const typedSinceMount = useRef(false)
+  // Fields the user has changed since their last save — carried across a swap.
+  const touched = useRef(new Set<Element>())
+  const restoring = useRef(false)
   const lastTyped = useRef(0)
   const lastInput = useRef(0)
   const editingSent = useRef(false)
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // What to put back once the new copy is on screen.
+  const afterSwap = useRef<{ scrollTop: number; focus: Field | null; sel: [number | null, number | null] } | null>(null)
 
   const sendPresence = useCallback(() => {
     editingSent.current = Date.now() - lastTyped.current < EDITING_WINDOW_MS
     post({ type: 'presence', clientId: clientId.current, page: pathRef.current, editing: editingSent.current })
   }, [])
 
-  const remount = useCallback(() => {
-    const main = anchorRef.current?.closest('main') ?? null
-    const top = main?.scrollTop ?? 0
-    loaded.current.clear()
-    engaged.current = false
-    typedSinceMount.current = false
-    lastInput.current = 0
-    setPending(null)
-    setMountKey((k) => k + 1)
-    // The page reloads its data asynchronously; keep putting the scroll back
-    // until the content is tall enough to hold it.
-    if (main && top > 0) {
-      const started = Date.now()
-      const iv = setInterval(() => {
-        main.scrollTop = top
-        if (Math.abs(main.scrollTop - top) < 2 || Date.now() - started > 2500) clearInterval(iv)
-      }, 100)
-    }
+  const startPreload = useCallback(() => {
+    keySeq.current += 1
+    nextKey.current = keySeq.current
+    preloadAt.current = Date.now()
+    setNext(keySeq.current)
   }, [])
+
+  const cancelPreload = useCallback(() => {
+    nextKey.current = null
+    setNext(null)
+  }, [])
+
+  /** Swap the hidden copy in, if that can be done without the user losing anything. */
+  const trySwap = useCallback(() => {
+    const from = curRef.current
+    const to = nextRef.current
+    if (nextKey.current === null || !from || !to) return
+    const now = Date.now()
+    const waited = now - preloadAt.current
+    if (waited < PRELOAD_MIN_MS) return
+    if (waited < PRELOAD_MAX_MS && (inflight > 0 || now - lastFetchAt < QUIET_MS)) return
+    if (now - lastTyped.current < TYPING_PAUSE_MS) return
+    // Modals are often portalled to <body>, so look everywhere but the hidden copy.
+    if ([...document.querySelectorAll(MODAL)].some((m) => !to.contains(m) && !m.closest('[data-live-ui]'))) return
+
+    // Every unsaved text edit must have a home in the new copy, or we wait.
+    const moves: [Field, Field][] = []
+    for (const el of touched.current) {
+      if (!el.isConnected || !from.contains(el)) continue
+      const target = counterpart(el, from, to)
+      if (target) moves.push([target, el as Field])
+      else if (!isToggle(el)) return
+    }
+
+    const active = document.activeElement
+    const focus = active && from.contains(active) && active.matches(FIELD) ? counterpart(active, from, to) : null
+    const sel: [number | null, number | null] = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement
+      ? (() => { try { return [active.selectionStart, active.selectionEnd] } catch { return [null, null] } })()
+      : [null, null]
+
+    restoring.current = true
+    try { for (const [target, source] of moves) writeValue(target, source) } finally { restoring.current = false }
+    touched.current = new Set(moves.map(([t]) => t))
+
+    afterSwap.current = { scrollTop: from.closest('main')?.scrollTop ?? 0, focus, sel }
+    const k = nextKey.current
+    nextKey.current = null
+    setNext(null)
+    setCur(k)
+  }, [])
+
+  // New copy on screen: put scroll and cursor back before the browser paints.
+  useLayoutEffect(() => {
+    const a = afterSwap.current
+    if (!a) return
+    afterSwap.current = null
+    const main = curRef.current?.closest('main')
+    if (main) main.scrollTop = a.scrollTop
+    if (a.focus?.isConnected) {
+      a.focus.focus({ preventScroll: true })
+      const [s, e] = a.sel
+      if (s !== null && e !== null && 'setSelectionRange' in a.focus) {
+        try { (a.focus as HTMLInputElement).setSelectionRange(s, e) } catch { /* not a text type */ }
+      }
+    }
+  }, [cur])
 
   // New page: fresh slate, tell the others where we are.
   useEffect(() => {
     pathRef.current = pathname
     loaded.current.clear()
-    engaged.current = false
-    typedSinceMount.current = false
-    setPending(null)
+    touched.current.clear()
+    cancelPreload()
     sendPresence()
-  }, [pathname, sendPresence])
+  }, [pathname, sendPresence, cancelPreload])
 
-  // Fetch hook + interaction tracking.
+  // Fetch hook + interaction tracking + swap loop.
   useEffect(() => {
     installFetchHook()
     hooks = {
       onRead: (r) => loaded.current.add(r),
       onWrite: (resource, method) => {
+        // Writes the hidden copy makes as it mounts aren't the user saving anything.
+        if (nextKey.current !== null && lastInput.current < preloadAt.current) return
         if (Date.now() - lastInput.current > SAVE_AFTER_INPUT_MS) return
+        touched.current.clear()
         post({ type: 'change', clientId: clientId.current, page: pathRef.current, resource, method })
       },
     }
     const inLiveUi = (t: EventTarget | null) => t instanceof Element && !!t.closest('[data-live-ui]')
     const onType = (e: Event) => {
-      if (inLiveUi(e.target)) return
-      engaged.current = true
-      typedSinceMount.current = true
+      if (restoring.current || inLiveUi(e.target)) return
+      if (e.target instanceof Element && e.target.matches(FIELD)) touched.current.add(e.target)
       lastTyped.current = lastInput.current = Date.now()
       if (!editingSent.current) sendPresence()
     }
     const onClick = (e: Event) => {
-      if (inLiveUi(e.target)) return
+      if (restoring.current || inLiveUi(e.target)) return
       lastInput.current = Date.now()
-      // Buttons open modals, switch tabs, sort tables: all state a remount would lose.
-      if (e.target instanceof Element && e.target.closest('button, [role="button"], [role="tab"], select')) engaged.current = true
     }
     document.addEventListener('input', onType, true)
     document.addEventListener('change', onType, true)
     document.addEventListener('click', onClick, true)
 
+    const swapLoop = setInterval(trySwap, 200)
     const beat = setInterval(sendPresence, HEARTBEAT_MS)
     // Drop the "editing" flag soon after typing stops, not at the next heartbeat.
     const idle = setInterval(() => {
@@ -193,12 +304,13 @@ export default function LiveSync({ children, layoutReads = [] }: { children: Rea
       document.removeEventListener('input', onType, true)
       document.removeEventListener('change', onType, true)
       document.removeEventListener('click', onClick, true)
+      clearInterval(swapLoop)
       clearInterval(beat)
       clearInterval(idle)
       window.removeEventListener('pagehide', leave)
       leave()
     }
-  }, [sendPresence])
+  }, [sendPresence, trySwap])
 
   // Event stream.
   useEffect(() => {
@@ -209,19 +321,10 @@ export default function LiveSync({ children, layoutReads = [] }: { children: Rea
     const onChange = (c: Change) => {
       setActivity((a) => [c, ...a.filter((x) => x.at !== c.at || x.clientId !== c.clientId)].slice(0, 25))
       if (c.clientId === clientId.current) return
-      const relevant = c.page === pathRef.current || loaded.current.has(c.resource)
-      if (!relevant) return
-      if (engaged.current) { setPending(c); return }
-      if (refreshTimer.current) clearTimeout(refreshTimer.current)
-      refreshTimer.current = setTimeout(() => {
-        refreshTimer.current = null
-        // They may have started working while the timer ran.
-        if (engaged.current) setPending(c)
-        else remount()
-      }, REFRESH_DEBOUNCE_MS)
+      if (c.page === pathRef.current || loaded.current.has(c.resource)) startPreload()
     }
 
-    const open = () => {
+    const connect = () => {
       if (closed) return
       es = new EventSource('/api/admin/live')
       es.addEventListener('open', () => setConnected(true))
@@ -238,19 +341,18 @@ export default function LiveSync({ children, layoutReads = [] }: { children: Rea
         // EventSource retries a dropped stream itself, but gives up for good on an error status.
         if (es?.readyState === EventSource.CLOSED) {
           es.close()
-          retry = setTimeout(open, 10_000)
+          retry = setTimeout(connect, 10_000)
         }
       })
     }
-    open()
+    connect()
 
     return () => {
       closed = true
       es?.close()
       if (retry) clearTimeout(retry)
-      if (refreshTimer.current) clearTimeout(refreshTimer.current)
     }
-  }, [remount, sendPresence])
+  }, [startPreload, sendPresence])
 
   const others = presence.filter((p) => p.clientId !== clientId.current)
   const here = others.filter((p) => p.page === pathname)
@@ -259,19 +361,10 @@ export default function LiveSync({ children, layoutReads = [] }: { children: Rea
 
   return (
     <>
-      <span ref={anchorRef} hidden />
-      <Fragment key={mountKey}>{children}</Fragment>
-
-      {pending && (
-        <div data-live-ui className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 shadow-lg text-sm font-play">
-          <span className="h-2 w-2 rounded-full bg-amber-500" />
-          <span>
-            <b>{pending.user}</b> saved changes to {label(pending.resource)}
-            {typedSinceMount.current && <span className="text-amber-700"> · your unsaved typing will be lost</span>}
-          </span>
-          <button onClick={remount} className="rounded bg-amber-500 px-3 py-1 text-white font-medium hover:bg-amber-600">Load</button>
-          <button onClick={() => setPending(null)} className="text-gray-500 hover:text-gray-800" aria-label="Dismiss">✕</button>
-        </div>
+      {/* display: contents — the wrappers add no box, so page layout is unchanged. */}
+      <div key={`page-${cur}`} ref={curRef} style={{ display: 'contents' }}>{children}</div>
+      {next !== null && (
+        <div key={`page-${next}`} ref={nextRef} style={{ display: 'none' }} aria-hidden>{children}</div>
       )}
 
       <div data-live-ui className="fixed bottom-4 right-4 z-[9998] font-play text-sm">
@@ -302,9 +395,9 @@ export default function LiveSync({ children, layoutReads = [] }: { children: Rea
         <button
           onClick={() => setOpen((o) => !o)}
           className="ml-auto flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 shadow-md hover:bg-gray-50"
-          title={connected ? 'Live: other users\' saves appear here' : 'Live updates reconnecting…'}
+          title={!connected ? 'Live updates reconnecting…' : next !== null ? 'Bringing in a new save…' : 'Live: other users\' saves appear by themselves'}
         >
-          <span className={`h-2 w-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <span className={`h-2 w-2 rounded-full ${!connected ? 'bg-gray-400' : next !== null ? 'bg-amber-400 animate-pulse' : 'bg-green-500'}`} />
           {here.length > 0
             ? here.map((p) => (
                 <span key={p.clientId} className={p.editing ? 'text-amber-600' : ''}>
