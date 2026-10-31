@@ -1,0 +1,41 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   SLOTCAR SKIN — R66Slot only, so it lives apart from account-skins.css, which
+   is mirrored verbatim with R66Emporium.
+
+   Decoration only. The lanes run down the canvas and the cards are solid, so
+   tables and forms never sit on top of them.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Each lane is a dark slot between two silver rails. */
+[data-skin='slotcar'] {
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 57px,
+    rgba(200, 205, 212, 0.14) 57px 59px,
+    rgba(0, 0, 0, 0.32) 59px 63px,
+    rgba(200, 205, 212, 0.14) 63px 65px,
+    transparent 65px 122px
+  );
+}
+
+/* Chequered stripe across the top of the sidebar card. */
+[data-skin='slotcar'] aside > nav {
+  position: relative;
+  overflow: hidden;
+  padding-top: 1.75rem;
+}
+[data-skin='slotcar'] aside > nav::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: repeating-conic-gradient(#1a1b1e 0 25%, #f5f5f2 0 50%) 0 0 / 12px 12px;
+}
+
+/* The picker swatch. Shown under every skin, so it is not scoped to slotcar;
+   !important because SkinPicker sets each swatch's background inline. */
+[data-skin] button[aria-label='Slotcar theme'] {
+  background: repeating-conic-gradient(#1a1b1e 0 25%, #f5f5f2 0 50%) 0 0 / 12px 12px !important;
+}

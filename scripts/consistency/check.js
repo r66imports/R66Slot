@@ -167,7 +167,13 @@ function checkMirrors() {
         .map((line) => (allow.some((re) => re.test(line)) ? '<per-site>' : line))
         .join('\n')
 
-    const a = blankAllowed(normalise(fs.readFileSync(mine, 'utf8')))
+    // A declared Slot-only block has no counterpart, so it is removed outright.
+    const stripSlotOnly = (text) =>
+      entry.slotOnlyBlocks
+        ? text.replace(/^[ \t]*\/\/ slot-only:start[\s\S]*?\/\/ slot-only:end\n/gm, '')
+        : text
+
+    const a = blankAllowed(stripSlotOnly(normalise(fs.readFileSync(mine, 'utf8'))))
     const b = blankAllowed(normalise(fs.readFileSync(theirs, 'utf8')))
     if (a === b) continue
 

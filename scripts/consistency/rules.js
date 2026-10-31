@@ -16,6 +16,10 @@
  * An entry may be a plain path, or { file, allow: [/regex/] } where a line
  * matching one of the patterns is permitted to differ per site. Every other
  * line must still match, so an exception stays as narrow as it was declared.
+ *
+ * { slotOnlyBlocks: true } additionally ignores anything in this repo between
+ * `// slot-only:start` and `// slot-only:end`, for a deliberate R66Slot-only
+ * addition to a mirrored file. Emporium's copy simply doesn't have those lines.
  */
 const MIRRORED_FILES = [
   // Account Skins — R66Slot is master (Rules 64 / 69)
@@ -24,6 +28,8 @@ const MIRRORED_FILES = [
     // The localStorage key is namespaced per site, so a customer's skin choice
     // on one site never leaks into the other.
     allow: [/^export const SKIN_STORAGE_KEY = /],
+    // The Slotcar skin is R66Slot-only (Rule 64).
+    slotOnlyBlocks: true,
   },
   'src/styles/account-skins.css',
   'src/components/account/AccountSkinProvider.tsx',

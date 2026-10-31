@@ -10,6 +10,7 @@
 
 /* Account Skins — client-chosen colour schemes for the My Account area */
 @import '../styles/account-skins.css';
+@import '../styles/account-skin-slotcar.css';
 
 :root {
   --font-assistant: 'Assistant', system-ui, sans-serif;
