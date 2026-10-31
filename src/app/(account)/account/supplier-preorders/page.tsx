@@ -629,7 +629,7 @@ export default function SupplierPreOrdersPage() {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search any SKU or description…"
+          placeholder="Search any SKU, description or category, e.g. Tyres…"
           className="w-full px-4 py-3 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
         {debouncedSearch && selectedBrands.length === 0 && (

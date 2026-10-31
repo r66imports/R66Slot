@@ -22,8 +22,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
  * client only ever receives an estimated ZAR retail.
  *
  * ?brands=a,b   items for those brands
- * ?q=text       search SKU and description; works with or without a brand, so a
- *               client who knows the SKU need not guess its brand first
+ * ?q=text       search SKU, description, brand and saved Item Categories; works
+ *               with or without a brand, so a client who knows the SKU need not
+ *               guess its brand first
  */
 export async function GET(request: NextRequest) {
   try {

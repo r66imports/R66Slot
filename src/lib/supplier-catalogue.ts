@@ -99,6 +99,14 @@ const firstImage = (p: { image_url: string | null; images: string[] | null }) =>
 
 const upper = (s: string) => (s || '').trim().toUpperCase()
 
+/**
+ * Item Categories hold both forms of a word — Interior and Interiors, White Kit
+ * and White Kits — and titles vary the same way, so words are matched on the
+ * singular, which finds both. SKUs and brands are never singularised.
+ */
+const singular = (word: string) =>
+  word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word
+
 async function loadContext() {
   const [catalogue, suppliers, savedAccounts, rateData] = await Promise.all([
     blobRead<SupplierCatalogueItem[]>('data/supplier-catalogue.json', []),
@@ -223,6 +231,11 @@ export async function getBrandIndex(): Promise<BrandRow[]> {
  * Items for the given brands, or — when `search` is set with no brands — the
  * matches across every brand, so a client who knows the SKU need not guess
  * which brand it belongs to first.
+ *
+ * Search is word by word: each word must land on the SKU, description, brand or
+ * a saved Item Category, in any order. A Sideways tyre is titled "Pro Speed Hard
+ * 18.5x10.5" and is only a tyre by its category, so "tyres" with the brand chosen
+ * and "sideways tyres" with none both have to find it.
  */
 export async function getMergedItems(opts: {
   brands?: string[]
@@ -232,10 +245,10 @@ export async function getMergedItems(opts: {
   limit?: number
 }): Promise<MergedItem[]> {
   const brands = (opts.brands || []).map((b) => b.trim().toLowerCase()).filter(Boolean)
-  const search = (opts.search || '').trim().toLowerCase()
+  const words = (opts.search || '').toLowerCase().split(/\s+/).filter(Boolean)
   const skus = (opts.skus || []).map(upper).filter(Boolean)
   const limit = Math.min(opts.limit || 500, 1000)
-  if (brands.length === 0 && !search && skus.length === 0) return []
+  if (brands.length === 0 && words.length === 0 && skus.length === 0) return []
 
   const ctx = await loadContext()
 
@@ -253,9 +266,14 @@ export async function getMergedItems(opts: {
     params.push(brands)
     where.push(`LOWER(TRIM(brand)) = ANY($${params.length})`)
   }
-  if (search) {
-    params.push(`%${search}%`)
-    where.push(`(LOWER(sku) LIKE $${params.length} OR LOWER(title) LIKE $${params.length})`)
+  for (const word of words) {
+    params.push(`%${word}%`, `%${singular(word)}%`)
+    const exact = params.length - 1
+    const stem = params.length
+    where.push(
+      `(LOWER(sku) LIKE $${exact} OR LOWER(brand) LIKE $${exact}
+        OR LOWER(title) LIKE $${stem} OR LOWER(item_categories::text) LIKE $${stem})`
+    )
   }
   params.push(limit)
 
@@ -352,10 +370,13 @@ export async function getMergedItems(opts: {
       if (!skus.includes(sku)) continue
     } else {
       const brandMatch = brands.length === 0 || brands.includes(itemBrand.toLowerCase())
+      // A product the search already found keeps its catalogue row: categories
+      // live on the product, and the catalogue still wins on price (Rule 61).
+      const code = `${sku} ${itemBrand}`.toLowerCase()
+      const description = (item.description || '').toLowerCase()
       const searchMatch =
-        !search ||
-        sku.toLowerCase().includes(search) ||
-        (item.description || '').toLowerCase().includes(search)
+        bySku.has(sku) ||
+        words.every((w) => code.includes(w) || description.includes(singular(w)))
       if (!brandMatch || !searchMatch) continue
     }
 
