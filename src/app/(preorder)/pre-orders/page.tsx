@@ -46,6 +46,7 @@ type Theme = {
   // header
   headerBg: string
   headerBorder?: string
+  headerStripe?: string
   logoR66: string
   logoEmporium: string
   badgeLabel: string
@@ -166,9 +167,42 @@ const THEMES: Record<string, Theme> = {
     accentText: '#ffffff',
     spinner: '#C41230',
   },
+
+  // Same palette as the Slotcar account skin. Track lanes run down the page
+  // canvas; cards are solid, so nothing is ever read on top of them.
+  slotcar: {
+    key: 'slotcar',
+    name: 'Slotcar',
+    icon: '🏎️',
+    bg: 'repeating-linear-gradient(90deg, transparent 0 57px, rgba(200,205,212,0.14) 57px 59px, rgba(0,0,0,0.32) 59px 63px, rgba(200,205,212,0.14) 63px 65px, transparent 65px 122px), #26282C',
+    footer: '#1A1B1E',
+    footerText: '#ABB1B9',
+    text: '#F5F5F2',
+    textMuted: '#C9CCD1',
+    textSku: '#ABB1B9',
+    border: 'rgba(200,205,212,0.22)',
+    headerBg: '#1A1B1E',
+    headerStripe: 'repeating-conic-gradient(#1A1B1E 0 25%, #F5F5F2 0 50%) 0 0 / 12px 12px',
+    logoR66: '#F5F5F2',
+    logoEmporium: '#FFD21F',
+    badgeLabel: 'PRE ORDERS',
+    badgeLabelBg: 'rgba(255,210,31,0.18)',
+    brandStrip: 'rgba(255,255,255,0.06)',
+    brandChipBg: 'rgba(255,255,255,0.12)',
+    brandChipText: '#F5F5F2',
+    brandChipActive: '#FFD21F',
+    brandChipActiveText: '#111111',
+    cardBg: '#32353A',
+    cardImageBg: '#3D4046',
+    cardRingColor: '#FFD21F',
+    accentBar: '#FFD21F',
+    accent: '#FFD21F',
+    accentText: '#111111',
+    spinner: '#FFD21F',
+  },
 }
 
-const THEME_ORDER = ['dark', 'cyberpunk', 'racing']
+const THEME_ORDER = ['dark', 'cyberpunk', 'racing', 'slotcar']
 
 // ─── Scanlines overlay (cyberpunk) ─────────────────────────────────────────────
 function Scanlines() {
@@ -454,6 +488,8 @@ export default function PreOrdersListPage() {
             )}
           </div>
         )}
+
+        {t.headerStripe && <div className="h-3" style={{ background: t.headerStripe }} />}
       </header>
 
       {/* ── Main ── */}
