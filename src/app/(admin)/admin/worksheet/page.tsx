@@ -2241,19 +2241,27 @@ function WorksheetEditor({
               className="border border-gray-200 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-72"
             />
           ) : (
-            <a
-              href={getTrackingUrl(trackingNumber)}
-              target="_blank"
-              rel="noopener noreferrer"
-              onDoubleClick={(e) => { e.preventDefault(); setTrackingEditMode(true) }}
-              title="Click to open tracking • Double-click to edit"
-              className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 hover:underline font-medium max-w-xs truncate"
-            >
-              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              {trackingNumber}
-            </a>
+            <span className="inline-flex items-center gap-1.5 max-w-xs">
+              {/* Link lives on the icon only — an <a> opens on the first click of a double-click */}
+              <a
+                href={getTrackingUrl(trackingNumber)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open tracking"
+                className="shrink-0 text-blue-600 hover:text-blue-800"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
+              <span
+                onDoubleClick={() => setTrackingEditMode(true)}
+                title="Double-click to edit"
+                className="text-sm text-blue-600 font-medium truncate cursor-text select-none"
+              >
+                {trackingNumber}
+              </span>
+            </span>
           )}
           </div>
           <div className="flex items-center gap-2">
