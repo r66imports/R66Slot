@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import Link from 'next/link'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
+import { tagPaymentsFromQuote, mergeQuoteRefs, quoteDepositNote } from '@/lib/quote-merge'
 import { preorderPaymentLabel } from '@/lib/payment-math'
 import {
   calcCosting, calcRetailPrice,
@@ -426,12 +426,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
 
   // A visible line for the invoice's Notes so the customer can see each deposit that was allocated
   // when several Quotes get consolidated onto one Invoice.
-  const depositNoteFor=(quoteDoc:any)=>{
-    const deposit=Number(quoteDoc.amountPaid||0)+Number(quoteDoc.creditApplied||0)
-    if(deposit<=0.005) return null
-    const dateStr=new Date().toLocaleDateString('en-ZA',{day:'2-digit',month:'short',year:'numeric'})
-    return `Deposit R${deposit.toFixed(2)} allocated from Quote ${quoteDoc.docNumber} (${dateStr})`
-  }
+  const depositNoteFor=quoteDepositNote
 
   // Nothing that is not on the shelf may be invoiced — an invoice against an empty product
   // used to deduct nothing at all, so the sale never came off inventory. The server enforces

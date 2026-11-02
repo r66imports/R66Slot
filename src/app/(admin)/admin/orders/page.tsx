@@ -11,7 +11,7 @@ import {
   settledAmount, balanceDue as calcBalanceDue, overpaymentFor,
   depositAsSettled, paymentWarnings,
 } from '@/lib/payment-math'
-import { tagPaymentsFromQuote, mergeQuoteRefs } from '@/lib/quote-merge'
+import { tagPaymentsFromQuote, mergeQuoteRefs, quoteDepositNote } from '@/lib/quote-merge'
 import { useAdminAuth } from '@/lib/admin-auth-context'
 
 // ─── Service types ────────────────────────────────────────────────────────────
@@ -3391,6 +3391,9 @@ function OrdersPageInner() {
         // Stamped with the Quote they came off, or the invoice shows unexplained deposits
         // once several Quotes have been consolidated onto it.
         patchBody.payments = [...(fresh.payments || []), ...tagPaymentsFromQuote((quote as any).payments, quote.docNumber)]
+        // Same Notes line the Pre-Order Dashboard writes, so the customer sees which Quote
+        // each deposit came from whichever page did the merge.
+        patchBody.notes = [fresh.notes, quoteDepositNote(quote as any)].filter(Boolean).join('\n')
       }
       // Rule 28 — the audit trail must name EVERY source Quote, not just the one that
       // created the invoice, so "Quote Ref:" grows with each merge.
@@ -3453,8 +3456,19 @@ function OrdersPageInner() {
     }
   }
 
-  const handleConvertQuote = async (doc: OrderDocument, toType: 'salesorder' | 'invoice') => {
+  const handleConvertQuote = async (listDoc: OrderDocument, toType: 'salesorder' | 'invoice') => {
     try {
+      // Re-read the Quote — the list copy may predate a payment or a line added since, and a
+      // conversion built from it would drop them. A Quote with no lines is never converted:
+      // archiving it behind an empty document keeps the deposit and loses the goods.
+      const quotesRaw = await fetch('/api/admin/orders/documents?type=quote').then((r) => r.ok ? r.json() : [])
+      const doc: OrderDocument = (Array.isArray(quotesRaw) ? quotesRaw : []).find((d: any) => d.id === listDoc.id) || listDoc
+      const quoteLines = doc.lineItems || []
+      if (quoteLines.length === 0) {
+        setSoToInvoiceResult(`Error: ${doc.docNumber} has no line items — nothing has been changed.`)
+        setTimeout(() => setSoToInvoiceResult(null), 8000)
+        return
+      }
       let newDocNumber: string
       if (toType === 'salesorder') {
         const existingRaw = await fetch('/api/admin/orders/documents?type=salesorder').then((r) => r.ok ? r.json() : [])
@@ -3485,10 +3499,13 @@ function OrdersPageInner() {
           clientEmail: doc.clientEmail || '',
           clientPhone: doc.clientPhone || '',
           clientAddress: doc.clientAddress || '',
-          lineItems: doc.lineItems || [],
-          notes: doc.notes || '',
+          lineItems: quoteLines,
+          // Same Notes line the Pre-Order Dashboard writes: what was paid, and on which Quote.
+          notes: [doc.notes, quoteDepositNote(doc as any)].filter(Boolean).join('\n'),
           terms: doc.terms || '',
           status: 'draft',
+          // Deposit mode is a Quotes-only presentation — the converted document bills in full.
+          depositMode: false,
           discountPct: (doc as any).discountPct || 0,
           shippingMethod: (doc as any).shippingMethod || '',
           shippingCost: (doc as any).shippingCost || 0,
@@ -3509,6 +3526,12 @@ function OrdersPageInner() {
       if (res.ok) {
         const newDoc = await res.json()
         setDocuments((prev) => [newDoc, ...prev])
+        // Confirm the goods landed before archiving the Quote behind them.
+        if (!newDoc?.id || (newDoc.lineItems || []).length < quoteLines.length) {
+          setSoToInvoiceResult(`Error: ${newDocNumber} did not accept all ${quoteLines.length} line item(s) from ${doc.docNumber} — the Quote has NOT been archived. Please check ${newDocNumber}.`)
+          setTimeout(() => setSoToInvoiceResult(null), 12000)
+          return
+        }
         // Archive the source quote
         const archiveRes = await fetch(`/api/admin/orders/documents/${doc.id}`, {
           method: 'PATCH',
@@ -3518,12 +3541,24 @@ function OrdersPageInner() {
         if (archiveRes.ok) {
           setDocuments((prev) => prev.map((d) => d.id === doc.id ? { ...d, status: 'archived' } : d))
         }
+        // Rule 60 — every Pre-Order Dashboard card the Quote covered follows it to the new
+        // document, exactly as a conversion made from the dashboard does.
+        const relink = { fromDocId: doc.id, fromDocNumber: doc.docNumber, toDocId: newDoc.id, toDocNumber: newDoc.docNumber }
+        await fetch('/api/admin/preorder-dashboard/relink', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(relink),
+        }).catch(() => {})
+        try {
+          localStorage.setItem('preorder-doc-relinked', JSON.stringify({ ...relink, t: Date.now() }))
+        } catch {}
         setSoToInvoiceResult(`✓ ${doc.docNumber} → ${newDocNumber} (quote archived)`)
         setTimeout(() => setSoToInvoiceResult(null), 5000)
       } else {
         const errData = await res.json().catch(() => ({}))
         setSoToInvoiceResult(`Error: ${errData.error || res.status}`)
-        setTimeout(() => setSoToInvoiceResult(null), 5000)
+        // Long enough to read a stock shortfall — at 5s it vanished before anyone saw why.
+        setTimeout(() => setSoToInvoiceResult(null), 12000)
       }
     } catch (e: any) {
       setSoToInvoiceResult(`Error: ${e?.message || 'unknown'}`)

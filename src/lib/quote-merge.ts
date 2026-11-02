@@ -33,6 +33,19 @@ export function tagPaymentsFromQuote<T extends { notes?: string }>(
   })
 }
 
+/** The Notes line naming the deposit a Quote brings across — "Deposit R1 000.00 allocated from
+ *  Quote QR66xxx (02 Nov 2026)" — so the customer sees each one when Quotes are consolidated.
+ *  Null when the Quote carries no money. */
+export function quoteDepositNote(
+  quote: { docNumber?: string; amountPaid?: number; creditApplied?: number } | null | undefined,
+): string | null {
+  const deposit = Number(quote?.amountPaid || 0) + Number(quote?.creditApplied || 0)
+  if (deposit <= 0.005) return null
+  const amount = deposit.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  const dateStr = new Date().toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })
+  return `Deposit R${amount} allocated from Quote ${quote?.docNumber || ''} (${dateStr})`
+}
+
 /** Append a Quote number to an Invoice's "Quote Ref:" list, keeping order and de-duplicating.
  *  Stored as a comma-separated string so the existing single-value readers (header, PDF,
  *  Orders table) keep working unchanged. */
