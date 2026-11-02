@@ -626,6 +626,126 @@ function parseSlotCarSupplyPdf(
   return { invoiceNumber, items, totals }
 }
 
+// ─── NSR (Italian) proforma invoice parser ───────────────────────────────────
+//
+// NSR print bilingual headers ("Codice/Code", "Netto/Disc. net") and comma decimals.
+// Every line reads, left to right:
+//   Qty · Code · Description · UM · Retail · Disc% · Unit net · Line total
+// Read from both ends rather than by column: the description is left-aligned far to
+// the left of its centred header, so header midpoints put it in the Code column.
+//   Unit net → wholesale       Code → NSR-<code> (inventory SKUs carry the NSR- prefix)
+// TOTAL GOODS VALUE already INCLUDES the shipping printed beside it, so shipping is
+// read on its own and never added on top.
+
+/** True when the PDF reads like an NSR invoice, so we can auto-pick this parser. */
+function looksNsr(rows: PdfRow[]): boolean {
+  const head = rows.slice(0, 40).map(r => r.cells.map(c => c.str).join(' ')).join(' ').toUpperCase()
+  return /NSRSLOT\.COM|\bNSR\s+SRL\b/.test(head)
+}
+
+function nsrSku(code: string): string {
+  const bare = code.trim().toUpperCase().replace(/^NSR[\s\-]*/, '')
+  return bare ? `NSR-${bare}` : ''
+}
+
+function parseNsrPdf(
+  rows: PdfRow[],
+  exchangeRate: number,
+  costing: CostingSettings,
+): { invoiceNumber: string; items: ParsedItem[]; totals: InvoiceTotals } {
+
+  // ── Invoice number: value sits under the NUMBER label ──
+  let invoiceNumber = ''
+  for (let i = 0; i < Math.min(rows.length, 40) && !invoiceNumber; i++) {
+    const label = rows[i].cells.find(c => /^NUMBER$/i.test(c.str.trim()))
+    if (!label) continue
+    for (let j = i + 1; j <= i + 2 && j < rows.length; j++) {
+      const v = rows[j].cells.find(c => Math.abs(c.x - label.x) <= 25 && /^[A-Z0-9\-\/]+$/i.test(c.str.trim()))
+      if (v) { invoiceNumber = v.str.trim(); break }
+    }
+  }
+
+  // ── Locate the table header ──
+  let headerRowIdx = -1
+  let descX = 0, umX = Infinity
+  for (let i = 0; i < Math.min(rows.length, 60); i++) {
+    const cells = rows[i].cells
+    if (!cells.some(c => /CODICE|^CODE$/i.test(c.str)) || !cells.some(c => /NETTO/i.test(c.str))) continue
+    headerRowIdx = i
+    descX = cells.find(c => /DESCRIZ|DESCRIPTION/i.test(c.str))?.x ?? 0
+    umX   = cells.find(c => /^UM$/i.test(c.str.trim()))?.x ?? Infinity
+    break
+  }
+  if (headerRowIdx === -1) {
+    throw new Error('Could not find the NSR table. Expected Codice/Code and Netto/Disc. net columns.')
+  }
+
+  const isNum = (s: string) => /^-?[\d.]*\d,\d+$|^-?\d+$/.test(s.trim())
+
+  // ── Read the line items ──
+  const items: ParsedItem[] = []
+  let lastItemY = -Infinity
+  let footerIdx = rows.length
+
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    const row  = rows[i]
+    const text = row.cells.map(c => c.str).join(' ')
+    if (/TOT\.?\s*QTY|TOTAL\s+GOODS/i.test(text)) { footerIdx = i; break }
+
+    const cells = row.cells.map(c => c.str.trim())
+    // Qty · Code · …description… · UM · Retail · Disc · Net · Total
+    const tail = cells.slice(-4)
+    if (cells.length >= 7 && /^\d+$/.test(cells[0]) && tail.every(isNum)) {
+      const code = nsrSku(cells[1])
+      const qty  = parseInt(cells[0], 10)
+      if (!code || !qty) continue
+      const wp = Math.round(parseFrNum(tail[2]) * 10000) / 10000
+      items.push({
+        id: `nsr_${Date.now()}_${i}`,
+        sku: code,
+        description: stripCJK(cells.slice(2, -5).join(' ')),
+        qty,
+        wholesalePrice: wp,
+        listPrice: parseFrNum(tail[0]),
+        estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT),
+      })
+      lastItemY = row.y
+      continue
+    }
+
+    // A long description wraps onto its own row ("EVO3"), under the line it belongs to.
+    const cont = row.cells.filter(c => c.x >= descX - 100 && c.x < umX - 5).map(c => c.str).join(' ').trim()
+    if (items.length && cont && cont.length === text.trim().length && row.y - lastItemY <= 20) {
+      const prev = items[items.length - 1]
+      prev.description = stripCJK(`${prev.description} ${cont}`)
+      lastItemY = row.y
+    }
+  }
+
+  // ── Totals block: labels on one row, values on the row beneath, by column ──
+  const totals: InvoiceTotals = {
+    subTotal: Math.round(items.reduce((s, it) => s + it.qty * it.wholesalePrice, 0) * 100) / 100,
+    shipping: 0, discount: 0, total: 0, discountRate: 0,
+  }
+  for (let i = footerIdx; i < rows.length; i++) {
+    const labels = rows[i].cells
+    const shipLabel = labels.find(c => /SHIPPING\s+COSTS?/i.test(c.str))
+    const goodsLabel = labels.find(c => /TOTAL\s+GOODS\s+VALUE/i.test(c.str))
+    if (!shipLabel && !goodsLabel) continue
+    const values = rows[i + 1]?.cells.filter(c => isNum(c.str)) ?? []
+    // A value belongs to the right-most label that starts at or before it.
+    const ownerOf = (x: number) => labels.filter(l => l.x <= x + 5).sort((a, b) => b.x - a.x)[0]
+    for (const v of values) {
+      const owner = ownerOf(v.x)
+      if (owner === shipLabel)  totals.shipping = parseFrNum(v.str)
+      if (owner === goodsLabel) totals.total    = parseFrNum(v.str)
+    }
+    break
+  }
+
+  return { invoiceNumber, items, totals }
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InvoiceImportPage() {
@@ -653,7 +773,7 @@ export default function InvoiceImportPage() {
   const [detectedShipping, setDetectedShipping] = useState(0)  // in supplier currency
   const [invoiceTotals, setInvoiceTotals] = useState<InvoiceTotals | null>(null)
   const [parseError, setParseError] = useState('')
-  const [parserUsed, setParserUsed] = useState<'generic' | 'sideways' | 'slotcarsupply' | ''>('')
+  const [parserUsed, setParserUsed] = useState<'generic' | 'sideways' | 'slotcarsupply' | 'nsr' | ''>('')
   const [parsing, setParsing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -716,6 +836,19 @@ export default function InvoiceImportPage() {
           if (!result.items.length) { setParseError('No line items found. Check the invoice has the Products, Model and Price (ex) columns.'); return }
           setParserUsed('slotcarsupply')
           if (currency !== 'USD') setCurrency('USD')   // Slot Car Supply invoices are priced in USD
+          setInvoiceNumber(result.invoiceNumber)
+          setDetectedShipping(result.totals.shipping)
+          setInvoiceTotals(result.totals)
+          setItems(result.items)
+          return
+        }
+
+        // NSR: Italian proforma, comma decimals, shipping already inside Total Goods Value.
+        if (/\bnsr\b/i.test(supplier) || looksNsr(rows)) {
+          const result = parseNsrPdf(rows, currency === 'EUR' ? exchangeRate : (exchangeRates.EUR || 0), costing)
+          if (!result.items.length) { setParseError('No line items found. Check the invoice has Codice/Code and Netto/Disc. net columns.'); return }
+          setParserUsed('nsr')
+          if (currency !== 'EUR') setCurrency('EUR')   // NSR invoices are priced in EUR
           setInvoiceNumber(result.invoiceNumber)
           setDetectedShipping(result.totals.shipping)
           setInvoiceTotals(result.totals)
@@ -1066,6 +1199,25 @@ The worksheet it created is not affected.`)) return
             </span>
           </div>
         )}
+
+        {parserUsed === 'nsr' && invoiceTotals && (() => {
+          const expected = Math.round((invoiceTotals.total - invoiceTotals.shipping) * 100) / 100
+          const matches = !invoiceTotals.total || Math.abs(expected - invoiceTotals.subTotal) < 0.05
+          return (
+            <div className="mt-3 bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 text-xs text-indigo-700 space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold">🇮🇹 NSR format</span>
+                <span className="text-indigo-500">
+                  Read Codice → SKU (NSR- prefix), Qtà → Qty, Netto/Disc. net → Wholesale (EUR), Number → Invoice No.
+                </span>
+              </div>
+              <div className={matches ? 'text-indigo-600' : 'text-red-600 font-semibold'}>
+                Lines €{invoiceTotals.subTotal.toFixed(2)} + shipping €{invoiceTotals.shipping.toFixed(2)} = Total Goods Value €{invoiceTotals.total.toFixed(2)}
+                {matches ? ' ✓ (shipping is inside the total — not added again)' : ` ✗ — lines should come to €${expected.toFixed(2)}; check every row was read`}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Invoice number extracted from PDF */}
         {invoiceNumber && (
