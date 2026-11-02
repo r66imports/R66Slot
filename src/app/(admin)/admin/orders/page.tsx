@@ -3595,6 +3595,15 @@ function OrdersPageInner() {
           shippingMethod: (doc as any).shippingMethod || '',
           shippingCost: (doc as any).shippingCost || 0,
           trackingNumber: (doc as any).trackingNumber || '',
+          // Rules 28 + 45 — the Quote Ref and every payment on the Sales Order follow it onto
+          // the Invoice, or a deposit taken on the Quote is lost at this second hop.
+          sourceQuoteNumber: (doc as any).sourceQuoteNumber || '',
+          depositMode: false,
+          amountPaid: (doc as any).amountPaid || 0,
+          creditApplied: (doc as any).creditApplied || 0,
+          overpaymentCredit: (doc as any).overpaymentCredit || 0,
+          showCreditOnInvoice: (doc as any).showCreditOnInvoice || false,
+          payments: (doc as any).payments || [],
           // true only for old SOs that already physically deducted stock (prevents double-deduct).
           // New SOs (stockDeducted:false) never deducted, so the invoice must deduct.
           stockAlreadyReserved: (doc as any).stockDeducted === true,

@@ -42,6 +42,13 @@ export interface OrderDocument {
   supplierOrderRef?: string
   supplierOrderName?: string
   supplierOrderSupplier?: string
+  // Carried across from the source Quote on conversion (Rules 28 + 45)
+  sourceQuoteNumber?: string
+  amountPaid?: number
+  creditApplied?: number
+  overpaymentCredit?: number
+  showCreditOnInvoice?: boolean
+  payments?: any[]
 }
 
 async function getDocs(): Promise<OrderDocument[]> {
@@ -131,6 +138,16 @@ export async function POST(request: Request) {
       supplierOrderRef: body.supplierOrderRef,
       supplierOrderName: body.supplierOrderName,
       supplierOrderSupplier: body.supplierOrderSupplier,
+      // Rules 28 + 45 — a Quote converted into this document brings its Quote Ref and the
+      // money already paid on it. Every converter sent these, but they were never stored, so
+      // each converted Invoice arrived with no Quote Ref and the deposit missing.
+      // Recording money never moves status (Mark as Paid is the only writer of 'paid').
+      sourceQuoteNumber: body.sourceQuoteNumber || undefined,
+      amountPaid: Number(body.amountPaid) || 0,
+      creditApplied: Number(body.creditApplied) || 0,
+      overpaymentCredit: Number(body.overpaymentCredit) || 0,
+      showCreditOnInvoice: !!body.showCreditOnInvoice,
+      payments: Array.isArray(body.payments) ? body.payments : [],
     }
     await blobAppendArrayItem(KEY, doc)
     // Rule 2 — Auto-Create Product: create draft products for unknown SKUs (best-effort)
