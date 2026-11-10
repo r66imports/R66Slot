@@ -177,9 +177,10 @@ export default function SupplierCataloguePage() {
         : calcEstRetailZAR(
             i.wholesalePrice,
             i.currency === currency ? rate : rates[i.currency] || 0,
-            account
+            account,
+            supplier?.name || i.supplierName
           ),
-    [currency, rate, rates, account]
+    [currency, rate, rates, account, supplier]
   )
 
   /** Brand → SKU is the default; ties fall back to it so nothing looks random. */
@@ -528,7 +529,7 @@ export default function SupplierCataloguePage() {
                 <td className="py-2 pr-3 text-right text-gray-500">
                   {isLocalSupplierCurrency(currency)
                     ? 'From Inventory'
-                    : formatZAR(calcEstRetailZAR(draft.wholesalePrice, rate, account))}
+                    : formatZAR(calcEstRetailZAR(draft.wholesalePrice, rate, account, supplier?.name))}
                 </td>
                 <td></td>
                 <td className="py-2 text-right">
@@ -581,7 +582,8 @@ export default function SupplierCataloguePage() {
                         calcEstRetailZAR(
                           item.wholesalePrice,
                           item.currency === currency ? rate : rates[item.currency] || 0,
-                          account
+                          account,
+                          supplier?.name || item.supplierName
                         )
                       )
                     )}

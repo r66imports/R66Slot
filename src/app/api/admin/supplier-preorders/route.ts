@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       const rate = rateFor(rateData.rates, o.currency)
       const lines = o.lines.map((l) => {
         const inf = skuInfo[l.sku.trim().toUpperCase()]
-        const est = Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100
+        const est = Math.round(lineEstRetailZAR(l, rate, account, o.supplierName) * 100) / 100
         const quote = l.priceLocked
           ? { amount: est, basis: 'estimate' as const }
           : clientQuoteZAR({

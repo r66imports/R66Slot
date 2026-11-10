@@ -8,11 +8,14 @@ import {
   parseDelimited,
   parsePdfCatalogue,
   rowsToParsed,
+  nsrSku,
   type ColumnMap,
   type ParsedRow,
 } from '@/lib/catalogue-import'
 import {
   calcEstRetailZAR,
+  isNsrSupplier,
+  vatPctFor,
   calcLandedZAR,
   formatZAR,
   isLocalSupplierCurrency,
@@ -91,9 +94,12 @@ export default function CatalogueImportModal({
       return next
     })
 
+  // NSR prints bare codes; Inventory SKUs carry the NSR- prefix.
+  const isNsr = isNsrSupplier(supplierName)
   const toRows = (parsed: ParsedRow[]): EditableRow[] =>
     parsed.map((r, i) => ({
       ...r,
+      sku: isNsr && r.sku ? nsrSku(r.sku) : r.sku,
       key: `r${i}_${r.sku}`,
       // Rows with nothing usable are unticked rather than hidden, so the count
       // in the file still reconciles with what is about to be imported.
@@ -120,7 +126,7 @@ export default function CatalogueImportModal({
       const name = file.name.toLowerCase()
       if (name.endsWith('.pdf')) {
         const pdfRows = await extractPdfRows(file)
-        const parsed = parsePdfCatalogue(pdfRows)
+        const parsed = parsePdfCatalogue(pdfRows, { numericSkus: isNsr })
         if (parsed.length === 0) {
           setError(
             'No product lines found in that PDF. It may be a scanned image rather than text — those cannot be read.'
@@ -507,7 +513,7 @@ export default function CatalogueImportModal({
                       const estimate =
                         isLocal || !rate || r.wholesalePrice <= 0
                           ? 0
-                          : calcEstRetailZAR(r.wholesalePrice, rate, account)
+                          : calcEstRetailZAR(r.wholesalePrice, rate, account, supplierName)
                       // Landed comes from the real function, never a local copy
                       // of the formula, so the breakdown cannot drift from the
                       // number the rest of the site quotes (Rule 60).
@@ -623,7 +629,7 @@ export default function CatalogueImportModal({
                                     value={formatZAR(landed)}
                                   />
                                   <Step label={`× markup ${account.markupPct || 0}%`} value={formatZAR(afterMarkup)} />
-                                  <Step label={`× VAT ${account.vatPct || 0}%`} value={formatZAR(estimate)} />
+                                  <Step label={`× VAT ${vatPctFor(r.wholesalePrice, account, supplierName)}%${isNsr ? (r.wholesalePrice >= 30 ? ' (NSR ≥ 30 EUR)' : ' (NSR < 30 EUR)') : ''}`} value={formatZAR(estimate)} />
                                   <div className="flex justify-between border-t border-gray-300 pt-1 mt-1 font-semibold text-gray-900">
                                     <span>Est. Retail</span>
                                     <span>{formatZAR(estimate)}</span>

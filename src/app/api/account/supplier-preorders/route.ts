@@ -74,7 +74,7 @@ export async function GET(_request: NextRequest) {
       const rate = rateFor(rateData.rates, o.currency)
       const lines = o.lines.map((l) => {
         const inf = info[l.sku.trim().toUpperCase()]
-        const est = Math.round(lineEstRetailZAR(l, rate, account) * 100) / 100
+        const est = Math.round(lineEstRetailZAR(l, rate, account, o.supplierName) * 100) / 100
         const retail = inf?.retailZAR || 0
         // A line the Worksheet has locked keeps its locked price and is never
         // re-quoted off the shelf; everything else follows the sheet's rule.
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
       // by hand, and the client sees "On request".
       const calculated = isLocalSupplierCurrency(currency)
         ? 0
-        : calcEstRetailZAR(wholesale, rate, account)
+        : calcEstRetailZAR(wholesale, rate, account, supplier?.name || match?.supplierName)
       const estRetailZAR =
         calculated > 0 ? calculated : match?.estRetailZAR || 0
 

@@ -142,7 +142,7 @@ export function estimateFor(
   // quoted for the NEXT shipment. The settled historical figure is not lost: the
   // Worksheet writes it to worksheet_est_retail, which never floats, so there is
   // no longer any reason to freeze this one.
-  const live = calcEstRetailZAR(wholesale, rate, account)
+  const live = calcEstRetailZAR(wholesale, rate, account, supplier?.name || product.supplier)
   if (live > 0) {
     return {
       ...base,

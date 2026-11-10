@@ -114,6 +114,16 @@ export function looksLikeSku(token: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9\-_./]*$/.test(t)
 }
 
+/**
+ * NSR codes are printed bare ("1446", "3043F") but every NSR SKU in Inventory
+ * carries the NSR- prefix. Same conversion as the Import Invoice page, so a
+ * catalogue row and an invoice line for one part land on one SKU.
+ */
+export function nsrSku(code: string): string {
+  const bare = (code || '').trim().toUpperCase().replace(/^NSR[\s\-]*/, '')
+  return bare ? `NSR-${bare}` : ''
+}
+
 const SKU_HEADERS = ['sku', 'code', 'cod', 'codice', 'ref', 'reference', 'article', 'art', 'part', 'item', 'model', 'codigo', 'référence', 'referencia']
 const DESC_HEADERS = ['description', 'desc', 'name', 'title', 'product', 'designation', 'désignation', 'descripcion', 'descrizione', 'artikel']
 const PRICE_HEADERS = ['wholesale', 'price', 'cost', 'net', 'trade', 'dealer', 'pvp', 'prix', 'precio', 'prezzo', 'tarif', 'unit price', 'list']
@@ -344,14 +354,21 @@ export function parseDelimited(text: string, delimiter?: string): string[][] {
  * is more likely to be the price than a leading code), and whatever text sits
  * between them as the description.
  */
-export function parsePdfCatalogue(rows: PdfRow[]): ParsedRow[] {
+export function parsePdfCatalogue(
+  rows: PdfRow[],
+  opts: { numericSkus?: boolean } = {}
+): ParsedRow[] {
   const out: ParsedRow[] = []
+  // Some suppliers (NSR) print all-digit codes — "1446" — which looksLikeSku
+  // rejects as a probable quantity. Only accepted when the supplier is known to.
+  const isSku = (t: string) =>
+    looksLikeSku(t) || (!!opts.numericSkus && /^\d{3,8}$/.test((t || '').trim()))
 
   for (const row of rows) {
     const cells = row.cells
     if (cells.length < 2) continue
 
-    const skuIdx = cells.findIndex((c) => looksLikeSku(c.str))
+    const skuIdx = cells.findIndex((c) => isSku(c.str))
     if (skuIdx < 0) continue
 
     let priceIdx = -1

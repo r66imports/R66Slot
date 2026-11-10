@@ -388,7 +388,7 @@ export async function getMergedItems(opts: {
     // at; a local SKU we have never stocked reads "On request" (Rule 65).
     const calculated = isLocalSupplierCurrency(currency)
       ? 0
-      : calcEstRetailZAR(item.wholesalePrice, rate, account)
+      : calcEstRetailZAR(item.wholesalePrice, rate, account, supplier?.name || item.supplierName)
 
     const existing = bySku.get(sku)
     bySku.set(sku, {

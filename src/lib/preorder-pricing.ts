@@ -130,11 +130,42 @@ export function clientQuoteZAR(row: {
   return { amount: Number(row.estRetailZAR) || 0, basis: 'estimate' }
 }
 
-/** Estimated retail per unit in ZAR, incl. markup and VAT. */
-export function calcEstRetailZAR(wholesale: number, exRate: number, account: CostingAccount): number {
+/**
+ * NSR is costed by price band, not by its account's VAT (user, 10 Nov 2026):
+ * a line whose net wholesale is 30 EUR or more is costed with NO VAT; anything
+ * under 30 EUR carries 15%. The band is read off the supplier's own net price,
+ * so it holds whatever the exchange rate does.
+ */
+export const NSR_NO_VAT_FROM_EUR = 30
+export const NSR_LOW_BAND_VAT_PCT = 15
+
+export function isNsrSupplier(supplierName?: string | null): boolean {
+  return /\bnsr\b/i.test(supplierName || '')
+}
+
+/** The VAT % a line is costed at — the account's, unless the supplier has its own band. */
+export function vatPctFor(wholesale: number, account: CostingAccount, supplierName?: string | null): number {
+  if (isNsrSupplier(supplierName)) {
+    return (Number(wholesale) || 0) >= NSR_NO_VAT_FROM_EUR ? 0 : NSR_LOW_BAND_VAT_PCT
+  }
+  return account.vatPct || 0
+}
+
+/**
+ * Estimated retail per unit in ZAR, incl. markup and VAT. Pass the supplier
+ * name wherever it is known — NSR's VAT depends on it (vatPctFor).
+ */
+export function calcEstRetailZAR(
+  wholesale: number,
+  exRate: number,
+  account: CostingAccount,
+  supplierName?: string | null
+): number {
   const landed = calcLandedZAR(wholesale, exRate, account)
   if (landed <= 0) return 0
-  return landed * (1 + (account.markupPct || 0) / 100) * (1 + (account.vatPct || 0) / 100)
+  return (
+    landed * (1 + (account.markupPct || 0) / 100) * (1 + vatPctFor(wholesale, account, supplierName) / 100)
+  )
 }
 
 /**
@@ -145,7 +176,8 @@ export function calcEstRetailZAR(wholesale: number, exRate: number, account: Cos
 export function lineEstRetailZAR(
   line: Pick<SupplierPreOrderLine, 'wholesalePrice' | 'estRetailZAR' | 'priceLocked' | 'currency'>,
   exRate: number,
-  account: CostingAccount
+  account: CostingAccount,
+  supplierName?: string | null
 ): number {
   if (line.priceLocked) return Number(line.estRetailZAR) || 0
   // A local supplier's line was priced from Inventory and never went through
@@ -153,7 +185,7 @@ export function lineEstRetailZAR(
   // that were never paid, and quietly undo the stored figure on every read.
   const calculated = isLocalSupplierCurrency(line.currency)
     ? 0
-    : calcEstRetailZAR(line.wholesalePrice, exRate, account)
+    : calcEstRetailZAR(line.wholesalePrice, exRate, account, supplierName)
   // No wholesale price means the line was priced from what we already sell the
   // item for, not through the calculator. Recomputing would return 0 and blank
   // the price out on every read, so the stored figure stands.
@@ -164,11 +196,12 @@ export function lineEstRetailZAR(
 export function preOrderTotalZAR(
   lines: SupplierPreOrderLine[],
   exRate: number,
-  account: CostingAccount
+  account: CostingAccount,
+  supplierName?: string | null
 ): number {
   return lines
     .filter((l) => l.status !== 'rejected')
-    .reduce((sum, l) => sum + (Number(l.qty) || 0) * lineEstRetailZAR(l, exRate, account), 0)
+    .reduce((sum, l) => sum + (Number(l.qty) || 0) * lineEstRetailZAR(l, exRate, account, supplierName), 0)
 }
 
 /** House format: R1 000.00 — space thousands separator, always two decimals. */

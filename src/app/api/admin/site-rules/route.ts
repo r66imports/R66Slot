@@ -576,6 +576,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Pre-Orders', 'Orders', 'Online Store', 'Suppliers'],
     category: 'Orders',
   },
+  {
+    id: 'nsr_vat_band_and_prefix',
+    name: 'Rule 68 — NSR Is Costed by Price Band and Every NSR SKU Carries the NSR- Prefix',
+    description: `NSR's VAT does not come from its costing account. It comes from the line's net wholesale price in EUR (user, 10 Nov 2026): 30 EUR or more is costed with NO VAT, and anything under 30 EUR is costed at 15% VAT. Shipping, customs, handling and markup still come from the account (Rule 60). The band is read off the supplier's own net price, never the Rand figure, so a line never changes band when the exchange rate moves. It is applied in ONE place, vatPctFor in src/lib/preorder-pricing.ts, which calcEstRetailZAR calls. Every caller passes the supplier name: the Supplier Catalogue page, its import preview (the VAT step names the band), the client Supplier Pre Order sheet, the admin request view and estimateFor. If a caller drops the supplier name, it silently falls back to the account's VAT. A supplier counts as NSR when its name contains the word NSR. NSR prints bare codes ("1446", "3043F"), but every NSR SKU in Inventory carries the NSR- prefix. So the Supplier Catalogue importer applies nsrSku (src/lib/catalogue-import.ts) to every row it reads for an NSR supplier, the same conversion the Import Invoice NSR parser uses. A code that is already prefixed is not doubled. NSR PDF price lists may print all-digit codes, which the generic PDF reader would take for quantities, so all-digit codes of 3 to 8 digits are accepted as SKUs for NSR only.`,
+    active: true,
+    appliesTo: ['Supplier Catalogue', 'Supplier Pre Orders', 'Suppliers'],
+    category: 'Orders',
+  },
 ]
 
 export async function GET() {
