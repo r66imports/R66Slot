@@ -3204,6 +3204,119 @@ function SendToInvoiceModal({
   )
 }
 
+// ─── Send Items (partial) from Sales Order to Invoice ─────────────────────────
+// Pick individual SKUs off a Sales Order, choose how many of each, and send just those to a
+// new or open invoice. What is sent comes off the Sales Order; the rest stays on it.
+
+function SendSOItemsModal({
+  so, openInvoices, onSend, onClose, busy,
+}: {
+  so: OrderDocument
+  openInvoices: OrderDocument[]
+  onSend: (picks: Record<string, number>, target: OrderDocument | null) => void
+  onClose: () => void
+  busy: boolean
+}) {
+  const lines = (so.lineItems || []).filter((li) => (li.qty || 0) > 0)
+  const [checked, setChecked] = useState<Record<string, boolean>>({})
+  const [qtys, setQtys] = useState<Record<string, number>>(() => Object.fromEntries(lines.map((li) => [li.id, li.qty])))
+  const [targetId, setTargetId] = useState<string>('new')
+  const picks: Record<string, number> = {}
+  for (const li of lines) {
+    const q = Math.floor(qtys[li.id] || 0)
+    if (checked[li.id] && q > 0) picks[li.id] = Math.min(q, li.qty)
+  }
+  const pickCount = Object.keys(picks).length
+  const pickTotal = lines.reduce((s, li) => s + (picks[li.id] ? lineAmt({ ...li, qty: picks[li.id] }) : 0), 0)
+  const allChecked = lines.length > 0 && lines.every((li) => checked[li.id])
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div>
+            <h2 className="text-lg font-bold">Send Items to Invoice</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{so.docNumber} · {so.clientName} — ticked items move to the invoice, the rest stay on the Sales Order</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold leading-none">✕</button>
+        </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-xs text-gray-500 uppercase border-b">
+                <th className="py-2 w-8 text-left">
+                  <input type="checkbox" checked={allChecked} onChange={(e) => setChecked(Object.fromEntries(lines.map((li) => [li.id, e.target.checked])))} />
+                </th>
+                <th className="py-2 text-left">SKU / Description</th>
+                <th className="py-2 text-center w-20">On SO</th>
+                <th className="py-2 text-center w-24">Send</th>
+                <th className="py-2 text-right w-28">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((li) => {
+                const on = !!checked[li.id]
+                const q = qtys[li.id] ?? li.qty
+                return (
+                  <tr key={li.id} className={`border-b border-gray-100 ${on ? 'bg-indigo-50/50' : ''}`}>
+                    <td className="py-2">
+                      <input type="checkbox" checked={on} onChange={(e) => setChecked((p) => ({ ...p, [li.id]: e.target.checked }))} />
+                    </td>
+                    <td className="py-2 pr-2 text-gray-800 cursor-pointer" onClick={() => setChecked((p) => ({ ...p, [li.id]: !on }))}>{li.description}</td>
+                    <td className="py-2 text-center text-gray-500">{li.qty}</td>
+                    <td className="py-2 text-center">
+                      <input
+                        type="number" min={1} max={li.qty} step={1} value={q}
+                        disabled={!on}
+                        onChange={(e) => {
+                          const v = Math.max(0, Math.min(li.qty, Math.floor(Number(e.target.value) || 0)))
+                          setQtys((p) => ({ ...p, [li.id]: v }))
+                        }}
+                        className="w-16 px-2 py-1 border border-gray-300 rounded text-center disabled:bg-gray-50 disabled:text-gray-300"
+                      />
+                    </td>
+                    <td className="py-2 text-right text-gray-700">{on && picks[li.id] ? fmtPrice(lineAmt({ ...li, qty: picks[li.id] })) : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Send to</p>
+            <div className="space-y-2">
+              <label className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border cursor-pointer ${targetId === 'new' ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200'}`}>
+                <input type="radio" checked={targetId === 'new'} onChange={() => setTargetId('new')} />
+                <span className="text-sm font-semibold text-indigo-700">+ Create New Invoice</span>
+              </label>
+              {openInvoices.map((inv) => (
+                <label key={inv.id} className={`flex items-center gap-3 px-4 py-2.5 rounded-lg border cursor-pointer ${targetId === inv.id ? 'border-indigo-400 bg-indigo-50' : 'border-gray-200'}`}>
+                  <input type="radio" checked={targetId === inv.id} onChange={() => setTargetId(inv.id)} />
+                  <span className="text-sm font-semibold text-gray-800">{inv.docNumber}</span>
+                  <span className="text-xs text-gray-400">{fmtDate(inv.date || inv.createdAt)} · {inv.status}</span>
+                  <span className="ml-auto text-sm text-gray-700">{fmtPrice(docTotal(inv))}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t flex items-center justify-between gap-3">
+          <span className="text-sm text-gray-500">{pickCount} line(s) · {fmtPrice(pickTotal)}</span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+            <button
+              onClick={() => onSend(picks, targetId === 'new' ? null : (openInvoices.find((i) => i.id === targetId) || null))}
+              disabled={busy || pickCount === 0}
+              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {busy ? 'Sending…' : 'Send to Invoice'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Actions Dropdown ──────────────────────────────────────────────────────────
 
 type ActionItem =
@@ -3359,6 +3472,142 @@ function OrdersPageInner() {
   const [paymentForm, setPaymentForm] = useState<PaymentFormState>({ amountReceived: '', creditApplied: '', useCredit: false, showCreditOnInvoice: false, paymentMethod: 'EFT', notes: '', confirmCredit: false })
   const [sendToInvoiceQuote, setSendToInvoiceQuote] = useState<OrderDocument | null>(null)
   const [appendingToInvoice, setAppendingToInvoice] = useState(false)
+  const [sendSOItems, setSendSOItems] = useState<OrderDocument | null>(null)
+  const [sendingSOItems, setSendingSOItems] = useState(false)
+
+  // Partial Sales Order → Invoice. Stock: on a Sales Order that already deducted (stockDeducted
+  // true), shrinking its lines makes the server hand those units back, and the invoice then
+  // takes them again with the normal Rule 1 check — net zero, and both moves are logged. On an
+  // un-deducted SO the SO patch skips stock entirely and the invoice deducts as normal. If the
+  // invoice step fails, the SO is put back exactly as it was.
+  const handleSendSOItemsToInvoice = async (listSO: OrderDocument, picks: Record<string, number>, target: OrderDocument | null) => {
+    setSendingSOItems(true)
+    const flash = (msg: string, ms = 8000) => { setSoToInvoiceResult(msg); setTimeout(() => setSoToInvoiceResult(null), ms) }
+    try {
+      const allRaw: any[] = await fetch('/api/admin/orders/documents').then((r) => r.ok ? r.json() : []).catch(() => [])
+      const all = Array.isArray(allRaw) ? allRaw : []
+      const so: OrderDocument = all.find((d: any) => d.id === listSO.id) || listSO
+      const origLines: LineItem[] = so.lineItems || []
+      const moved: LineItem[] = []
+      const remaining: LineItem[] = []
+      for (const li of origLines) {
+        const want = picks[li.id] || 0
+        const send = Math.min(want, li.qty || 0)
+        if (want > (li.qty || 0)) { flash(`Error: ${so.docNumber} now has only ${li.qty} of "${li.description}" — nothing has been changed.`); return }
+        if (send > 0) moved.push({ ...li, id: `li_${Date.now()}_${moved.length}_${Math.random().toString(36).slice(2, 6)}`, qty: send })
+        if ((li.qty || 0) - send > 0) remaining.push({ ...li, qty: (li.qty || 0) - send })
+      }
+      if (moved.length === 0) { flash(`Error: none of the picked lines are on ${so.docNumber} any more — nothing has been changed.`); return }
+      // An archived/rejected SO is inert on the server — shrinking it would NOT hand its stock
+      // back, so the invoice would take the same units a second time.
+      if (['archived', 'rejected'].includes(so.status)) { flash(`Error: ${so.docNumber} is ${so.status} — restore it to active before invoicing it. Nothing has been changed.`); return }
+      // Everything is leaving the SO: its money, discount and shipping go with it (Rules 28 + 45),
+      // or a deposit taken on it is billed again on the invoice.
+      const sendingAll = remaining.length === 0
+      const soAny = so as any
+      const soNote = [`Items from ${so.docNumber}`, sendingAll ? soAny.notes : ''].filter(Boolean).join('\n')
+
+      const soSkipStock = !(so as any).stockDeducted
+      const patchSO = (items: LineItem[]) => fetch(`/api/admin/orders/documents/${so.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lineItems: items, ...(soSkipStock ? { skipStockAdjust: true } : {}) }),
+      })
+
+      // 1 — take the items off the Sales Order (frees their stock on a deducted SO).
+      const soRes = await patchSO(remaining)
+      if (!soRes.ok) { const e = await soRes.json().catch(() => ({})); flash(`Error: ${e.error || soRes.status} — nothing has been changed.`); return }
+      const updatedSO = await soRes.json()
+      setDocuments((prev) => prev.map((d) => d.id === updatedSO.id ? updatedSO : d))
+
+      // 2 — put them on the invoice.
+      let invRes: Response
+      let invNumber: string
+      let freshTarget: any = null
+      if (target) {
+        freshTarget = all.find((d: any) => d.id === target.id) || target
+        invNumber = freshTarget.docNumber
+        const patchBody: Record<string, any> = { appendLineItems: moved }
+        const pct = freshTarget.depositPct || 0
+        if (freshTarget.preOrderDeposit && pct > 0) {
+          const merged = [...(freshTarget.lineItems || []), ...moved]
+          const sub = merged.reduce((s: number, li: LineItem) => s + lineAmt(li), 0)
+          const tot = sub - sub * (freshTarget.discountPct || 0) / 100 + (freshTarget.shippingCost || 0)
+          patchBody.depositPaid = Math.round(tot * pct / 100 * 100) / 100
+        }
+        patchBody.notes = [freshTarget.notes, soNote].filter(Boolean).join('\n')
+        if (sendingAll && ((soAny.amountPaid || 0) > 0.005 || (soAny.creditApplied || 0) > 0.005)) {
+          patchBody.amountPaid = (freshTarget.amountPaid || 0) + (soAny.amountPaid || 0)
+          patchBody.creditApplied = (freshTarget.creditApplied || 0) + (soAny.creditApplied || 0)
+          patchBody.payments = [...(freshTarget.payments || []), ...(soAny.payments || [])]
+        }
+        if (sendingAll && soAny.sourceQuoteNumber) patchBody.sourceQuoteNumber = mergeQuoteRefs(freshTarget.sourceQuoteNumber, soAny.sourceQuoteNumber)
+        invRes = await fetch(`/api/admin/orders/documents/${target.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) })
+      } else {
+        const nums = all
+          .filter((d: any) => d.type === 'invoice')
+          .map((d: any) => { const m = /^INV(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
+          .filter((n: number) => n > 0)
+        invNumber = `INV${String((nums.length > 0 ? Math.max(...nums) : 25) + 1).padStart(4, '0')}`
+        invRes = await fetch('/api/admin/orders/documents', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'invoice',
+            docNumber: invNumber,
+            date: new Date().toISOString().split('T')[0],
+            clientName: so.clientName || 'Unknown',
+            clientEmail: so.clientEmail || '',
+            clientPhone: so.clientPhone || '',
+            clientAddress: so.clientAddress || '',
+            lineItems: moved,
+            notes: soNote,
+            terms: so.terms || '',
+            status: 'draft',
+            depositMode: false,
+            sourceQuoteNumber: soAny.sourceQuoteNumber || '',
+            ...(sendingAll ? {
+              discountPct: soAny.discountPct || 0,
+              shippingMethod: soAny.shippingMethod || '',
+              shippingCost: soAny.shippingCost || 0,
+              trackingNumber: soAny.trackingNumber || '',
+              amountPaid: soAny.amountPaid || 0,
+              creditApplied: soAny.creditApplied || 0,
+              overpaymentCredit: soAny.overpaymentCredit || 0,
+              showCreditOnInvoice: soAny.showCreditOnInvoice || false,
+              payments: soAny.payments || [],
+            } : {}),
+          }),
+        })
+      }
+
+      const invOk = invRes.ok
+      const inv = invOk ? await invRes.json().catch(() => null) : null
+      const expected = (freshTarget?.lineItems?.length || 0) + moved.length
+      if (!invOk || !inv?.id || (inv.lineItems || []).length < expected) {
+        const e = invOk ? {} : await invRes.json().catch(() => ({}))
+        // Put the Sales Order back exactly as it was.
+        const back = await patchSO(origLines)
+        if (back.ok) { const b = await back.json(); setDocuments((prev) => prev.map((d) => d.id === b.id ? b : d)) }
+        flash(back.ok
+          ? `Error: ${(e as any).error || `${invNumber} did not accept the items`} — ${so.docNumber} has been restored, nothing lost.`
+          : `Error: ${(e as any).error || invRes.status} — AND ${so.docNumber} could not be restored. Check ${so.docNumber} lines.`, 15000)
+        return
+      }
+      setDocuments((prev) => target ? prev.map((d) => d.id === inv.id ? inv : d) : [inv, ...prev])
+
+      // 3 — everything sent: file the empty Sales Order.
+      if (remaining.length === 0) {
+        const ar = await fetch(`/api/admin/orders/documents/${so.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
+        if (ar.ok) setDocuments((prev) => prev.map((d) => d.id === so.id ? { ...d, status: 'archived' } : d))
+      }
+      const units = moved.reduce((s, li) => s + li.qty, 0)
+      flash(`✓ ${units} unit(s) from ${so.docNumber} → ${invNumber}${remaining.length === 0 ? ` (${so.docNumber} empty, archived)` : ''}`, 6000)
+      setSendSOItems(null)
+    } catch (e: any) {
+      flash(`Error: ${e?.message || 'unknown'}`)
+    } finally {
+      setSendingSOItems(false)
+    }
+  }
 
   const handleAppendQuoteToInvoice = async (quote: OrderDocument, target: OrderDocument) => {
     setAppendingToInvoice(true)
@@ -3566,63 +3815,12 @@ function OrdersPageInner() {
     }
   }
 
+  // Full Sales Order → Invoice. Runs the same path as Send Items with every line ticked, so the
+  // SO hands its stock to the invoice and is archived. The old version left the SO open still
+  // holding its stock while the invoice took the same units again — every such sale counted twice.
   const handleSendSOToInvoice = async (doc: OrderDocument) => {
-    try {
-      const existingRaw = await fetch('/api/admin/orders/documents?type=invoice').then((r) => r.ok ? r.json() : [])
-      const existing: any[] = Array.isArray(existingRaw) ? existingRaw : []
-      const nums = existing
-        .map((d: any) => { const m = /^INV(\d+)$/.exec(d.docNumber || ''); return m ? parseInt(m[1], 10) : 0 })
-        .filter((n: number) => n > 0)
-      const next = (nums.length > 0 ? Math.max(...nums) : 25) + 1
-      const newDocNumber = `INV${String(next).padStart(4, '0')}`
-
-      const res = await fetch('/api/admin/orders/documents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'invoice',
-          docNumber: newDocNumber,
-          date: new Date().toISOString().split('T')[0],
-          clientName: doc.clientName || 'Unknown',
-          clientEmail: doc.clientEmail || '',
-          clientPhone: doc.clientPhone || '',
-          clientAddress: doc.clientAddress || '',
-          lineItems: doc.lineItems || [],
-          notes: doc.notes || '',
-          terms: doc.terms || '',
-          status: 'draft',
-          discountPct: (doc as any).discountPct || 0,
-          shippingMethod: (doc as any).shippingMethod || '',
-          shippingCost: (doc as any).shippingCost || 0,
-          trackingNumber: (doc as any).trackingNumber || '',
-          // Rules 28 + 45 — the Quote Ref and every payment on the Sales Order follow it onto
-          // the Invoice, or a deposit taken on the Quote is lost at this second hop.
-          sourceQuoteNumber: (doc as any).sourceQuoteNumber || '',
-          depositMode: false,
-          amountPaid: (doc as any).amountPaid || 0,
-          creditApplied: (doc as any).creditApplied || 0,
-          overpaymentCredit: (doc as any).overpaymentCredit || 0,
-          showCreditOnInvoice: (doc as any).showCreditOnInvoice || false,
-          payments: (doc as any).payments || [],
-          // true only for old SOs that already physically deducted stock (prevents double-deduct).
-          // New SOs (stockDeducted:false) never deducted, so the invoice must deduct.
-          stockAlreadyReserved: (doc as any).stockDeducted === true,
-        }),
-      })
-      if (res.ok) {
-        const newInvoice = await res.json()
-        setDocuments((prev) => [newInvoice, ...prev])
-        setSoToInvoiceResult(`✓ ${doc.docNumber} → ${newDocNumber}`)
-        setTimeout(() => setSoToInvoiceResult(null), 4000)
-      } else {
-        const errData = await res.json().catch(() => ({}))
-        setSoToInvoiceResult(`Error: ${errData.error || res.status}`)
-        setTimeout(() => setSoToInvoiceResult(null), 5000)
-      }
-    } catch (e: any) {
-      setSoToInvoiceResult(`Error: ${e?.message || 'unknown'}`)
-      setTimeout(() => setSoToInvoiceResult(null), 5000)
-    }
+    const picks = Object.fromEntries((doc.lineItems || []).filter((li) => (li.qty || 0) > 0).map((li) => [li.id, li.qty]))
+    await handleSendSOItemsToInvoice(doc, picks, null)
   }
 
   const handleSendToPackingList = async (doc: OrderDocument) => {
@@ -5261,6 +5459,12 @@ function OrdersPageInner() {
                               icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
                               className: 'text-indigo-600',
                               onClick: () => handleSendSOToInvoice(doc),
+                            }, {
+                              label: 'Send Items to Invoice…',
+                              icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h6m8-3v6m-3-3h6" /></svg>,
+                              className: 'text-indigo-600',
+                              disabled: doc.status === 'archived',
+                              onClick: () => setSendSOItems(doc),
                             }] : []),
                             ...(doc.type === 'invoice' ? [{
                               label: (doc as any).sentToPackingList ? '✓ Sent to Packing List' : 'Send to Packing List',
@@ -5483,6 +5687,19 @@ function OrdersPageInner() {
           onAppend={(target) => handleAppendQuoteToInvoice(sendToInvoiceQuote, target)}
           onClose={() => setSendToInvoiceQuote(null)}
           busy={appendingToInvoice}
+        />
+      )}
+      {sendSOItems && (
+        <SendSOItemsModal
+          so={sendSOItems}
+          openInvoices={documents.filter((d) =>
+            d.type === 'invoice'
+            && !['paid', 'archived'].includes(d.status)
+            && d.clientName.trim().toLowerCase() === sendSOItems.clientName.trim().toLowerCase()
+          )}
+          onSend={(picks, target) => handleSendSOItemsToInvoice(sendSOItems, picks, target)}
+          onClose={() => setSendSOItems(null)}
+          busy={sendingSOItems}
         />
       )}
       {confirmDelete && (
