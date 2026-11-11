@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
+import { isNsrSupplier, NSR_NO_VAT_FROM_EUR, NSR_LOW_BAND_VAT_PCT } from '@/lib/preorder-pricing'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -987,7 +988,13 @@ function WorksheetEditor({
   function calcLanded(w: number) {
     return effectiveW(w) * exchangeRate * (1 + (shippingPct + handlingPct) / 100)
   }
-  function calcRetail(w: number) { return calcLanded(w) * (1 + markupPct / 100) * (1 + vatPct / 100) }
+  // NSR is costed by price band, never by the sheet's VAT box (Rule 68): a line whose
+  // net wholesale is 30 EUR or more carries NO VAT, anything under 30 EUR carries 15%.
+  const nsrSheet = isNsrSupplier(supplier)
+  function lineVatPct(w: number, sheetVat: number) {
+    return nsrSheet ? (w >= NSR_NO_VAT_FROM_EUR ? 0 : NSR_LOW_BAND_VAT_PCT) : sheetVat
+  }
+  function calcRetail(w: number) { return calcLanded(w) * (1 + markupPct / 100) * (1 + lineVatPct(w, vatPct) / 100) }
 
   // Final costing — derived percentages from total costs
   const totalWholesaleZAR = items
@@ -1019,7 +1026,7 @@ function WorksheetEditor({
     return entity === 'R66' ? base * 1.15 : base
   }
   // Markup applied on top of Final Landed: (wholesale + shipping + customs + handling) × (1 + markup%)
-  function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + finalVatPct / 100) }
+  function calcFinalRetail(w: number) { return calcFinalLanded(w) * (1 + finalMarkupPct / 100) * (1 + lineVatPct(w, finalVatPct) / 100) }
   function fmtFC(n: number) { return n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') }
 
   // JSS Calculator — wholesale in ZAR, shipping allocated proportionally
@@ -1720,8 +1727,9 @@ function WorksheetEditor({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">VAT %</label>
-            <input type="number" min={0} step={1} value={vatPct} onChange={(e) => setVatPct(Number(e.target.value))}
-              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            <input type="number" min={0} step={1} value={vatPct} onChange={(e) => setVatPct(Number(e.target.value))} disabled={nsrSheet}
+              className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-40" />
+            {nsrSheet && <span className="text-[10px] text-amber-700" title="Rule 68">NSR: 15% under €{NSR_NO_VAT_FROM_EUR}, 0% from €{NSR_NO_VAT_FROM_EUR}</span>}
           </div>
           {slsMode && (
             <>
@@ -1850,8 +1858,9 @@ function WorksheetEditor({
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">VAT %</label>
-            <input type="number" min={0} step={1} value={finalVatPct} onChange={(e) => setFinalVatPct(Number(e.target.value))}
-              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+            <input type="number" min={0} step={1} value={finalVatPct} onChange={(e) => setFinalVatPct(Number(e.target.value))} disabled={nsrSheet}
+              className="border border-emerald-200 rounded-lg px-2.5 py-1.5 text-sm w-20 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-40" />
+            {nsrSheet && <span className="text-[10px] text-amber-700" title="Rule 68">NSR: 15% under €{NSR_NO_VAT_FROM_EUR}, 0% from €{NSR_NO_VAT_FROM_EUR}</span>}
           </div>
 
           {/* ── SLS Discount OR regular Discount + VAT display ── */}

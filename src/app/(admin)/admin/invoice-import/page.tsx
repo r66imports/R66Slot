@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { extractPdfRows, type PdfRow } from '@/lib/catalogue-import'
+import { isNsrSupplier, NSR_NO_VAT_FROM_EUR } from '@/lib/preorder-pricing'
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
@@ -707,7 +708,8 @@ function parseNsrPdf(
         qty,
         wholesalePrice: wp,
         listPrice: parseFrNum(tail[0]),
-        estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT),
+        // NSR VAT is by band, not the page toggle (Rule 68): 30 EUR+ no VAT, under 30 EUR 15%.
+        estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, wp < NSR_NO_VAT_FROM_EUR),
       })
       lastItemY = row.y
       continue
@@ -774,6 +776,9 @@ export default function InvoiceImportPage() {
   const [invoiceTotals, setInvoiceTotals] = useState<InvoiceTotals | null>(null)
   const [parseError, setParseError] = useState('')
   const [parserUsed, setParserUsed] = useState<'generic' | 'sideways' | 'slotcarsupply' | 'nsr' | ''>('')
+  // NSR is costed by band, never by the VAT toggle (Rule 68): 30 EUR+ no VAT, under 30 EUR 15%.
+  const nsrMode = parserUsed === 'nsr' || isNsrSupplier(supplier)
+  const vatOn = (wp: number) => (nsrMode ? wp < NSR_NO_VAT_FROM_EUR : costing.includeVAT)
   const [parsing, setParsing] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState('')
@@ -812,8 +817,8 @@ export default function InvoiceImportPage() {
   // Recalc est. retail when rate/costing changes
   useEffect(() => {
     if (!items.length) return
-    setItems(prev => prev.map(it => ({ ...it, estRetailZAR: calcEstRetail(it.wholesalePrice, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT) })))
-  }, [exchangeRate, exchangeRates, currency, costing, supplier])
+    setItems(prev => prev.map(it => ({ ...it, estRetailZAR: calcEstRetail(it.wholesalePrice, exchangeRate, costing.shippingMarkup, costing.markup, vatOn(it.wholesalePrice)) })))
+  }, [exchangeRate, exchangeRates, currency, costing, supplier, parserUsed])
 
   const handleSupplierChange = (name: string) => {
     setSupplier(name)
@@ -849,6 +854,12 @@ export default function InvoiceImportPage() {
           if (!result.items.length) { setParseError('No line items found. Check the invoice has Codice/Code and Netto/Disc. net columns.'); return }
           setParserUsed('nsr')
           if (currency !== 'EUR') setCurrency('EUR')   // NSR invoices are priced in EUR
+          // The Worksheet applies NSR's VAT band by supplier name, so a sheet filed as
+          // 'Imported' would lose it. Pick the NSR contact when none was chosen.
+          if (!isNsrSupplier(supplier)) {
+            const nsr = suppliers.find(s => isNsrSupplier(s.name))
+            if (nsr) setSupplier(nsr.name)
+          }
           setInvoiceNumber(result.invoiceNumber)
           setDetectedShipping(result.totals.shipping)
           setInvoiceTotals(result.totals)
@@ -900,7 +911,7 @@ export default function InvoiceImportPage() {
         if (cells.some((c: string) => SHIP_KEYS.some(k => c.includes(k)))) continue
         const wp   = header.price !== -1 ? parseNum(row[header.price]) : 0
         const desc = header.desc  !== -1 ? stripCJK(String(row[header.desc] ?? '').trim()) : ''
-        parsed.push({ id: `imp_${Date.now()}_${i}`, sku, description: desc, qty, wholesalePrice: wp, estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT) })
+        parsed.push({ id: `imp_${Date.now()}_${i}`, sku, description: desc, qty, wholesalePrice: wp, estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, isNsrSupplier(supplier) ? wp < NSR_NO_VAT_FROM_EUR : costing.includeVAT) })
       }
 
       if (!parsed.length) { setParseError('No line items found. Check SKU/ITEM and QTY columns have data.'); return }
@@ -908,7 +919,7 @@ export default function InvoiceImportPage() {
       setItems(parsed)
     } catch (err: any) { setParseError(`Parse failed: ${err.message}`) }
     finally { setParsing(false) }
-  }, [exchangeRate, costing])
+  }, [exchangeRate, costing, supplier, suppliers])
 
   const buildSheet = (wsId: string, existingSheet?: any) => {
     const supplierName = supplier || 'Imported'
@@ -1148,13 +1159,20 @@ The worksheet it created is not affected.`)) return
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">VAT</label>
+              {nsrMode ? (
+                <div className="w-full py-2 px-2 rounded-lg text-xs font-semibold border bg-amber-50 border-amber-300 text-amber-800 text-center"
+                  title="NSR VAT is set by price band (Rule 68), not by this toggle">
+                  NSR: 15% under €{NSR_NO_VAT_FROM_EUR} · none from €{NSR_NO_VAT_FROM_EUR}
+                </div>
+              ) : (
               <button onClick={() => setCosting(c => ({ ...c, includeVAT: !c.includeVAT }))}
                 className={`w-full py-2 rounded-lg text-sm font-semibold border transition-colors ${costing.includeVAT ? 'bg-green-50 border-green-300 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-500'}`}>
                 {costing.includeVAT ? '+15% VAT' : 'No VAT'}
               </button>
+              )}
             </div>
           </div>
-          <p className="text-xs text-gray-400">Est. Retail = Wholesale × rate × (1+ship%) × (1+markup%){costing.includeVAT ? ' × 1.15' : ''}</p>
+          <p className="text-xs text-gray-400">Est. Retail = Wholesale × rate × (1+ship%) × (1+markup%){nsrMode ? ` × 1.15 only when wholesale is under €${NSR_NO_VAT_FROM_EUR}` : costing.includeVAT ? ' × 1.15' : ''}</p>
         </div>
       </div>
 
@@ -1385,7 +1403,7 @@ The worksheet it created is not affected.`)) return
                       <input type="number" min={0} step={0.01} value={item.wholesalePrice}
                         onChange={e => {
                           const wp = parseFloat(e.target.value) || 0
-                          setItems(p => p.map(i => i.id === item.id ? { ...i, wholesalePrice: wp, estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, costing.includeVAT) } : i))
+                          setItems(p => p.map(i => i.id === item.id ? { ...i, wholesalePrice: wp, estRetailZAR: calcEstRetail(wp, exchangeRate, costing.shippingMarkup, costing.markup, vatOn(wp)) } : i))
                         }}
                         className="w-24 text-xs border border-gray-200 rounded px-1.5 py-0.5 text-right focus:outline-none focus:ring-1 focus:ring-primary/50" />
                     </td>
