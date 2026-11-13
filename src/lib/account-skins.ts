@@ -245,6 +245,29 @@ export const ACCOUNT_SKINS: AccountSkin[] = [
       inputBg: '#2B2E33',
     },
   },
+  // Gulf Racing — powder blue and orange livery. Stripes and swatch are in
+  // account-skin-gulf.css.
+  {
+    id: 'gulf',
+    name: 'Gulf Racing',
+    blurb: 'Powder blue and orange — the classic Le Mans livery.',
+    dark: false,
+    colors: {
+      bg: '#D6ECF9',
+      surface: '#FFFFFF',
+      surface2: '#EAF5FC',
+      border: '#B4D9EF',
+      text: '#14205A',
+      muted: '#3A4C7C',
+      faint: '#7487AD',
+      accent: '#F26B1D',
+      accentFg: '#14205A',
+      accentDark: '#D2550C',
+      strong: '#14205A',
+      strongFg: '#FFFFFF',
+      inputBg: '#FFFFFF',
+    },
+  },
   // slot-only:end
 ]
 

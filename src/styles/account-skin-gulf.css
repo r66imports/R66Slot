@@ -1,0 +1,53 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   GULF RACING SKIN — R66Slot only, so it lives apart from account-skins.css,
+   which is mirrored verbatim with R66Emporium.
+
+   Decoration only: a navy-edged orange stripe runs down the canvas like the
+   livery's centre band, and the cards are solid, so tables and forms never
+   sit on top of it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-skin='gulf'] {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0 calc(50% - 46px),
+    rgba(20, 32, 90, 0.18) calc(50% - 46px) calc(50% - 40px),
+    rgba(242, 107, 29, 0.22) calc(50% - 40px) calc(50% + 40px),
+    rgba(20, 32, 90, 0.18) calc(50% + 40px) calc(50% + 46px),
+    transparent calc(50% + 46px) 100%
+  );
+}
+
+/* Livery band across the top of the sidebar card: blue / orange / blue. */
+[data-skin='gulf'] aside > nav {
+  position: relative;
+  overflow: hidden;
+  padding-top: 1.75rem;
+}
+[data-skin='gulf'] aside > nav::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: linear-gradient(
+    90deg,
+    #9fd3f0 0 34%,
+    #14205a 34% 36%,
+    #f26b1d 36% 64%,
+    #14205a 64% 66%,
+    #9fd3f0 66% 100%
+  );
+}
+
+/* The picker swatch. Shown under every skin, so it is not scoped to gulf;
+   !important because SkinPicker sets each swatch's background inline. */
+[data-skin] button[aria-label='Gulf Racing theme'] {
+  background: linear-gradient(
+    90deg,
+    #9fd3f0 0 32%,
+    #f26b1d 32% 68%,
+    #9fd3f0 68% 100%
+  ) !important;
+}
