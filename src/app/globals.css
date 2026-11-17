@@ -12,6 +12,7 @@
 @import '../styles/account-skins.css';
 @import '../styles/account-skin-slotcar.css';
 @import '../styles/account-skin-gulf.css';
+@import '../styles/account-skin-redbull.css';
 
 :root {
   --font-assistant: 'Assistant', system-ui, sans-serif;

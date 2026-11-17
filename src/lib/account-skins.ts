@@ -268,6 +268,29 @@ export const ACCOUNT_SKINS: AccountSkin[] = [
       inputBg: '#FFFFFF',
     },
   },
+  // Red Bull Racing — matte navy, red and yellow livery. Stripes and swatch are
+  // in account-skin-redbull.css.
+  {
+    id: 'redbull',
+    name: 'Red Bull Racing',
+    blurb: 'Matte navy with a red and yellow livery.',
+    dark: true,
+    colors: {
+      bg: '#0E1631',
+      surface: '#18234A',
+      surface2: '#212E5A',
+      border: '#2F3D6E',
+      text: '#F2F4FA',
+      muted: '#B7C0D9',
+      faint: '#8792B3',
+      accent: '#E21B4D',
+      accentFg: '#FFFFFF',
+      accentDark: '#B8133C',
+      strong: '#FFCC00',
+      strongFg: '#0E1631',
+      inputBg: '#152043',
+    },
+  },
   // slot-only:end
 ]
 

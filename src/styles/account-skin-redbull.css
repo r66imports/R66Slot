@@ -1,0 +1,48 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   RED BULL RACING SKIN — R66Slot only, so it lives apart from account-skins.css,
+   which is mirrored verbatim with R66Emporium.
+
+   Decoration only: a yellow-edged red stripe runs down the canvas, and the
+   cards are solid, so tables and forms never sit on top of it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+[data-skin='redbull'] {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0 calc(50% - 46px),
+    rgba(255, 204, 0, 0.22) calc(50% - 46px) calc(50% - 40px),
+    rgba(226, 27, 77, 0.2) calc(50% - 40px) calc(50% + 40px),
+    rgba(255, 204, 0, 0.22) calc(50% + 40px) calc(50% + 46px),
+    transparent calc(50% + 46px) 100%
+  );
+}
+
+/* Livery band across the top of the sidebar card: red / yellow / red. */
+[data-skin='redbull'] aside > nav {
+  position: relative;
+  overflow: hidden;
+  padding-top: 1.75rem;
+}
+[data-skin='redbull'] aside > nav::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: linear-gradient(
+    90deg,
+    #e21b4d 0 40%,
+    #ffcc00 40% 60%,
+    #e21b4d 60% 100%
+  );
+}
+
+/* The picker swatch: a yellow disc on navy over a red lower band. Shown under
+   every skin, so it is not scoped to redbull; !important because SkinPicker
+   sets each swatch's background inline. */
+[data-skin] button[aria-label='Red Bull Racing theme'] {
+  background:
+    radial-gradient(circle at 50% 40%, #ffcc00 0 28%, transparent 29%),
+    linear-gradient(180deg, #0e1631 0 65%, #e21b4d 65% 100%) !important;
+}
