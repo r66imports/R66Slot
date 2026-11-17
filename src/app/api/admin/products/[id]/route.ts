@@ -281,12 +281,23 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
+    const num = (v: any) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
     // key in body -> [column, serializer]
     const allowed: Record<string, [string, (v: any) => any]> = {
       status: ['status', (v) => v],
       brand: ['brand', (v) => v],
       supplier: ['supplier', (v) => v],
       categoryBrands: ['category_brands', (v) => JSON.stringify(Array.isArray(v) ? v : [])],
+      // Worksheet Save writes its costings here, not through PUT: PUT's weight column is not
+      // COALESCE'd, so a partial PUT nulls the package weight. Never quantity — Save moves no stock.
+      price: ['price', num],
+      compareAtPrice: ['compare_at_price', num],
+      costPerItem: ['cost_per_item', num],
+      preOrderPrice: ['pre_order_price', num],
+      worksheetEstRetail: ['worksheet_est_retail', num],
+      worksheetExRate: ['worksheet_ex_rate', num],
+      worksheetCurrency: ['worksheet_currency', (v) => v ?? null],
+      worksheetPricedAt: ['worksheet_priced_at', (v) => v ?? null],
     }
     const updates: string[] = []
     const values: any[] = []

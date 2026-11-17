@@ -511,7 +511,7 @@ function WorksheetEditor({
         }
       }
       await syncWholesalePricelist()
-      await saveWorksheet()
+      await saveWorksheet({ skipProducts: true })
       onRefresh()  // refresh products state so next press uses current DB
       if (duplicateSkus.length > 0) setDoubleSKUAlert(duplicateSkus)
       const keptNote =
@@ -740,10 +740,27 @@ function WorksheetEditor({
       try {
         for (const it of existingItems) {
           const matches = freshProducts.filter((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-          const patchBody: Record<string, any> = { quantity: it.qty }
-          if (it.retailPrice > 0) patchBody.price = Math.round(it.retailPrice * 100) / 100
+          const baseBody: Record<string, any> = {}
+          if (it.retailPrice > 0) baseBody.price = Math.round(it.retailPrice * 100) / 100
           let allOk = true
-          for (const prod of matches) {
+          for (const [i, prod] of matches.entries()) {
+            // The shipment ADDS to what the product already holds. Setting the qty to the
+            // sheet figure wiped both directions: units invoiced before the stock landed
+            // came back as phantoms (A1801891: -2 set to 6, should be 4) and leftover stock
+            // vanished (IG3871: 1 set to 48, should be 49). Re-read just before writing so a
+            // sale made since the sheet opened is not overwritten. A duplicate SKU takes the
+            // shipment once, on the first match; the others get the price only.
+            const patchBody: Record<string, any> = { ...baseBody }
+            if (i === 0) {
+              const cur = await fetch(`/api/admin/products/${prod.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+              if (!cur) {
+                errors.push(`${it.sku}: could not read current qty`)
+                allOk = false
+                continue
+              }
+              patchBody.quantity = (Number(cur.quantity) || 0) + it.qty
+            }
+            if (Object.keys(patchBody).length === 0) continue
             const res = await fetch(`/api/admin/products/${prod.id}`, {
               method: 'PUT',
               // Names this push in the stock ledger. Without it the intake is logged as a
@@ -1122,7 +1139,31 @@ function WorksheetEditor({
     }
   }
 
-  async function saveWorksheet() {
+  // Every costing the sheet owns for one row — the same figures Update Products writes.
+  // Never qty, title, brand or accounts: those stay with Update Products.
+  function costingPatch(it: WsItem): Record<string, any> {
+    const r2 = (n: number) => Math.round(n * 100) / 100
+    const patch: Record<string, any> = {}
+    if (it.wholesalePrice > 0) {
+      const finalLanded = r2(calcEntityFinalLanded(it.wholesalePrice, it.costingEntity))
+      const landedRetail = r2(calcFinalRetail(it.wholesalePrice))
+      const estRetail = r2(calcRetail(it.wholesalePrice))
+      if (finalLanded > 0) patch.costPerItem = finalLanded
+      if (landedRetail > 0) patch.compareAtPrice = landedRetail
+      else if (finalLanded > 0) patch.compareAtPrice = finalLanded
+      if (estRetail > 0) {
+        patch.preOrderPrice = estRetail
+        patch.worksheetEstRetail = estRetail
+        patch.worksheetExRate = exchangeRate || null
+        patch.worksheetCurrency = currency || null
+        patch.worksheetPricedAt = worksheetDate ? `${worksheetDate}T00:00:00.000Z` : null
+      }
+    }
+    if (it.retailPrice > 0) patch.price = r2(it.retailPrice)
+    return patch
+  }
+
+  async function saveWorksheet(opts: { skipProducts?: boolean } = {}) {
     setSaveStatus('saving')
     try {
       await fetch('/api/admin/worksheets', {
@@ -1130,16 +1171,24 @@ function WorksheetEditor({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentSheetData()),
       })
-      // Sync retail prices back to products
-      const toSync = items.filter((it) => it.sku && it.retailPrice > 0)
-      for (const it of toSync) {
-        const prod = products.find((p) => p.sku.trim().toLowerCase() === it.sku.trim().toLowerCase())
-        if (!prod) continue
-        await fetch(`/api/admin/products/${prod.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ price: Math.round(it.retailPrice * 100) / 100 }),
-        })
+      // Save updates all costings on existing products (PATCH — PUT would null the weight).
+      // Update Products has already written them when it calls Save, so it skips this.
+      if (!opts.skipProducts) {
+        const seen = new Set<string>()
+        for (const it of items) {
+          const key = it.sku.trim().toLowerCase()
+          if (!key || seen.has(key)) continue
+          seen.add(key)
+          const prod = products.find((p) => p.sku.trim().toLowerCase() === key)
+          if (!prod) continue
+          const patch = costingPatch(it)
+          if (Object.keys(patch).length === 0) continue
+          await fetch(`/api/admin/products/${prod.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(patch),
+          })
+        }
       }
       // Sync wholesale price (supplier currency) to inventory pricelist
       await syncWholesalePricelist()
@@ -1452,7 +1501,7 @@ function WorksheetEditor({
             Archive {archivedSheets.length > 0 && <span className="bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 text-xs font-bold">{archivedSheets.length}</span>}
           </button>
           <button
-            onClick={saveWorksheet}
+            onClick={() => saveWorksheet()}
             disabled={saveStatus === 'saving'}
             className={`flex items-center gap-1.5 text-sm px-4 py-1.5 rounded-lg font-semibold transition-colors ${
               saveStatus === 'saved' ? 'bg-green-600 text-white' :
@@ -1611,7 +1660,7 @@ function WorksheetEditor({
           {displayDate && <p className="text-sm text-gray-500">{displayDate}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={saveWorksheet} disabled={saveStatus === 'saving'}
+          <button onClick={() => saveWorksheet()} disabled={saveStatus === 'saving'}
             className={`text-sm px-3 py-1.5 rounded-lg font-semibold transition-colors ${
               saveStatus === 'saved' ? 'bg-green-100 text-green-700' :
               saveStatus === 'saving' ? 'bg-gray-100 text-gray-500' :
