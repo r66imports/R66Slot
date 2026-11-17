@@ -3507,7 +3507,15 @@ function OrdersPageInner() {
       const soAny = so as any
       const soNote = [`Items from ${so.docNumber}`, sendingAll ? soAny.notes : ''].filter(Boolean).join('\n')
 
-      const soSkipStock = !(so as any).stockDeducted
+      // Rule 1 exception — an SO that already reserved its stock hands that reservation to the
+      // invoice: the SO keeps its deduction (skipStockAdjust) and the invoice takes it over
+      // (stockAlreadyReserved + stockTransferred) instead of releasing it and selling again.
+      // Releasing first meant any SO on stock that has not landed (shelf 0, SO at -1) failed
+      // the invoice's shortfall check and rolled back. Only when the receiving invoice itself
+      // carries a deduction — a legacy un-deducted invoice would deduct its whole list again.
+      const freshTargetPre: any = target ? (all.find((d: any) => d.id === target.id) || target) : null
+      const transferStock = !!(so as any).stockDeducted && (!freshTargetPre || freshTargetPre.stockDeducted !== false)
+      const soSkipStock = !(so as any).stockDeducted || transferStock
       const patchSO = (items: LineItem[]) => fetch(`/api/admin/orders/documents/${so.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lineItems: items, ...(soSkipStock ? { skipStockAdjust: true } : {}) }),
@@ -3526,7 +3534,7 @@ function OrdersPageInner() {
       if (target) {
         freshTarget = all.find((d: any) => d.id === target.id) || target
         invNumber = freshTarget.docNumber
-        const patchBody: Record<string, any> = { appendLineItems: moved }
+        const patchBody: Record<string, any> = { appendLineItems: moved, ...(transferStock ? { stockAlreadyReserved: true, skipStockAdjust: true } : {}) }
         const pct = freshTarget.depositPct || 0
         if (freshTarget.preOrderDeposit && pct > 0) {
           const merged = [...(freshTarget.lineItems || []), ...moved]
@@ -3563,6 +3571,7 @@ function OrdersPageInner() {
             terms: so.terms || '',
             status: 'draft',
             depositMode: false,
+            ...(transferStock ? { stockAlreadyReserved: true, stockTransferred: true } : {}),
             sourceQuoteNumber: soAny.sourceQuoteNumber || '',
             ...(sendingAll ? {
               discountPct: soAny.discountPct || 0,

@@ -133,7 +133,10 @@ export async function POST(request: Request) {
       createdAt: now,
       updatedAt: now,
       backorderId: body.backorderId,
-      stockDeducted: deductStock,
+      // stockTransferred: the stock was deducted by a Sales Order and this invoice takes that
+      // deduction over, so it owns it — later edits/rejects/deletes must restore it. Left
+      // false, the next save would see an un-deducted invoice and take the stock a second time.
+      stockDeducted: deductStock || (stockable && stockAlreadyReserved && !!body.stockTransferred),
       supplierOrderSent: body.supplierOrderSent || false,
       supplierOrderRef: body.supplierOrderRef,
       supplierOrderName: body.supplierOrderName,
