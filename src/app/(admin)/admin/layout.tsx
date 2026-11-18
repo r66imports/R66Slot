@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
 import LiveSync from '@/components/admin/live-sync'
-import { AdminSkinMain, AdminSkinPicker } from '@/components/admin/AdminSkin'
+import { AdminSkinMain, AdminThemesModal } from '@/components/admin/AdminSkin'
 import { AdminAuthContext, type AdminAuthData } from '@/lib/admin-auth-context'
 import { ALWAYS_ALLOWED, canAccessPath } from '@/lib/admin-permissions'
 
@@ -59,6 +59,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [showCostingModal, setShowCostingModal] = useState(false)
+  const [showThemes, setShowThemes] = useState(false)
   const [costingState, setCostingState] = useState<CostingState>(INITIAL_COSTING_STATE)
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   // Only ever one nav menu open, so one anchored instance serves them all. gap 0 keeps
@@ -211,6 +212,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Pre-Orders Mapping', href: '/admin/settings/preorders-mapping' },
         { name: 'Prompts', href: '/admin/settings/prompts' },
         { name: 'User Accounts', href: '/admin/settings/users', adminOnly: true },
+        { name: 'Themes', isModal: true },
         { name: 'My Account', href: '/admin/account' },
       ],
     },
@@ -317,7 +319,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             return (
                               <button
                                 key={item.name}
-                                onClick={() => { setShowCostingModal(true); setOpenMenu(null) }}
+                                onClick={() => { if (item.name === 'Themes') setShowThemes(true); else setShowCostingModal(true); setOpenMenu(null) }}
                                 className="flex items-center w-full px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-primary font-play transition-colors"
                               >
                                 {item.name}
@@ -357,8 +359,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Main content — full width, scrollable */}
         <AdminSkinMain className="flex-1 overflow-y-auto p-8 font-play"><LiveSync layoutReads={['checkout']}>{children}</LiveSync></AdminSkinMain>
-        <AdminSkinPicker />
       </div>
+
+      <AdminThemesModal open={showThemes} onClose={() => setShowThemes(false)} />
 
       {showCostingModal && (
         <CostingModal
