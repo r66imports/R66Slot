@@ -1222,6 +1222,19 @@ function CreateDocumentModal({
   const [modalProducts, setModalProducts] = useState<Array<{ id: string; sku: string; title: string; price: number; costPerItem: number; preOrderPrice: number; quantity: number }>>([])
   const [enforceStockLimit, setEnforceStockLimit] = useState(false)
   const [priceMode, setPriceMode] = useState<'retail' | 'cost' | 'preorder'>('retail')
+  // Hide Profits — hides cost badges + profit figures on every invoice until switched off.
+  // Remembered per browser so it sticks across invoices and reloads.
+  const [hideProfits, setHideProfits] = useState(false)
+  useEffect(() => {
+    try { setHideProfits(localStorage.getItem('orders-hide-profits') === '1') } catch {}
+  }, [])
+  const toggleHideProfits = () => {
+    setHideProfits((v) => {
+      const next = !v
+      try { localStorage.setItem('orders-hide-profits', next ? '1' : '0') } catch {}
+      return next
+    })
+  }
   const [fullScreen, setFullScreen] = useState(false)
 
   // Inline payment recording
@@ -1546,6 +1559,22 @@ function CreateDocumentModal({
   const subtotal = lineItems.reduce((s, l) => s + lineAmt(l), 0)
   const discountAmt = depositMode ? 0 : subtotal * discountPct / 100
   const total = subtotal - discountAmt + shippingCost
+  // Profit per line after discount: line total (after its Disc %) less its share of the
+  // Order Disc %, minus qty × landed cost. Same basis as Accounting → Profit — a cost under
+  // SUSPECT_COST_RATIO (15%) of the price is unreliable and excluded, never guessed.
+  // Editor only — never on emailed or downloaded invoices.
+  const orderDiscRate = subtotal > 0 ? discountAmt / subtotal : 0
+  const lineProfitInfo = (li: LineItem): { profit: number } | 'none' | 'suspect' | null => {
+    if (li._service || !(li.description || '').trim()) return null
+    if (!li._costPrice) return 'none'
+    if (li.unitPrice > 0 && li._costPrice / li.unitPrice < 0.15) return 'suspect'
+    return { profit: lineAmt(li) * (1 - orderDiscRate) - li.qty * li._costPrice }
+  }
+  const profitInfos = lineItems.map(lineProfitInfo)
+  const totalProfit = profitInfos.reduce<number>((s, p) => s + (p && typeof p === 'object' ? p.profit : 0), 0)
+  const costedRevenue = lineItems.reduce((s, l, i) => { const p = profitInfos[i]; return s + (p && typeof p === 'object' ? lineAmt(l) * (1 - orderDiscRate) : 0) }, 0)
+  const totalMargin = costedRevenue > 0 ? (totalProfit / costedRevenue) * 100 : 0
+  const excludedCount = profitInfos.filter((p) => p === 'none' || p === 'suspect').length
   // Auto-adjust fixed deposit when items change (quotes only)
   useEffect(() => {
     if (isQuote && !depositMode && nonDepositPctRef.current > 0 && total > 0) {
@@ -1893,6 +1922,14 @@ function CreateDocumentModal({
                 >
                   Deposit
                 </button>
+                <button
+                  type="button"
+                  onClick={toggleHideProfits}
+                  title="Hide cost and profit figures on every invoice until switched off"
+                  className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-colors ${hideProfits ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}
+                >
+                  {hideProfits ? '👁 Show Profits' : '🙈 Hide Profits'}
+                </button>
                 <button onClick={addLine} className="text-xs text-blue-600 hover:text-blue-800 font-semibold">+ Add Line</button>
                 <button onClick={() => setLineItems(p => [...p, { ...newLine(), _service: true, _serviceType: 'setup', _serviceCost: 0, _staffMember: '', description: 'Services - Setup' }])} className="text-xs text-orange-600 hover:text-orange-800 font-semibold">⚙ Add Service</button>
               </div>
@@ -1977,7 +2014,7 @@ function CreateDocumentModal({
                               <div className="flex gap-1 mt-1 flex-wrap">
                                 {li._retailPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._retailPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._retailPrice ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>Retail R{li._retailPrice.toFixed(2)}</button> : null}
                                 {li._preOrderPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._preOrderPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._preOrderPrice ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-500 border-gray-300 hover:border-amber-400'}`}>Pre Order R{li._preOrderPrice.toFixed(2)}</button> : null}
-                                {li._costPrice ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
+                                {li._costPrice && !hideProfits ? <button type="button" onClick={() => updateLine(li.id, 'unitPrice', li._costPrice!)} className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${li.unitPrice === li._costPrice ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-500 border-gray-300 hover:border-gray-500'}`}>Cost R{li._costPrice.toFixed(2)}</button> : null}
                               </div>
                             )}
                           </td>
@@ -2010,6 +2047,17 @@ function CreateDocumentModal({
                             {(li.discountPct || 0) > 0 ? (
                               <span className="text-red-600 font-medium">{fmtPrice(lineAmt(li))}</span>
                             ) : fmtPrice(lineAmt(li))}
+                            {!hideProfits && (() => {
+                              const p = lineProfitInfo(li)
+                              if (p === null) return null
+                              if (p === 'none') return <div className="text-[11px] text-gray-400 mt-0.5" title="No landed cost on this product">no cost</div>
+                              if (p === 'suspect') return <div className="text-[11px] text-amber-600 mt-0.5" title="Cost is under 15% of the price — unreliable, excluded from profit">cost suspect</div>
+                              return (
+                                <div className={`text-[11px] font-semibold mt-0.5 ${p.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`} title="Profit after discount — internal only, not on client invoices">
+                                  Profit {p.profit < 0 ? '−' : ''}{fmtPrice(Math.abs(p.profit))}
+                                </div>
+                              )
+                            })()}
                           </td>
                         </>
                       )}
@@ -2211,6 +2259,22 @@ function CreateDocumentModal({
                         {depositMode ? 'Balance on Delivery' : 'Balance Due'}
                       </td>
                       <td className="px-3 py-2.5 text-right font-bold text-orange-700">{fmtPrice(balanceDue)}</td><td />
+                    </tr>
+                  )}
+                  {/* Internal only — the email/PDF/print renderers never read this */}
+                  {!hideProfits && costedRevenue > 0 && (
+                    <tr className={`border-t ${totalProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                      <td colSpan={5} className={`px-3 py-2 text-right text-xs font-semibold ${totalProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                        Profit after discount
+                        <span className="ml-1.5 font-normal opacity-70">
+                          {totalMargin.toFixed(1)}% margin
+                          {excludedCount > 0 ? ` · ${excludedCount} line${excludedCount > 1 ? 's' : ''} with no/suspect cost excluded` : ''}
+                          {' · '}internal — not on client invoice
+                        </span>
+                      </td>
+                      <td className={`px-3 py-2 text-right font-bold ${totalProfit >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
+                        {totalProfit < 0 ? '−' : ''}{fmtPrice(Math.abs(totalProfit))}
+                      </td><td />
                     </tr>
                   )}
                 </tfoot>
