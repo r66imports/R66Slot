@@ -10,8 +10,9 @@
  * • Default — the standard look the back office was built with. It sets no
  *   data-skin at all, so it is exactly the original admin.
  * • Every skin not in ADMIN_EXCLUDED_SKINS. The original client colour skins
- *   (and Slotcar) are excluded; any skin added from now on appears here
- *   automatically. To keep a new skin off admin, add its id to the list.
+ *   are excluded; any skin added from now on appears here automatically. To
+ *   keep a new skin off admin, add its id to the list. Slotcar is offered, but
+ *   only R66Slot defines it, so it shows on Slot admin alone.
  *
  * Scope is the admin <main> content only — the header and its menus keep the
  * site's brand colours. The choice is per admin user, per browser
@@ -30,7 +31,7 @@ import {
 import { AdminAuthContext } from '@/lib/admin-auth-context'
 
 /** Client skins that are never offered on admin. */
-const ADMIN_EXCLUDED_SKINS = ['chrome', 'pitlane', 'emerald', 'carbon', 'midnight', 'plum', 'mono', 'slotcar']
+const ADMIN_EXCLUDED_SKINS = ['chrome', 'pitlane', 'emerald', 'carbon', 'midnight', 'plum', 'mono']
 
 const DEFAULT_THEME = {
   ...getSkin(DEFAULT_SKIN_ID),
@@ -204,7 +205,7 @@ export function AdminThemesModal({ open, onClose }: { open: boolean; onClose: ()
           </button>
         </div>
 
-        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 'min(70vh, 560px)', overflowY: 'auto' }}>
           {ADMIN_THEMES.map((t) => {
             const selected = t.id === themeId
             return (
