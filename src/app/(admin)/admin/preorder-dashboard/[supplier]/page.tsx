@@ -496,6 +496,8 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
         // Rule 28 — every Quote merged in stays named in "Quote Ref:", not just the one
         // that created the invoice.
         sourceQuoteNumber:mergeQuoteRefs(inv.sourceQuoteNumber,quote.docNumber),
+        // Invoice with no bank chosen picks up the Quote's; one already set is never overwritten.
+        ...(!inv.bankAccountId&&quote.bankAccountId?{bankAccountId:quote.bankAccountId}:{}),
       })})
       if(!res.ok){
         const e=await res.json().catch(()=>({}))
@@ -547,7 +549,7 @@ function SendToDropdown({ customer, form, unitPrice, onLinked }: {
           clientName:freshTarget.clientName,clientEmail:freshTarget.clientEmail||'',clientPhone:freshTarget.clientPhone||'',clientAddress:freshTarget.clientAddress||'',
           lineItems:invoiceItems,notes:[freshTarget.notes,depositNote].filter(Boolean).join('\n'),terms:freshTarget.terms||'',status:'draft',
           // Deposit mode is a Quotes-only presentation — an Invoice raised off one bills in full.
-          discountPct:freshTarget.discountPct||0,depositMode:false,sourceQuoteNumber:freshTarget.docNumber,
+          discountPct:freshTarget.discountPct||0,depositMode:false,sourceQuoteNumber:freshTarget.docNumber,bankAccountId:freshTarget.bankAccountId||'',
           amountPaid:freshTarget.amountPaid||0,creditApplied:freshTarget.creditApplied||0,payments:tagPaymentsFromQuote(freshTarget.payments,freshTarget.docNumber),
         })})
         if(!newInvRes.ok){

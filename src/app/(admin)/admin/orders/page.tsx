@@ -3613,6 +3613,8 @@ function OrdersPageInner() {
           patchBody.payments = [...(freshTarget.payments || []), ...(soAny.payments || [])]
         }
         if (sendingAll && soAny.sourceQuoteNumber) patchBody.sourceQuoteNumber = mergeQuoteRefs(freshTarget.sourceQuoteNumber, soAny.sourceQuoteNumber)
+        // Invoice with no bank chosen picks up the Sales Order's; one already set is never overwritten.
+        if (!freshTarget.bankAccountId && soAny.bankAccountId) patchBody.bankAccountId = soAny.bankAccountId
         invRes = await fetch(`/api/admin/orders/documents/${target.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) })
       } else {
         const nums = all
@@ -3637,6 +3639,7 @@ function OrdersPageInner() {
             depositMode: false,
             ...(transferStock ? { stockAlreadyReserved: true, stockTransferred: true } : {}),
             sourceQuoteNumber: soAny.sourceQuoteNumber || '',
+            bankAccountId: soAny.bankAccountId || '',
             ...(sendingAll ? {
               discountPct: soAny.discountPct || 0,
               shippingMethod: soAny.shippingMethod || '',
@@ -3720,6 +3723,8 @@ function OrdersPageInner() {
       // Rule 28 — the audit trail must name EVERY source Quote, not just the one that
       // created the invoice, so "Quote Ref:" grows with each merge.
       patchBody.sourceQuoteNumber = mergeQuoteRefs(fresh.sourceQuoteNumber, quote.docNumber)
+      // Invoice with no bank chosen picks up the Quote's; one already set is never overwritten.
+      if (!(fresh as any).bankAccountId && (quote as any).bankAccountId) patchBody.bankAccountId = (quote as any).bankAccountId
       const res = await fetch(`/api/admin/orders/documents/${target.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -3833,6 +3838,8 @@ function OrdersPageInner() {
           shippingCost: (doc as any).shippingCost || 0,
           trackingNumber: (doc as any).trackingNumber || '',
           sourceQuoteNumber: doc.docNumber,
+          // The bank account chosen on the Quote travels with it — the client was told to pay there.
+          bankAccountId: (doc as any).bankAccountId || '',
           // Rule 45(1): payments already taken on the quote carry onto the new document, or the
           // customer gets re-billed for money they have paid.
           amountPaid: (doc as any).amountPaid || 0,
