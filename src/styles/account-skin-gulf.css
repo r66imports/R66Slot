@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   GULF RACING SKIN — R66Slot only, so it lives apart from account-skins.css,
-   which is mirrored verbatim with R66Emporium.
+   GULF RACING SKIN — livery decoration, kept apart from account-skins.css so
+   that sheet stays pure colour remaps. Mirrored verbatim with R66Emporium.
 
    Decoration only: a navy-edged orange stripe runs down the canvas like the
    livery's centre band, and the cards are solid, so tables and forms never
@@ -43,7 +43,8 @@
 
 /* The picker swatch. Shown under every skin, so it is not scoped to gulf;
    !important because SkinPicker sets each swatch's background inline. */
-[data-skin] button[aria-label='Gulf Racing theme'] {
+[data-skin] button[aria-label='Gulf Racing theme'],
+[data-skin-swatches] button[aria-label='Gulf Racing theme'] {
   background: linear-gradient(
     90deg,
     #9fd3f0 0 32%,

@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAnchoredMenu } from '@/hooks/use-anchored-menu'
 import CostingModal, { INITIAL_COSTING_STATE, type CostingState } from '@/components/admin/costing-modal'
 import LiveSync from '@/components/admin/live-sync'
+import { AdminSkinMain, AdminSkinPicker } from '@/components/admin/AdminSkin'
 import { AdminAuthContext, type AdminAuthData } from '@/lib/admin-auth-context'
 import { ALWAYS_ALLOWED, canAccessPath } from '@/lib/admin-permissions'
 
@@ -355,7 +356,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </header>
 
         {/* Main content — full width, scrollable */}
-        <main className="flex-1 overflow-y-auto p-8 font-play"><LiveSync layoutReads={['checkout']}>{children}</LiveSync></main>
+        <AdminSkinMain className="flex-1 overflow-y-auto p-8 font-play"><LiveSync layoutReads={['checkout']}>{children}</LiveSync></AdminSkinMain>
+        <AdminSkinPicker />
       </div>
 
       {showCostingModal && (

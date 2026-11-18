@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   RED BULL RACING SKIN — R66Slot only, so it lives apart from account-skins.css,
-   which is mirrored verbatim with R66Emporium.
+   RED BULL RACING SKIN — livery decoration, kept apart from account-skins.css
+   so that sheet stays pure colour remaps. Mirrored verbatim with R66Emporium.
 
    Decoration only: a yellow-edged red stripe runs down the canvas, and the
    cards are solid, so tables and forms never sit on top of it.
@@ -41,7 +41,8 @@
 /* The picker swatch: a yellow disc on navy over a red lower band. Shown under
    every skin, so it is not scoped to redbull; !important because SkinPicker
    sets each swatch's background inline. */
-[data-skin] button[aria-label='Red Bull Racing theme'] {
+[data-skin] button[aria-label='Red Bull Racing theme'],
+[data-skin-swatches] button[aria-label='Red Bull Racing theme'] {
   background:
     radial-gradient(circle at 50% 40%, #ffcc00 0 28%, transparent 29%),
     linear-gradient(180deg, #0e1631 0 65%, #e21b4d 65% 100%) !important;

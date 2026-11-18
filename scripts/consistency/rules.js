@@ -28,12 +28,16 @@ const MIRRORED_FILES = [
     // The localStorage key is namespaced per site, so a customer's skin choice
     // on one site never leaks into the other.
     allow: [/^export const SKIN_STORAGE_KEY = /],
-    // The Slotcar skin is R66Slot-only (Rule 64).
+    // The Slotcar skin is R66Slot-only (Rule 64); Gulf and Red Bull are shared.
     slotOnlyBlocks: true,
   },
   'src/styles/account-skins.css',
   'src/components/account/AccountSkinProvider.tsx',
   'src/components/account/SkinPicker.tsx',
+  'src/styles/account-skin-gulf.css',
+  'src/styles/account-skin-redbull.css',
+  // Admin Themes — the same skins on the admin content area, both sites.
+  'src/components/admin/AdminSkin.tsx',
 
   // Events + Event Checklists — R66Slot is master for both sites.
   // The payment-split lib is deliberately NOT mirrored; it differs per site.

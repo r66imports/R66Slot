@@ -36,6 +36,7 @@
 
 /* The picker swatch. Shown under every skin, so it is not scoped to slotcar;
    !important because SkinPicker sets each swatch's background inline. */
-[data-skin] button[aria-label='Slotcar theme'] {
+[data-skin] button[aria-label='Slotcar theme'],
+[data-skin-swatches] button[aria-label='Slotcar theme'] {
   background: repeating-conic-gradient(#1a1b1e 0 25%, #f5f5f2 0 50%) 0 0 / 12px 12px !important;
 }

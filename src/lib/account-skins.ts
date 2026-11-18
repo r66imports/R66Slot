@@ -222,29 +222,6 @@ export const ACCOUNT_SKINS: AccountSkin[] = [
       inputBg: '#FFFFFF',
     },
   },
-  // slot-only:start — this block is exempt from the mirror check; do not copy it
-  // to R66Emporium. The lanes and chequered swatch are in account-skin-slotcar.css.
-  {
-    id: 'slotcar',
-    name: 'Slotcar',
-    blurb: 'Asphalt, silver rails and a racing yellow.',
-    dark: true,
-    colors: {
-      bg: '#26282C',
-      surface: '#32353A',
-      surface2: '#3D4046',
-      border: '#5A5F67',
-      text: '#F5F5F2',
-      muted: '#C9CCD1',
-      faint: '#ABB1B9',
-      accent: '#FFD21F',
-      accentFg: '#111111',
-      accentDark: '#E5B800',
-      strong: '#F5F5F2',
-      strongFg: '#1A1B1E',
-      inputBg: '#2B2E33',
-    },
-  },
   // Gulf Racing — powder blue and orange livery. Stripes and swatch are in
   // account-skin-gulf.css.
   {
@@ -289,6 +266,29 @@ export const ACCOUNT_SKINS: AccountSkin[] = [
       strong: '#FFCC00',
       strongFg: '#0E1631',
       inputBg: '#152043',
+    },
+  },
+  // slot-only:start — this block is exempt from the mirror check; do not copy it
+  // to R66Emporium. The lanes and chequered swatch are in account-skin-slotcar.css.
+  {
+    id: 'slotcar',
+    name: 'Slotcar',
+    blurb: 'Asphalt, silver rails and a racing yellow.',
+    dark: true,
+    colors: {
+      bg: '#26282C',
+      surface: '#32353A',
+      surface2: '#3D4046',
+      border: '#5A5F67',
+      text: '#F5F5F2',
+      muted: '#C9CCD1',
+      faint: '#ABB1B9',
+      accent: '#FFD21F',
+      accentFg: '#111111',
+      accentDark: '#E5B800',
+      strong: '#F5F5F2',
+      strongFg: '#1A1B1E',
+      inputBg: '#2B2E33',
     },
   },
   // slot-only:end
