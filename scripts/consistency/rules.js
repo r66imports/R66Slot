@@ -38,6 +38,7 @@ const MIRRORED_FILES = [
   'src/styles/account-skin-redbull.css',
   // Admin Themes — the same skins on the admin content area, both sites.
   'src/components/admin/AdminSkin.tsx',
+  'src/components/admin/AdminPopupMover.tsx',
 
   // Events + Event Checklists — R66Slot is master for both sites.
   // The payment-split lib is deliberately NOT mirrored; it differs per site.
