@@ -197,7 +197,29 @@ const readFonts = (username: string | null, themeId: string) => readJson<FontMap
 
 /** One edited item. `sel` matches every element styled like the one clicked —
  *  all of its classes — on any admin page. */
-type StyleRule = { sel: string; label: string; size?: number; color?: string; bold?: boolean; bg?: string }
+type StyleRule = {
+  sel: string
+  label: string
+  size?: number
+  color?: string
+  bold?: boolean
+  bg?: string
+  /** Set when a background was given to an item with no padding of its own:
+   *  it gets a small inner gap so the text doesn't touch the edge. */
+  pad?: boolean
+  /** Colours while the pointer is over the item. */
+  hoverColor?: string
+  hoverBg?: string
+}
+
+/** True when the item has (almost) no padding — a background on it would sit
+ *  tight against the text. Measured before any gap of ours is applied. */
+function needsPad(sel: string): boolean | undefined {
+  const el = safeAll(sel)[0]
+  if (!el) return undefined
+  const cs = getComputedStyle(el)
+  return parseFloat(cs.paddingLeft) < 4 || parseFloat(cs.paddingTop) < 2
+}
 
 const rulesKey = (username: string | null, themeId: string) => `${storageKey(username)}.styles.${themeId}`
 const readRules = (username: string | null, themeId: string) => {
@@ -214,12 +236,21 @@ function rulesCss(rules: StyleRule[] | null): string {
   const out: string[] = []
   for (const r of rules) {
     const s = r.sel + LIFT
-    if (r.size) out.push(`${s}{font-size:${r.size}px!important;line-height:1.35!important}`)
+    if (r.size) {
+      out.push(`${s}{font-size:${r.size}px!important;line-height:1.35!important}`)
+      // A fixed-height box (h-8 button, h-9 input) grows with its text instead
+      // of the text pressing on its border.
+      if (/\.h-\d/.test(r.sel)) out.push(`${s}{height:auto!important;padding-top:.3em!important;padding-bottom:.3em!important}`)
+    }
     if (r.bg) out.push(`${s}{background-color:${r.bg}!important}`)
+    if (r.bg && r.pad) out.push(`${s}{padding:.25em .5em!important;border-radius:4px!important}`)
     const text = [r.color && `color:${r.color}!important`, r.bold !== undefined && `font-weight:${r.bold ? 700 : 400}!important`]
       .filter(Boolean)
       .join(';')
     if (text) out.push(`${s},${r.sel} *${LIFT}{${text}}`)
+    // Hover beats the plain colours: :hover adds to the selector's weight.
+    if (r.hoverBg) out.push(`${r.sel}:hover${LIFT}{background-color:${r.hoverBg}!important}`)
+    if (r.hoverColor) out.push(`${r.sel}:hover${LIFT},${r.sel}:hover *${LIFT}{color:${r.hoverColor}!important}`)
   }
   return out.join('\n')
 }
@@ -637,7 +668,18 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
     setSaved(s)
     setDraft(s)
     setSavedRules(r)
-    setRules(r)
+    // Backgrounds set before gaps existed: work out the gap for those on this
+    // page (shows as an unsaved change — Save keeps it).
+    let fixed = false
+    const withPad = r.map((x) => {
+      if (!x.bg || x.pad !== undefined) return x
+      const p = needsPad(x.sel)
+      if (p === undefined) return x
+      fixed = true
+      return { ...x, pad: p }
+    })
+    setRules(withPad)
+    if (fixed) announceFonts({ themeId, fonts: s, rules: withPad, bg: readBg(username, themeId) || NO_BG })
     setSelected(null)
     const b = readBg(username, themeId) || NO_BG
     setSavedBg(b)
@@ -658,7 +700,7 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
 
   const setRulesLive = (next: StyleRule[]) => {
     // An item with nothing left set is dropped.
-    const clean = next.filter((r) => r.size || r.color || r.bg || r.bold !== undefined)
+    const clean = next.filter((r) => r.size || r.color || r.bg || r.bold !== undefined || r.hoverColor || r.hoverBg)
     setRules(clean)
     announceFonts({ themeId, fonts: draft, rules: clean, bg: bgDraft })
   }
@@ -670,7 +712,8 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
   const editSelected = (patch: Partial<StyleRule>) => {
     if (!selected) return
     const base: StyleRule = current || { sel: selected.sel, label: selected.label }
-    const merged = { ...base, ...patch }
+    const merged: StyleRule = { ...base, ...patch }
+    if (patch.bg && merged.pad === undefined) merged.pad = needsPad(selected.sel) ?? false
     for (const k of Object.keys(patch) as (keyof StyleRule)[]) if (patch[k] === undefined) delete merged[k]
     setRulesLive(current ? rules.map((r) => (r.sel === selected.sel ? merged : r)) : [...rules, merged])
   }
@@ -701,6 +744,7 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const [, redraw] = useState(0)
   const info = selected ? describeItem(selected.sel) : null
+  const hoverInfo = selected ? describeHover(selected.sel, current) : null
   useEffect(() => {
     if (selected) scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [selected?.sel])
@@ -836,6 +880,37 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
                   what="Background"
                 />
               </Row>
+
+              {/* ── On hover ── */}
+              <div style={{ marginTop: 4, paddingTop: 10, borderTop: '1px dashed #E5E7EB', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>
+                  On hover{' '}
+                  <span style={{ fontWeight: 400, color: '#6B7280', fontSize: 12 }}>
+                    {hoverInfo
+                      ? `now: text ${hoverInfo.color}${colourName(hoverInfo.color, palette)} · background ${hoverInfo.bg ? hoverInfo.bg + colourName(hoverInfo.bg, palette) : 'none'}`
+                      : 'no hover colours yet'}{' '}
+                    — point at the item on the page to see it
+                  </span>
+                </div>
+                <Row label="Hover text">
+                  <ColourChoice
+                    palette={palette}
+                    value={current?.hoverColor}
+                    fallback={hoverInfo?.color || '#000000'}
+                    onPick={(c) => editSelected({ hoverColor: c })}
+                    what="Hover text colour"
+                  />
+                </Row>
+                <Row label="Hover background">
+                  <ColourChoice
+                    palette={palette}
+                    value={current?.hoverBg}
+                    fallback={hoverInfo?.bg || '#FFFFFF'}
+                    onPick={(c) => editSelected({ hoverBg: c })}
+                    what="Hover background"
+                  />
+                </Row>
+              </div>
             </div>
           )}
         </div>
@@ -906,6 +981,11 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
                   </button>
                   {r.color && <span title="Text colour" style={{ width: 14, height: 14, borderRadius: 9999, background: r.color, border: '1px solid #9CA3AF' }} />}
                   {r.bg && <span title="Background" style={{ width: 14, height: 14, borderRadius: 3, background: r.bg, border: '1px solid #9CA3AF' }} />}
+                  {(r.hoverColor || r.hoverBg) && (
+                    <span title={`Hover: ${r.hoverColor || 'theme'} on ${r.hoverBg || 'theme'}`} style={{ fontSize: 11, color: '#6B7280' }}>
+                      hover
+                    </span>
+                  )}
                   <button type="button" onClick={() => setRulesLive(rules.filter((x) => x.sel !== r.sel))} aria-label={`Remove edit for ${r.label}`} title="Undo this item"
                     style={{ border: 0, background: 'transparent', color: '#6B7280', cursor: 'pointer', fontSize: 15 }}>
                     ×
@@ -1287,4 +1367,35 @@ function describeItem(sel: string): { px: number; token: string; color: string; 
 function colourName(hex: string, palette?: { name: string; hex: string }[]): string {
   const p = palette?.find((c) => c.hex.toUpperCase() === hex.toUpperCase())
   return p ? ` (${p.name})` : ''
+}
+
+/**
+ * The selected item's hover colours: an edited hover wins; otherwise its
+ * hover: classes are tried on a hidden copy (plain bg-/text- versions, so the
+ * theme's remaps apply). Null when the item has no hover colours at all.
+ */
+function describeHover(sel: string, rule?: StyleRule): { color: string; bg: string | null } | null {
+  const el = safeAll(sel)[0]
+  if (!el) return null
+  const hoverClasses = [...el.classList].filter((c) => /^hover:(text|bg)-/.test(c)).map((c) => c.slice(6))
+  let color: string | null = rule?.hoverColor ?? null
+  let bg: string | null = rule?.hoverBg ?? null
+  if (hoverClasses.length && (!color || !bg)) {
+    const probe = el.cloneNode(false) as HTMLElement
+    probe.textContent = 'x'
+    // Drop the plain colour classes so they can't outrank the hover ones.
+    ;[...probe.classList].filter((c) => /^(text|bg)-/.test(c)).forEach((c) => probe.classList.remove(c))
+    probe.classList.add(...hoverClasses)
+    probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none'
+    el.parentElement?.appendChild(probe)
+    const cs = getComputedStyle(probe)
+    if (!color && hoverClasses.some((c) => c.startsWith('text-'))) color = toHex(cs.color).toUpperCase()
+    if (!bg && hoverClasses.some((c) => c.startsWith('bg-'))) {
+      const a = (cs.backgroundColor.match(/[\d.]+/g) || [])[3]
+      bg = a !== undefined && parseFloat(a) === 0 ? null : toHex(cs.backgroundColor).toUpperCase()
+    }
+    probe.remove()
+  }
+  if (!color && !bg) return null
+  return { color: color || toHex(getComputedStyle(el).color).toUpperCase(), bg }
 }
