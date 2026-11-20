@@ -400,6 +400,7 @@ const smallBtn: React.CSSProperties = {
 export function AdminThemesModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [themeId, setThemeId] = useAdminThemeId()
   const [settingsFor, setSettingsFor] = useState<string | null>(null)
+  const boxRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (open) setSettingsFor(null)
@@ -413,6 +414,23 @@ export function AdminThemesModal({ open, onClose }: { open: boolean; onClose: ()
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose, settingsFor])
+
+  // In settings, a press inside the box must not count as an outside click for
+  // a menu left open on the page (that would close it mid-edit). React listens
+  // on the document, so this stops the native event first, at window capture.
+  // Only mousedown/touchstart: the pop-up mover needs pointerdown.
+  useEffect(() => {
+    if (!open || settingsFor === null) return
+    const stop = (e: Event) => {
+      if (boxRef.current?.contains(e.target as Node)) e.stopPropagation()
+    }
+    window.addEventListener('mousedown', stop, true)
+    window.addEventListener('touchstart', stop, true)
+    return () => {
+      window.removeEventListener('mousedown', stop, true)
+      window.removeEventListener('touchstart', stop, true)
+    }
+  }, [open, settingsFor])
 
   if (!open) return null
   const inSettings = settingsFor !== null
@@ -440,6 +458,7 @@ export function AdminThemesModal({ open, onClose }: { open: boolean; onClose: ()
         aria-modal={!inSettings}
         aria-label={inSettings ? 'Font settings' : 'Themes'}
         data-skin-swatches
+        ref={boxRef}
         onClick={(e) => e.stopPropagation()}
         style={{
           pointerEvents: 'auto',
@@ -697,7 +716,7 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
     <>
       <PanelHeader
         title={`${themeName(themeId)} — Theme settings`}
-        subtitle="Click anything on the page to edit it. Save to keep; × goes back to Themes."
+        subtitle="Click = pick to edit · Double-click = use it (open a menu, run an action). Save to keep; × goes back."
         onClose={back}
         closeLabel="Back to Themes"
       />
@@ -716,7 +735,7 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
         }}
       >
         <span style={{ color: paused ? '#92400E' : '#065F46', fontWeight: 600 }}>
-          {paused ? 'Editing paused — use the page (open a menu), then resume' : 'Editing on — clicks pick items to edit'}
+          {paused ? 'Editing paused — use the page (open a menu), then resume' : 'Editing on — click picks, double-click opens menus'}
         </span>
         <button type="button" style={smallBtn} onClick={() => setPaused((v) => !v)}>
           {paused ? '▶ Resume' : '⏸ Pause'}
@@ -1083,8 +1102,9 @@ function toHex(css: string): string {
 /**
  * Edit mode on the page while Theme settings are open: hovering outlines what a
  * click would pick, a click selects it (and does nothing else — links and
- * buttons in the content area don't fire), and every item matching the
- * selection is outlined. Only the admin <main> is editable.
+ * buttons in the content area don't fire), a double-click uses the item as
+ * normal (opens a menu, runs an action), and every item matching the selection
+ * is outlined. Only the admin <main> is editable.
  */
 function PageEditor({ selected, onSelect }: { selected: string | null; onSelect: (s: { sel: string; label: string } | null) => void }) {
   const layer = useRef<HTMLDivElement | null>(null)
@@ -1104,11 +1124,31 @@ function PageEditor({ selected, onSelect }: { selected: string | null; onSelect:
     const onMove = (e: PointerEvent) => {
       hovered.current = inMain(e.target) ? selectorFor(e.target as Element)?.el ?? null : null
     }
+    // Double-click = use the page as normal: a second click on the same item
+    // within DOUBLE_MS is passed through as a plain click, so "Actions" opens its
+    // menu and a menu item runs its action or opens its pop-up. Detected here
+    // because the blocked press means the browser never fires dblclick.
+    const DOUBLE_MS = 450
+    let last: { t: number; el: EventTarget } | null = null
+    let passing = false
     const onClick = (e: MouseEvent) => {
-      if (!inMain(e.target)) return
+      if (passing || !inMain(e.target)) return
       e.preventDefault()
       e.stopPropagation()
-      const s = selectorFor(e.target as Element)
+      const target = e.target as Element
+      const now = Date.now()
+      if (last && last.el === target && now - last.t < DOUBLE_MS) {
+        last = null
+        passing = true
+        try {
+          target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window, clientX: e.clientX, clientY: e.clientY }))
+        } finally {
+          passing = false
+        }
+        return
+      }
+      last = { t: now, el: target }
+      const s = selectorFor(target)
       if (s) onSelect({ sel: s.sel, label: labelFor(s.el) })
     }
     const onKey = (e: KeyboardEvent) => {
