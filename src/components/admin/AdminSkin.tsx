@@ -68,12 +68,14 @@ function readLocal(key: string): string | null {
   }
 }
 
-function writeLocal(key: string, value: string | null) {
+function writeLocal(key: string, value: string | null): boolean {
   try {
     if (value === null) window.localStorage.removeItem(key)
     else window.localStorage.setItem(key, value)
+    return true
   } catch {
-    /* private browsing — the choice just won't be remembered */
+    /* private browsing or storage full — the choice just won't be remembered */
+    return false
   }
 }
 
@@ -242,28 +244,71 @@ function labelFor(el: Element): string {
 
 /** Live preview: { themeId, fonts, rules } previews; null for both goes back
  *  to what is saved. */
-type FontDetail = { themeId: string; fonts: FontMap | null; rules: StyleRule[] | null }
+// ── Page background image ───────────────────────────────────────────────────
+
+/** Image (a downscaled JPEG data URL) shown behind the admin content, faded
+ *  to `opacity` % over the theme's canvas colour. */
+type BgSetting = { image?: string; opacity: number }
+const NO_BG: BgSetting = { opacity: 30 }
+const bgKey = (username: string | null, themeId: string) => `${storageKey(username)}.bg.${themeId}`
+const readBg = (username: string | null, themeId: string) => readJson<BgSetting>(bgKey(username, themeId))
+
+function bgCss(bg: BgSetting | null): string {
+  if (!bg?.image) return ''
+  const veil = `color-mix(in srgb, var(--skin-bg, #F9FAFB) ${100 - bg.opacity}%, transparent)`
+  return `main[data-admin-main]{background-image:linear-gradient(${veil},${veil}),url("${bg.image}")!important;background-size:cover!important;background-position:center!important;background-attachment:fixed!important}`
+}
+
+/** Fits a picked image inside 1920px and re-encodes it as JPEG so it fits in
+ *  localStorage (a few hundred KB). */
+async function shrinkImage(file: File): Promise<string> {
+  const url = URL.createObjectURL(file)
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image()
+      i.onload = () => res(i)
+      i.onerror = rej
+      i.src = url
+    })
+    const scale = Math.min(1, 1920 / Math.max(img.width, img.height))
+    const c = document.createElement('canvas')
+    c.width = Math.round(img.width * scale)
+    c.height = Math.round(img.height * scale)
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height)
+    let q = 0.82
+    let out = c.toDataURL('image/jpeg', q)
+    while (out.length > 1_200_000 && q > 0.4) out = c.toDataURL('image/jpeg', (q -= 0.12))
+    return out
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+type FontDetail = { themeId: string; fonts: FontMap | null; rules: StyleRule[] | null; bg: BgSetting | null }
 const announceFonts = (detail: FontDetail) => window.dispatchEvent(new CustomEvent(FONT_EVENT, { detail }))
 
 function useAppliedStyles(themeId: string): string {
   const { username } = useContext(AdminAuthContext)
   const [fonts, setFonts] = useState<FontMap | null>(null)
   const [rules, setRules] = useState<StyleRule[] | null>(null)
+  const [bg, setBg] = useState<BgSetting | null>(null)
 
   useEffect(() => {
     setFonts(readFonts(username, themeId))
     setRules(readRules(username, themeId))
+    setBg(readBg(username, themeId))
     const onChange = (e: Event) => {
       const d = (e as CustomEvent<FontDetail>).detail
       if (d.themeId !== themeId) return
       setFonts(d.fonts ?? readFonts(username, themeId))
       setRules(d.rules ?? readRules(username, themeId))
+      setBg(d.bg ?? readBg(username, themeId))
     }
     window.addEventListener(FONT_EVENT, onChange)
     return () => window.removeEventListener(FONT_EVENT, onChange)
   }, [username, themeId])
 
-  return [fontsCss(fonts), rulesCss(rules)].filter(Boolean).join('\n')
+  return [bgCss(bg), fontsCss(fonts), rulesCss(rules)].filter(Boolean).join('\n')
 }
 
 // ── Content area ────────────────────────────────────────────────────────────
@@ -559,7 +604,10 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
   const [savedRules, setSavedRules] = useState<StyleRule[]>([])
   const [rules, setRules] = useState<StyleRule[]>([])
   const [selected, setSelected] = useState<{ sel: string; label: string } | null>(null)
+  const [savedBg, setSavedBg] = useState<BgSetting>(NO_BG)
+  const [bgDraft, setBgDraft] = useState<BgSetting>(NO_BG)
   const [flash, setFlash] = useState('')
+  const palette = getSkin(themeId).palette
 
   useEffect(() => {
     const s = readFonts(username, themeId) || {}
@@ -569,25 +617,32 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
     setSavedRules(r)
     setRules(r)
     setSelected(null)
+    const b = readBg(username, themeId) || NO_BG
+    setSavedBg(b)
+    setBgDraft(b)
     setSizes(scanPageSizes())
   }, [username, themeId])
 
   const pxOf = (token: string) => draft[token] ?? defaultPx(token)
-  const dirty = JSON.stringify(draft) !== JSON.stringify(saved) || JSON.stringify(rules) !== JSON.stringify(savedRules)
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved) || JSON.stringify(rules) !== JSON.stringify(savedRules) || JSON.stringify(bgDraft) !== JSON.stringify(savedBg)
 
   const update = (next: FontMap) => {
     // Sizes back at their default are dropped, so the stored map stays small.
     const clean: FontMap = {}
     for (const [k, v] of Object.entries(next)) if (v !== defaultPx(k)) clean[k] = v
     setDraft(clean)
-    announceFonts({ themeId, fonts: clean, rules })
+    announceFonts({ themeId, fonts: clean, rules, bg: bgDraft })
   }
 
   const setRulesLive = (next: StyleRule[]) => {
     // An item with nothing left set is dropped.
     const clean = next.filter((r) => r.size || r.color || r.bg || r.bold !== undefined)
     setRules(clean)
-    announceFonts({ themeId, fonts: draft, rules: clean })
+    announceFonts({ themeId, fonts: draft, rules: clean, bg: bgDraft })
+  }
+  const setBgLive = (next: BgSetting) => {
+    setBgDraft(next)
+    announceFonts({ themeId, fonts: draft, rules, bg: next })
   }
   const current = selected ? rules.find((r) => r.sel === selected.sel) : undefined
   const editSelected = (patch: Partial<StyleRule>) => {
@@ -607,14 +662,16 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
   const save = () => {
     writeLocal(fontsKey(username, themeId), Object.keys(draft).length ? JSON.stringify(draft) : null)
     writeLocal(rulesKey(username, themeId), rules.length ? JSON.stringify(rules) : null)
+    const bgOk = writeLocal(bgKey(username, themeId), bgDraft.image ? JSON.stringify(bgDraft) : null)
     setSaved(draft)
     setSavedRules(rules)
-    announceFonts({ themeId, fonts: null, rules: null })
-    setFlash('Saved ✓')
+    if (bgOk) setSavedBg(bgDraft)
+    announceFonts({ themeId, fonts: null, rules: null, bg: null })
+    setFlash(bgOk ? 'Saved ✓' : 'Saved — but the image is too big to keep; try a smaller one')
     window.setTimeout(() => setFlash(''), 1800)
   }
   const back = () => {
-    announceFonts({ themeId, fonts: null, rules: null }) // drops anything unsaved
+    announceFonts({ themeId, fonts: null, rules: null, bg: null }) // drops anything unsaved
     onBack()
   }
 
@@ -676,22 +733,13 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
                 )}
               </Row>
               <Row label="Text colour">
-                <input
-                  type="color"
-                  value={current?.color || toHex(firstMatchStyle(selected.sel, 'color'))}
-                  onChange={(e) => editSelected({ color: e.target.value })}
-                  aria-label="Selected item text colour"
-                  style={{ width: 44, height: 30, border: '1px solid #D1D5DB', borderRadius: 7, padding: 2, background: '#FFFFFF' }}
+                <ColourChoice
+                  palette={palette}
+                  value={current?.color}
+                  fallback={toHex(firstMatchStyle(selected.sel, 'color'))}
+                  onPick={(c) => editSelected({ color: c })}
+                  what="Text colour"
                 />
-                {['#FFFFFF', '#111827', '#FFCC00', '#E21B4D', '#22C55E', '#3B82F6'].map((c) => (
-                  <button key={c} type="button" onClick={() => editSelected({ color: c })} title={c} aria-label={`Text colour ${c}`}
-                    style={{ width: 24, height: 24, borderRadius: 9999, border: '1px solid #9CA3AF', background: c, cursor: 'pointer', padding: 0 }} />
-                ))}
-                {current?.color && (
-                  <button type="button" style={smallBtn} onClick={() => editSelected({ color: undefined })} title="Back to the theme's colour">
-                    ↺
-                  </button>
-                )}
               </Row>
               <Row label="Bold">
                 {([['Theme', undefined], ['Bold', true], ['Normal', false]] as const).map(([name, v]) => (
@@ -702,21 +750,73 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
                 ))}
               </Row>
               <Row label="Background">
-                <input
-                  type="color"
-                  value={current?.bg || toHex(firstMatchStyle(selected.sel, 'backgroundColor'))}
-                  onChange={(e) => editSelected({ bg: e.target.value })}
-                  aria-label="Selected item background colour"
-                  style={{ width: 44, height: 30, border: '1px solid #D1D5DB', borderRadius: 7, padding: 2, background: '#FFFFFF' }}
+                <ColourChoice
+                  palette={palette}
+                  value={current?.bg}
+                  fallback={toHex(firstMatchStyle(selected.sel, 'backgroundColor'))}
+                  onPick={(c) => editSelected({ bg: c })}
+                  what="Background"
                 />
-                {current?.bg && (
-                  <button type="button" style={smallBtn} onClick={() => editSelected({ bg: undefined })} title="Back to the theme's background">
-                    ↺
-                  </button>
-                )}
               </Row>
             </div>
           )}
+        </div>
+
+        {/* ── Page background image ── */}
+        <div style={{ padding: '12px 0', borderBottom: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 14, fontWeight: 700 }}>Background image</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div
+              aria-hidden
+              style={{
+                width: 72,
+                height: 44,
+                borderRadius: 6,
+                border: '1px solid #D1D5DB',
+                background: bgDraft.image ? `center / cover no-repeat url("${bgDraft.image}")` : '#F3F4F6',
+                flexShrink: 0,
+              }}
+            />
+            <label style={{ ...smallBtn, display: 'inline-flex', alignItems: 'center' }}>
+              {bgDraft.image ? 'Change image…' : 'Choose image…'}
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  e.target.value = ''
+                  if (!file) return
+                  try {
+                    setBgLive({ ...bgDraft, image: await shrinkImage(file) })
+                  } catch {
+                    setFlash('Could not read that image')
+                  }
+                }}
+              />
+            </label>
+            {bgDraft.image && (
+              <button type="button" style={smallBtn} onClick={() => setBgLive({ ...bgDraft, image: undefined })}>
+                Remove
+              </button>
+            )}
+          </div>
+          <Row label="Opacity">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={bgDraft.opacity}
+              disabled={!bgDraft.image}
+              onChange={(e) => setBgLive({ ...bgDraft, opacity: Number(e.target.value) })}
+              aria-label="Background image opacity"
+              style={{ flex: 1, minWidth: 120 }}
+            />
+            <span style={{ width: 44, textAlign: 'right', fontSize: 14, fontWeight: 600 }}>{bgDraft.opacity}%</span>
+          </Row>
+        </div>
+
+        <div style={{ paddingTop: 4 }}>
           {rules.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>Edited items ({rules.length})</div>
@@ -993,5 +1093,63 @@ function PageEditor({ selected, onSelect }: { selected: string | null; onSelect:
       <div ref={layer} aria-hidden style={{ position: 'fixed', inset: 0, zIndex: 59, pointerEvents: 'none' }} />
     </>,
     document.body,
+  )
+}
+
+/** Colour options for an edited item: the theme's palette when it has one
+ *  (swatches only), otherwise a free picker plus a few quick swatches. */
+function ColourChoice({
+  palette,
+  value,
+  fallback,
+  onPick,
+  what,
+}: {
+  palette?: { name: string; hex: string }[]
+  value?: string
+  fallback: string
+  onPick: (c: string | undefined) => void
+  what: string
+}) {
+  const swatches = palette ?? ['#FFFFFF', '#111827', '#FFCC00', '#E21B4D', '#22C55E', '#3B82F6'].map((hex) => ({ name: hex, hex }))
+  return (
+    <>
+      {!palette && (
+        <input
+          type="color"
+          value={value || fallback}
+          onChange={(e) => onPick(e.target.value)}
+          aria-label={`${what} — any colour`}
+          style={{ width: 44, height: 30, border: '1px solid #D1D5DB', borderRadius: 7, padding: 2, background: '#FFFFFF' }}
+        />
+      )}
+      {swatches.map((c) => {
+        const on = value?.toUpperCase() === c.hex.toUpperCase()
+        return (
+          <button
+            key={c.hex}
+            type="button"
+            onClick={() => onPick(c.hex)}
+            title={`${c.name} ${c.hex}`}
+            aria-label={`${what} ${c.name}`}
+            aria-pressed={on}
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: 9999,
+              border: on ? '3px solid #2563EB' : '1px solid #9CA3AF',
+              background: c.hex,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          />
+        )
+      })}
+      {value && (
+        <button type="button" style={smallBtn} onClick={() => onPick(undefined)} title="Back to the theme's colour">
+          ↺
+        </button>
+      )}
+    </>
   )
 }
