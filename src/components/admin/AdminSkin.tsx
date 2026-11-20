@@ -675,7 +675,20 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
     onBack()
   }
 
-  const curSize = current?.size ?? (selected ? Math.round(parseFloat(firstMatchStyle(selected.sel, 'fontSize')) || 14) : 14)
+  // What the selected item looks like right now (after any live edits).
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const [, redraw] = useState(0)
+  const info = selected ? describeItem(selected.sel) : null
+  useEffect(() => {
+    if (selected) scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [selected?.sel])
+  useEffect(() => {
+    // The <style> with live edits lands a frame after this render — re-read.
+    const id = requestAnimationFrame(() => redraw((n) => n + 1))
+    return () => cancelAnimationFrame(id)
+  }, [rules, draft])
+
+  const curSize = current?.size ??(selected ? Math.round(parseFloat(firstMatchStyle(selected.sel, 'fontSize')) || 14) : 14)
 
   return (
     <>
@@ -687,7 +700,7 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
       />
       <PageEditor selected={selected?.sel ?? null} onSelect={setSelected} />
 
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
         {/* ── Selected item ── */}
         <div style={{ padding: '6px 0 12px', borderBottom: '1px solid #E5E7EB' }}>
           {!selected ? (
@@ -702,6 +715,29 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
                     “{selected.label}”
                   </div>
                   <div style={{ fontSize: 12, color: '#6B7280' }}>{matchCount(selected.sel)} matching on this page</div>
+                  {info && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 4, fontSize: 12, color: '#111827' }}>
+                      <span style={{ fontWeight: 700 }}>Now:</span>
+                      <span>
+                        {info.px}px <span style={{ color: '#6B7280' }}>({info.token === 'base' ? 'body text' : info.token})</span>
+                      </span>
+                      <span>·</span>
+                      <span title="Text colour" style={{ width: 14, height: 14, borderRadius: 9999, background: info.color, border: '1px solid #9CA3AF' }} />
+                      <span>{info.color}{colourName(info.color, palette)}</span>
+                      <span>·</span>
+                      <span>{info.weight >= 600 ? 'bold' : 'normal'} ({info.weight})</span>
+                      <span>·</span>
+                      <span>background</span>
+                      {info.bg ? (
+                        <>
+                          <span style={{ width: 14, height: 14, borderRadius: 3, background: info.bg, border: '1px solid #9CA3AF' }} />
+                          <span>{info.bg}{colourName(info.bg, palette)}</span>
+                        </>
+                      ) : (
+                        <span style={{ color: '#6B7280' }}>none</span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <button type="button" style={smallBtn} onClick={() => setSelected(null)} title="Stop editing this item">
                   Done
@@ -870,6 +906,7 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
         {sizes.map(({ token, count }) => {
           const px = pxOf(token)
           const changed = px !== defaultPx(token)
+          const isSel = info?.token === token
           return (
             <div
               key={token}
@@ -878,12 +915,16 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
                 gridTemplateColumns: '1fr auto',
                 gap: '4px 10px',
                 alignItems: 'center',
-                padding: '10px 0',
+                padding: isSel ? '10px 8px' : '10px 0',
                 borderBottom: '1px solid #F3F4F6',
+                background: isSel ? '#EFF6FF' : undefined,
+                borderLeft: isSel ? '3px solid #2563EB' : undefined,
+                borderRadius: isSel ? 6 : undefined,
               }}
             >
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {isSel && <span style={{ color: '#2563EB' }}>◀ selected · </span>}
                   {sizeLabel(token)}{' '}
                   <span style={{ fontWeight: 400, color: '#6B7280', fontSize: 12 }}>
                     {token === 'base' ? 'no size set' : token} · standard {defaultPx(token)}px
@@ -1152,4 +1193,35 @@ function ColourChoice({
       )}
     </>
   )
+}
+
+/** The selected item as it looks now: size and which size class gives it,
+ *  text colour, weight, and its own background (null when see-through). */
+function describeItem(sel: string): { px: number; token: string; color: string; weight: number; bg: string | null } | null {
+  const el = safeAll(sel)[0]
+  if (!el) return null
+  const cs = getComputedStyle(el)
+  let token = 'base'
+  for (let e: Element | null = el; e && e.matches('main[data-admin-main] *'); e = e.parentElement) {
+    const t = [...e.classList].find((c) => SIZE_TOKEN.test(c))
+    if (t) {
+      token = t
+      break
+    }
+  }
+  const alpha = (cs.backgroundColor.match(/[\d.]+/g) || [])[3]
+  const bg = alpha !== undefined && parseFloat(alpha) === 0 ? null : toHex(cs.backgroundColor).toUpperCase()
+  return {
+    px: Math.round(parseFloat(cs.fontSize)),
+    token,
+    color: toHex(cs.color).toUpperCase(),
+    weight: parseInt(cs.fontWeight, 10) || 400,
+    bg,
+  }
+}
+
+/** " (Livery yellow)" when a colour is one of the theme's palette swatches. */
+function colourName(hex: string, palette?: { name: string; hex: string }[]): string {
+  const p = palette?.find((c) => c.hex.toUpperCase() === hex.toUpperCase())
+  return p ? ` (${p.name})` : ''
 }

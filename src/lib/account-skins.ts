@@ -264,9 +264,10 @@ export const ACCOUNT_SKINS: AccountSkin[] = [
     name: 'Red Bull Racing',
     blurb: 'Matte navy with a red and yellow livery.',
     dark: true,
-    // The 2022 livery colours, green, signal red and the Oracle Red Bull Racing
+    // White, the 2022 livery colours, green, signal red and the Oracle Red Bull Racing
     // logo colours — nothing else.
     palette: [
+      { name: 'White', hex: '#FFFFFF' },
       { name: 'Livery navy', hex: '#121F45' },
       { name: 'Livery blue', hex: '#223971' },
       { name: 'Livery red', hex: '#CC1E4A' },
