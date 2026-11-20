@@ -3403,7 +3403,7 @@ function ActionsDropdown({ items }: { items: ActionItem[] }) {
     setOpen((v) => !v)
   }
   return (
-    <div className="relative" onClick={(e) => e.stopPropagation()}>
+    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <button ref={btnRef} onClick={handleToggle} className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 shadow-sm whitespace-nowrap">
         Actions <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
@@ -3485,14 +3485,28 @@ function OrdersPageInner() {
   const docTableRef = useRef<HTMLDivElement>(null)
   const DOC_COLS = ['docNumber', 'date', 'client', 'description', 'total', 'status', 'paymentType', 'source'] as const
   const DOC_COL_DEFAULTS: Record<string, number> = { docNumber: 100, date: 90, client: 150, description: 160, total: 90, status: 90, paymentType: 110, source: 90 }
-  const DOC_ACTIONS_W = 84
+  // Actions column width. Starts at 84px; Fit measures the real Actions button and
+  // header, so a bigger font (Theme settings) never cuts the button off.
+  const [docActionsW, setDocActionsW] = useState(84)
+  const measureDocActionsW = () => {
+    let w = 84
+    docTableRef.current?.querySelectorAll<HTMLElement>('[data-doc-actions]').forEach((cell) => {
+      const inner = cell.firstElementChild as HTMLElement | null
+      if (!inner) return
+      const cs = getComputedStyle(cell)
+      w = Math.max(w, Math.ceil(inner.scrollWidth + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 4))
+    })
+    return w
+  }
   const getDocContainerW = () => docTableRef.current?.offsetWidth ?? 1200
   const cappedDocWidth = (col: string, w: number) => {
-    const other = DOC_COLS.filter(c => c !== col).reduce((s, c) => s + (docColW[c] ?? DOC_COL_DEFAULTS[c]), 0) + DOC_ACTIONS_W
+    const other = DOC_COLS.filter(c => c !== col).reduce((s, c) => s + (docColW[c] ?? DOC_COL_DEFAULTS[c]), 0) + docActionsW
     return Math.min(Math.max(40, w), Math.max(40, getDocContainerW() - other))
   }
   const autoFitDocCols = () => {
-    const available = getDocContainerW() - DOC_ACTIONS_W
+    const actionsW = measureDocActionsW()
+    setDocActionsW(actionsW)
+    const available = getDocContainerW() - actionsW
     const total = DOC_COLS.reduce((s, c) => s + DOC_COL_DEFAULTS[c], 0)
     DOC_COLS.forEach(c => setDocWidth(c, Math.max(40, Math.floor(available * (DOC_COL_DEFAULTS[c] / total)))))
   }
@@ -5304,7 +5318,7 @@ function OrdersPageInner() {
                   <col style={{ width: docColW.status }} />
                   <col style={{ width: docColW.paymentType }} />
                   <col style={{ width: docColW.source }} />
-                  <col style={{ width: DOC_ACTIONS_W }} />
+                  <col style={{ width: docActionsW }} />
                 </colgroup>
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider">
@@ -5343,9 +5357,11 @@ function OrdersPageInner() {
                           <SortTh col="status" label="Status" align="center" />
                           <PlainTh col="paymentType" label="Payment Type" />
                           <PlainTh col="source" label="Source" />
-                          <th className="text-center py-3 px-4 text-gray-500 flex items-center justify-end gap-1.5">
+                          <th data-doc-actions className="text-right py-3 px-4 text-gray-500">
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
                             <span>Actions</span>
                             <button onClick={autoFitDocCols} title="Auto-fit columns to page" className="text-xs px-1.5 py-0.5 rounded border border-gray-300 text-gray-400 hover:border-blue-400 hover:text-blue-500 font-medium leading-none">Fit</button>
+                            </span>
                           </th>
                         </>
                       )
@@ -5474,7 +5490,7 @@ function OrdersPageInner() {
                             })()}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-center">
+                        <td data-doc-actions className="py-3 px-4 text-center">
                           <ActionsDropdown items={[
                             {
                               label: isPartiallyPaid ? `Record Payment (Due ${fmtPrice(docBalance)})` : 'Record Payment',

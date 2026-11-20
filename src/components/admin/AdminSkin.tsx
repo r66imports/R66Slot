@@ -607,6 +607,9 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
   const [savedBg, setSavedBg] = useState<BgSetting>(NO_BG)
   const [bgDraft, setBgDraft] = useState<BgSetting>(NO_BG)
   const [flash, setFlash] = useState('')
+  // Paused = the page works normally (open a menu or dropdown), then resume
+  // and click inside it to edit it.
+  const [paused, setPaused] = useState(false)
   const palette = getSkin(themeId).palette
 
   useEffect(() => {
@@ -698,7 +701,27 @@ function FontSettings({ themeId, onBack }: { themeId: string; onBack: () => void
         onClose={back}
         closeLabel="Back to Themes"
       />
-      <PageEditor selected={selected?.sel ?? null} onSelect={setSelected} />
+      {!paused && <PageEditor selected={selected?.sel ?? null} onSelect={setSelected} />}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          padding: '8px 16px',
+          background: paused ? '#FEF3C7' : '#ECFDF5',
+          borderBottom: '1px solid #E5E7EB',
+          flexShrink: 0,
+          fontSize: 13,
+        }}
+      >
+        <span style={{ color: paused ? '#92400E' : '#065F46', fontWeight: 600 }}>
+          {paused ? 'Editing paused — use the page (open a menu), then resume' : 'Editing on — clicks pick items to edit'}
+        </span>
+        <button type="button" style={smallBtn} onClick={() => setPaused((v) => !v)}>
+          {paused ? '▶ Resume' : '⏸ Pause'}
+        </button>
+      </div>
 
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 16px' }}>
         {/* ── Selected item ── */}
