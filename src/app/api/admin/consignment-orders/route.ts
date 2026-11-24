@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobReplaceArrayItem, blobRemoveArrayItem } from '@/lib/blob-storage'
-import { CONSIGNMENT_KEY, DOCS_KEY, type ConsignmentOrder, lineKey, isOpenConsignmentSO, stockPictureFor } from '@/lib/consignment'
+import { CONSIGNMENT_KEY, DOCS_KEY, type ConsignmentOrder, type LandedCosts, lineKey, isOpenConsignmentSO, stockPictureFor, invoicesFromSO, orderDiscount } from '@/lib/consignment'
+import { skuFromDescription } from '@/lib/profit'
+import { db } from '@/lib/db'
 import { POST as createDocument } from '@/app/api/admin/orders/documents/route'
 import { PATCH as patchDocument } from '@/app/api/admin/orders/documents/[id]/route'
 
@@ -14,12 +16,25 @@ export async function GET(request: Request) {
     blobRead<any[]>(DOCS_KEY, []),
   ])
   if (new URL(request.url).searchParams.get('view') === 'stock') {
-    const rows = docs.filter(isOpenConsignmentSO)
+    const sos = docs.filter(isOpenConsignmentSO)
       .sort((a, b) => String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)))
-      .map(so => stockPictureFor(so, orders, docs))
+    const skus = sos.flatMap(so => [...(so.lineItems || []), ...invoicesFromSO(so, docs).flatMap(i => i.lineItems || [])])
+      .map((l: any) => skuFromDescription(l.description))
+    const costs = await latestLandedCosts(skus)
+    const rows = sos.map(so => stockPictureFor(so, orders, docs, costs))
     return NextResponse.json(rows)
   }
   return NextResponse.json([...orders].sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
+}
+
+/** LATEST landed cost per SKU — products.cost_per_item, which the Worksheet keeps current. */
+async function latestLandedCosts(skus: string[]): Promise<LandedCosts> {
+  const map: LandedCosts = new Map()
+  const wanted = Array.from(new Set(skus.map(s => s.toUpperCase()).filter(Boolean)))
+  if (wanted.length === 0) return map
+  const { rows } = await db.query('SELECT UPPER(TRIM(sku)) AS sku, cost_per_item FROM products WHERE UPPER(TRIM(sku)) = ANY($1)', [wanted])
+  for (const r of rows) map.set(r.sku, parseFloat(r.cost_per_item) || 0)
+  return map
 }
 
 const patchDoc = (id: string, body: unknown) =>
@@ -92,6 +107,8 @@ export async function POST(request: Request) {
     if (moved.length === 0) return NextResponse.json({ error: `None of the reported lines are on ${so.docNumber} any more` }, { status: 409 })
 
     const transferStock = so.stockDeducted === true
+    // The whole consignment carries the discount the first invoice from it was given.
+    const discount = orderDiscount(so, invoicesFromSO(so, docs))
 
     // 1 — take the sold qtys off the Sales Order (the SO's stock stays put).
     const soRes = await patchDoc(so.id, { lineItems: remaining, skipStockAdjust: true })
@@ -122,6 +139,7 @@ export async function POST(request: Request) {
         terms: so.terms || '',
         status: 'draft',
         depositMode: false,
+        discountPct: discount.pct,
         ...(transferStock ? { stockAlreadyReserved: true, stockTransferred: true } : {}),
         sourceQuoteNumber: so.sourceQuoteNumber || '',
         bankAccountId: so.bankAccountId || '',

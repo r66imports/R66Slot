@@ -10,11 +10,23 @@ interface Report {
   status: 'new' | 'invoiced' | 'rejected'; invoiceNumber?: string
   createdAt: string; invoicedAt?: string
 }
-interface SoInvoice { id: string; docNumber: string; date: string; status: string; qty: number; lines: { description: string; qty: number; unitPrice: number }[] }
+interface PricedLine {
+  description: string; sku: string; qty: number; unitPrice: number; netUnit: number; net: number
+  landed: number; costIssue: 'missing' | 'suspect' | null; profit: number | null
+}
+interface Block { net: number; costedNet: number; landed: number; profit: number; marginPct: number | null; uncostedNet: number; uncostedCount: number }
+interface SoInvoice {
+  id: string; docNumber: string; date: string; status: string; discountPct: number; qty: number
+  lines: PricedLine[]; total: number; paid: number; due: number
+}
 interface StockSO {
   soId: string; soNumber: string; date: string; clientName: string; clientEmail: string; sourceQuoteNumber: string
-  lines: (Line & { reported: number; remaining: number })[]
-  totalQty: number; totalReported: number; sentQty: number; soldQty: number; outValue: number
+  lines: (PricedLine & { lineId: string; reported: number; remaining: number })[]
+  totalQty: number; totalReported: number; sentQty: number; soldQty: number
+  discountPct: number; discountSource: string; outValue: number; outValueNet: number
+  invoicedTotal: number; paid: number; due: number
+  sold: Block; out: Block; whole: Block
+  uncosted: { sku: string; landed: number; issue: 'missing' | 'suspect' }[]
   invoices: SoInvoice[]
 }
 
@@ -32,6 +44,58 @@ function Chip({ href, label, tone }: { href?: string; label: string; tone: strin
   return href ? <Link href={href} onClick={e => e.stopPropagation()} className={`${cls} hover:underline`}>{label}</Link> : <span className={cls}>{label}</span>
 }
 const Arrow = () => <span className="text-gray-400 text-xs">→</span>
+
+function Tile({ label, value, sub, tone = 'text-gray-900' }: { label: string; value: string; sub?: string; tone?: string }) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 min-w-[120px]">
+      <div className="text-[10px] uppercase tracking-wide text-gray-400">{label}</div>
+      <div className={`text-sm font-bold ${tone}`}>{value}</div>
+      {sub && <div className="text-[10px] text-gray-500">{sub}</div>}
+    </div>
+  )
+}
+const pct = (n: number | null) => n === null ? '—' : `${n.toFixed(1)}%`
+const profitTone = (n: number) => n < 0 ? 'text-red-600' : 'text-green-700'
+
+/** One priced table — Item / Qty / Price / After discount / Line / Landed / Profit. */
+function PricedTable({ lines, discountPct, qtyLabel, extra }: {
+  lines: (PricedLine & { reported?: number })[]; discountPct: number; qtyLabel: string; extra?: boolean
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead className="text-gray-400 uppercase">
+        <tr>
+          <th className="text-left py-1">Item</th>
+          <th className="text-right py-1">{qtyLabel}</th>
+          {extra && <th className="text-right py-1">Reported</th>}
+          <th className="text-right py-1">Price</th>
+          <th className="text-right py-1">{discountPct > 0 ? `Less ${discountPct}%` : 'Net'}</th>
+          <th className="text-right py-1">Line</th>
+          <th className="text-right py-1">Landed</th>
+          <th className="text-right py-1">Profit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {lines.map((l, i) => (
+          <tr key={i} className="border-t border-gray-200">
+            <td className="py-1.5">{l.description}</td>
+            <td className="py-1.5 text-right font-semibold">{l.qty}</td>
+            {extra && <td className="py-1.5 text-right">{l.reported || ''}</td>}
+            <td className="py-1.5 text-right text-gray-500">{fmt(l.unitPrice)}</td>
+            <td className="py-1.5 text-right">{fmt(l.netUnit)}</td>
+            <td className="py-1.5 text-right font-semibold">{fmt(l.net)}</td>
+            <td className="py-1.5 text-right">
+              {l.costIssue
+                ? <span className="text-amber-700 font-semibold" title={l.costIssue === 'missing' ? 'No landed cost on the product' : 'Landed cost under 15% of the price, likely a foreign price saved as Rand'}>{l.costIssue === 'missing' ? 'no cost' : `${fmt(l.landed)} ?`}</span>
+                : fmt(l.landed)}
+            </td>
+            <td className={`py-1.5 text-right font-semibold ${l.profit === null ? 'text-gray-300' : profitTone(l.profit)}`}>{l.profit === null ? '—' : fmt(l.profit)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
 
 export default function ConsignmentOrdersPage() {
   const [reports, setReports] = useState<Report[]>([])
@@ -98,7 +162,7 @@ export default function ConsignmentOrdersPage() {
       {/* Out on Consignment — every ticked Sales Order with its Quote → SO → Invoice chain. */}
       <div className="mb-8">
         <h2 className="text-lg font-bold mb-1">Out on Consignment</h2>
-        <p className="text-xs text-gray-500 mb-3">Sent = still out + sold. Sold = the invoices raised from the Sales Order. Click a row for the lines.</p>
+        <p className="text-xs text-gray-500 mb-3">Sent = still out + sold. Sold = the invoices raised from the Sales Order. The first invoice&apos;s discount applies to the whole order. Profit uses the LATEST landed cost (product cost, kept current by the Worksheet). Click a card for the lines.</p>
         {loading ? <p className="text-gray-400">Loading…</p> : stock.length === 0 ? (
           <div className="bg-white rounded-xl border p-6 text-center text-gray-400 text-sm">No Sales Orders are ticked as consignment.</div>
         ) : (
@@ -117,7 +181,8 @@ export default function ConsignmentOrdersPage() {
                         <div className="text-right"><div className="text-[10px] uppercase text-gray-400">Sent</div><div className="font-semibold">{so.sentQty}</div></div>
                         <div className="text-right"><div className="text-[10px] uppercase text-gray-400">Sold</div><div className="font-semibold text-green-700">{so.soldQty}</div></div>
                         <div className="text-right"><div className="text-[10px] uppercase text-gray-400">Still Out</div><div className="font-bold">{so.totalQty}</div></div>
-                        <div className="text-right"><div className="text-[10px] uppercase text-gray-400">Value Out</div><div className="font-semibold">{fmt(so.outValue)}</div></div>
+                        <div className="text-right"><div className="text-[10px] uppercase text-gray-400">Value Out{so.discountPct > 0 ? ` (less ${so.discountPct}%)` : ''}</div><div className="font-semibold">{fmt(so.outValueNet)}</div></div>
+                        <div className="text-right"><div className="text-[10px] uppercase text-gray-400">Due</div><div className={`font-bold ${so.due > 0.005 ? 'text-red-600' : 'text-green-700'}`}>{fmt(so.due)}</div></div>
                       </div>
                     </div>
                     {/* Document flow: Quote → Sales Order → Invoice(s) → next sale on a new invoice */}
@@ -133,39 +198,39 @@ export default function ConsignmentOrdersPage() {
                     {so.totalReported > 0 && (
                       <div className="mt-1.5 text-xs font-semibold text-amber-700">{so.totalReported} reported sold, waiting to be invoiced below</div>
                     )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Tile label="Order discount" value={`${so.discountPct}%`} sub={`set by ${so.discountSource} · whole order`} />
+                      <Tile label="Out — full price" value={fmt(so.outValue)} sub={`${so.totalQty} units`} />
+                      <Tile label={`Out — less ${so.discountPct}%`} value={fmt(so.outValueNet)} />
+                      <Tile label="Invoiced" value={fmt(so.invoicedTotal)} sub={`${so.invoices.length} invoice${so.invoices.length === 1 ? '' : 's'}`} />
+                      <Tile label="Paid" value={fmt(so.paid)} tone="text-green-700" />
+                      <Tile label="Due" value={fmt(so.due)} tone={so.due > 0.005 ? 'text-red-600' : 'text-green-700'} />
+                      <Tile label="Profit — sold" value={fmt(so.sold.profit)} sub={`${pct(so.sold.marginPct)} on costed lines`} tone={profitTone(so.sold.profit)} />
+                      <Tile label="Profit — if out sells" value={fmt(so.out.profit)} sub={`${pct(so.out.marginPct)} on costed lines`} tone={profitTone(so.out.profit)} />
+                      <Tile label="Profit — whole order" value={fmt(so.whole.profit)} sub={`${pct(so.whole.marginPct)} · landed ${fmt(so.whole.landed)}`} tone={profitTone(so.whole.profit)} />
+                    </div>
+                    {so.uncosted.length > 0 && (
+                      <div className="mt-2 text-[11px] text-amber-700">
+                        Profit covers costed lines only — {fmt(so.whole.uncostedNet)} of {fmt(so.whole.net)} has no reliable landed cost ({so.uncosted.length} SKU{so.uncosted.length === 1 ? '' : 's'}): {so.uncosted.map(u => `${u.sku} (${u.issue === 'missing' ? 'no cost' : `${fmt(u.landed)} suspect`})`).join(', ')}.
+                      </div>
+                    )}
                   </div>
                   {isOpen && (
                     <div className="border-t bg-gray-50 px-6 py-3 space-y-4">
                       <div>
-                        <div className="text-xs font-bold text-gray-500 uppercase mb-1">Still out on {so.soNumber}</div>
-                        <table className="w-full text-xs">
-                          <thead className="text-gray-400 uppercase"><tr><th className="text-left py-1">Item</th><th className="text-right py-1">Out</th><th className="text-right py-1">Reported</th><th className="text-right py-1">Unit</th></tr></thead>
-                          <tbody>
-                            {so.lines.map(l => (
-                              <tr key={l.lineId} className="border-t border-gray-200">
-                                <td className="py-1.5">{l.description}</td>
-                                <td className="py-1.5 text-right font-semibold">{l.qty}</td>
-                                <td className="py-1.5 text-right">{l.reported || ''}</td>
-                                <td className="py-1.5 text-right">{fmt(l.unitPrice)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <div className="text-xs font-bold text-gray-500 uppercase mb-1">Still out on {so.soNumber} — at the order discount</div>
+                        <PricedTable lines={so.lines} discountPct={so.discountPct} qtyLabel="Out" extra />
+                        <div className="mt-1 text-right text-xs text-gray-600">Out {fmt(so.out.net)} · landed {fmt(so.out.landed)} · profit <span className={`font-bold ${profitTone(so.out.profit)}`}>{fmt(so.out.profit)}</span> ({pct(so.out.marginPct)})</div>
                       </div>
                       {so.invoices.map(inv => (
                         <div key={inv.id}>
-                          <div className="text-xs font-bold text-green-700 uppercase mb-1">Sold — {inv.docNumber} · {fmtDate(inv.date)}</div>
-                          <table className="w-full text-xs">
-                            <tbody>
-                              {inv.lines.map((l, i) => (
-                                <tr key={i} className="border-t border-gray-200">
-                                  <td className="py-1.5">{l.description}</td>
-                                  <td className="py-1.5 text-right font-semibold w-16">{l.qty}</td>
-                                  <td className="py-1.5 text-right w-28">{fmt(l.unitPrice)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                          <div className="text-xs font-bold text-green-700 uppercase mb-1">
+                            Sold — <Link href={docLink('invoices', inv.docNumber)} className="hover:underline">{inv.docNumber}</Link> · {fmtDate(inv.date)} · {inv.status} · discount {inv.discountPct}%
+                          </div>
+                          <PricedTable lines={inv.lines} discountPct={inv.discountPct} qtyLabel="Sold" />
+                          <div className="mt-1 text-right text-xs text-gray-600">
+                            Total {fmt(inv.total)} · paid <span className="text-green-700 font-semibold">{fmt(inv.paid)}</span> · due <span className={`font-bold ${inv.due > 0.005 ? 'text-red-600' : 'text-green-700'}`}>{fmt(inv.due)}</span>
+                          </div>
                         </div>
                       ))}
                       <p className="text-xs text-gray-500">Each new batch of sold qtys from {so.soNumber} is raised on a new invoice — it is never added to an earlier one.</p>

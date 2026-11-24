@@ -13,6 +13,8 @@
  * So the SO always shows what is still out, and the invoices from it are what sold.
  */
 
+import { costIssue, skuFromDescription } from '@/lib/profit'
+
 export const CONSIGNMENT_KEY = 'data/consignment-orders.json'
 export const DOCS_KEY = 'data/order-documents.json'
 
@@ -98,30 +100,124 @@ export function checklistFor(so: any, orders: ConsignmentOrder[]) {
   }
 }
 
+const r2 = (n: number) => Math.round(n * 100) / 100
+
+/**
+ * The discount the WHOLE consignment carries. The first invoice raised from the SO sets it
+ * (INV0457 at 20% → all of SO025 is 20% off); before any invoice exists, the SO's own discount.
+ */
+export function orderDiscount(so: any, invoices: any[]): { pct: number; source: string } {
+  const first = [...invoices].sort((a, b) =>
+    String(a.date || a.createdAt).localeCompare(String(b.date || b.createdAt)) ||
+    String(a.createdAt).localeCompare(String(b.createdAt)))[0]
+  if (first) return { pct: Number(first.discountPct) || 0, source: first.docNumber }
+  return { pct: Number(so.discountPct) || 0, source: so.docNumber }
+}
+
+/** Invoice total with its discount and shipping (same as payment-math documentTotal). */
+function invoiceTotal(inv: any): number {
+  const sub = (inv.lineItems || []).reduce((s: number, l: any) => s + (Number(l.qty) || 0) * (Number(l.unitPrice) || 0) * (1 - (Number(l.discountPct) || 0) / 100), 0)
+  return sub - sub * (Number(inv.discountPct) || 0) / 100 + (Number(inv.shippingCost) || 0)
+}
+/** Money received on an invoice (payment-math settledAmount: deposit folds in with Math.max). */
+function invoiceSettled(inv: any): number {
+  const deposit = inv.depositMode ? 0 : (Number(inv.depositPaid) || 0)
+  return Math.max(Number(inv.amountPaid) || 0, deposit) + (Number(inv.creditApplied) || 0)
+}
+
+export type LandedCosts = Map<string, number>
+
+/**
+ * One line priced for the consignment: net = after the order discount; profit only when the
+ * LATEST landed cost (product costPerItem, which the Worksheet keeps current) is reliable —
+ * a missing or suspect cost (Accounting → Profit's 15% guard) is shown, never guessed.
+ */
+function priceLine(description: string, qty: number, unitPrice: number, discPct: number, costs: LandedCosts) {
+  const sku = skuFromDescription(description).toUpperCase()
+  const netUnit = unitPrice * (1 - discPct / 100)
+  const landed = costs.get(sku) ?? 0
+  const issue = costIssue(landed, netUnit)
+  const net = qty * netUnit
+  return {
+    description, sku, qty, unitPrice, netUnit: r2(netUnit), net: r2(net),
+    landed: r2(landed), costIssue: issue,
+    profit: issue ? null : r2(net - qty * landed),
+  }
+}
+
+function sumBlock(lines: ReturnType<typeof priceLine>[]) {
+  const costed = lines.filter(l => !l.costIssue)
+  const net = lines.reduce((s, l) => s + l.net, 0)
+  const costedNet = costed.reduce((s, l) => s + l.net, 0)
+  const landed = costed.reduce((s, l) => s + l.qty * l.landed, 0)
+  const profit = costedNet - landed
+  return {
+    net: r2(net),
+    costedNet: r2(costedNet),
+    landed: r2(landed),
+    profit: r2(profit),
+    marginPct: costedNet > 0 ? Math.round(profit / costedNet * 1000) / 10 : null,
+    uncostedNet: r2(net - costedNet),
+    uncostedCount: lines.length - costed.length,
+  }
+}
+
 /** Admin picture of one consignment SO: sent = still out + sold; sold = invoices from the SO. */
-export function stockPictureFor(so: any, orders: ConsignmentOrder[], docs: any[]) {
+export function stockPictureFor(so: any, orders: ConsignmentOrder[], docs: any[], costs: LandedCosts = new Map()) {
   const view = checklistFor(so, orders)
-  const invoices = invoicesFromSO(so, docs).map(inv => {
+  const rawInvoices = invoicesFromSO(so, docs)
+  const disc = orderDiscount(so, rawInvoices)
+
+  const invoices = rawInvoices.map(inv => {
+    const invDisc = Number(inv.discountPct) || 0
     const lines = (inv.lineItems || []).filter((l: any) => !l._service)
+      .map((l: any) => priceLine(l.description || '', Number(l.qty) || 0, Number(l.unitPrice) || 0, invDisc, costs))
+    const total = invoiceTotal(inv)
+    const paid = invoiceSettled(inv)
     return {
       id: inv.id,
       docNumber: inv.docNumber,
       date: inv.date,
       status: inv.status,
-      lines: lines.map((l: any) => ({ description: l.description || '', qty: Number(l.qty) || 0, unitPrice: Number(l.unitPrice) || 0 })),
-      qty: lines.reduce((s: number, l: any) => s + (Number(l.qty) || 0), 0),
+      discountPct: invDisc,
+      lines,
+      qty: lines.reduce((s: number, l: any) => s + l.qty, 0),
+      total: r2(total),
+      paid: r2(paid),
+      due: r2(Math.max(0, total - paid)),
     }
   })
+  const outLines = view.lines.map((l: any) => ({
+    ...priceLine(l.description, l.qty, l.unitPrice, disc.pct, costs),
+    lineId: l.lineId, reported: l.reported, remaining: l.remaining,
+  }))
+
   const soldQty = invoices.reduce((s, i) => s + i.qty, 0)
-  const outValue = view.lines.reduce((s: number, l: any) => s + l.qty * l.unitPrice, 0)
+  const sold = sumBlock(invoices.flatMap(i => i.lines))
+  const out = sumBlock(outLines)
+  const outGross = view.lines.reduce((s: number, l: any) => s + l.qty * l.unitPrice, 0)
+  const allLines = [...invoices.flatMap(i => i.lines), ...outLines]
   return {
     ...view,
+    lines: outLines,
     clientEmail: so.clientEmail || '',
     /** Where the SO came from — the start of the Quote → Sales Order → Invoice chain. */
     sourceQuoteNumber: so.sourceQuoteNumber || '',
     invoices,
     soldQty,
     sentQty: view.totalQty + soldQty,
-    outValue: Math.round(outValue * 100) / 100,
+    discountPct: disc.pct,
+    discountSource: disc.source,
+    /** Still out at full price, and at the order's discounted price. */
+    outValue: r2(outGross),
+    outValueNet: out.net,
+    sold,
+    out,
+    whole: sumBlock(allLines),
+    invoicedTotal: r2(invoices.reduce((s, i) => s + i.total, 0)),
+    paid: r2(invoices.reduce((s, i) => s + i.paid, 0)),
+    due: r2(invoices.reduce((s, i) => s + i.due, 0)),
+    /** SKUs whose landed cost is missing or suspect — fix them on the product / Worksheet. */
+    uncosted: Array.from(new Map(allLines.filter(l => l.costIssue).map(l => [l.sku, { sku: l.sku, landed: l.landed, issue: l.costIssue }])).values()),
   }
 }
