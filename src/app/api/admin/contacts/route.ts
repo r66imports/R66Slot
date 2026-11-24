@@ -7,6 +7,8 @@ const CUSTOMERS_KEY = 'data/customers.json'
 
 export interface Contact {
   id: string
+  /** Contacts → Reseller tick. Gates reseller features such as the Consignment Checklist (Rule 69). */
+  isReseller?: boolean
   // Personal
   firstName: string
   lastName: string
@@ -158,6 +160,7 @@ export async function POST(request: Request) {
       deliveryPudoLocker:    Boolean(body.deliveryPudoLocker),
       deliveryPostnetAramex: Boolean(body.deliveryPostnetAramex),
       source:               body.source || 'manual',
+      isReseller:           body.isReseller === true,
       notes:                body.notes?.trim()          || '',
       totalOrders: 0,
       totalSpent:  0,

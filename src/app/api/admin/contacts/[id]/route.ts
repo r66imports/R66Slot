@@ -38,6 +38,8 @@ export async function PATCH(
       'deliveryDoorToDoor', 'deliveryKioskToKiosk', 'deliveryPudoLocker', 'deliveryPostnetAramex',
       'preferredShipping', 'courierGuyBranch',
       'source', 'notes',
+      // The Reseller tick on Contacts — was missing here, so ticking it never saved.
+      'isReseller',
     ]
 
     const now = new Date().toISOString()
@@ -74,6 +76,7 @@ export async function PATCH(
         preferredShipping:    body.preferredShipping?.trim() || '',
         courierGuyBranch:     body.courierGuyBranch?.trim()  || '',
         source:               body.source || 'website',
+        isReseller:           body.isReseller === true,
         notes:                body.notes?.trim() || '',
         totalOrders: 0,
         totalSpent:  0,
