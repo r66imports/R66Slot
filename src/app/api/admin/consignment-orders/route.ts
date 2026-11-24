@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { blobRead, blobReplaceArrayItem, blobRemoveArrayItem } from '@/lib/blob-storage'
+import { blobRead, blobReplaceArrayItem, blobRemoveArrayItem, blobAppendArrayItem } from '@/lib/blob-storage'
 import { CONSIGNMENT_KEY, DOCS_KEY, type ConsignmentOrder, type LandedCosts, lineKey, isOpenConsignmentSO, stockPictureFor, invoicesFromSO, orderDiscount } from '@/lib/consignment'
 import { skuFromDescription } from '@/lib/profit'
 import { db } from '@/lib/db'
@@ -57,8 +57,39 @@ const patchDoc = (id: string, body: unknown) =>
  */
 export async function POST(request: Request) {
   try {
-    const { id, action } = await request.json()
+    const reqBody = await request.json()
+    const { id, action } = reqBody
     const orders = await blobRead<ConsignmentOrder[]>(CONSIGNMENT_KEY, [])
+
+    // fromInvoice { invoiceNumber } — files the client's report behind an invoice that was raised
+    // from a consignment SO before the checklist existed (sales the client gave in by hand). The
+    // report is filed as already invoiced on that invoice, dated when it was raised; the invoice,
+    // the SO and stock are not touched.
+    if (action === 'fromInvoice') {
+      const docs = await blobRead<any[]>(DOCS_KEY, [])
+      const inv = docs.find(d => d.type === 'invoice' && d.docNumber === reqBody.invoiceNumber)
+      if (!inv) return NextResponse.json({ error: `Invoice ${reqBody.invoiceNumber} not found` }, { status: 404 })
+      const so = docs.find(d => d.type === 'salesorder' && d.consignment === true && invoicesFromSO(d, [inv]).length > 0)
+      if (!so) return NextResponse.json({ error: `${inv.docNumber} was not raised from a consignment Sales Order` }, { status: 409 })
+      const existing = orders.find(o => o.invoiceId === inv.id)
+      if (existing) return NextResponse.json({ error: `${inv.docNumber} already has a report` }, { status: 409 })
+      const lines = (inv.lineItems || []).filter((l: any) => !l._service && Number(l.qty) > 0)
+        .map((l: any, i: number) => ({ lineId: lineKey(l, i), description: l.description || '', qty: Number(l.qty) || 0, unitPrice: Number(l.unitPrice) || 0 }))
+      const when = inv.createdAt || `${inv.date}T00:00:00.000Z`
+      const filed: ConsignmentOrder = {
+        id: `con_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        soId: so.id, soNumber: so.docNumber,
+        clientName: so.clientName || inv.clientName || '',
+        clientEmail: String(so.clientEmail || inv.clientEmail || '').toLowerCase(),
+        lines,
+        note: 'Sold qtys given in by the client before the checklist existed',
+        status: 'invoiced', invoiceId: inv.id, invoiceNumber: inv.docNumber,
+        createdAt: when, invoicedAt: when,
+      }
+      await blobAppendArrayItem(CONSIGNMENT_KEY, filed)
+      return NextResponse.json(filed)
+    }
+
     const order = orders.find(o => o.id === id)
     if (!order) return NextResponse.json({ error: 'Report not found' }, { status: 404 })
 
