@@ -5448,9 +5448,6 @@ function OrdersPageInner() {
                           {(doc as any).consignment && doc.type === 'salesorder' && (
                             <div className="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">Consignment</div>
                           )}
-                          {(doc as any).consignmentOrder && (
-                            <div className="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">{(doc as any).consignmentOrder}</div>
-                          )}
                           {(doc as any).sourceQuoteNumber && (
                             <div className="text-xs font-bold text-gray-400 mt-0.5">Q: {(doc as any).sourceQuoteNumber}</div>
                           )}

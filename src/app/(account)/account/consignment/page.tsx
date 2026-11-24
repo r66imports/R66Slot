@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 
-interface Line { lineId: string; description: string; qty: number; unitPrice: number; sold: number; remaining: number }
+interface Line { lineId: string; description: string; qty: number; unitPrice: number; reported: number; remaining: number }
 interface SalesOrder {
   soId: string; soNumber: string; date: string; clientName: string; lines: Line[]
-  totalQty: number; totalSold: number; totalRemaining: number
+  totalQty: number; totalReported: number; totalRemaining: number
 }
-interface Report { id: string; number: string; soNumber: string; status: 'new' | 'invoiced' | 'rejected'; createdAt: string; invoiceNumber?: string; totalQty: number }
+interface Report { id: string; soNumber: string; status: 'new' | 'invoiced' | 'rejected'; createdAt: string; invoiceNumber?: string; totalQty: number }
 
 function fmtR(n: number) { return 'R ' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') }
 function fmtDate(iso: string) {
@@ -55,7 +55,7 @@ export default function ConsignmentChecklistPage() {
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Could not send')
-      setDone(`✓ Sent as ${d.number} — ${pickedQty} item${pickedQty === 1 ? '' : 's'}. We'll invoice you for these.`)
+      setDone(`✓ Sent — ${pickedQty} item${pickedQty === 1 ? '' : 's'} off ${so.soNumber}. We'll invoice you for these.`)
       setSold({}); setNote('')
       await load()
     } catch (e: any) { setError(e.message) } finally { setSending(false) }
@@ -93,7 +93,7 @@ export default function ConsignmentChecklistPage() {
                   <thead className="text-xs uppercase text-gray-400 border-b">
                     <tr>
                       <th className="text-left py-2">Item</th>
-                      <th className="text-right py-2 px-2">Sent</th>
+                      <th className="text-right py-2 px-2">With you</th>
                       <th className="text-right py-2 px-2">Reported</th>
                       <th className="text-right py-2 px-2">Left</th>
                       <th className="text-center py-2 px-2">Sold now</th>
@@ -113,7 +113,7 @@ export default function ConsignmentChecklistPage() {
                             </label>
                           </td>
                           <td className="py-2.5 px-2 text-right">{l.qty}</td>
-                          <td className="py-2.5 px-2 text-right text-gray-500">{l.sold}</td>
+                          <td className="py-2.5 px-2 text-right text-gray-500">{l.reported}</td>
                           <td className="py-2.5 px-2 text-right font-semibold">{l.remaining}</td>
                           <td className="py-2.5 px-2">
                             {full ? <div className="text-center text-xs text-green-600 font-semibold">All reported</div> : (
@@ -152,12 +152,11 @@ export default function ConsignmentChecklistPage() {
           <h3 className="font-bold mb-3">Sent so far</h3>
           <table className="w-full text-sm">
             <thead className="text-xs uppercase text-gray-400 border-b">
-              <tr><th className="text-left py-2">No.</th><th className="text-left py-2">Date</th><th className="text-left py-2">Order</th><th className="text-right py-2">Qty</th><th className="text-right py-2">Status</th></tr>
+              <tr><th className="text-left py-2">Date</th><th className="text-left py-2">Order</th><th className="text-right py-2">Qty</th><th className="text-right py-2">Status</th></tr>
             </thead>
             <tbody>
               {reports.map(r => (
                 <tr key={r.id} className="border-b last:border-0">
-                  <td className="py-2 font-mono">{r.number}</td>
                   <td className="py-2 text-gray-500">{fmtDate(r.createdAt)}</td>
                   <td className="py-2 font-mono">{r.soNumber}</td>
                   <td className="py-2 text-right">{r.totalQty}</td>

@@ -101,13 +101,7 @@ export async function PATCH(
     // restored before the new ones are taken, so they count as available.
     // stockAlreadyReserved: the caller already took the stock elsewhere (Rule 31 — a site
     // order deducts at checkout), so there is nothing left to check.
-    // Rule 69 — an invoice raised from a Consignment Order bills stock its consignment Sales
-    // Order already took off the shelf. The SO owns that deduction, so this invoice never
-    // checks the shelf and never deducts or restores on a later save. (If the SO never
-    // deducted, the invoice took the stock itself at creation and stockDeducted is true.)
-    const consignmentHeld = !!(prev as any).consignmentOrder && prev.stockDeducted !== true
-
-    if (itemsChanged && newType === 'invoice' && !isCancelled && !body.stockAlreadyReserved && !consignmentHeld) {
+    if (itemsChanged && newType === 'invoice' && !isCancelled && !body.stockAlreadyReserved) {
       const alreadyDeducted = prev.stockDeducted !== false && wasStockable ? prev.lineItems : []
       const shortfalls = await findStockShortfalls(newItems, { creditFrom: alreadyDeducted })
       if (shortfalls.length > 0) {
@@ -118,7 +112,7 @@ export async function PATCH(
     // skipStockAdjust: the caller owns this document's stock movement. Rule 31 — a site
     // order's stock is deducted at checkout and held by the order itself, so moving its
     // lines onto or off an invoice must neither credit nor deduct anything here.
-    const skipStockAdjust = !!body.skipStockAdjust || consignmentHeld
+    const skipStockAdjust = !!body.skipStockAdjust
 
     // Rule 3 — Stock Deduction: only adjust stock if the rule is active
     if (!skipStockAdjust && stockRelevantChange && (wasStockable || nowStockable) && await isRuleActive('invoice_stock_deduction', true)) {

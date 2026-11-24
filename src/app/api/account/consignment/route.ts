@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import { blobRead, blobAppendArrayItem } from '@/lib/blob-storage'
 import {
   CONSIGNMENT_KEY, DOCS_KEY, type ConsignmentOrder, type ConsignmentLine,
-  isOpenConsignmentSO, checklistFor, nextConsignmentNumber,
+  isOpenConsignmentSO, checklistFor,
 } from '@/lib/consignment'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -43,7 +43,7 @@ export async function GET(_req: NextRequest) {
       .sort((a, b) => String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)))
     const mine = orders.filter(o => o.clientEmail.toLowerCase() === who.email)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-      .map(o => ({ id: o.id, number: o.number, soNumber: o.soNumber, status: o.status, createdAt: o.createdAt,
+      .map(o => ({ id: o.id, soNumber: o.soNumber, status: o.status, createdAt: o.createdAt,
         invoiceNumber: o.invoiceNumber, totalQty: o.lines.reduce((s, l) => s + l.qty, 0) }))
     return NextResponse.json({
       isReseller: reseller,
@@ -86,7 +86,6 @@ export async function POST(req: NextRequest) {
 
     const order: ConsignmentOrder = {
       id: `con_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      number: nextConsignmentNumber(orders),
       soId: so.id,
       soNumber: so.docNumber,
       clientName: so.clientName || '',
