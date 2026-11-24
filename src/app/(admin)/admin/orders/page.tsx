@@ -2713,7 +2713,7 @@ async function doEmail(data: DocViewData, template: OrderTemplate, selectedBankA
   }
 }
 
-async function doDownload(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
+async function doDownload(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount, asBlob = false): Promise<Blob | void> {
   const { jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
 
@@ -3019,7 +3019,51 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
     doc.text(template.footerText, pageW / 2, pageH - 10, { align: 'center' })
   }
 
+  if (asBlob) return doc.output('blob')
   doc.save(`${data.docNumber}.pdf`)
+}
+
+// Send to WhatsApp — the same PDF as Download plus a thank-you note. Where the
+// device can share files (phone, iPad, Chrome/Edge on Windows) the share sheet
+// opens with the PDF attached; pick WhatsApp. Otherwise the PDF downloads and
+// WhatsApp opens on the client's number with the message, ready to attach.
+function waNumber(phone: string): string {
+  let n = (phone || '').replace(/[^0-9]/g, '')
+  if (n.startsWith('00')) n = n.slice(2)
+  if (n.startsWith('0')) n = '27' + n.slice(1)
+  return n
+}
+
+async function doWhatsApp(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
+  const docLabel = (data as any).preOrderDeposit ? 'Pre Order Deposit' : data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
+  const firstName = (data.clientName || '').trim().split(/\s+/)[0]
+  const message = `Hi${firstName ? ' ' + firstName : ''}, thank you for your order! Please find your ${docLabel} ${data.docNumber} attached. Let us know if you have any questions.
+
+Route 66 Slot`
+  const blob = await doDownload(data, template, selectedBankAccount, true)
+  if (!blob) return
+  const fileName = `${data.docNumber}.pdf`
+  const file = new File([blob], fileName, { type: 'application/pdf' })
+  const nav = navigator as any
+  if (nav.canShare && nav.canShare({ files: [file] })) {
+    try {
+      await nav.share({ files: [file], text: message, title: `${docLabel} ${data.docNumber}` })
+      return
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return
+    }
+  }
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = fileName
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
+  const num = waNumber(data.clientPhone)
+  window.open(`https://wa.me/${num}?text=${encodeURIComponent(message)}`, '_blank')
+}
+
+function IconWhatsApp() {
+  return <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.25-.46-2.38-1.47-.88-.79-1.47-1.76-1.64-2.05-.17-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.21 3.07c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.75-.72 2-1.41.25-.69.25-1.29.17-1.41-.07-.12-.27-.2-.57-.35zM12.04 21.5h-.01a9.45 9.45 0 01-4.82-1.32l-.35-.21-3.58.94.96-3.49-.23-.36a9.43 9.43 0 01-1.45-5.03c0-5.22 4.25-9.47 9.48-9.47 2.53 0 4.91.99 6.7 2.78a9.4 9.4 0 012.77 6.7c0 5.22-4.25 9.46-9.47 9.46zm8.06-17.53A11.32 11.32 0 0012.04.63C5.76.63.65 5.74.65 12.02c0 2.01.52 3.97 1.52 5.69L.55 23.6l6.04-1.58a11.36 11.36 0 005.44 1.39h.01c6.28 0 11.39-5.11 11.39-11.39 0-3.04-1.18-5.9-3.33-8.05z"/></svg>
 }
 
 // ─── Shared icon button style ──────────────────────────────────────────────────
@@ -5547,6 +5591,7 @@ function OrdersPageInner() {
                             { label: 'Print', icon: <IconPrint />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doPrint(docToViewData(doc), template, ba) } },
                             { label: 'Email', icon: <IconEmail />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doEmail(docToViewData(doc), template, ba) } },
                             { label: 'Download', icon: <IconDownload />, onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doDownload(docToViewData(doc), template, ba) } },
+                            { label: 'Send to WhatsApp', icon: <IconWhatsApp />, className: 'text-green-600', onClick: () => { const ba = (doc as any).bankAccountId ? allBankAccounts.find((b: BankAccount) => b.id === (doc as any).bankAccountId) : undefined; doWhatsApp(docToViewData(doc), template, ba) } },
                             ...(doc.type === 'quote' ? [
                               {
                                 label: doc.status === 'sent' ? '✓ Quote Sent' : 'Quote Sent',
