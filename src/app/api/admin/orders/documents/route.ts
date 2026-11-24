@@ -46,6 +46,8 @@ export interface OrderDocument {
   consignment?: boolean
   // Carried across from the source Quote on conversion (Rules 28 + 45)
   sourceQuoteNumber?: string
+  /** Sales Order(s) this Invoice was raised from — comma list, shown as "SO:" under the doc #. */
+  sourceSalesOrderNumber?: string
   amountPaid?: number
   creditApplied?: number
   overpaymentCredit?: number
@@ -150,6 +152,7 @@ export async function POST(request: Request) {
       // each converted Invoice arrived with no Quote Ref and the deposit missing.
       // Recording money never moves status (Mark as Paid is the only writer of 'paid').
       sourceQuoteNumber: body.sourceQuoteNumber || undefined,
+      sourceSalesOrderNumber: body.sourceSalesOrderNumber || undefined,
       amountPaid: Number(body.amountPaid) || 0,
       creditApplied: Number(body.creditApplied) || 0,
       overpaymentCredit: Number(body.overpaymentCredit) || 0,

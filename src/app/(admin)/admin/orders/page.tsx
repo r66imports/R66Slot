@@ -3706,6 +3706,7 @@ function OrdersPageInner() {
           patchBody.payments = [...(freshTarget.payments || []), ...(soAny.payments || [])]
         }
         if (sendingAll && soAny.sourceQuoteNumber) patchBody.sourceQuoteNumber = mergeQuoteRefs(freshTarget.sourceQuoteNumber, soAny.sourceQuoteNumber)
+        patchBody.sourceSalesOrderNumber = mergeQuoteRefs(freshTarget.sourceSalesOrderNumber, so.docNumber)
         // Invoice with no bank chosen picks up the Sales Order's; one already set is never overwritten.
         if (!freshTarget.bankAccountId && soAny.bankAccountId) patchBody.bankAccountId = soAny.bankAccountId
         invRes = await fetch(`/api/admin/orders/documents/${target.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) })
@@ -3732,6 +3733,7 @@ function OrdersPageInner() {
             depositMode: false,
             ...(transferStock ? { stockAlreadyReserved: true, stockTransferred: true } : {}),
             sourceQuoteNumber: soAny.sourceQuoteNumber || '',
+            sourceSalesOrderNumber: so.docNumber || '',
             bankAccountId: soAny.bankAccountId || '',
             ...(sendingAll ? {
               discountPct: soAny.discountPct || 0,
@@ -3763,11 +3765,10 @@ function OrdersPageInner() {
       }
       setDocuments((prev) => target ? prev.map((d) => d.id === inv.id ? inv : d) : [inv, ...prev])
 
-      // 3 — everything sent: file the empty Sales Order.
-      if (remaining.length === 0) {
-        const ar = await fetch(`/api/admin/orders/documents/${so.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'archived' }) })
-        if (ar.ok) setDocuments((prev) => prev.map((d) => d.id === so.id ? { ...d, status: 'archived' } : d))
-      }
+      // 3 — record the Invoice on the Sales Order ("INV:" under its doc #); everything sent: file the empty Sales Order.
+      const linkedInvoiceNumber = mergeQuoteRefs(soAny.linkedInvoiceNumber, invNumber)
+      const ar = await fetch(`/api/admin/orders/documents/${so.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ linkedInvoiceNumber, ...(remaining.length === 0 ? { status: 'archived' } : {}) }) })
+      if (ar.ok) setDocuments((prev) => prev.map((d) => d.id === so.id ? { ...d, linkedInvoiceNumber, ...(remaining.length === 0 ? { status: 'archived' as const } : {}) } : d))
       const units = moved.reduce((s, li) => s + li.qty, 0)
       flash(`✓ ${units} unit(s) from ${so.docNumber} → ${invNumber}${remaining.length === 0 ? ` (${so.docNumber} empty, archived)` : ''}`, 6000)
       setSendSOItems(null)
@@ -5511,6 +5512,12 @@ function OrdersPageInner() {
                           )}
                           {(doc as any).sourceQuoteNumber && (
                             <div className="text-xs font-bold text-gray-400 mt-0.5">Q: {(doc as any).sourceQuoteNumber}</div>
+                          )}
+                          {(doc as any).sourceSalesOrderNumber && (
+                            <div className="text-xs font-bold text-gray-400 mt-0.5">SO: {(doc as any).sourceSalesOrderNumber}</div>
+                          )}
+                          {(doc as any).linkedInvoiceNumber && doc.type === 'salesorder' && (
+                            <div className="text-xs font-bold text-gray-400 mt-0.5">INV: {(doc as any).linkedInvoiceNumber}</div>
                           )}
                         </td>
                         <td className="py-3 px-4 text-xs font-bold text-gray-500">{fmtDate(doc.date)}</td>

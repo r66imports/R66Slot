@@ -173,6 +173,7 @@ export async function POST(request: Request) {
         discountPct: discount.pct,
         ...(transferStock ? { stockAlreadyReserved: true, stockTransferred: true } : {}),
         sourceQuoteNumber: so.sourceQuoteNumber || '',
+        sourceSalesOrderNumber: so.docNumber || '',
         bankAccountId: so.bankAccountId || '',
       }),
     }))
@@ -183,6 +184,13 @@ export async function POST(request: Request) {
       return NextResponse.json({
         error: `${inv?.error || 'Invoice could not be created'} — ${back.ok ? `${so.docNumber} restored, nothing lost` : `AND ${so.docNumber} could not be restored, check its lines`}`,
       }, { status: invRes.ok ? 500 : invRes.status })
+    }
+
+    // Record the Invoice on the Sales Order ("INV:" under its doc # in Orders). Best-effort — the invoice already exists.
+    {
+      const refs = String((so as any).linkedInvoiceNumber || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+      if (!refs.includes(inv.docNumber)) refs.push(inv.docNumber)
+      await patchDoc(so.id, { linkedInvoiceNumber: refs.join(', ') }).catch(() => null)
     }
 
     const updated: ConsignmentOrder = {
