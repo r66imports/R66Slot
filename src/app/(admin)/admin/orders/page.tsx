@@ -1470,6 +1470,7 @@ function CreateDocumentModal({
   useEffect(() => { nonDepositPctRef.current = nonDepositPct }, [nonDepositPct])
   const [depositMode, setDepositMode] = useState<boolean>((editDoc as any)?.depositMode || !!(editDoc as any)?.preOrderDeposit || false)
   const [preOrderDeposit, setPreOrderDeposit] = useState<boolean>((editDoc as any)?.preOrderDeposit || false)
+  const [consignment, setConsignment] = useState<boolean>((editDoc as any)?.consignment === true)
   // ── Add to Supplier Order (Quotes only) ──────────────────────────────────
   // Ticking this pushes every line on the quote to /admin/suppliers as backorder lines,
   // either onto an existing supplier order (shared supplierOrderRef) or a brand new one.
@@ -1619,7 +1620,7 @@ function CreateDocumentModal({
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formFields, ...statusField, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, preOrderDeposit, ...(targetSO ? { supplierOrderSent: true, supplierOrderRef: targetSO.ref, supplierOrderName: targetSO.name, supplierOrderSupplier: soSupplierName } : {}) }),
+        body: JSON.stringify({ ...formFields, ...statusField, type: docType, lineItems: savedLineItems, discountPct: depositMode ? 0 : discountPct, depositMode, depositPct: depositMode ? discountPct : nonDepositPct, depositPaid: depositAmount, bankAccountId: selectedBankAccountId, shippingCost, shippingMethod, trackingNumber, creditApplied: creditAppliedAmt, preOrderDeposit, ...(docType === 'salesorder' ? { consignment } : {}), ...(targetSO ? { supplierOrderSent: true, supplierOrderRef: targetSO.ref, supplierOrderName: targetSO.name, supplierOrderSupplier: soSupplierName } : {}) }),
       })
       if (res.ok) {
         const savedDoc = await res.json()
@@ -1751,6 +1752,23 @@ function CreateDocumentModal({
               <div>
                 <span className="text-sm font-semibold text-amber-700">Pre Order Deposit</span>
                 <span className="text-xs text-gray-500 ml-2">Renames this Quote to &quot;Pre Order Deposit&quot; and switches Discount → Deposit %</span>
+              </div>
+            </label>
+          )}
+
+          {/* Rule 69 — Consignment stock, Sales Orders only. Ticked SOs show on the client's
+              Consignment Checklist (Account → Consignment Checklist), where they tick off what they sold. */}
+          {docType === 'salesorder' && (
+            <label className={`flex items-center gap-3 cursor-pointer select-none px-4 py-3 rounded-xl border-2 transition-colors ${consignment ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-teal-300'}`}>
+              <input
+                type="checkbox"
+                checked={consignment}
+                onChange={(e) => setConsignment(e.target.checked)}
+                className="w-4 h-4 rounded accent-teal-600"
+              />
+              <div>
+                <span className="text-sm font-semibold text-teal-700">Consignment stock</span>
+                <span className="text-xs text-gray-500 ml-2">Shows this Sales Order on the client&apos;s Consignment Checklist so they can tick off what they sold</span>
               </div>
             </label>
           )}
@@ -5427,6 +5445,12 @@ function OrdersPageInner() {
                       <tr key={`doc-${doc.id}`} onDoubleClick={() => setEditDocState(doc)} className={`border-b border-gray-100 transition-colors cursor-pointer ${(doc as any).redFlag ? 'bg-red-50 hover:bg-red-100' : (doc as any).depositReceived ? 'bg-yellow-50 hover:bg-yellow-100' : (doc as any).shippingAdded ? 'bg-blue-50 hover:bg-blue-100' : isPartiallyPaid ? 'bg-red-950/10 hover:bg-red-950/15' : doc.status === 'paid' ? 'bg-green-50 hover:bg-green-100' : (doc.type === 'quote' && doc.status === 'sent') ? 'bg-green-50 hover:bg-green-100' : 'hover:bg-gray-50'}`}>
                         <td className="py-3 px-4 text-xs">
                           <div className="font-mono font-bold text-blue-700">{doc.docNumber}</div>
+                          {(doc as any).consignment && doc.type === 'salesorder' && (
+                            <div className="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">Consignment</div>
+                          )}
+                          {(doc as any).consignmentOrder && (
+                            <div className="inline-block mt-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700">{(doc as any).consignmentOrder}</div>
+                          )}
                           {(doc as any).sourceQuoteNumber && (
                             <div className="text-xs font-bold text-gray-400 mt-0.5">Q: {(doc as any).sourceQuoteNumber}</div>
                           )}

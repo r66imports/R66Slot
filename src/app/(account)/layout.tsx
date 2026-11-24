@@ -22,6 +22,16 @@ export default function AccountLayout({
       .catch(() => {})
   }, [])
 
+  // Rule 69 — Consignment Checklist: resellers, or anyone holding a consignment Sales Order.
+  const [showConsignment, setShowConsignment] = useState(false)
+  useEffect(() => {
+    fetch('/api/account/consignment').then(async (r) => {
+      if (!r.ok) return
+      const d = await r.json()
+      setShowConsignment(d?.isReseller === true || (Array.isArray(d?.salesOrders) && d.salesOrders.length > 0))
+    }).catch(() => {})
+  }, [])
+
   // Public pages that don't need sidebar
   const isAuthPage = pathname === '/account/login' || pathname === '/account/register'
 
@@ -39,6 +49,7 @@ export default function AccountLayout({
     { name: 'My Bids', href: '/account/auctions', icon: '🔨' },
     { name: 'Won Auctions', href: '/account/auctions/won', icon: '🏆' },
     { name: 'Watchlist', href: '/account/auctions/watchlist', icon: '❤️' },
+    ...(showConsignment ? [{ name: 'Consignment Checklist', href: '/account/consignment', icon: '✅' }] : []),
   ]
 
   return (

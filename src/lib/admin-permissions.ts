@@ -20,6 +20,7 @@ export const ALL_PERMISSIONS: { group: string; name: string; href: string }[] = 
   { group: 'Order Network', name: 'Site Orders', href: '/admin/site-orders' },
   { group: 'Order Network', name: 'Supplier Pre Orders', href: '/admin/supplier-preorders' },
   { group: 'Order Network', name: 'Orders (Sales)', href: '/admin/orders' },
+  { group: 'Order Network', name: 'Consignment Orders', href: '/admin/consignment-orders' },
   { group: 'Order Network', name: 'Pre Orders', href: '/admin/preorder-list' },
   { group: 'Order Network', name: 'Pre Order Dashboard', href: '/admin/preorder-dashboard' },
   { group: 'Order Network', name: 'Pre-Orders Header', href: '/admin/preorder-header' },

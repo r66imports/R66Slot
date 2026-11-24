@@ -42,6 +42,10 @@ export interface OrderDocument {
   supplierOrderRef?: string
   supplierOrderName?: string
   supplierOrderSupplier?: string
+  /** Rule 69 — Sales Order of consignment stock; shows on the client's Consignment Checklist. */
+  consignment?: boolean
+  /** Rule 69 — CON number of the Consignment Order this invoice was raised from. */
+  consignmentOrder?: string
   // Carried across from the source Quote on conversion (Rules 28 + 45)
   sourceQuoteNumber?: string
   amountPaid?: number
@@ -141,6 +145,10 @@ export async function POST(request: Request) {
       supplierOrderRef: body.supplierOrderRef,
       supplierOrderName: body.supplierOrderName,
       supplierOrderSupplier: body.supplierOrderSupplier,
+      // Rule 69 — consignment stock. Only a Sales Order can be ticked; the CON number marks an
+      // invoice raised from a Consignment Order so later saves never move the SO's stock.
+      consignment: body.type === 'salesorder' && body.consignment === true ? true : undefined,
+      consignmentOrder: body.type === 'invoice' && typeof body.consignmentOrder === 'string' ? body.consignmentOrder : undefined,
       // Rules 28 + 45 — a Quote converted into this document brings its Quote Ref and the
       // money already paid on it. Every converter sent these, but they were never stored, so
       // each converted Invoice arrived with no Quote Ref and the deposit missing.

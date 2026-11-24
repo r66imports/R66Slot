@@ -584,6 +584,14 @@ const DEFAULT_RULES: SiteRule[] = [
     appliesTo: ['Supplier Catalogue', 'Supplier Pre Orders', 'Suppliers'],
     category: 'Orders',
   },
+  {
+    id: 'consignment_stock',
+    name: 'Rule 69 — Consignment Stock: Sales Order → Client Checklist → Invoice',
+    description: `Stock handed to a reseller to sell on our behalf runs through a Sales Order ticked "Consignment stock" (consignment: true). STOCK: the SO takes the stock off Inventory QTY when it is made (Rule 3), because it has left the shelf. CHECKLIST: only a ticked SO, matched to the client by email, shows on Account → Consignment Checklist (shown to clients ticked Reseller on Contacts, or anyone holding one). The client picks the SO and ticks the qtys sold; they can never report more than is left on a line. Each send is a Consignment Order (CON001, CON002…, blob data/consignment-orders.json). ADMIN: Orders → Consignment Orders lists them. Send to Invoice raises an INV invoice for the sold lines at the SO's prices with stockAlreadyReserved and consignmentOrder set to the CON number, so it NEVER deducts the stock again — not on creation and not on any later save (the documents PATCH treats it as skipStockAdjust and skips the Rule 1 shelf check). If the SO itself never deducted, because Rule 3 was off, the invoice deducts as normal and behaves like any other invoice. Reject sends the qtys back to the client's checklist; Reopen undoes a reject. An archived or rejected SO drops off the checklist. RETURNS: unsold stock coming back is a qty reduction on the SO, which restores it to Inventory.`,
+    active: true,
+    appliesTo: ['Sales Orders', 'Invoices', 'My Account'],
+    category: 'Orders',
+  },
 ]
 
 export async function GET() {
