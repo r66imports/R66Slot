@@ -31,6 +31,7 @@ export default function ConsignmentChecklistPage() {
       if (res.status === 401) { window.location.href = '/account/login'; return }
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || 'Could not load your consignment stock')
+      if (d.isReseller !== true) { window.location.href = '/account'; return }
       setOrders(d.salesOrders || [])
       setReports(d.reports || [])
       setSelected(s => s || (d.salesOrders || []).find((o: SalesOrder) => o.totalRemaining > 0)?.soId || '')

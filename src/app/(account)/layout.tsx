@@ -22,13 +22,13 @@ export default function AccountLayout({
       .catch(() => {})
   }, [])
 
-  // Rule 69 — Consignment Checklist: resellers, or anyone holding a consignment Sales Order.
+  // Rule 69 — Consignment Checklist: only clients ticked Reseller on Contacts.
   const [showConsignment, setShowConsignment] = useState(false)
   useEffect(() => {
     fetch('/api/account/consignment').then(async (r) => {
       if (!r.ok) return
       const d = await r.json()
-      setShowConsignment(d?.isReseller === true || (Array.isArray(d?.salesOrders) && d.salesOrders.length > 0))
+      setShowConsignment(d?.isReseller === true)
     }).catch(() => {})
   }, [])
 

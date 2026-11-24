@@ -34,10 +34,12 @@ export async function GET(_req: NextRequest) {
   const who = await currentCustomer()
   if (!who) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   try {
-    const [docs, orders, reseller] = await Promise.all([
+    const reseller = await isReseller(who.email)
+    // Rule 69 — only clients ticked Reseller on Contacts see consignment stock.
+    if (!reseller) return NextResponse.json({ isReseller: false, salesOrders: [], reports: [] })
+    const [docs, orders] = await Promise.all([
       blobRead<any[]>(DOCS_KEY, []),
       blobRead<ConsignmentOrder[]>(CONSIGNMENT_KEY, []),
-      isReseller(who.email),
     ])
     const sos = docs.filter(d => isOpenConsignmentSO(d) && belongsTo(d, who))
       .sort((a, b) => String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)))
@@ -46,7 +48,7 @@ export async function GET(_req: NextRequest) {
       .map(o => ({ id: o.id, soNumber: o.soNumber, status: o.status, createdAt: o.createdAt,
         invoiceNumber: o.invoiceNumber, totalQty: o.lines.reduce((s, l) => s + l.qty, 0) }))
     return NextResponse.json({
-      isReseller: reseller,
+      isReseller: true,
       salesOrders: sos.map(so => checklistFor(so, orders)),
       reports: mine,
     })
@@ -61,6 +63,7 @@ export async function POST(req: NextRequest) {
   const who = await currentCustomer()
   if (!who) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
   try {
+    if (!(await isReseller(who.email))) return NextResponse.json({ error: 'Consignment stock is for resellers only' }, { status: 403 })
     const body = await req.json()
     const docs = await blobRead<any[]>(DOCS_KEY, [])
     const so = docs.find(d => d.id === body.soId)

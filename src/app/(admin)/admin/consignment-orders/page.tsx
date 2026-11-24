@@ -47,10 +47,10 @@ const Arrow = () => <span className="text-gray-400 text-xs">→</span>
 
 function Tile({ label, value, sub, tone = 'text-gray-900' }: { label: string; value: string; sub?: string; tone?: string }) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 min-w-[120px]">
-      <div className="text-[10px] uppercase tracking-wide text-gray-400">{label}</div>
+    <div className="rounded-lg border border-gray-200 bg-white px-2.5 py-2 min-w-0">
+      <div className="text-[10px] uppercase tracking-wide text-gray-400 truncate" title={label}>{label}</div>
       <div className={`text-sm font-bold ${tone}`}>{value}</div>
-      {sub && <div className="text-[10px] text-gray-500">{sub}</div>}
+      {sub && <div className="text-[10px] text-gray-500 truncate" title={sub}>{sub}</div>}
     </div>
   )
 }
@@ -198,7 +198,7 @@ export default function ConsignmentOrdersPage() {
                     {so.totalReported > 0 && (
                       <div className="mt-1.5 text-xs font-semibold text-amber-700">{so.totalReported} reported sold, waiting to be invoiced below</div>
                     )}
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div className="overflow-x-auto"><div className="mt-3 grid grid-cols-9 gap-1.5 min-w-[900px]">
                       <Tile label="Order discount" value={`${so.discountPct}%`} sub={`set by ${so.discountSource} · whole order`} />
                       <Tile label="Out — full price" value={fmt(so.outValue)} sub={`${so.totalQty} units`} />
                       <Tile label={`Out — less ${so.discountPct}%`} value={fmt(so.outValueNet)} />
@@ -207,8 +207,8 @@ export default function ConsignmentOrdersPage() {
                       <Tile label="Due" value={fmt(so.due)} tone={so.due > 0.005 ? 'text-red-600' : 'text-green-700'} />
                       <Tile label="Profit — sold" value={fmt(so.sold.profit)} sub={`${pct(so.sold.marginPct)} on costed lines`} tone={profitTone(so.sold.profit)} />
                       <Tile label="Profit — if out sells" value={fmt(so.out.profit)} sub={`${pct(so.out.marginPct)} on costed lines`} tone={profitTone(so.out.profit)} />
-                      <Tile label="Profit — whole order" value={fmt(so.whole.profit)} sub={`${pct(so.whole.marginPct)} · landed ${fmt(so.whole.landed)}`} tone={profitTone(so.whole.profit)} />
-                    </div>
+                      <Tile label="Profit — whole" value={fmt(so.whole.profit)} sub={`${pct(so.whole.marginPct)} · landed ${fmt(so.whole.landed)}`} tone={profitTone(so.whole.profit)} />
+                    </div></div>
                     {so.uncosted.length > 0 && (
                       <div className="mt-2 text-[11px] text-amber-700">
                         Profit covers costed lines only — {fmt(so.whole.uncostedNet)} of {fmt(so.whole.net)} has no reliable landed cost ({so.uncosted.length} SKU{so.uncosted.length === 1 ? '' : 's'}): {so.uncosted.map(u => `${u.sku} (${u.issue === 'missing' ? 'no cost' : `${fmt(u.landed)} suspect`})`).join(', ')}.
