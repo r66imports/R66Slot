@@ -1,10 +1,28 @@
 import { NextResponse } from 'next/server'
 import { blobRead, blobReplaceArrayItem } from '@/lib/blob-storage'
-import { CONSIGNMENT_KEY, DOCS_KEY, type ConsignmentOrder, checklistFor } from '@/lib/consignment'
+import { CONSIGNMENT_KEY, DOCS_KEY, type ConsignmentOrder, checklistFor, isOpenConsignmentSO } from '@/lib/consignment'
 import { POST as createDocument } from '@/app/api/admin/orders/documents/route'
 
-/** GET — every Consignment Order, newest first, with each SO's sold / remaining picture. */
-export async function GET() {
+/**
+ * GET — every Consignment Order, newest first, with each SO's sold / remaining picture.
+ * GET ?view=stock — every open consignment Sales Order (stock out with clients), so the page
+ * shows what each reseller is holding before they have reported anything.
+ */
+export async function GET(request: Request) {
+  if (new URL(request.url).searchParams.get('view') === 'stock') {
+    const [orders, docs] = await Promise.all([
+      blobRead<ConsignmentOrder[]>(CONSIGNMENT_KEY, []),
+      blobRead<any[]>(DOCS_KEY, []),
+    ])
+    const rows = docs.filter(isOpenConsignmentSO)
+      .sort((a, b) => String(b.date || b.createdAt).localeCompare(String(a.date || a.createdAt)))
+      .map(so => {
+        const v = checklistFor(so, orders)
+        const value = v.lines.reduce((s: number, l: any) => s + l.remaining * l.unitPrice, 0)
+        return { ...v, clientEmail: so.clientEmail || '', status: so.status, remainingValue: Math.round(value * 100) / 100 }
+      })
+    return NextResponse.json(rows)
+  }
   const [orders, docs] = await Promise.all([
     blobRead<ConsignmentOrder[]>(CONSIGNMENT_KEY, []),
     blobRead<any[]>(DOCS_KEY, []),

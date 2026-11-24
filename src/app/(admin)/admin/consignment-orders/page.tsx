@@ -5,6 +5,11 @@ import Link from 'next/link'
 
 interface Line { lineId: string; description: string; qty: number; unitPrice: number }
 interface SoView { soNumber: string; totalQty: number; totalSold: number; totalRemaining: number }
+interface StockLine { lineId: string; description: string; qty: number; unitPrice: number; sold: number; remaining: number }
+interface StockSO {
+  soId: string; soNumber: string; date: string; clientName: string; clientEmail: string
+  lines: StockLine[]; totalQty: number; totalSold: number; totalRemaining: number; remainingValue: number
+}
 interface Row {
   id: string; number: string; soId: string; soNumber: string
   clientName: string; clientEmail: string; lines: Line[]; note?: string
@@ -27,6 +32,8 @@ export default function ConsignmentOrdersPage() {
   const [filter, setFilter] = useState<'new' | 'invoiced' | 'rejected' | 'all'>('new')
   const [busy, setBusy] = useState<string | null>(null)
   const [open, setOpen] = useState<string | null>(null)
+  const [stock, setStock] = useState<StockSO[]>([])
+  const [openSO, setOpenSO] = useState<string | null>(null)
 
   const load = async () => {
     setError('')
@@ -34,6 +41,9 @@ export default function ConsignmentOrdersPage() {
       const res = await fetch('/api/admin/consignment-orders')
       if (!res.ok) throw new Error(`Could not load consignment orders (${res.status})`)
       setRows(await res.json())
+      const sres = await fetch('/api/admin/consignment-orders?view=stock')
+      if (!sres.ok) throw new Error(`Could not load consignment stock (${sres.status})`)
+      setStock(await sres.json())
     } catch (e: any) { setError(e.message) } finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
@@ -73,6 +83,69 @@ export default function ConsignmentOrdersPage() {
         <button onClick={() => { setLoading(true); load() }} className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50">↻ Refresh</button>
       </div>
 
+      {/* Out on Consignment — every ticked Sales Order, so stock with resellers is visible before they report. */}
+      <div className="mb-8">
+        <h2 className="text-lg font-bold mb-1">Out on Consignment</h2>
+        <p className="text-xs text-gray-500 mb-3">Sales Orders ticked &quot;Consignment stock&quot; — what each client is holding. Click a row for the lines.</p>
+        {loading ? <p className="text-gray-400">Loading…</p> : stock.length === 0 ? (
+          <div className="bg-white rounded-xl border p-6 text-center text-gray-400 text-sm">No Sales Orders are ticked as consignment.</div>
+        ) : (
+          <div className="bg-white rounded-xl border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                <tr>
+                  <th className="text-left px-4 py-2">Sales Order</th>
+                  <th className="text-left px-4 py-2">Date</th>
+                  <th className="text-left px-4 py-2">Client</th>
+                  <th className="text-right px-4 py-2">Sent</th>
+                  <th className="text-right px-4 py-2">Reported Sold</th>
+                  <th className="text-right px-4 py-2">Still Out</th>
+                  <th className="text-right px-4 py-2">Value Out</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stock.map(so => (
+                  <Fragment key={so.soId}>
+                    <tr className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => setOpenSO(openSO === so.soId ? null : so.soId)}>
+                      <td className="px-4 py-2.5">
+                        <Link href={`/admin/orders?tab=salesorders&open=${encodeURIComponent(so.soNumber)}`} onClick={e => e.stopPropagation()} className="font-mono font-bold text-blue-700 hover:underline">{so.soNumber}</Link>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-600">{fmtDate(so.date)}</td>
+                      <td className="px-4 py-2.5 font-semibold">{so.clientName}<div className="text-xs text-gray-400 font-normal">{so.clientEmail}</div></td>
+                      <td className="px-4 py-2.5 text-right">{so.totalQty}</td>
+                      <td className="px-4 py-2.5 text-right">{so.totalSold}</td>
+                      <td className="px-4 py-2.5 text-right font-bold">{so.totalRemaining}</td>
+                      <td className="px-4 py-2.5 text-right">{fmt(so.remainingValue)}</td>
+                    </tr>
+                    {openSO === so.soId && (
+                      <tr className="bg-gray-50">
+                        <td colSpan={7} className="px-6 py-3">
+                          <table className="w-full text-xs">
+                            <thead className="text-gray-400 uppercase"><tr><th className="text-left py-1">Item</th><th className="text-right py-1">Sent</th><th className="text-right py-1">Sold</th><th className="text-right py-1">Left</th><th className="text-right py-1">Unit</th></tr></thead>
+                            <tbody>
+                              {so.lines.map(l => (
+                                <tr key={l.lineId} className="border-t border-gray-200">
+                                  <td className="py-1.5">{l.description}</td>
+                                  <td className="py-1.5 text-right">{l.qty}</td>
+                                  <td className="py-1.5 text-right">{l.sold}</td>
+                                  <td className="py-1.5 text-right font-semibold">{l.remaining}</td>
+                                  <td className="py-1.5 text-right">{fmt(l.unitPrice)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <h2 className="text-lg font-bold mb-3">Sold Qtys Reported</h2>
       <div className="flex gap-2 mb-4">
         {(['new', 'invoiced', 'rejected', 'all'] as const).map(k => (
           <button key={k} onClick={() => setFilter(k)}
