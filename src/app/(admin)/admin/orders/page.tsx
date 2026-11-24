@@ -3023,31 +3023,46 @@ async function doDownload(data: DocViewData, template: OrderTemplate, selectedBa
   doc.save(`${data.docNumber}.pdf`)
 }
 
-// Send to WhatsApp — the same PDF as Download plus a thank-you note. Where the
-// device can share files (phone, iPad, Chrome/Edge on Windows) the share sheet
-// opens with the PDF attached; pick WhatsApp. Otherwise the PDF downloads and
-// WhatsApp opens on the client's number with the message, ready to attach.
-function waNumber(phone: string): string {
-  let n = (phone || '').replace(/[^0-9]/g, '')
-  if (n.startsWith('00')) n = n.slice(2)
-  if (n.startsWith('0')) n = '27' + n.slice(1)
-  return n
-}
-
+// Send to WhatsApp — the same PDF as Download, sent automatically from the
+// business WhatsApp number to the client's phone on the document, with a
+// thank-you note. Server: /api/admin/orders/whatsapp (WhatsApp Cloud API).
 async function doWhatsApp(data: DocViewData, template: OrderTemplate, selectedBankAccount?: BankAccount) {
+  if (!data.clientPhone || data.clientPhone.replace(/[^0-9]/g, '').length < 9) {
+    alert('This client has no phone number on the document — add one in Edit first.')
+    return
+  }
   const docLabel = (data as any).preOrderDeposit ? 'Pre Order Deposit' : data.docType === 'quote' ? 'Quote' : data.docType === 'salesorder' ? 'Sales Order' : 'Invoice'
-  const firstName = (data.clientName || '').trim().split(/\s+/)[0]
-  const message = `Hi${firstName ? ' ' + firstName : ''}, thank you for your order! Please find your ${docLabel} ${data.docNumber} attached. Let us know if you have any questions.
+  const firstName = (data.clientName || '').trim().split(/\s+/)[0] || 'there'
+  const docRef = `${docLabel} ${data.docNumber}`
+  const message = `Hi ${firstName}, thank you for your order! Please find your ${docRef} attached. Let us know if you have any questions.
 
 Route 66 Slot`
   const blob = await doDownload(data, template, selectedBankAccount, true)
   if (!blob) return
+  const fd = new FormData()
+  fd.append('file', blob, `${data.docNumber}.pdf`)
+  fd.append('fileName', `${data.docNumber}.pdf`)
+  fd.append('to', data.clientPhone)
+  fd.append('message', message)
+  fd.append('firstName', firstName)
+  fd.append('docRef', docRef)
+  try {
+    const res = await fetch('/api/admin/orders/whatsapp', { method: 'POST', body: fd })
+    const result = await res.json().catch(() => ({}))
+    if (result.success) { alert(`✓ ${docRef} sent on WhatsApp to ${data.clientPhone}`); return }
+    if (!result.notConfigured) { alert(`WhatsApp not sent: ${result.error || res.statusText}`); return }
+  } catch (e: any) {
+    alert(`WhatsApp not sent: ${e?.message || 'network error'}`)
+    return
+  }
+  // Business API not set up yet — basic send: share sheet with the PDF, or
+  // download the PDF and open WhatsApp on the client's number with the note.
   const fileName = `${data.docNumber}.pdf`
   const file = new File([blob], fileName, { type: 'application/pdf' })
   const nav = navigator as any
   if (nav.canShare && nav.canShare({ files: [file] })) {
     try {
-      await nav.share({ files: [file], text: message, title: `${docLabel} ${data.docNumber}` })
+      await nav.share({ files: [file], text: message, title: docRef })
       return
     } catch (e: any) {
       if (e?.name === 'AbortError') return
@@ -3058,7 +3073,9 @@ Route 66 Slot`
   a.href = url; a.download = fileName
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10000)
-  const num = waNumber(data.clientPhone)
+  let num = data.clientPhone.replace(/[^0-9]/g, '')
+  if (num.startsWith('00')) num = num.slice(2)
+  if (num.startsWith('0')) num = '27' + num.slice(1)
   window.open(`https://wa.me/${num}?text=${encodeURIComponent(message)}`, '_blank')
 }
 
