@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useLocalCart } from '@/context/local-cart-context'
+import { retailDiscountPct, sellingPrice } from '@/lib/retail-discount'
 
 export default function ProductDetailClient({ id }: { id: string }) {
   const [product, setProduct] = useState<any>(null)
@@ -45,6 +46,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
   // invoicing/POS, not what a customer is allowed to put in their cart.
   const availableQty = Number(product.quantity ?? 0)
   const stockLimit = availableQty
+  const discountPct = retailDiscountPct(product)
 
   const handleAddToCart = () => {
     if (availableQty <= 0) return
@@ -53,7 +55,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
       sku: product.sku || '',
       title: product.title,
       brand: product.brand || '',
-      price: product.price || 0,
+      price: sellingPrice(product),
       imageUrl: product.imageUrl || '',
       pageUrl: `/product/${product.id}`,
       stockQty: availableQty,
@@ -116,10 +118,20 @@ export default function ProductDetailClient({ id }: { id: string }) {
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">{product.title}</h1>
           {product.sku && <p className="text-sm text-gray-500">SKU: <span className="font-mono font-semibold text-gray-700">{product.sku}</span></p>}
 
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-baseline gap-3 flex-wrap">
             <span className="text-3xl font-bold text-gray-900">
-              {product.price > 0 ? `R${product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : 'POA'}
+              {product.price > 0 ? `R${sellingPrice(product).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}` : 'POA'}
             </span>
+            {product.price > 0 && discountPct > 0 && (
+              <>
+                <span className="text-lg text-gray-400 line-through">
+                  R{product.price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}
+                </span>
+                <span className="text-lg font-bold text-amber-500">
+                  -{Number.isInteger(discountPct) ? discountPct : discountPct.toFixed(1)}%
+                </span>
+              </>
+            )}
             {/* No compareAtPrice "was" price here: on R66Slot that field is the
                 internal Average Cost, not a former retail price. Rendering it
                 published our cost wherever cost happened to exceed retail — on

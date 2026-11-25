@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { blobRead, blobWrite } from '@/lib/blob-storage'
 import { getAdminUsers, verifyPassword } from '@/lib/admin-users'
+import { logLoginAttempt } from '@/lib/admin-login-log'
 
 const CUSTOMERS_KEY = 'data/customers.json'
 
@@ -11,8 +12,11 @@ async function getCustomers() {
 }
 
 export async function POST(request: Request) {
+  let username = ''
   try {
-    const { username, password } = await request.json()
+    const body = await request.json()
+    username = body.username
+    const password = body.password
 
     if (!username || !password) {
       return NextResponse.json(
@@ -50,9 +54,11 @@ export async function POST(request: Request) {
       }
 
       if (!isValid) {
+        await logLoginAttempt(request, 'Admin', 'bad_password')
         return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
       }
 
+      await logLoginAttempt(request, 'Admin', 'success')
       return await setSessionAndRespond('Admin')
     }
 
@@ -63,21 +69,26 @@ export async function POST(request: Request) {
     )
 
     if (!staffUser) {
+      await logLoginAttempt(request, username, 'unknown_user')
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
     if (!staffUser.active) {
+      await logLoginAttempt(request, staffUser.username, 'inactive')
       return NextResponse.json({ error: 'Account is inactive' }, { status: 401 })
     }
 
     const isValid = await verifyPassword(password, staffUser.password)
     if (!isValid) {
+      await logLoginAttempt(request, staffUser.username, 'bad_password')
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
+    await logLoginAttempt(request, staffUser.username, 'success')
     return await setSessionAndRespond(staffUser.username)
   } catch (error) {
     console.error('Admin login error:', error)
+    if (username) await logLoginAttempt(request, username, 'error')
     return NextResponse.json({ error: 'Login failed' }, { status: 500 })
   }
 }

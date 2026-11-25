@@ -8,6 +8,7 @@ import { useLocalCart } from '@/context/local-cart-context'
 import type { PageComponent } from '@/lib/pages/schema'
 import { AnimatedWrapper, type AnimationType } from './animated-wrapper'
 import { ImageWithZoom } from '@/components/ui/image-zoom'
+import { retailDiscountPct, sellingPrice, formatRand } from '@/lib/retail-discount'
 
 // ─── Live Product Grid — fetches real products filtered by class ──────────────
 function ProductGridLive({
@@ -71,7 +72,7 @@ function ProductGridLive({
       sku: p.sku || '',
       title: p.title,
       brand: p.brand || '',
-      price: p.price || 0,
+      price: sellingPrice(p),
       imageUrl: p.imageUrl || '',
       pageUrl: p.pageUrl || '',
       stockQty,
@@ -192,9 +193,21 @@ function ProductGridLive({
                     )}
                   </div>
                   {settings.showPrice && (
-                    <p className="font-bold mb-1" style={{ fontSize: priceFontSize, color: priceColor }}>
-                      {p.price > 0 ? `R${p.price.toFixed(2)}` : 'POA'}
-                    </p>
+                    p.price > 0 && retailDiscountPct(p) > 0 ? (
+                      <div className="mb-1">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="line-through text-gray-400" style={{ fontSize: metaFontSize }}>{formatRand(p.price)}</span>
+                          <span className="font-bold" style={{ fontSize: metaFontSize, color: '#f59e0b' }}>
+                            -{Number.isInteger(retailDiscountPct(p)) ? retailDiscountPct(p) : retailDiscountPct(p).toFixed(1)}%
+                          </span>
+                        </div>
+                        <p className="font-bold" style={{ fontSize: priceFontSize, color: priceColor }}>{formatRand(sellingPrice(p))}</p>
+                      </div>
+                    ) : (
+                      <p className="font-bold mb-1" style={{ fontSize: priceFontSize, color: priceColor }}>
+                        {p.price > 0 ? formatRand(p.price) : 'POA'}
+                      </p>
+                    )
                   )}
                   {showStockQty && (!p.isPreOrder || p.quantity <= 0) && (
                     <p className={`text-xs font-medium mb-2 ${p.quantity > 0 ? 'text-green-600' : 'text-gray-400'}`}>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ALL_PERMISSIONS, DEFAULT_PERMISSIONS } from '@/lib/admin-permissions'
 import { useAdminAuth } from '@/lib/admin-auth-context'
+import Link from 'next/link'
 
 interface UserForm {
   username: string
@@ -66,6 +67,7 @@ export default function UserAccountsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState<string | null>(null)
 
   const fetchUsers = async () => {
     try {
@@ -192,6 +194,22 @@ export default function UserAccountsPage() {
     }
   }
 
+  const syncNewPermissions = async (user: AdminUserPublic) => {
+    const allHrefs = ALL_PERMISSIONS.map(p => p.href)
+    const merged = [...new Set([...user.permissions, ...allHrefs])]
+    setSyncing(user.id)
+    try {
+      await fetch(`/api/admin/users/${user.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions: merged }),
+      })
+      await fetchUsers()
+    } finally {
+      setSyncing(null)
+    }
+  }
+
   const handleToggleActive = async (user: AdminUserPublic) => {
     await fetch(`/api/admin/users/${user.id}`, {
       method: 'PATCH',
@@ -213,18 +231,42 @@ export default function UserAccountsPage() {
           <h1 className="text-2xl font-bold text-gray-900">User Accounts</h1>
           <p className="text-sm text-gray-500 mt-1">Manage staff access to the admin dashboard</p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-        >
-          + Add User
-        </button>
+        <div className="flex gap-2">
+          {users.some(u => ALL_PERMISSIONS.some(p => !u.permissions.includes(p.href))) && (
+            <button
+              onClick={async () => {
+                if (!confirm('Grant all staff users access to any new dashboard items?')) return
+                for (const u of users) {
+                  const allHrefs = ALL_PERMISSIONS.map(p => p.href)
+                  const merged = [...new Set([...u.permissions, ...allHrefs])]
+                  if (merged.length !== u.permissions.length) {
+                    await fetch(`/api/admin/users/${u.id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ permissions: merged }),
+                    })
+                  }
+                }
+                await fetchUsers()
+              }}
+              className="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors"
+            >
+              ↻ Refresh All
+            </button>
+          )}
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            + Add User
+          </button>
+        </div>
       </div>
 
       {/* Admin account note */}
       <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
         The main <strong>Admin</strong> account has full access and cannot be edited here. Use{' '}
-        <a href="/admin/account" className="underline font-medium">My Account</a> to manage it.
+        <Link href="/admin/account" className="underline font-medium">My Account</Link> to manage it.
       </div>
 
       {/* Users list */}
@@ -241,6 +283,7 @@ export default function UserAccountsPage() {
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Username</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Access</th>
+                <th className="text-left px-4 py-3 font-semibold text-gray-600">New Items</th>
                 <th className="text-left px-4 py-3 font-semibold text-gray-600">Status</th>
                 <th className="px-4 py-3" />
               </tr>
@@ -257,6 +300,27 @@ export default function UserAccountsPage() {
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
                       {user.permissions.length} page{user.permissions.length !== 1 ? 's' : ''}
                     </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {(() => {
+                      const missing = ALL_PERMISSIONS.filter(p => !user.permissions.includes(p.href))
+                      if (missing.length === 0) return <span className="text-xs text-green-600 font-medium">✓ Up to date</span>
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            {missing.length} new
+                          </span>
+                          <button
+                            onClick={() => syncNewPermissions(user)}
+                            disabled={syncing === user.id}
+                            title={missing.map(p => p.name).join(', ')}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium px-2 py-1 rounded hover:bg-indigo-50 transition-colors disabled:opacity-50"
+                          >
+                            {syncing === user.id ? 'Syncing…' : '↻ Sync'}
+                          </button>
+                        </div>
+                      )
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <button

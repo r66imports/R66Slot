@@ -213,6 +213,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { name: 'Pre-Orders Mapping', href: '/admin/settings/preorders-mapping' },
         { name: 'Prompts', href: '/admin/settings/prompts' },
         { name: 'User Accounts', href: '/admin/settings/users', adminOnly: true },
+        { name: 'Login Log', href: '/admin/settings/users/login-log', adminOnly: true },
         { name: 'Themes', isModal: true },
         { name: 'My Account', href: '/admin/account' },
       ],
