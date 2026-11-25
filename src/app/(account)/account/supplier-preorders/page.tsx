@@ -749,8 +749,8 @@ export default function SupplierPreOrdersPage() {
                     {sortTh('description', 'Description', 'py-2 pr-4')}
                     {sortTh('stock', 'In Stock', 'py-2 pr-4 text-center whitespace-nowrap')}
                     {sortTh('onorder', 'Qty Required', 'py-2 pr-4 text-center whitespace-nowrap')}
-                    {sortTh('retail', 'Retail', 'py-2 pr-4 text-right whitespace-nowrap')}
-                    {sortTh('price', 'Pre Order Price', 'py-2 pr-4 text-right whitespace-nowrap')}
+                    {sortTh('retail', 'Retail', 'py-2 pr-4 text-center whitespace-nowrap')}
+                    {sortTh('price', 'Pre Order Price', 'py-2 pr-4 text-center whitespace-nowrap')}
                     <th className="py-2 font-medium text-center">Qty</th>
                   </tr>
                 </thead>
@@ -799,12 +799,12 @@ export default function SupplierPreOrdersPage() {
                           )}
                         </td>
                         <td
-                          className="py-2 pr-4 text-right text-gray-600 whitespace-nowrap"
+                          className="py-2 pr-4 text-center text-gray-600 whitespace-nowrap"
                           title="What this sells for on the site today"
                         >
                           {item.retailZAR > 0 ? formatZAR(item.retailZAR) : '—'}
                         </td>
-                        <td className="py-2 pr-4 text-right font-semibold whitespace-nowrap">
+                        <td className="py-2 pr-4 text-center font-semibold whitespace-nowrap">
                           {item.quoteBasis === 'retail'
                             ? '—'
                             : item.estRetailZAR > 0
