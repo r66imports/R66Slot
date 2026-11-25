@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin-session'
+import { findLiveStaffUser } from '@/lib/admin-users'
 
 /**
  * Blanket authentication gate for /api/admin/*.
@@ -47,18 +48,56 @@ function isPublic(pathname: string, method: string): boolean {
   })
 }
 
-export function middleware(request: NextRequest) {
+/**
+ * Off-site backup cron. The nightly snapshot job cannot hold an admin-session
+ * cookie, so GET /api/admin/backup also accepts a bearer token from BACKUP_TOKEN.
+ *
+ * Fails closed: an unset or blank BACKUP_TOKEN makes the header worthless, so a
+ * missing env var cannot quietly open the route. Pinned to GET on that one path
+ * — this is a backup key, not a general-purpose admin key.
+ */
+function isBackupRequest(pathname: string, method: string, request: NextRequest): boolean {
+  if (method !== 'GET' || pathname !== '/api/admin/backup') return false
+
+  const expected = process.env.BACKUP_TOKEN
+  if (!expected) return false
+
+  const header = request.headers.get('authorization') ?? ''
+  if (!header.startsWith('Bearer ')) return false
+
+  return tokensMatch(header.slice(7), expected)
+}
+
+/** Constant-time for equal-length input, so a near-miss token leaks nothing by timing. */
+function tokensMatch(given: string, expected: string): boolean {
+  if (given.length !== expected.length) return false
+  let diff = 0
+  for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i)
+  return diff === 0
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   if (request.method === 'OPTIONS') return NextResponse.next()
   if (isPublic(pathname, request.method)) return NextResponse.next()
+  if (isBackupRequest(pathname, request.method, request)) return NextResponse.next()
 
   const session = verifyAdminSession(request.cookies.get('admin-session')?.value)
-  if (session) return NextResponse.next()
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // The cookie alone outlives the account: a staff user deleted or deactivated
+  // mid-session would otherwise keep full API access until it expired (7 days).
+  // Admin is not a staff record and cannot be deleted.
+  if (session.username !== 'Admin' && !(await findLiveStaffUser(session.username, session.issuedAt))) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return NextResponse.next()
 }
 
 export const config = {
   matcher: '/api/admin/:path*',
+  // Node, not Edge: the staff-account check above reads Postgres.
+  runtime: 'nodejs',
 }

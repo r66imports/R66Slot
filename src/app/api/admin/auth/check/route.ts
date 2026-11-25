@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { getAdminUsers } from '@/lib/admin-users'
+import { findLiveStaffUser } from '@/lib/admin-users'
 import { verifyAdminSession } from '@/lib/admin-session'
 import { ALWAYS_ALLOWED } from '@/lib/admin-permissions'
 
@@ -35,12 +35,10 @@ export async function GET() {
     }
 
     // Staff account — look up permissions
-    const staffUsers = await getAdminUsers()
-    const staffUser = staffUsers.find(
-      (u) => u.username.toLowerCase() === username.toLowerCase()
-    )
+    // Same lookup the middleware gate makes, so the UI and the API agree.
+    const staffUser = await findLiveStaffUser(username, verified.issuedAt)
 
-    if (!staffUser || !staffUser.active) {
+    if (!staffUser) {
       // User was deleted or deactivated after session was issued
       return NextResponse.json({ authenticated: false })
     }
