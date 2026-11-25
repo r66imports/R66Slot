@@ -368,7 +368,7 @@ export default function SupplierPreOrdersPage() {
       const live = order.lines.filter((l) => l.status !== 'rejected')
       autoTable(doc, {
         startY: 44,
-        head: [['SKU', 'Description', 'Qty', 'Retail', 'Est. Retail', 'Line Total']],
+        head: [['SKU', 'Description', 'Qty', 'Retail', 'Pre Order Price', 'Line Total']],
         body: order.lines.map((l) => [
           l.sku || '—',
           `${l.description || l.brand}${l.status === 'rejected' ? '  (not available)' : ''}`,
@@ -750,7 +750,7 @@ export default function SupplierPreOrdersPage() {
                     {sortTh('stock', 'In Stock', 'py-2 pr-4 text-center whitespace-nowrap')}
                     {sortTh('onorder', 'Qty Ordered', 'py-2 pr-4 text-center whitespace-nowrap')}
                     {sortTh('retail', 'Retail', 'py-2 pr-4 text-right whitespace-nowrap')}
-                    {sortTh('price', 'Est. Retail', 'py-2 pr-4 text-right whitespace-nowrap')}
+                    {sortTh('price', 'Pre Order Price', 'py-2 pr-4 text-right whitespace-nowrap')}
                     <th className="py-2 font-medium text-center">Qty</th>
                   </tr>
                 </thead>
