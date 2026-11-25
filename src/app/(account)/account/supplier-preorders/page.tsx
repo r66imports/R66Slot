@@ -373,7 +373,7 @@ export default function SupplierPreOrdersPage() {
           l.sku || '—',
           `${l.description || l.brand}${l.status === 'rejected' ? '  (not available)' : ''}`,
           String(l.qty),
-          l.quoteBasis === 'retail' ? formatZAR(l.retailZAR) : '—',
+          l.retailZAR > 0 ? formatZAR(l.retailZAR) : '—',
           l.quoteBasis === 'retail'
             ? '—'
             : l.estRetailZAR > 0
@@ -802,7 +802,7 @@ export default function SupplierPreOrdersPage() {
                           className="py-2 pr-4 text-right text-gray-600 whitespace-nowrap"
                           title="What this sells for on the site today"
                         >
-                          {item.quoteBasis === 'retail' ? formatZAR(item.retailZAR) : '—'}
+                          {item.retailZAR > 0 ? formatZAR(item.retailZAR) : '—'}
                         </td>
                         <td className="py-2 pr-4 text-right font-semibold whitespace-nowrap">
                           {item.quoteBasis === 'retail'

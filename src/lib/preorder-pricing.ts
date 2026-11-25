@@ -110,9 +110,9 @@ export function isLocalSupplierCurrency(code: string): boolean {
  *
  * Stock on hand is sold at the shelf price we already set; only what we do NOT
  * have is quoted as an estimate that floats with the exchange rate (Rule 63).
- * So a row shows Retail or Est. Retail, never both — showing two different
- * numbers for one item is what made the sheet confusing, and clearing one
- * column for one supplier only hid the symptom.
+ * The client sheet always shows the shelf Retail when one exists (user,
+ * 25 Nov 2026); Est. Retail appears only on rows quoted as an estimate, and
+ * the quote itself still follows the basis below.
  *
  * A shelf price of 0 is not a price: an in-stock SKU nobody has priced falls
  * back to the estimate rather than reading as free.
