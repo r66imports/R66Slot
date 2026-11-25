@@ -17,10 +17,14 @@ export function WhatsAppButton() {
     window.open(whatsappUrl, '_blank')
   }
 
+  // On a phone the client pre-order sheet has a full-width View order bar along
+  // the bottom; lift the button clear of it there.
+  const lifted = pathname?.startsWith('/account/supplier-preorders')
+
   return (
     <button
       onClick={handleClick}
-      className="fixed bottom-6 right-6 z-50 bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center group"
+      className={`fixed ${lifted ? 'bottom-24 sm:bottom-6' : 'bottom-6'} right-6 z-50 bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center group [.hide-whatsapp_&]:hidden`}
       aria-label="Contact us on WhatsApp"
     >
       {/* WhatsApp Icon */}

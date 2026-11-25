@@ -108,6 +108,13 @@ export default function SupplierPreOrdersPage() {
   const [submitting, setSubmitting] = useState(false)
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
   const [showOrder, setShowOrder] = useState(false)
+  // The site-wide WhatsApp button sits over the order pop-up's Send button on
+  // a phone, so it steps aside while the pop-up is open.
+  useEffect(() => {
+    if (!showOrder) return
+    document.body.classList.add('hide-whatsapp')
+    return () => document.body.classList.remove('hide-whatsapp')
+  }, [showOrder])
 
   const [history, setHistory] = useState<SubmittedOrder[]>([])
   const [pdfBusy, setPdfBusy] = useState<string | null>(null)
@@ -1099,11 +1106,11 @@ export default function SupplierPreOrdersPage() {
       {/* View Order modal */}
       {showOrder && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
           onClick={() => setShowOrder(false)}
         >
           <div
-            className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-lg shadow-xl max-h-[85vh] flex flex-col"
+            className="bg-white w-full sm:max-w-2xl rounded-lg shadow-xl max-h-[85vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
