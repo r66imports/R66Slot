@@ -221,3 +221,36 @@ export function stockPictureFor(so: any, orders: ConsignmentOrder[], docs: any[]
     uncosted: Array.from(new Map(allLines.filter(l => l.costIssue).map(l => [l.sku, { sku: l.sku, landed: l.landed, issue: l.costIssue }])).values()),
   }
 }
+
+/**
+ * The CLIENT's picture of a consignment SO — everything admin sees (sent / sold / still out,
+ * the order discount, every invoice with its lines, invoiced / paid / due) EXCEPT landed cost
+ * and profit, which are admin only. Built on the server so cost never reaches the browser.
+ */
+export function clientPictureFor(so: any, orders: ConsignmentOrder[], docs: any[]) {
+  const p = stockPictureFor(so, orders, docs)
+  const strip = (l: any) => ({ description: l.description, qty: l.qty, unitPrice: l.unitPrice, netUnit: l.netUnit, net: l.net })
+  return {
+    soId: p.soId,
+    soNumber: p.soNumber,
+    date: p.date,
+    clientName: p.clientName,
+    sourceQuoteNumber: p.sourceQuoteNumber,
+    lines: p.lines.map((l: any) => ({ ...strip(l), lineId: l.lineId, reported: l.reported, remaining: l.remaining })),
+    totalQty: p.totalQty,
+    totalReported: p.totalReported,
+    totalRemaining: p.totalRemaining,
+    sentQty: p.sentQty,
+    soldQty: p.soldQty,
+    discountPct: p.discountPct,
+    outValue: p.outValue,
+    outValueNet: p.outValueNet,
+    invoicedTotal: p.invoicedTotal,
+    paid: p.paid,
+    due: p.due,
+    invoices: p.invoices.map(inv => ({
+      id: inv.id, docNumber: inv.docNumber, date: inv.date, status: inv.status, discountPct: inv.discountPct,
+      qty: inv.qty, total: inv.total, paid: inv.paid, due: inv.due, lines: inv.lines.map(strip),
+    })),
+  }
+}

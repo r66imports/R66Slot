@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken'
 import { blobRead, blobAppendArrayItem } from '@/lib/blob-storage'
 import {
   CONSIGNMENT_KEY, DOCS_KEY, type ConsignmentOrder, type ConsignmentLine,
-  isOpenConsignmentSO, checklistFor,
+  isOpenConsignmentSO, checklistFor, clientPictureFor,
 } from '@/lib/consignment'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production'
@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest) {
         invoiceNumber: o.invoiceNumber, totalQty: o.lines.reduce((s, l) => s + l.qty, 0) }))
     return NextResponse.json({
       isReseller: true,
-      salesOrders: sos.map(so => checklistFor(so, orders)),
+      salesOrders: sos.map(so => clientPictureFor(so, orders, docs)),
       reports: mine,
     })
   } catch (e: any) {

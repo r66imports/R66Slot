@@ -56,6 +56,14 @@ function Tile({ label, value, sub, tone = 'text-gray-900' }: { label: string; va
 }
 const pct = (n: number | null) => n === null ? '—' : `${n.toFixed(1)}%`
 const profitTone = (n: number) => n < 0 ? 'text-red-600' : 'text-green-700'
+/** Profit as a % of what the client pays (net of discount). */
+const linePct = (l: PricedLine) => l.profit === null || l.net <= 0 ? null : Math.round(l.profit / l.net * 1000) / 10
+function blockOf(lines: PricedLine[]) {
+  const costed = lines.filter(l => l.profit !== null)
+  const net = costed.reduce((s, l) => s + l.net, 0)
+  const profit = costed.reduce((s, l) => s + (l.profit || 0), 0)
+  return { profit, pct: net > 0 ? Math.round(profit / net * 1000) / 10 : null }
+}
 
 /** One priced table — Item / Qty / Price / After discount / Line / Landed / Profit. */
 function PricedTable({ lines, discountPct, qtyLabel, extra }: {
@@ -73,6 +81,7 @@ function PricedTable({ lines, discountPct, qtyLabel, extra }: {
           <th className="text-right py-1">Line</th>
           <th className="text-right py-1">Landed</th>
           <th className="text-right py-1">Profit</th>
+          <th className="text-right py-1">Profit %</th>
         </tr>
       </thead>
       <tbody>
@@ -90,6 +99,7 @@ function PricedTable({ lines, discountPct, qtyLabel, extra }: {
                 : fmt(l.landed)}
             </td>
             <td className={`py-1.5 text-right font-semibold ${l.profit === null ? 'text-gray-300' : profitTone(l.profit)}`}>{l.profit === null ? '—' : fmt(l.profit)}</td>
+            <td className={`py-1.5 text-right font-semibold ${l.profit === null ? 'text-gray-300' : profitTone(l.profit)}`}>{pct(linePct(l))}</td>
           </tr>
         ))}
       </tbody>
@@ -198,16 +208,16 @@ export default function ConsignmentOrdersPage() {
                     {so.totalReported > 0 && (
                       <div className="mt-1.5 text-xs font-semibold text-amber-700">{so.totalReported} reported sold, waiting to be invoiced below</div>
                     )}
-                    <div className="overflow-x-auto"><div className="mt-3 grid grid-cols-9 gap-1.5 min-w-[900px]">
+                    <div className="overflow-x-auto"><div className="mt-3 grid grid-cols-9 gap-1.5 min-w-[1100px]">
                       <Tile label="Order discount" value={`${so.discountPct}%`} sub={`set by ${so.discountSource} · whole order`} />
                       <Tile label="Out — full price" value={fmt(so.outValue)} sub={`${so.totalQty} units`} />
                       <Tile label={`Out — less ${so.discountPct}%`} value={fmt(so.outValueNet)} />
                       <Tile label="Invoiced" value={fmt(so.invoicedTotal)} sub={`${so.invoices.length} invoice${so.invoices.length === 1 ? '' : 's'}`} />
                       <Tile label="Paid" value={fmt(so.paid)} tone="text-green-700" />
                       <Tile label="Due" value={fmt(so.due)} tone={so.due > 0.005 ? 'text-red-600' : 'text-green-700'} />
-                      <Tile label="Profit — sold" value={fmt(so.sold.profit)} sub={`${pct(so.sold.marginPct)} on costed lines`} tone={profitTone(so.sold.profit)} />
-                      <Tile label="Profit — if out sells" value={fmt(so.out.profit)} sub={`${pct(so.out.marginPct)} on costed lines`} tone={profitTone(so.out.profit)} />
-                      <Tile label="Profit — whole" value={fmt(so.whole.profit)} sub={`${pct(so.whole.marginPct)} · landed ${fmt(so.whole.landed)}`} tone={profitTone(so.whole.profit)} />
+                      <Tile label="Profit — sold" value={`${fmt(so.sold.profit)} · ${pct(so.sold.marginPct)}`} sub="% of sale, costed lines" tone={profitTone(so.sold.profit)} />
+                      <Tile label="Profit — if out sells" value={`${fmt(so.out.profit)} · ${pct(so.out.marginPct)}`} sub="% of sale, costed lines" tone={profitTone(so.out.profit)} />
+                      <Tile label="Profit — whole" value={`${fmt(so.whole.profit)} · ${pct(so.whole.marginPct)}`} sub={`landed ${fmt(so.whole.landed)}`} tone={profitTone(so.whole.profit)} />
                     </div></div>
                     {so.uncosted.length > 0 && (
                       <div className="mt-2 text-[11px] text-amber-700">
@@ -229,7 +239,7 @@ export default function ConsignmentOrdersPage() {
                           </div>
                           <PricedTable lines={inv.lines} discountPct={inv.discountPct} qtyLabel="Sold" />
                           <div className="mt-1 text-right text-xs text-gray-600">
-                            Total {fmt(inv.total)} · paid <span className="text-green-700 font-semibold">{fmt(inv.paid)}</span> · due <span className={`font-bold ${inv.due > 0.005 ? 'text-red-600' : 'text-green-700'}`}>{fmt(inv.due)}</span>
+                            Profit <span className={`font-bold ${profitTone(blockOf(inv.lines).profit)}`}>{fmt(blockOf(inv.lines).profit)} ({pct(blockOf(inv.lines).pct)})</span> · Total {fmt(inv.total)} · paid <span className="text-green-700 font-semibold">{fmt(inv.paid)}</span> · due <span className={`font-bold ${inv.due > 0.005 ? 'text-red-600' : 'text-green-700'}`}>{fmt(inv.due)}</span>
                           </div>
                         </div>
                       ))}
