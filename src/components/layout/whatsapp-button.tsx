@@ -8,6 +8,11 @@ export function WhatsAppButton() {
   // Hide on editor and admin pages
   if (pathname?.startsWith('/r66-editor') || pathname?.startsWith('/admin')) return null
 
+  // Pages where a client sends something to us (Supplier Pre Orders request,
+  // Consignment sold qtys). The floating button sat on top of their green Send
+  // buttons on a phone, so a tap opened WhatsApp instead of sending.
+  if (pathname?.startsWith('/account/supplier-preorders') || pathname?.startsWith('/account/consignment')) return null
+
   const whatsappNumber = '27615898921'
   const message = 'Hi! I have a question about your slot cars.'
 
@@ -17,14 +22,10 @@ export function WhatsAppButton() {
     window.open(whatsappUrl, '_blank')
   }
 
-  // On a phone the client pre-order sheet has a full-width View order bar along
-  // the bottom; lift the button clear of it there.
-  const lifted = pathname?.startsWith('/account/supplier-preorders')
-
   return (
     <button
       onClick={handleClick}
-      className={`fixed ${lifted ? 'bottom-24 sm:bottom-6' : 'bottom-6'} right-6 z-50 bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center group [.hide-whatsapp_&]:hidden`}
+      className={`fixed bottom-6 right-6 z-50 bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center group [.hide-whatsapp_&]:hidden`}
       aria-label="Contact us on WhatsApp"
     >
       {/* WhatsApp Icon */}
