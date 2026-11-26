@@ -8,10 +8,14 @@ export function WhatsAppButton() {
   // Hide on editor and admin pages
   if (pathname?.startsWith('/r66-editor') || pathname?.startsWith('/admin')) return null
 
-  // Pages where a client sends something to us (Supplier Pre Orders request,
-  // Consignment sold qtys). The floating button sat on top of their green Send
-  // buttons on a phone, so a tap opened WhatsApp instead of sending.
-  if (pathname?.startsWith('/account/supplier-preorders') || pathname?.startsWith('/account/consignment')) return null
+  // Consignment sold qtys: the floating button sat on top of the green Send
+  // button on a phone, so a tap opened WhatsApp instead of sending.
+  if (pathname?.startsWith('/account/consignment')) return null
+
+  // Supplier Pre Orders keeps the button (user, 25 Nov 2026), lifted clear of
+  // the full-width View order bar on a phone; the page hides it while the
+  // order pop-up is open (body.hide-whatsapp).
+  const lifted = pathname?.startsWith('/account/supplier-preorders')
 
   const whatsappNumber = '27615898921'
   const message = 'Hi! I have a question about your slot cars.'
@@ -25,7 +29,7 @@ export function WhatsAppButton() {
   return (
     <button
       onClick={handleClick}
-      className={`fixed bottom-6 right-6 z-50 bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center group [.hide-whatsapp_&]:hidden`}
+      className={`fixed ${lifted ? 'bottom-24 sm:bottom-6' : 'bottom-6'} right-6 z-50 bg-green-500 hover:bg-green-600 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 flex items-center justify-center group [.hide-whatsapp_&]:hidden`}
       aria-label="Contact us on WhatsApp"
     >
       {/* WhatsApp Icon */}
